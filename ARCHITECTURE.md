@@ -107,7 +107,7 @@ Irohaco/
 | 依存のバージョン | `gradle/libs.versions.toml`で管理する |
 | 開発環境 | `.devcontainer/`のDockerイメージで、JDKとAndroid SDKをそろえてビルドする |
 
-`core/domain`は純粋なKotlinのモジュールとし、AndroidX、Room、LiteRT-LM、HTTPクライアントの依存を宣言するとビルドが失敗する（`core/domain/build.gradle.kts`）。
+`core/domain`と`core/contracts`は純粋なKotlinのモジュールとし、AndroidX、Room、LiteRT-LM、HTTPクライアントの依存を宣言するとビルドが失敗する（ルートの`build.gradle.kts`）。値オブジェクトと不変条件は`core/domain`に、Portと表示用のViewは`core/contracts`に置く。
 
 ### 1.2 主なUse Case
 
@@ -120,7 +120,7 @@ Irohaco/
 - `AskGallery` / `ResolveEvidenceMedia`
 - `RegisterModelProfile` / `AssignModelToTask` / `UpdateEgressGrant`
 - `BackupUserData` / `RestoreUserData`
-- データ整合性に関するもの（詳しくは[`docs/implementation/USE_CASES.md`](./docs/implementation/USE_CASES.md)、インターフェースの例は`core/contracts/MediaIntegrityContracts.kt`）: `EditMetadata`, `DiscoverMetadataConflicts`, `ResolveMetadataConflict`, `ExportMetadataToOriginal`, `DiscoverNewSources`, `DecideIdentity`, `RecheckMissingAssets`, `EvaluateMediaAccess`, `ReconcileAfterResume`, `RevokeDerivedAccess`, `ExportEncryptedUserData`, `PreviewEncryptedImport`, `ApplyRestore`, `VerifyRestore`
+- データ整合性に関するもの（詳しくは[`docs/implementation/USE_CASES.md`](./docs/implementation/USE_CASES.md)、インターフェースは`core/contracts/src/main/kotlin/dev/irohaco/core/contracts/MediaIntegrityContracts.kt`）: `EditMetadata`, `DiscoverMetadataConflicts`, `ResolveMetadataConflict`, `ExportMetadataToOriginal`, `DiscoverNewSources`, `DecideIdentity`, `RecheckMissingAssets`, `EvaluateMediaAccess`, `ReconcileAfterResume`, `RevokeDerivedAccess`, `ExportEncryptedUserData`, `PreviewEncryptedImport`, `ApplyRestore`, `VerifyRestore`
 
 ## 2. ドメインモデルと永続ID
 

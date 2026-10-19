@@ -1,19 +1,23 @@
 package dev.irohaco.core.contracts
 
-/** Design-stage pure Kotlin ports; intentionally Android/Room independent. */
-@JvmInline value class AssetId(val value: String)
-@JvmInline value class DiscoveryId(val value: String)
-@JvmInline value class ConflictId(val value: String)
-@JvmInline value class BackupId(val value: String)
-@JvmInline value class RestoreId(val value: String)
+import dev.irohaco.core.domain.AccessDecision
+import dev.irohaco.core.domain.AccessPurpose
+import dev.irohaco.core.domain.AssetId
+import dev.irohaco.core.domain.BackupId
+import dev.irohaco.core.domain.BackupSelection
+import dev.irohaco.core.domain.ConflictId
+import dev.irohaco.core.domain.DiscoveryId
+import dev.irohaco.core.domain.IdentityDecision
+import dev.irohaco.core.domain.IdentityEvidence
+import dev.irohaco.core.domain.LiveMediaAccess
+import dev.irohaco.core.domain.MetadataEdit
+import dev.irohaco.core.domain.MetadataResolution
+import dev.irohaco.core.domain.MetadataTagKey
+import dev.irohaco.core.domain.RestoreId
+import dev.irohaco.core.domain.RestorePreview
+import dev.irohaco.core.domain.TypedMetadataValue
 
-enum class IdentityAction { LINK_EXISTING, NEW_ASSET, IGNORE }
-enum class IdentityDecisionOrigin { USER, HIGH_CONFIDENCE_POLICY, IMPORT }
-enum class MetadataResolution { KEEP_LOCAL, ACCEPT_REMOTE, MANUAL_MERGE }
-enum class AccessPurpose { GALLERY_VIEW, AI_INDEX, SEARCH, RAG, REMOTE_SEND, EXIF_WRITE }
-enum class AccessDecision { ALLOW, DENY, RECHECK_REQUIRED }
-
-data class MetadataTagKey(val assetId: AssetId, val namespace: String, val tagName: String)
+/** Base, local and remote values of one tag for 3-way conflict resolution (USE_CASES UC-META-02). */
 data class MetadataConflictView(
     val conflictId: ConflictId,
     val key: MetadataTagKey,
@@ -24,69 +28,57 @@ data class MetadataConflictView(
     val localValues: List<TypedMetadataValue>,
     val remoteValues: List<TypedMetadataValue>,
 )
-sealed interface TypedMetadataValue {
-    data class Text(val value: String): TypedMetadataValue
-    data class WholeNumber(val value: Long): TypedMetadataValue
-    data class Decimal(val value: Double): TypedMetadataValue
-    data class Raw(val value: ByteArray): TypedMetadataValue
+
+data class IdentityCandidateView(val assetId: AssetId, val confidence: Double, val signals: List<IdentityEvidence>) {
+    init {
+        require(confidence in 0.0..1.0) { "confidence must be between 0 and 1" }
+    }
 }
-data class MetadataEdit(val key: MetadataTagKey, val values: List<TypedMetadataValue>?) // null means REMOVE; empty list invalid
 
-data class IdentityEvidence(val signalCode: String, val digest: String?)
-data class IdentityCandidateView(val assetId: AssetId, val confidence: Double, val signals: List<IdentityEvidence>)
 data class DiscoveryView(val discoveryId: DiscoveryId, val candidateAssets: List<IdentityCandidateView>)
-data class IdentityDecision(
-    val discoveryId: DiscoveryId,
-    val action: IdentityAction,
-    val selectedAssetId: AssetId?,
-    val origin: IdentityDecisionOrigin,
-)
 
-data class BackupSelection(
-    val includeTags: Boolean = true,
-    val includeRatings: Boolean = true,
-    val includeAlbums: Boolean = true,
-    val includeSemanticNotes: Boolean = true,
-    val includeMetadataOverrides: Boolean = true,
-    val includeEmbeddings: Boolean = false,
-)
-data class RestorePreview(
-    val restoreId: RestoreId,
-    val exactMatches: Int,
-    val ambiguousMatches: Int,
-    val unmatchedAssets: Int,
-    val conflicts: Int,
-)
-
-data class LiveMediaAccess(val canRead: Boolean, val canWrite: Boolean, val gpsAllowed: Boolean)
 interface LiveMediaPermissionPort {
     /** Consult Android OS at call time; never use a stored observation as an authorization. */
     suspend fun checkNow(assetId: AssetId, purpose: AccessPurpose): LiveMediaAccess
 }
+
 interface MetadataIntegrityUseCases {
     /** Commit only if expected local revision and base/current original revision still match; otherwise return a conflict. */
     suspend fun editMetadata(edit: MetadataEdit, expectedLocalRevision: Long): ConflictId?
+
     suspend fun discoverConflicts(assetId: AssetId): List<MetadataConflictView>
+
     suspend fun resolveConflict(conflictId: ConflictId, resolution: MetadataResolution, manualValues: List<TypedMetadataValue>? = null)
+
     /** Must re-check real file digest/revision, OS write access, journal + post-write verification. */
     suspend fun exportMetadata(assetId: AssetId)
 }
+
 interface MediaIdentityUseCases {
     /** Discoveries are independent of MediaAsset until adjudicated; hashes alone must not merge copies. */
     suspend fun discoverNewSources(): List<DiscoveryView>
+
     suspend fun decideIdentity(decision: IdentityDecision): AssetId?
+
     suspend fun recheckMissingAssets(): Int
 }
+
 interface PermissionIntegrityUseCases {
     suspend fun evaluate(assetId: AssetId, purpose: AccessPurpose): AccessDecision
+
     suspend fun reconcileAfterResume()
+
     suspend fun revokeDerivedAccess(assetId: AssetId)
 }
+
 interface PortableBackupUseCases {
     /** User-initiated: excludes originals, credentials, grants, permission state by default. */
     suspend fun exportEncrypted(selection: BackupSelection, passphrase: CharArray): BackupId
+
     suspend fun previewEncryptedImport(archiveUri: String, passphrase: CharArray): RestorePreview
+
     /** Only apply after preview + explicit user confirmation. */
     suspend fun applyRestore(restoreId: RestoreId)
+
     suspend fun verifyRestore(restoreId: RestoreId): Boolean
 }
