@@ -1,7 +1,7 @@
 # Irohaco データ整合性 Use Case 詳細仕様
 
 - 対応DDL: `../../database/schema.sql`
-- インターフェースの案: `../../core/contracts/MediaIntegrityContracts.kt`
+- インターフェース: `../../core/contracts/src/main/kotlin/dev/irohaco/core/contracts/MediaIntegrityContracts.kt`（値オブジェクトは`../../core/domain/`）
 - 原則: 書き込みはUseCaseを通して行う。基本テーブルは3NF以上にする。Androidの権限は毎回その時点の状態を問い合わせる。派生のキャッシュと原本を混同しない。
 
 ## UC-META-01: EditMetadata
