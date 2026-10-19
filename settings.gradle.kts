@@ -23,4 +23,5 @@ rootProject.name = "Irohaco"
 include(":app")
 include(":core:domain")
 include(":core:contracts")
+include(":core:database")
 include(":core:designsystem")

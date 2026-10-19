@@ -5,14 +5,14 @@ PRAGMA foreign_keys = ON;
 
 -- table: storage_volumes
 CREATE TABLE storage_volumes (
-  volume_id TEXT PRIMARY KEY,
+  volume_id TEXT NOT NULL PRIMARY KEY,
   provider_volume_name TEXT NOT NULL UNIQUE,
   state TEXT NOT NULL CHECK(state IN ('ONLINE','OFFLINE','INACCESSIBLE'))
 );
 
 -- table: media_assets
 CREATE TABLE media_assets (
-  asset_id TEXT PRIMARY KEY,
+  asset_id TEXT NOT NULL PRIMARY KEY,
   media_kind TEXT NOT NULL CHECK(media_kind IN ('IMAGE','VIDEO')),
   first_seen_at INTEGER NOT NULL,
   tombstoned_at INTEGER
@@ -20,7 +20,7 @@ CREATE TABLE media_assets (
 
 -- table: media_sources
 CREATE TABLE media_sources (
-  source_id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL PRIMARY KEY,
   asset_id TEXT NOT NULL REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   volume_id TEXT NOT NULL REFERENCES storage_volumes(volume_id) ON DELETE RESTRICT,
   media_store_id INTEGER,
@@ -42,27 +42,28 @@ CREATE INDEX ix_media_sources_access ON media_sources(access_state);
 
 -- table: media_revisions
 CREATE TABLE media_revisions (
-  revision_id TEXT PRIMARY KEY,
+  revision_id TEXT NOT NULL PRIMARY KEY,
   asset_id TEXT NOT NULL REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   file_digest TEXT NOT NULL,
   visual_digest TEXT,
   observed_at INTEGER NOT NULL,
   width_px INTEGER CHECK(width_px IS NULL OR width_px > 0),
   height_px INTEGER CHECK(height_px IS NULL OR height_px > 0),
-  duration_ms INTEGER CHECK(duration_ms IS NULL OR duration_ms >= 0),
-  UNIQUE(asset_id,revision_id)
+  duration_ms INTEGER CHECK(duration_ms IS NULL OR duration_ms >= 0)
 );
+-- Parent key of the (asset_id, revision_id) foreign keys; a named index so Room can see it.
+CREATE UNIQUE INDEX ux_media_revisions_asset_revision ON media_revisions(asset_id,revision_id);
 
 -- table: asset_current_revisions
 CREATE TABLE asset_current_revisions (
-  asset_id TEXT PRIMARY KEY REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
+  asset_id TEXT NOT NULL PRIMARY KEY REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   revision_id TEXT NOT NULL,
   FOREIGN KEY(asset_id,revision_id) REFERENCES media_revisions(asset_id,revision_id) ON DELETE RESTRICT
 );
 
 -- table: tags
 CREATE TABLE tags (
-  tag_id TEXT PRIMARY KEY,
+  tag_id TEXT NOT NULL PRIMARY KEY,
   name TEXT NOT NULL,
   parent_tag_id TEXT REFERENCES tags(tag_id) ON DELETE RESTRICT,
   UNIQUE(parent_tag_id,name),
@@ -84,14 +85,14 @@ CREATE INDEX ix_media_tags_tag ON media_tags(tag_id);
 
 -- table: media_ratings
 CREATE TABLE media_ratings (
-  asset_id TEXT PRIMARY KEY REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
+  asset_id TEXT NOT NULL PRIMARY KEY REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   rating INTEGER CHECK(rating BETWEEN 0 AND 5),
   is_favorite INTEGER NOT NULL DEFAULT 0 CHECK(is_favorite IN (0,1))
 );
 
 -- table: albums
 CREATE TABLE albums (
-  album_id TEXT PRIMARY KEY,
+  album_id TEXT NOT NULL PRIMARY KEY,
   title TEXT NOT NULL,
   album_kind TEXT NOT NULL CHECK(album_kind IN ('MANUAL','SMART')),
   parent_album_id TEXT REFERENCES albums(album_id) ON DELETE RESTRICT,
@@ -123,7 +124,7 @@ CREATE TABLE metadata_observations (
 
 -- table: frame_extraction_profiles
 CREATE TABLE frame_extraction_profiles (
-  extraction_profile_id TEXT PRIMARY KEY,
+  extraction_profile_id TEXT NOT NULL PRIMARY KEY,
   strategy TEXT NOT NULL CHECK(strategy IN ('FIXED_INTERVAL','SCENE_AWARE')),
   interval_ms INTEGER NOT NULL CHECK(interval_ms > 0),
   max_frames INTEGER NOT NULL CHECK(max_frames > 0),
@@ -132,7 +133,7 @@ CREATE TABLE frame_extraction_profiles (
 
 -- table: video_segments
 CREATE TABLE video_segments (
-  segment_id TEXT PRIMARY KEY,
+  segment_id TEXT NOT NULL PRIMARY KEY,
   revision_id TEXT NOT NULL REFERENCES media_revisions(revision_id) ON DELETE RESTRICT,
   extraction_profile_id TEXT NOT NULL REFERENCES frame_extraction_profiles(extraction_profile_id) ON DELETE RESTRICT,
   start_ms INTEGER NOT NULL CHECK(start_ms >= 0),
@@ -146,7 +147,7 @@ CREATE INDEX ix_video_segments_revision ON video_segments(revision_id,start_ms);
 
 -- table: sampled_frames
 CREATE TABLE sampled_frames (
-  frame_id TEXT PRIMARY KEY,
+  frame_id TEXT NOT NULL PRIMARY KEY,
   segment_id TEXT NOT NULL REFERENCES video_segments(segment_id) ON DELETE RESTRICT,
   timestamp_ms INTEGER NOT NULL CHECK(timestamp_ms >= 0),
   frame_digest TEXT NOT NULL,
@@ -158,7 +159,7 @@ CREATE INDEX ix_sampled_frames_segment ON sampled_frames(segment_id,timestamp_ms
 
 -- table: annotation_subjects
 CREATE TABLE annotation_subjects (
-  subject_id TEXT PRIMARY KEY,
+  subject_id TEXT NOT NULL PRIMARY KEY,
   asset_id TEXT REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   segment_id TEXT REFERENCES video_segments(segment_id) ON DELETE RESTRICT,
   CHECK((asset_id IS NOT NULL)+(segment_id IS NOT NULL)=1)
@@ -172,7 +173,7 @@ CREATE UNIQUE INDEX ux_annotation_subject_segment ON annotation_subjects(segment
 
 -- table: semantic_annotations
 CREATE TABLE semantic_annotations (
-  annotation_id TEXT PRIMARY KEY,
+  annotation_id TEXT NOT NULL PRIMARY KEY,
   subject_id TEXT NOT NULL REFERENCES annotation_subjects(subject_id) ON DELETE RESTRICT,
   annotation_kind TEXT NOT NULL CHECK(annotation_kind IN ('CONTEXT','VISUAL_DESCRIPTION','KEYWORDS','AI_CAPTION')),
   searchable INTEGER NOT NULL DEFAULT 1 CHECK(searchable IN (0,1)),
@@ -202,7 +203,7 @@ BEGIN SELECT RAISE(ABORT, 'annotation revisions are append-only'); END;
 
 -- table: ocr_observations
 CREATE TABLE ocr_observations (
-  ocr_id TEXT PRIMARY KEY,
+  ocr_id TEXT NOT NULL PRIMARY KEY,
   asset_id TEXT REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   frame_id TEXT REFERENCES sampled_frames(frame_id) ON DELETE RESTRICT,
   text TEXT NOT NULL,
@@ -218,7 +219,7 @@ CREATE INDEX ix_ocr_frame ON ocr_observations(frame_id);
 
 -- table: location_evidence
 CREATE TABLE location_evidence (
-  evidence_id TEXT PRIMARY KEY,
+  evidence_id TEXT NOT NULL PRIMARY KEY,
   asset_id TEXT NOT NULL REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   evidence_source TEXT NOT NULL CHECK(evidence_source IN ('EXIF','USER','OCR','NEARBY_MEDIA','AI_INFERENCE')),
   evidence_status TEXT NOT NULL CHECK(evidence_status IN ('CONFIRMED','CANDIDATE','REJECTED','UNKNOWN')),
@@ -242,7 +243,7 @@ CREATE TABLE location_evidence_support (
 
 -- table: provider_connections
 CREATE TABLE provider_connections (
-  connection_id TEXT PRIMARY KEY,
+  connection_id TEXT NOT NULL PRIMARY KEY,
   protocol TEXT NOT NULL CHECK(protocol IN ('LOCAL_LITERT','OPENAI_CHAT','OPENAI_RESPONSES','ANTHROPIC_MESSAGES','OPENAI_EMBEDDINGS','GEMINI_EMBED_CONTENT')),
   base_url TEXT,
   credential_ref TEXT
@@ -250,7 +251,7 @@ CREATE TABLE provider_connections (
 
 -- table: model_profiles
 CREATE TABLE model_profiles (
-  model_profile_id TEXT PRIMARY KEY,
+  model_profile_id TEXT NOT NULL PRIMARY KEY,
   connection_id TEXT NOT NULL REFERENCES provider_connections(connection_id) ON DELETE RESTRICT,
   provider_model_id TEXT NOT NULL,
   artifact_revision TEXT,
@@ -266,7 +267,7 @@ CREATE TABLE model_capabilities (
 
 -- table: embedding_spaces
 CREATE TABLE embedding_spaces (
-  space_id TEXT PRIMARY KEY,
+  space_id TEXT NOT NULL PRIMARY KEY,
   model_profile_id TEXT NOT NULL REFERENCES model_profiles(model_profile_id) ON DELETE RESTRICT,
   dimension INTEGER NOT NULL CHECK(dimension > 0),
   value_format TEXT NOT NULL DEFAULT 'FLOAT32_LE' CHECK(value_format IN ('FLOAT32_LE')),
@@ -280,7 +281,7 @@ CREATE TABLE embedding_spaces (
 
 -- table: embedding_targets
 CREATE TABLE embedding_targets (
-  target_id TEXT PRIMARY KEY,
+  target_id TEXT NOT NULL PRIMARY KEY,
   asset_id TEXT REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   frame_id TEXT REFERENCES sampled_frames(frame_id) ON DELETE RESTRICT,
   annotation_id TEXT REFERENCES semantic_annotations(annotation_id) ON DELETE RESTRICT,
@@ -302,7 +303,7 @@ CREATE UNIQUE INDEX ux_embed_target_ocr ON embedding_targets(ocr_id) WHERE ocr_i
 
 -- table: embedding_vectors
 CREATE TABLE embedding_vectors (
-  vector_id TEXT PRIMARY KEY,
+  vector_id TEXT NOT NULL PRIMARY KEY,
   space_id TEXT NOT NULL REFERENCES embedding_spaces(space_id) ON DELETE RESTRICT,
   target_id TEXT NOT NULL REFERENCES embedding_targets(target_id) ON DELETE RESTRICT,
   source_revision_digest TEXT NOT NULL,
@@ -323,7 +324,7 @@ END;
 
 -- table: search_profiles
 CREATE TABLE search_profiles (
-  search_profile_id TEXT PRIMARY KEY,
+  search_profile_id TEXT NOT NULL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   fusion_strategy TEXT NOT NULL CHECK(fusion_strategy IN ('RRF','SINGLE_SPACE','METADATA_ONLY'))
 );
@@ -339,14 +340,14 @@ CREATE TABLE search_profile_spaces (
 
 -- table: saved_searches
 CREATE TABLE saved_searches (
-  saved_search_id TEXT PRIMARY KEY,
+  saved_search_id TEXT NOT NULL PRIMARY KEY,
   name TEXT NOT NULL,
   search_profile_id TEXT NOT NULL REFERENCES search_profiles(search_profile_id) ON DELETE RESTRICT
 );
 
 -- table: search_rule_nodes
 CREATE TABLE search_rule_nodes (
-  rule_node_id TEXT PRIMARY KEY,
+  rule_node_id TEXT NOT NULL PRIMARY KEY,
   parent_node_id TEXT REFERENCES search_rule_nodes(rule_node_id) ON DELETE RESTRICT,
   sibling_order INTEGER NOT NULL CHECK(sibling_order >= 0),
   node_kind TEXT NOT NULL CHECK(node_kind IN ('AND','OR','NOT','PREDICATE')),
@@ -363,7 +364,7 @@ CREATE UNIQUE INDEX ux_rule_sibling ON search_rule_nodes(parent_node_id,sibling_
 
 -- table: saved_search_roots
 CREATE TABLE saved_search_roots (
-  saved_search_id TEXT PRIMARY KEY REFERENCES saved_searches(saved_search_id) ON DELETE RESTRICT,
+  saved_search_id TEXT NOT NULL PRIMARY KEY REFERENCES saved_searches(saved_search_id) ON DELETE RESTRICT,
   root_node_id TEXT NOT NULL UNIQUE REFERENCES search_rule_nodes(rule_node_id) ON DELETE RESTRICT
 );
 
@@ -376,7 +377,7 @@ CREATE TABLE search_rule_set_values (
 
 -- table: indexing_jobs
 CREATE TABLE indexing_jobs (
-  job_id TEXT PRIMARY KEY,
+  job_id TEXT NOT NULL PRIMARY KEY,
   space_id TEXT NOT NULL REFERENCES embedding_spaces(space_id) ON DELETE RESTRICT,
   job_kind TEXT NOT NULL CHECK(job_kind IN ('INITIAL','INCREMENTAL','REBUILD')),
   state TEXT NOT NULL CHECK(state IN ('PLANNED','RUNNING','PAUSING','PAUSED','VERIFYING','SUCCEEDED','PARTIAL','FAILED','CANCELLED')),
@@ -409,14 +410,14 @@ CREATE TABLE egress_grants (
 
 -- table: task_model_assignments
 CREATE TABLE task_model_assignments (
-  task_code TEXT PRIMARY KEY CHECK(task_code IN ('SEARCH_QUERY','IMAGE_INDEX','VIDEO_INDEX','CAPTION','RAG','OCR_ASSIST')),
+  task_code TEXT NOT NULL PRIMARY KEY CHECK(task_code IN ('SEARCH_QUERY','IMAGE_INDEX','VIDEO_INDEX','CAPTION','RAG','OCR_ASSIST')),
   model_profile_id TEXT NOT NULL REFERENCES model_profiles(model_profile_id) ON DELETE RESTRICT
 );
 
 -- table: metadata_write_operations
 -- Journal for writing DB-side metadata edits back to the original file.
 CREATE TABLE metadata_write_operations (
-  operation_id TEXT PRIMARY KEY,
+  operation_id TEXT NOT NULL PRIMARY KEY,
   asset_id TEXT NOT NULL REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   before_revision_id TEXT,
   after_revision_id TEXT,
@@ -430,7 +431,7 @@ CREATE TABLE metadata_write_operations (
 
 -- table: catalog_sync_state
 CREATE TABLE catalog_sync_state (
-  volume_id TEXT PRIMARY KEY REFERENCES storage_volumes(volume_id) ON DELETE RESTRICT,
+  volume_id TEXT NOT NULL PRIMARY KEY REFERENCES storage_volumes(volume_id) ON DELETE RESTRICT,
   media_store_version TEXT,
   last_generation INTEGER CHECK(last_generation IS NULL OR last_generation >= 0),
   last_successful_sync_at INTEGER
@@ -533,7 +534,7 @@ END;
 -- table: smart_album_rules
 -- A SMART album is defined by exactly one saved search; members are computed, never stored.
 CREATE TABLE smart_album_rules (
-  album_id TEXT PRIMARY KEY REFERENCES albums(album_id) ON DELETE RESTRICT,
+  album_id TEXT NOT NULL PRIMARY KEY REFERENCES albums(album_id) ON DELETE RESTRICT,
   saved_search_id TEXT NOT NULL REFERENCES saved_searches(saved_search_id) ON DELETE RESTRICT
 );
 
@@ -553,7 +554,7 @@ END;
 
 -- table: metadata_override_sets
 CREATE TABLE metadata_override_sets (
-  override_id TEXT PRIMARY KEY,
+  override_id TEXT NOT NULL PRIMARY KEY,
   asset_id TEXT NOT NULL REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   namespace TEXT NOT NULL,
   tag_name TEXT NOT NULL,
@@ -594,7 +595,7 @@ END;
 
 -- table: metadata_sync_baselines
 CREATE TABLE metadata_sync_baselines (
-  override_id TEXT PRIMARY KEY REFERENCES metadata_override_sets(override_id) ON DELETE RESTRICT,
+  override_id TEXT NOT NULL PRIMARY KEY REFERENCES metadata_override_sets(override_id) ON DELETE RESTRICT,
   base_revision_id TEXT NOT NULL REFERENCES media_revisions(revision_id) ON DELETE RESTRICT,
   base_local_revision_no INTEGER NOT NULL CHECK(base_local_revision_no > 0),
   checked_at INTEGER NOT NULL
@@ -602,7 +603,7 @@ CREATE TABLE metadata_sync_baselines (
 
 -- table: metadata_conflicts
 CREATE TABLE metadata_conflicts (
-  conflict_id TEXT PRIMARY KEY,
+  conflict_id TEXT NOT NULL PRIMARY KEY,
   override_id TEXT NOT NULL REFERENCES metadata_override_sets(override_id) ON DELETE RESTRICT,
   base_revision_id TEXT NOT NULL REFERENCES media_revisions(revision_id) ON DELETE RESTRICT,
   remote_revision_id TEXT NOT NULL REFERENCES media_revisions(revision_id) ON DELETE RESTRICT,
@@ -638,7 +639,7 @@ END;
 
 -- table: media_discoveries
 CREATE TABLE media_discoveries (
-  discovery_id TEXT PRIMARY KEY,
+  discovery_id TEXT NOT NULL PRIMARY KEY,
   volume_id TEXT NOT NULL REFERENCES storage_volumes(volume_id) ON DELETE RESTRICT,
   provider_media_store_id INTEGER,
   observed_uri TEXT NOT NULL,
@@ -671,7 +672,7 @@ CREATE TABLE identity_candidate_signals (
 
 -- table: identity_resolutions
 CREATE TABLE identity_resolutions (
-  discovery_id TEXT PRIMARY KEY REFERENCES media_discoveries(discovery_id) ON DELETE RESTRICT,
+  discovery_id TEXT NOT NULL PRIMARY KEY REFERENCES media_discoveries(discovery_id) ON DELETE RESTRICT,
   resolution_kind TEXT NOT NULL CHECK(resolution_kind IN ('LINK_EXISTING','NEW_ASSET','IGNORE')),
   selected_asset_id TEXT REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   decided_by TEXT NOT NULL CHECK(decided_by IN ('USER','HIGH_CONFIDENCE_POLICY','IMPORT')),
@@ -703,7 +704,7 @@ END;
 
 -- table: media_access_events
 CREATE TABLE media_access_events (
-  access_event_id TEXT PRIMARY KEY,
+  access_event_id TEXT NOT NULL PRIMARY KEY,
   asset_id TEXT REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   source_id TEXT REFERENCES media_sources(source_id) ON DELETE RESTRICT,
   access_event_code TEXT NOT NULL CHECK(access_event_code IN ('GRANTED','REVOKED','PARTIAL','SOURCE_OFFLINE','SOURCE_RECONNECTED','OPEN_DENIED')),
@@ -716,7 +717,7 @@ CREATE INDEX ix_access_events_asset ON media_access_events(asset_id,observed_at)
 
 -- table: asset_privacy_rules
 CREATE TABLE asset_privacy_rules (
-  asset_id TEXT PRIMARY KEY REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
+  asset_id TEXT NOT NULL PRIMARY KEY REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
   allow_ai_indexing INTEGER NOT NULL DEFAULT 1 CHECK(allow_ai_indexing IN (0,1)),
   allow_remote_send INTEGER NOT NULL DEFAULT 0 CHECK(allow_remote_send IN (0,1)),
   updated_at INTEGER NOT NULL
@@ -724,7 +725,7 @@ CREATE TABLE asset_privacy_rules (
 
 -- table: backup_archives
 CREATE TABLE backup_archives (
-  backup_id TEXT PRIMARY KEY,
+  backup_id TEXT NOT NULL PRIMARY KEY,
   format_version INTEGER NOT NULL CHECK(format_version > 0),
   created_at INTEGER NOT NULL,
   archive_ref TEXT NOT NULL,
@@ -744,7 +745,7 @@ CREATE TABLE backup_archive_entries (
 
 -- table: restore_sessions
 CREATE TABLE restore_sessions (
-  restore_id TEXT PRIMARY KEY,
+  restore_id TEXT NOT NULL PRIMARY KEY,
   backup_id TEXT NOT NULL REFERENCES backup_archives(backup_id) ON DELETE RESTRICT,
   restore_state TEXT NOT NULL CHECK(restore_state IN ('STAGING','VALIDATING','PREVIEW','APPLYING','VERIFYING','COMMITTED','FAILED','ROLLED_BACK')),
   started_at INTEGER NOT NULL,

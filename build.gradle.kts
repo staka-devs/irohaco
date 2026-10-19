@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.roborazzi) apply false
+    alias(libs.plugins.androidx.room) apply false
+    alias(libs.plugins.ksp) apply false
 }
 
 // These modules stay pure Kotlin (CONTRIBUTING §3.1): declaring or pulling in any of these groups fails the build.
