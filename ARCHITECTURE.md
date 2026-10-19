@@ -1,24 +1,24 @@
-# Irohaco — Software Architecture & Technical Specification
+# Irohaco Software Architecture & Technical Specification
 
 - 文書ID: IRO-ARCH-001
 - バージョン: 1.0.0
 - 作成日: 2026-10-18
 - 確定日: 2026-10-19
-- 状態: **確定**（初版ベースライン）
-- 対象プラットフォーム: Android（基準端末 1台のハイエンド機種）
+- 状態: 確定
+- 対象プラットフォーム: Android（ハイエンド機種1台を基準端末とする）
 - 要求仕様: [`PRD.md`](./PRD.md)
 - アーキテクチャ: Android Native + Kotlin/Compose + Clean Architecture + Ports & Adapters
-- 実装状況: 設計のみ。掲載コード・DBスキーマはv1.0.0の実装契約であり、実機検証は未実施。
+- 実装状況: 設計のみ。この文書のコードとDBスキーマはv1.0.0の実装方針を示すもので、実機での検証はまだ行っていない。
 
-## 0. 設計の非交渉条件
+## 0. 設計上の前提
 
-- 画像・動画は`MediaAsset`で統一し、動画は**検索可能なタイムスタンプ付きセグメント/フレーム**を必ず持つ。
-- メタデータのアプリ上の正本はDB。原本EXIF変更は明示的操作と適切な権限・検証を要する。
-- Embeddingモデル別に複数索引を保持する。モデル切替時に別モデルのベクトルを混ぜない。
-- 通常MediaStore同期と初回AI索引を分け、AI索引の初回起動はユーザーのみがトリガーする。
-- 外部AI/APIは既定無効、用途別に許可する。API障害時の無断クラウド移行を禁止する。
-- ギャラリーはAIモデル未導入・破損・ロード失敗・ネットワーク遮断でも使用できる。
-- AI推測、ユーザー記録、EXIF、OCRは根拠の種類と確度を分離し、原本の保存情報を無断で書き換えない。
+- 画像と動画は`MediaAsset`で統一して扱う。動画には検索できるタイムスタンプ付きのセグメントとフレームを必ず持たせる。
+- アプリ上のメタデータはDBの値を正とする。原本のEXIFを変えるには、明示的な操作と、適切な権限と、検証が必要である。
+- Embeddingモデルごとに別々の索引を持つ。モデルを切り替えるときに、別のモデルのベクトルを混ぜない。
+- 通常のMediaStoreの同期と最初のAI索引は分け、最初のAI索引はユーザーの操作でだけ始める。
+- 外部のAIとAPIは既定で無効にし、用途ごとに許可する。APIの障害時に、無断でクラウドへ切り替えない。
+- ギャラリーは、AIモデルが未導入、破損、ロードの失敗、ネットワークの遮断のどの場合でも使える。
+- AIの推測、ユーザーの記録、EXIF、OCRは、根拠の種類と確度を分けて持ち、原本に保存されている情報を無断で書き換えない。
 
 ## 1. 論理コンポーネント
 
@@ -46,7 +46,7 @@ flowchart TB
   POLICY -. guards .-> INDEX
 ```
 
-**依存方向**: Presentation → Application → Domain Contracts ← Infrastructure implementations。DomainはAndroid Framework、Room、LiteRT-LM、HTTPクライアント、Rustを知らない。ApplicationはドメインUseCaseを実行し、推論・画像アクセス・永続化の具体的実装はPortで注入する。
+依存の向きは Presentation → Application → Domain Contracts ← Infrastructure implementations とする。DomainはAndroid Framework、Room、LiteRT-LM、HTTPクライアント、Rustを参照しない。ApplicationはドメインのUseCaseを実行し、推論、画像へのアクセス、永続化の具体的な実装はPortを通して注入する。
 
 ### 1.1 推奨リポジトリ構成
 
@@ -88,28 +88,31 @@ Irohaco/
 ├── benchmark/                  # Macrobenchmark + golden retrieval
 ├── PRD.md
 ├── ARCHITECTURE.md
+├── DESIGN.md                   # UIデザインシステム（M3 Expressive）
+├── CONTRIBUTING.md             # Issue駆動・Git Flow・設計原則
+├── .github/                    # Issue/PRテンプレート、CI
 ├── adr/                        # ADR-0001-....md
 ├── database/                   # 参照DDL(schema.sql)・DB設計・状態遷移
-├── docs/                       # Use Case詳細・Android方針・検証計画
+├── docs/                       # Use Case詳細・Android方針・検証計画・ロードマップ
 └── tests/                      # 参照DDLの制約テスト
 ```
 
-### 1.2 主要Use Case
+### 1.2 主なUse Case
 
 - `ObserveGallery` / `ListMedia` / `OpenMedia` / `PlayVideoAt`
 - `SyncMediaCatalog` / `ReconcileMediaIdentity`
-- `CreateOrUpdateAnnotation` / `EditMetadata` / `ExportMetadata`
+- `CreateOrUpdateAnnotation` / `ExportMetadata`
 - `StartAiIndexing` / `PauseAiIndexing` / `ResumeAiIndexing` / `RebuildIndex`
 - `ExtractVideoSegments` / `EmbedVideoFrames` / `IndexFrameOcr`
 - `SearchMedia` / `SearchSimilar` / `CompareEmbeddingSpaces`
 - `AskGallery` / `ResolveEvidenceMedia`
 - `RegisterModelProfile` / `AssignModelToTask` / `UpdateEgressGrant`
 - `BackupUserData` / `RestoreUserData`
-- データ整合性（詳細は[`docs/implementation/USE_CASES.md`](./docs/implementation/USE_CASES.md)、契約例は`core/contracts/MediaIntegrityContracts.kt`）: `EditMetadata`, `DiscoverMetadataConflicts`, `ResolveMetadataConflict`, `ExportMetadataToOriginal`, `DiscoverNewSources`, `DecideIdentity`, `RecheckMissingAssets`, `EvaluateMediaAccess`, `ReconcileAfterResume`, `RevokeDerivedAccess`, `ExportEncryptedUserData`, `PreviewEncryptedImport`, `ApplyRestore`, `VerifyRestore`
+- データ整合性に関するもの（詳しくは[`docs/implementation/USE_CASES.md`](./docs/implementation/USE_CASES.md)、インターフェースの例は`core/contracts/MediaIntegrityContracts.kt`）: `EditMetadata`, `DiscoverMetadataConflicts`, `ResolveMetadataConflict`, `ExportMetadataToOriginal`, `DiscoverNewSources`, `DecideIdentity`, `RecheckMissingAssets`, `EvaluateMediaAccess`, `ReconcileAfterResume`, `RevokeDerivedAccess`, `ExportEncryptedUserData`, `PreviewEncryptedImport`, `ApplyRestore`, `VerifyRestore`
 
 ## 2. ドメインモデルと永続ID
 
-この章の`data class`は**アプリ向けのドメインDTO/集約**であり、DBの列構成とは一致しない。永続化は3NFの正本スキーマ（[`database/DATABASE_DESIGN.md`](./database/DATABASE_DESIGN.md)）へ分解して行う。例: `MediaAsset`は`media_assets`・`media_sources`・`media_revisions`のJOIN結果、`SemanticAnnotation`は`annotation_subjects`・`semantic_annotations`・最新の`semantic_annotation_revisions`のJOIN結果。
+この章の`data class`はアプリ向けのドメインDTOと集約で、DBの列構成とは一致しない。永続化するときは、3NFのスキーマ（[`database/DATABASE_DESIGN.md`](./database/DATABASE_DESIGN.md)）に分解して保存する。たとえば`MediaAsset`は`media_assets`、`media_sources`、`media_revisions`をJOINした結果で、`SemanticAnnotation`は`annotation_subjects`、`semantic_annotations`、最新の`semantic_annotation_revisions`をJOINした結果である。
 
 ### 2.1 MediaAsset
 
@@ -129,14 +132,14 @@ data class MediaAsset(
     val durationMs: Long?,                // video only
     val contentRevision: String,          // bytes/fingerprint/source generation
     val catalogRevision: Long,
-    val availability: AssetAvailability
+    val availability: AssetAvailability   // DBでは media_sources.access_state
 )
 ```
 
-- MediaStore IDは端末・再スキャン・ボリューム間での永続不変キーではない。`assetId`をアプリで付与する。
-- 重複・移動・復元時の再紐付けは、Volume/URI、ファイルサイズ、日付、部分ハッシュ・フルハッシュ（必要に応じて）を組み合わせて判定。**衝突・曖昧な一致を自動確定しない**。
-- `MISSING_CANDIDATE`は再スキャン後の一時行方不明。アクセス権限の撤回は`INACCESSIBLE`、SD取り外しは`OFFLINE`。MISSINGは確定削除を意味しない。
-- 原本のコピーや移動はユーザー操作のみ。媒体の変更に追従してタグ・メモを引き継ぐ。
+- MediaStoreのIDは端末、再スキャン、ボリュームをまたいで変わらないキーではない。そのため`assetId`をアプリで付ける。
+- 重複、移動、復元のときの対応付けは、ボリュームとURI、ファイルサイズ、日付、部分ハッシュと（必要なら）フルハッシュを組み合わせて判断する。衝突やあいまいな一致は自動で確定しない。
+- `MISSING_CANDIDATE`は、再スキャンで一時的に見つからなくなった状態である。アクセス権限が取り消されたときは`INACCESSIBLE`、SDカードを取り外したときは`OFFLINE`にする。`MISSING_CANDIDATE`は削除が確定したことを意味しない。
+- 原本のコピーと移動はユーザーの操作でだけ行う。メディアが移っても、タグとメモを引き継ぐ。
 
 ### 2.2 VideoSegment / SampledFrame
 
@@ -163,15 +166,15 @@ data class SampledFrame(
 )
 ```
 
-- 半開区間`[startMs, endMs)`で統一し境界重複を回避する。
-- セグメントやフレームの子IDは`assetId + extractionProfile + segment/window/timestamp + revision`の決定的生成を優先し、再処理の冪等性を保つ。
-- 動画全体・シーン・代表フレームの3階層で関連付け。索引最小単位はフレームとテキストメモ、表示最小単位はシーン。
-- シーン抽出は`FrameExtractor`の時刻呼び出しとシーン変化のヒューリスティックを併用。フレーム抽出の失敗や近似時刻は結果に反映する。
-- 動画の再生位置はMedia3が扱うミリ秒値に揃える。根拠は`frameTimestampMs`も持つ。
+- 区間は半開区間`[startMs, endMs)`にそろえ、境界が重ならないようにする。
+- セグメントとフレームの子IDは、`assetId + extractionProfile + segment/window/timestamp + revision`から決まった値で作ることを優先し、同じ処理をやり直しても結果が変わらないようにする。
+- 動画全体、シーン、代表フレームの3階層で関連付ける。索引の最小単位はフレームとテキストのメモ、表示の最小単位はシーンとする。
+- シーンの抽出には`FrameExtractor`で時刻を指定して取り出す方法と、シーンの変化を見つけるヒューリスティックを併用する。フレームの抽出に失敗したことや、時刻が近似値であることは結果に反映する。
+- 動画の再生位置は、Media3が扱うミリ秒の値にそろえる。根拠には`frameTimestampMs`も持たせる。
 
 ### 2.3 メタデータ／注釈／位置情報
 
-`supportingAssetIds`はDBでは`location_evidence_support`の複数行へ正規化する。
+`supportingAssetIds`は、DBでは`location_evidence_support`の複数の行に正規化する。
 
 ```kotlin
 enum class AnnotationSource { USER, AI }
@@ -205,58 +208,58 @@ data class LocationEvidence(
 )
 ```
 
-- `originalMetadata`（読み取った値）と`effectiveMetadata`（ユーザーがアプリ内で採用した値）を分離する。EXIF由来の地点の真偽までアプリが保証するものではない。
-- 機密情報を含むメモの外部API転送は画像とは別の許可対象とする。
-- 元画像のピクセルを変えずメモだけ変更したら視覚Embeddingは不変。説明文/OCR/検索メモのEmbeddingは必要部分のみ更新。
+- `originalMetadata`（読み取った値）と`effectiveMetadata`（ユーザーがアプリ内で採用した値）を分けて持つ。EXIFに書かれた地点が正しいかどうかまでは、アプリは保証しない。
+- 機密情報を含むメモを外部APIへ送るときは、画像とは別に許可を得る。
+- 元の画像のピクセルを変えずにメモだけを変えたときは、画像のEmbeddingは変えない。説明文、OCR、検索メモのEmbeddingは、必要な部分だけを更新する。
 
-## 3. Room / SQLiteスキーマ — 正本は最低3NF
+## 3. Room / SQLiteスキーマ（基本テーブルは3NF以上）
 
-**確定方針**: 正本の関係テーブルは最低でも第3正規形（3NF）とする。重複した業務属性を持つワイドテーブルや、M:NをJSON/配列に埋めた正本を禁止する。詳細な正本スキーマは以下の資料が優先される。
+基本テーブル（派生データ以外のテーブル）はすべて第3正規形（3NF）以上にすることを確定した方針とする。同じ業務上の属性を重複して持つ横長のテーブルや、多対多の関係をJSONや配列に詰めた基本テーブルは禁止する。スキーマの詳細はこの文書より次の資料を優先する。
 
-- [`database/DATABASE_DESIGN.md`](./database/DATABASE_DESIGN.md)：ER図、候補キー、関数従属性、FK、不変条件、Roomへの移植方針。
-- [`database/schema.sql`](./database/schema.sql)：正本となる参照DDL（Room database version 1）。Roomで同等のスキーマを生成・検証する。
-- [`database/INDEX_STATE_MACHINE.md`](./database/INDEX_STATE_MACHINE.md)：カタログ同期、ジョブ・索引状態遷移、クラッシュ復旧、影響範囲別の再生成方針。
-- [`adr/ADR-0005-正本スキーマ第三正規形を必須とする.md`](./adr/ADR-0005-正本スキーマ第三正規形を必須とする.md)：設計判断。
+- [`database/DATABASE_DESIGN.md`](./database/DATABASE_DESIGN.md): ER図、候補キー、関数従属性、FK、不変条件、Roomへの移植の方針。
+- [`database/schema.sql`](./database/schema.sql): 参照用のDDL（Room database version 1）。Roomで同じスキーマを作り、一致を検証する。
+- [`database/INDEX_STATE_MACHINE.md`](./database/INDEX_STATE_MACHINE.md): カタログの同期、ジョブと索引の状態遷移、クラッシュからの復旧、変更の影響範囲ごとの作り直しの方針。
+- [`adr/ADR-0005-正本スキーマ第三正規形を必須とする.md`](./adr/ADR-0005-正本スキーマ第三正規形を必須とする.md): この判断の記録。
 
-### 3.1 正規化した主要関係
+### 3.1 正規化した主な関係
 
 | 分野 | 関係 | 備考 |
 |---|---|---|
-| メディア | `media_assets`, `media_sources`, `media_revisions`, `asset_current_revisions` | MediaStore URIと永続asset IDを分離 |
-| メタデータ | `metadata_observations`, `metadata_override_sets`, `metadata_override_values`, `metadata_sync_baselines`, `metadata_conflicts`, `location_evidence`, `location_evidence_support` | 多値編集・3-way競合・推定根拠は別関係 |
-| 管理 | `tags`, `media_tags`, `albums`, `album_items`, `smart_album_rules`, `media_ratings` | 1:NとM:Nを別表へ。スマートアルバムは保存検索を参照 |
-| 動画 | `frame_extraction_profiles`, `video_segments`, `sampled_frames`, `ocr_observations` | 元video→segment→frame |
-| メモ | `annotation_subjects`, `semantic_annotations`, `semantic_annotation_revisions` | 動画区間か写真・動画全体かを排他的FKで区別。本文は追記式の履歴 |
-| 同一性 | `media_discoveries`, `identity_candidates`, `identity_candidate_signals`, `identity_resolutions` | 新規観測を既存assetへ自動統合しない |
-| アクセス | `media_access_events`, `asset_privacy_rules` | イベントは監査のみ。認可はOSへ都度照会 |
-| バックアップ | `backup_archives`, `backup_archive_entries`, `restore_sessions`, `restore_asset_bindings` | 段階復元と曖昧一致の明示 |
-| AI | `provider_connections`, `model_profiles`, `model_capabilities`, `embedding_spaces`, `embedding_targets`, `embedding_vectors` | 接続/モデル/空間/ベクトルの責務分離 |
-| 検索 | `search_profiles`, `search_profile_spaces`, `saved_searches`, `saved_search_roots`, `search_rule_nodes`, `search_rule_set_values` | JSON条件を正本化しない |
-| 処理・権限 | `indexing_jobs`, `indexing_job_items`, `egress_grants`, `task_model_assignments`, `metadata_write_operations`, `metadata_write_operation_items`, `catalog_sync_state` | 初回AI索引のユーザー操作、外部通信許可、書き戻しジャーナル |
+| メディア | `media_assets`, `media_sources`, `media_revisions`, `asset_current_revisions` | MediaStoreのURIと永続的なasset IDを分ける |
+| メタデータ | `metadata_observations`, `metadata_override_sets`, `metadata_override_values`, `metadata_sync_baselines`, `metadata_conflicts`, `location_evidence`, `location_evidence_support` | 複数の値の編集、3-wayの競合、推定の根拠は別の関係にする |
+| 管理 | `tags`, `media_tags`, `albums`, `album_items`, `smart_album_rules`, `media_ratings` | 1対多と多対多を別の表にする。スマートアルバムは保存した検索を参照する |
+| 動画 | `frame_extraction_profiles`, `video_segments`, `sampled_frames`, `ocr_observations` | 元の動画、セグメント、フレームの順に関連付ける |
+| メモ | `annotation_subjects`, `semantic_annotations`, `semantic_annotation_revisions` | 動画の区間か、写真や動画の全体かを、排他的なFKで区別する。本文は追記していく履歴にする |
+| 同一性 | `media_discoveries`, `identity_candidates`, `identity_candidate_signals`, `identity_resolutions` | 新しく見つかったメディアを既存のassetへ自動で統合しない |
+| アクセス | `media_access_events`, `asset_privacy_rules` | イベントは監査のためだけに使い、認可はそのつどOSに問い合わせる |
+| バックアップ | `backup_archives`, `backup_archive_entries`, `restore_sessions`, `restore_asset_bindings` | 段階的に復元し、あいまいな一致は状態として明示する |
+| AI | `provider_connections`, `model_profiles`, `model_capabilities`, `embedding_spaces`, `embedding_targets`, `embedding_vectors` | 接続、モデル、空間、ベクトルで責務を分ける |
+| 検索 | `search_profiles`, `search_profile_spaces`, `saved_searches`, `saved_search_roots`, `search_rule_nodes`, `search_rule_set_values` | 検索条件をJSONのまま基本テーブルに入れない |
+| 処理と権限 | `indexing_jobs`, `indexing_job_items`, `egress_grants`, `task_model_assignments`, `metadata_write_operations`, `metadata_write_operation_items`, `catalog_sync_state` | 最初のAI索引を始めたユーザーの操作、外部通信の許可、書き戻しのジャーナル |
 
-### 3.2 正本とRead Model
+### 3.2 基本テーブルとRead Model
 
-SQLiteのFTS、ANNインデックス、ランキングキャッシュ、サムネイルは派生データであり、3NF正本から再構築できる。検索速度を理由とした正本の非正規化は禁止。`PRAGMA foreign_key_check`と関数従属性の設計レビューを実施する。初版はRoom database version 1として作成し、移行経路は持たない。リリース後のスキーマ変更ではMigrationTestを必須とし、`fallbackToDestructiveMigration`は禁止。
+SQLiteのFTS、ANNのインデックス、ランキングのキャッシュ、サムネイルは派生データで、3NFの基本テーブルから作り直せる。検索を速くするために基本テーブルを非正規化することは禁止する。`PRAGMA foreign_key_check`と、関数従属性の設計レビューを行う。初版はRoom database version 1として作り、移行の経路は持たない。リリース後にスキーマを変えるときはMigrationTestを必須とし、`fallbackToDestructiveMigration`は禁止する。
 
-### 3.3 データ整合性の非交渉条件
+### 3.3 データ整合性の前提
 
-- Content SHA256一致だけで自動統合しない。SD抜去は削除ではない。
-- 原本への書込時はAndroid許可/再読込/ステージング/検証を必須とする。
-- アプリ内部で既知の位置情報や過去のアクセスイベントはOSアクセス許可を意味しない。
-- External API利用には接続/用途/ペイロードの許可と、Asset固有のremote-sendポリシーが必要。標準はdeny。
-- 復元時は資格情報・送信権限・OS permissionを勝手に回復しない。
-- 3NFのレビューチェックはSQLite unit testと独立した必須ゲート。
+- コンテンツのSHA256が一致しただけで自動統合しない。SDカードを抜いたことは削除ではない。
+- 原本に書き込むときは、Androidの許可、読み込み直し、作業用コピーへの書き込み、検証を必須とする。
+- アプリ内部で分かっている位置情報や過去のアクセスのイベントは、OSのアクセス許可の代わりにならない。
+- 外部APIを使うには、接続、用途、送る内容のそれぞれの許可と、Assetごとの外部送信のポリシーが必要である。標準は拒否とする。
+- 復元のときは、資格情報、送信の権限、OSのpermissionを勝手に戻さない。
+- 3NFのレビューはSQLiteのユニットテストとは別の必須の確認とする。
 
 ## 4. Embeddingモデルと検索空間
 
-### 4.1 初期プロファイル
+### 4.1 初期のプロファイル
 
-- ローカル既定Embedding: **EmbeddingGemma 2 Text-Vision 440M**（テキストと画像を共通空間へ）。動画は抽出フレームを画像として入力。
-- 生成: Gemma 4 E2B IT。E4B ITはオプション。
-- EmbeddingGemma 2フル740Mは動画/音声対応可能な別プロファイル候補だが、Android上の直接動画入力はモデル配布物・ランタイムの実機対応を確認した上で利用。**初期動画検索は440M+フレーム抽出で成立させる**。
-- 出力次元の初期値: 768。必要があれば512/256/128を個別`EmbeddingSpace`として扱い、切り詰め後のL2再正規化を行う。
+- ローカルの既定のEmbeddingはEmbeddingGemma 2 Text-Vision 440M（テキストと画像を同じ空間に写す）とする。動画は抽出したフレームを画像として入力する。
+- 生成にはGemma 4 E2B ITを使い、E4B ITは任意とする。
+- EmbeddingGemma 2のフル構成（740M）は動画と音声も扱えるため、別のプロファイルの候補になる。ただしAndroid上で動画を直接入力するのは、モデルの配布物とランタイムが実機で対応していると確かめてからにする。初期の動画検索は440Mとフレームの抽出で成り立たせる。
+- 出力の次元の初期値は768とする。必要なら512、256、128をそれぞれ別の`EmbeddingSpace`として扱い、切り詰めたあとにL2で正規化し直す。
 
-### 4.2 モデル能力の定義
+### 4.2 モデルの能力の定義
 
 ```kotlin
 enum class InputModality { TEXT, IMAGE, VIDEO, AUDIO }
@@ -287,12 +290,12 @@ data class EmbeddingSpaceSpec(
 )
 ```
 
-- 画像・テキストを共通検索する場合、同一モデル/次元/設定が両者で使えることを検証。単なる「768次元一致」で横断検索しない。
-- プロトコル名だけでモデル能力を推定しない。接続テスト・モデル固有の能力設定を使う。
-- サーバー側でモデル名同一でも内容が更新される場合、旧索引が意味的に無効になりうる。モデルRevision不明なら警告し再索引導線を提供。
-- モデルのプロファイル追加・削除と、検索索引削除は別操作とする。
+- 画像とテキストをまとめて検索するときは、両方で同じモデル、次元、設定を使えることを確かめる。「どちらも768次元」というだけで横断検索はしない。
+- プロトコルの名前だけでモデルの能力を推定しない。接続テストと、モデルごとの能力の設定を使う。
+- サーバー側でモデル名が同じまま中身が更新されると、古い索引の意味が通らなくなることがある。モデルのRevisionが分からないときは警告を出し、再索引へ進めるようにする。
+- モデルのプロファイルの追加と削除は、検索の索引の削除とは別の操作にする。
 
-### 4.3 Embeddingプロバイダー契約
+### 4.3 Embeddingプロバイダーのインターフェース
 
 ```kotlin
 interface EmbeddingProvider {
@@ -313,11 +316,11 @@ data class EmbeddingVector(
 )
 ```
 
-上記は契約の概念例。実装時はJava/Kotlin境界でメモリ所有権・例外型・キャンセル処理を型で表現する。`FloatArray`は境界を跨ぐ際のコピーコストがあるため計測する。
+上のコードは考え方を示す例である。実装では、JavaとKotlinの境界でのメモリの所有権、例外の型、キャンセルの扱いを型で表す。`FloatArray`は境界をまたぐときにコピーの負荷がかかるので、計測する。
 
-### 4.4 索引切替の状態機械
+### 4.4 索引の切り替えの状態遷移
 
-Space状態（`embedding_spaces.lifecycle_state`）とジョブ状態（`indexing_jobs.state`）は別物。状態遷移・原子的切替・冪等性の正本は[`database/INDEX_STATE_MACHINE.md`](./database/INDEX_STATE_MACHINE.md)とし、ここでは要点のみ示す。
+空間の状態（`embedding_spaces.lifecycle_state`）とジョブの状態（`indexing_jobs.state`）は別のものである。状態遷移、まとめての切り替え、冪等性は[`database/INDEX_STATE_MACHINE.md`](./database/INDEX_STATE_MACHINE.md)に従い、ここでは要点だけを示す。
 
 ```text
 PLANNED -> BUILDING -> VERIFYING -> READY -> STALE
@@ -325,12 +328,12 @@ PLANNED -> BUILDING -> VERIFYING -> READY -> STALE
               +-- FAILED <-+          +--> DELETING
 ```
 
-- 一時停止・再開はジョブ側（`RUNNING/PAUSING/PAUSED`）で扱い、Spaceは`BUILDING`のまま。
-- **複数READYは同時維持**。切替は`search_profile_spaces`の参照変更（または検索リクエストの選択space変更）だけで行い、旧空間の削除を伴わない。
-- 初回READYがまだない場合、メタデータ/全文検索は利用可能。部分索引で意味検索する場合はカバレッジを表示。
-- 新空間は`VERIFYING`まで旧索引と併存させ、検証後に`search_profile_spaces`を1DBトランザクションで切替える。
+- 一時停止と再開はジョブの側（`RUNNING/PAUSING/PAUSED`）で扱い、空間は`BUILDING`のままにする。
+- READYの空間は複数を同時に保持する。切り替えは`search_profile_spaces`の参照を変えるか、検索リクエストで選ぶ空間を変えるだけで行い、古い空間は削除しない。
+- READYの空間がまだ1つもないときも、メタデータの検索と全文検索は使える。作成途中の索引で意味の検索をするときは、カバレッジを表示する。
+- 新しい空間は`VERIFYING`が終わるまで古い索引と並べて持ち、検証が済んだら`search_profile_spaces`を1つのDBトランザクションで切り替える。
 
-## 5. 動画のAIインデックス生成パイプライン（R0 MUST）
+## 5. 動画のAIインデックス作成パイプライン（R0で必須）
 
 ```mermaid
 flowchart TD
@@ -350,27 +353,27 @@ flowchart TD
   Search --> Seek[Result segment -> Media3 seekTo(startMs)]
 ```
 
-### 5.1 抽出方式
+### 5.1 抽出の方法
 
-1. `MediaMetadataRetriever`相当で長さ、解像度、回転、メディア形式を得る。
-2. `FrameExtractor`で指定時刻のフレームを抽出。タイムスタンプはミリ秒で統一し、境界補正・シーク精度を評価する。
-3. Balancedモードの暫定ルールは10秒サンプリング＋シーン変化点。1動画あたりの固定フレーム上限は設けず、長尺動画は時間チャンク単位で処理し、密度と容量上限は[`docs/verification/AI_SEARCH_SPIKE.md`](./docs/verification/AI_SEARCH_SPIKE.md)の計測で決める。近いフレームのpHash/色ヒストグラムを用いて重複を間引く。シーン変化検出に粗い事前サンプルが必要なら全デコードを前提にせず段階的に処理する。
-4. フレームを縮小しEmbeddingGemma 2 Image Encoderに入力。代表フレームの元映像は変更しない。
-5. 隣接フレームの変化点と時間距離により`VideoSegment`を作成。シーン境界を正確に得られなければ時間窓で代替し、信頼度を低く扱う。
-6. OCRは代表フレームに適用してテキスト検索用に保存する。
-7. 動画セグメント単位のテキストメモは対象区間に関連付け、独立Embeddingとする。
-8. 動画の編集・置換・トリム等で内容Revisionが変化したら、影響セグメントを旧Revisionとして失効し再抽出。サイズ・更新日時のみで完全な同一性を保証しない。
+1. Media3の`MetadataRetriever`などで、長さ、解像度、回転、メディアの形式を取得する。
+2. `FrameExtractor`で指定した時刻のフレームを取り出す。タイムスタンプはミリ秒にそろえ、境界の補正とシークの精度を評価する。
+3. Balancedモードの暫定のルールは、10秒ごとのサンプリングとシーンの変化点とする。1本の動画のフレーム数に固定の上限は設けず、長い動画は時間のチャンクごとに処理する。密度と容量の上限は、[`docs/verification/AI_SEARCH_SPIKE.md`](./docs/verification/AI_SEARCH_SPIKE.md)の計測で決める。近いフレームはpHashと色のヒストグラムで比べて重複を減らす。シーンの変化を見つけるために粗いサンプルが先に必要なら、全フレームのデコードを前提にせず段階的に処理する。
+4. フレームを縮小して、EmbeddingGemma 2の画像エンコーダーに入力する。代表フレームの元の映像は変えない。
+5. 隣り合うフレームの変化点と時間の距離から`VideoSegment`を作る。シーンの境界を正確に取れないときは時間の幅で区切り、信頼度を低く扱う。
+6. 代表フレームにOCRをかけ、テキスト検索のために保存する。
+7. 動画のセグメントに付けたテキストのメモは、その区間に関連付けて独立したEmbeddingにする。
+8. 動画の編集、置き換え、トリムなどで内容のRevisionが変わったら、影響を受けるセグメントを古いRevisionとして無効にし、抽出し直す。サイズと更新日時だけで同一だと断定しない。
 
-**品質上の限定**: 10秒サンプルでは数秒の短い出来事を見落としうる。初期リリースでは「スキャン品質」と各動画のカバレッジをUIに出し、深掘り再索引を提供する。単一サムネイルを動画全体の代表として済ませる実装は禁止。
+10秒ごとのサンプリングでは、数秒しかない短い出来事を見落とすことがある。そのため初期リリースでは「スキャン品質」と動画ごとのカバレッジを画面に出し、より細かく索引し直す操作を用意する。1枚のサムネイルを動画全体の代表として済ませる実装は禁止する。
 
-### 5.2 動画結果の集約
+### 5.2 動画の結果のまとめ方
 
-- フレーム類似度上位を`segmentId`に集約。極端に近接したヒットはまとめ、異なる区間は同じ動画でも複数検索結果として返す。
-- `matchedFrameMs`、`segmentStartMs/endMs`、`highlightedEvidence`を保持。
-- 同じメディアが結果に多数出すぎないよう、多様性制御を設定可能にする（例: 1ページ先頭は1動画につき最大Nシーン）。
-- タップで動画プレイヤーを開きシーク。時間表示は正確なフレーム位置ではなく概算になりうるため再生開始後のフレーム表示を確認。
+- フレームの類似度の上位を`segmentId`ごとにまとめる。非常に近い位置のヒットは1つにまとめ、異なる区間は同じ動画でも別々の検索結果として返す。
+- `matchedFrameMs`、`segmentStartMs/endMs`、`highlightedEvidence`を持つ。
+- 同じメディアが結果に並びすぎないよう、多様性を調整できるようにする（例: 1ページ目の上位では1本の動画につき最大Nシーン）。
+- タップすると動画プレイヤーを開いてシークする。表示する時刻は正確なフレームの位置ではなく概算になることがあるので、再生を始めたあとのフレームの表示を確かめる。
 
-### 5.3 後から交換できる動画Embeddingアダプター
+### 5.3 あとから差し替えられる動画のEmbeddingアダプター
 
 ```kotlin
 interface VideoUnderstandingProvider {
@@ -379,19 +382,19 @@ interface VideoUnderstandingProvider {
 }
 ```
 
-初期実装は`FrameBasedVideoProvider`。将来直接動画入力に対応するローカルモデル・外部モデルへ差し替える場合、入力制限と課金/プライバシー許可を守る。Gemini Embedding 2の動画直接入力は120秒・32フレームなどのAPI制限があるため、長時間動画の無断一括アップロードを禁止する。
+初期の実装は`FrameBasedVideoProvider`とする。将来、動画を直接入力できるローカルのモデルや外部のモデルへ差し替えるときも、入力の制限と、課金とプライバシーの許可を守る。Gemini Embedding 2に動画を直接入力するときは、120秒、32フレームといったAPIの制限があるので、長い動画を無断でまとめてアップロードすることは禁止する。
 
-## 6. 通常カタログ同期とAIジョブを分離
+## 6. 通常のカタログ同期とAIジョブを分ける
 
 ### 6.1 カタログ同期
 
-- MediaStoreの画像・動画コレクションを対象とする。権限はAPIレベルと写真の部分選択権限に従う。
-- `MediaStore.getVersion(volume)`で大きな変更を確認し、同一バージョン内なら`getGeneration()`と追加・更新世代を用いて差分同期。
-- 既存のアプリ内注釈・索引を保持したまま新URIとの対応付けを行う。
-- ユーザーの許可外に出た写真は即削除しない。`INACCESSIBLE`とし、表示・検索対象から一時除外するなど方針を明示。
-- 通常カタログ表示のためのメタデータ同期はユーザーのAIインデックス開始操作を要求しない。
+- MediaStoreの画像と動画のコレクションを対象にする。権限はAPIレベルと、写真の部分的な選択の権限に従う。
+- `MediaStore.getVersion(volume)`で大きな変更を確かめ、同じバージョンの中なら`getGeneration()`と追加、更新の世代を使って差分を同期する。
+- アプリ内の既存の注釈と索引を残したまま、新しいURIとの対応を付ける。
+- ユーザーが許可した範囲から外れた写真は、すぐには削除しない。`INACCESSIBLE`にして、表示と検索の対象から一時的に外すなど、扱いを画面に示す。
+- 通常のカタログ表示のためのメタデータの同期には、ユーザーがAIインデックスを開始する操作を必要としない。
 
-### 6.2 AIインデックスの実行状態
+### 6.2 AIインデックスの実行の流れ
 
 ```text
 User taps Start
@@ -408,20 +411,20 @@ User taps Start
   -> Mark READY (or PARTIAL with errors)
 ```
 
-- `indexing_job_items`の`(job_id, target_id, source_revision_digest)`と`embedding_vectors`の`(space_id, target_id, source_revision_digest)`の一意性で重複実行を抑止。対象は`embedding_targets`の型別FKで表し、`sourceKind/sourceId`の文字列参照は使わない。
-- 1写真や1動画の処理単位で失敗を捕捉し、ジョブ全体を停止しない。メモリ圧迫/熱しきい値超過時は適切に中断。
-- 端末が再起動しても最後のコミット済みチェックポイントから再開できる。
-- 初回起動はユーザー操作。以後の差分は設定を明示して有効化した場合のみWorkManagerに委譲する。
-- バックグラウンドで無制限に処理できると仮定しない。Android 15+の`mediaProcessing` FGSは24h当たり合計6hなどの制約があり、Android 16のlong-running Workerもjob quotaを消費しうる。実行時間・通知・停止条件・再開方法を設計に含める。
-- モデル実行中のギャラリーUIはキャッシュと別dispatcherを用い滑らかさを維持する。ユーザーの動画再生・RAG要求は索引の大量処理より優先する。
+- `indexing_job_items`の`(job_id, target_id, source_revision_digest)`と、`embedding_vectors`の`(space_id, target_id, source_revision_digest)`を一意にして、同じ処理が二重に走らないようにする。対象は`embedding_targets`の種類ごとのFKで表し、`sourceKind/sourceId`のような文字列での参照は使わない。
+- 失敗は写真1枚、動画1本の単位で受け止め、ジョブ全体を止めない。メモリが逼迫したときや温度が閾値を超えたときは、適切に中断する。
+- 端末を再起動しても、最後にコミットしたチェックポイントから再開できる。
+- 最初の実行はユーザーの操作で始める。それ以降の差分の処理は、ユーザーが設定で明示的に有効にしたときだけWorkManagerに任せる。
+- バックグラウンドで無制限に処理できるとは考えない。Android 15以降の`mediaProcessing`のフォアグラウンドサービスには24時間あたり合計6時間までという制約があり、Android 16では長時間動くWorkerがジョブのクォータを使い切ることがある。実行時間、通知、止める条件、再開の方法を設計に含める。
+- モデルの実行中も、ギャラリーの画面はキャッシュと別のdispatcherを使って滑らかに動かす。ユーザーの動画再生とRAGの要求は、索引の大量の処理より優先する。
 
-### 6.3 差分更新ルール
+### 6.3 差分更新のルール
 
-変更イベントごとの再読込・Embedding再生成・失効の規則は[`database/INDEX_STATE_MACHINE.md`](./database/INDEX_STATE_MACHINE.md) §6を正本とする。原則は「視覚Embeddingは映像の内容revisionが変わった時だけ再生成し、EXIF・メモの変更では作り直さない」。
+変更のイベントごとに、何を読み込み直し、どのEmbeddingを作り直し、何を無効にするかは[`database/INDEX_STATE_MACHINE.md`](./database/INDEX_STATE_MACHINE.md) §6に従う。原則として、画像のEmbeddingは映像の内容のrevisionが変わったときだけ作り直し、EXIFやメモの変更では作り直さない。
 
 ## 7. Hybrid Retrieval & RAG
 
-### 7.1 Search API契約
+### 7.1 Search APIのインターフェース
 
 ```kotlin
 data class SearchRequest(
@@ -448,20 +451,20 @@ data class SearchHit(
 )
 ```
 
-`SearchEvidence`は`source=IMAGE_VECTOR|FRAME_VECTOR|ANNOTATION_VECTOR|OCR|EXIF|USER_LOCATION|INFERRED_LOCATION`、使用した`embeddingSpaceId`、出典ID、該当時間、リランキング根拠を持つ。内部スコアはデバッグ用に保持しても、モデル間の「確率」表示はしない。
+`SearchEvidence`には`source=IMAGE_VECTOR|FRAME_VECTOR|ANNOTATION_VECTOR|OCR|EXIF|USER_LOCATION|INFERRED_LOCATION`、使った`embeddingSpaceId`、出典のID、該当する時間、リランキングの根拠を持たせる。内部のスコアはデバッグ用に持ってもよいが、モデルをまたいだ「確率」としては表示しない。
 
-### 7.2 実行ステップ
+### 7.2 実行の手順
 
-1. クエリ解析: 明示日時/年、地名、ファイル種別、メモ語、意味クエリを分離。LLMなしの決定的パーサーを基本にし、曖昧表現のLLM解析は任意。
-2. 位置条件: 確定GPS/ユーザー確定と推定位置を分ける。GPSなしは意味検索やOCRで残す。
-3. 各READY EmbeddingSpaceでクエリのEmbeddingを生成。写真、動画フレーム、メモのベクトルを検索する。
-4. メタデータと全文(OCR、メモ、タグ)を並列検索。
-5. `RRF`などで**順位**を統合。異なるモデルのコサイン値を直接比較/加算しない。
-6. 同一写真・同一動画シーンのヒットを集約し、必要に応じ多様性制御・再ランキング。
-7. メディアの可用性と索引範囲で除外/注記し、写真とタイムスタンプ付き動画の混在結果を表示。
-8. RAG使用時は上位の**必要最小限の実画像・代表フレーム**と出典メモをGemma 4へ渡し、根拠付き回答を生成。ベクトルだけをGemma 4へ渡して画像の理解を期待しない。
+1. クエリを解析し、明示された日時や年、地名、ファイルの種類、メモの語、意味のクエリに分ける。LLMを使わない決まった規則のパーサーを基本とし、あいまいな表現をLLMで解析するのは任意とする。
+2. 位置の条件では、確定したGPSやユーザーが確定した位置と、推定した位置を分ける。GPSのない写真は意味の検索やOCRで候補に残す。
+3. READYの各EmbeddingSpaceでクエリのEmbeddingを作り、写真、動画のフレーム、メモのベクトルを検索する。
+4. メタデータと全文（OCR、メモ、タグ）を並行して検索する。
+5. `RRF`などで順位を統合する。異なるモデルのコサイン類似度を直接比べたり足したりしない。
+6. 同じ写真や同じ動画のシーンのヒットをまとめ、必要なら多様性の調整と再ランキングを行う。
+7. メディアの可用性と索引の範囲によって除外するか注記し、写真とタイムスタンプ付きの動画を混ぜた結果を表示する。
+8. RAGを使うときは、上位の結果から必要最小限の実際の画像と代表フレーム、出典のメモをGemma 4へ渡し、根拠付きの回答を作る。ベクトルだけをGemma 4へ渡して、画像を理解させようとはしない。
 
-### 7.3 RAG出典管理
+### 7.3 RAGの出典の管理
 
 ```json
 {
@@ -479,44 +482,44 @@ data class SearchHit(
 }
 ```
 
-- AIの説明が根拠元に存在しない場合は推論と明示。ユーザーメモは`USER_STATED`と表示し、画像から観測できる事実と混同しない。
-- Video RAGは関連セグメントのフレーム枚数を制限し、モデルの実効入力長を監視する。動画全体を常にLLMに投入しない。
-- AI応答中に保存メタデータを変更する機能は提供しない（変更は確認ダイアログと編集UseCaseが必要）。
+- AIの説明が根拠のどこにもないときは、推論であると明示する。ユーザーのメモは`USER_STATED`と表示し、画像から観測できる事実と混同しない。
+- 動画のRAGでは、関連するセグメントのフレームの枚数を制限し、モデルが実際に受け取れる入力の長さを監視する。動画の全体をそのままLLMに入れることはしない。
+- AIの応答の途中で、保存されているメタデータを変える機能は作らない（変えるには確認ダイアログと編集のUseCaseを通す）。
 
-## 8. メタデータ編集・書き出しの安全性
+## 8. メタデータの編集と書き出しの安全性
 
-### 8.1 保存の3段階
+### 8.1 保存の3つの段階
 
-1. **内部DB編集**: `effectiveMetadata`を更新。検索に即時反映、原本は不変。
-2. **原本に反映**: 対応形式のみ。権限確認、変更差分・バックアップ手段の案内、書き込み、再読込検証、索引更新。
-3. **コピーとしてエクスポート**: 形式・権限制約やプライバシー除去に利用。原本は維持。
+1. 内部DBの編集: `effectiveMetadata`を更新する。検索にはすぐ反映し、原本は変えない。
+2. 原本への反映: 対応する形式でだけ行う。権限を確かめ、変更の差分とバックアップの手段を案内してから書き込み、読み込み直して検証し、索引を更新する。
+3. コピーとしてのエクスポート: 形式や権限の制約があるとき、またはプライバシー情報を除くときに使う。原本はそのまま残す。
 
-AndroidX `ExifInterface`での書込対応はJPEG, PNG, WebP。他形式は専用安全なwriterがない限りDB内編集またはXMPサイドカー/コピーに留める。Motion Photo、Ultra HDRなどの複合構造を破壊しない保証が取れるまでは書込を制限する。
+AndroidXの`ExifInterface`で書き込めるのはJPEG、PNG、WebPである。ほかの形式は、安全に書き込める専用のwriterがないかぎり、DB内の編集か、XMPのサイドカーかコピーへの書き出しにとどめる。Motion PhotoやUltra HDRのような複合的な構造を持つファイルは、構造を保てると確かめられるまで書き込みを制限する。
 
-### 8.2 ジャーナル付き更新
+### 8.2 ジャーナル付きの更新
 
-状態遷移（`REQUESTED → … → COMMITTED / RECOVERY_REQUIRED`）は[`database/INDEX_STATE_MACHINE.md`](./database/INDEX_STATE_MACHINE.md) §7を正本とする。ジャーナルは書き込むタグ編集とそのlocal revisionを`metadata_write_operation_items`に記録し、`COMMITTED`には書込後に再読込したrevisionを必須とする。
+状態遷移（`REQUESTED → … → COMMITTED / RECOVERY_REQUIRED`）は[`database/INDEX_STATE_MACHINE.md`](./database/INDEX_STATE_MACHINE.md) §7に従う。ジャーナルには書き込むタグの編集とそのlocal revisionを`metadata_write_operation_items`に記録し、`COMMITTED`にするには書き込み後に読み込み直したrevisionを必須とする。
 
-- AndroidのContent URIに対して常にファイルシステムレベルのatomic renameが可能とは限らない。**すべてのプロバイダーで完全トランザクション性を保証すると宣言しない**。
-- 最安全パスは作業用コピーにメタデータを書き込み、再読込・メディア再生可能性の検証後、権限・プロバイダーのサポートに応じ反映する。原本置換が安全に保証できないときは「コピーの書き出し」を優先する。
-- `MediaStore.createWriteRequest()`等を使用して他アプリ所有メディアへの更新許可を得る。拒否された場合はDB内編集を維持。
-- 共有用のGPS除去はEXIF GPSに限らずXMP/位置を示すその他のメタデータを対象に検査し、原本でなくエクスポートコピーで実施する。
+- AndroidのContent URIでは、ファイルシステムの単位でのatomic renameがいつもできるとは限らない。すべてのプロバイダーで完全なトランザクション性を保証するとは言わない。
+- もっとも安全な手順は作業用のコピーにメタデータを書き込み、読み込み直しとメディアの再生の検証をしてから、権限とプロバイダーの対応に応じて反映するものである。原本の置き換えを安全に行えると保証できないときは、「コピーの書き出し」を優先する。
+- 他のアプリが所有するメディアを更新するときは、`MediaStore.createWriteRequest()`などで許可を得る。拒否されたらDB内の編集を残す。
+- 共有のためにGPSを除くときは、EXIFのGPSだけでなく、XMPなど位置を示すほかのメタデータも調べる。除く処理は原本ではなく、エクスポートしたコピーで行う。
 
-## 9. モデル登録・5 API形式
+## 9. モデルの登録と5つのAPI形式
 
-### 9.1 プロバイダーと接続方式
+### 9.1 プロバイダーと接続の方式
 
-| Protocol ID | 形式 | 標準パス | 能力判断 |
+| Protocol ID | 形式 | 標準のパス | 能力の判断 |
 |---|---|---|---|
-| `OPENAI_CHAT` | OpenAI Chat Completions | `POST /v1/chat/completions` | 画像入力/JSON/streamはモデル依存 |
-| `OPENAI_RESPONSES` | OpenAI Responses | `POST /v1/responses` | Responses固有形式・イベントに対応 |
-| `ANTHROPIC_MESSAGES` | Anthropic Messages | `POST /v1/messages` | 独立アダプター、特有認証/イベント |
-| `OPENAI_EMBEDDINGS` | OpenAI Embeddings | `POST /v1/embeddings` | 公式はテキスト、独自互換サーバーは手動能力設定 |
-| `GEMINI_EMBED_CONTENT` | Gemini embedContent | `POST /v1beta/models/{model}:embedContent` | text/image/video等モデル能力と制限を取得 |
+| `OPENAI_CHAT` | OpenAI Chat Completions | `POST /v1/chat/completions` | 画像入力、JSON、streamはモデルによる |
+| `OPENAI_RESPONSES` | OpenAI Responses | `POST /v1/responses` | Responses固有の形式とイベントに対応する |
+| `ANTHROPIC_MESSAGES` | Anthropic Messages | `POST /v1/messages` | 独立したアダプター。認証とイベントの形式が異なる |
+| `OPENAI_EMBEDDINGS` | OpenAI Embeddings | `POST /v1/embeddings` | 公式はテキストのみ。独自の互換サーバーは能力を手動で設定する |
+| `GEMINI_EMBED_CONTENT` | Gemini embedContent | `POST /v1beta/models/{model}:embedContent` | テキスト、画像、動画などのモデルの能力と制限を取得する |
 
-ベースURL・モデルID・認証方式・APIキー・カスタムヘッダー・タイムアウト・ストリーム有無をプロファイル単位で管理。APIキー空欄を許し、認証不要の明示的ローカル互換サーバーも接続可能とする（HTTPは警告）。URLのパス結合はプロトコル別に明示し、`/v1/v1`などの二重パスを防ぐ。
+ベースURL、モデルID、認証の方式、APIキー、独自のヘッダー、タイムアウト、ストリームを使うかどうかを、プロファイルごとに管理する。APIキーは空欄でもよく、認証の要らないローカルの互換サーバーにも、明示すれば接続できる（HTTPのときは警告する）。URLのパスの結合はプロトコルごとに明示し、`/v1/v1`のようにパスが重ならないようにする。
 
-### 9.2 タスク別割り当てと通信許可
+### 9.2 タスクごとの割り当てと通信の許可
 
 ```kotlin
 enum class EgressPayload { QUERY_TEXT, IMAGE_PIXELS, VIDEO_FRAMES, VIDEO_BYTES, OCR_TEXT, USER_ANNOTATIONS, GPS_EXIF }
@@ -530,17 +533,16 @@ data class EgressGrant(
 )
 ```
 
-- 許可は接続先（`provider_connections`）単位で持つ。同じ接続先の複数モデルプロファイルは同じ許可を共有する。
-- Asset単位の送信禁止は`asset_privacy_rules.allow_remote_send`で別に管理する。大量送信時の確認ダイアログはUI/Use Caseの責務で、DBには保存しない。
+- 許可は接続先（`provider_connections`）ごとに持つ。同じ接続先にある複数のモデルのプロファイルは、同じ許可を共有する。
+- Assetごとの送信の禁止は`asset_privacy_rules.allow_remote_send`で別に管理する。大量に送るときの確認ダイアログは画面とUseCaseで扱い、DBには保存しない。
+- `RAG`だけ外部を許可し、`IMAGE_INDEX`と`VIDEO_INDEX`は禁止する、といった設定を個別にできる。
+- 設定の登録時の「接続テスト」はユーザーの操作で行い、テストでネットワーク通信が発生することを示す。能力のテストには実際のメディアではなくサンプルを使うのを既定とする。
+- 外部のEmbeddingで大量に送るときは、対象の件数と、送る形式（フレームの画像、メモのテキスト、OCR）の内訳を確認してもらう。
+- 画像を送るときは、送信用にデコードした画像から位置のメタデータを除く。メモの本文にも地名が含まれうることを警告する。
+- 429とRetry-After、認証エラー、タイムアウト、バッチの一部だけの成功、利用の上限を画面に示す。外部へ無断で再試行して課金が重ならないよう、Idempotencyを管理する。
+- キーはAndroid Keystoreで保護した暗号化領域に保存し、設定のうち機密でない部分はDataStoreかRoomに保存する。Keystoreの鍵と資格情報は、通常のバックアップに含めない。
 
-- `RAG`だけ外部許可、`IMAGE_INDEX`と`VIDEO_INDEX`は禁止、など独立設定できる。
-- 設定登録時の「接続テスト」はユーザー操作で行い、テストがネットワーク通信を伴うことを明示する。実メディアを使わずサンプルで能力テストするのが既定。
-- 大量外部Embedding時は対象件数と送信形式（フレーム画像・メモテキスト・OCR）の内訳を確認する。
-- 画像送信時、送信用デコード画像から位置メタデータを除外。メモ本文にも地名がありうることを警告。
-- 429とRetry-After、認証エラー、タイムアウト、部分バッチ成功、利用上限を明示。外部への無断再試行で重複課金しないようIdempotency管理。
-- キーはAndroid Keystore保護の暗号化領域、設定の非機密部分はDataStore/Room。Keystore鍵/資格情報は通常バックアップ対象外。
-
-### 9.3 推論Port
+### 9.3 推論のPort
 
 ```kotlin
 interface GenerationProvider {
@@ -559,11 +561,11 @@ interface EgressPolicy {
 }
 ```
 
-API通信の前に`EgressPolicy`の許可を必ず通す。UIのトグル状態だけを通信可否の唯一の判定にしない。処理途中で許可が取り消された場合は、可能な範囲で中止する。
+APIと通信する前に、必ず`EgressPolicy`の許可を通す。画面のトグルの状態だけで通信してよいかを判断しない。処理の途中で許可が取り消されたら、できる範囲で中止する。
 
-## 10. AIリソース・並行性
+## 10. AIのリソースと並行処理
 
-### 10.1 単一のリソース調停
+### 10.1 リソースの調停を1か所にまとめる
 
 ```text
 AiResourceManager
@@ -575,120 +577,114 @@ AiResourceManager
 └── Cancellation: user cancel and Android lifecycle
 ```
 
-- UIは通常AIモデルをロードせず動作。EmbeddingエンジンとGemma 4エンジンの常時同時常駐を前提にしない。
-- バックエンドのCPU/GPU優劣は実機で計測。自動フォールバックは**ローカル間のみ**。リモートへのフェイルオーバーは禁止。
-- 温度・メモリ・バッテリーを監視してフレーム抽出/索引を減速または一時停止。Androidの制約に反して無制限のバックグラウンド稼働をしない。
-- 推論のキャンセル、メモリ解放、モデル再ロード、描画バッファ圧迫時の対処をテストする。
+- 画面は、通常はAIモデルをロードせずに動く。EmbeddingのエンジンとGemma 4のエンジンが常に同時にメモリにあることを前提にしない。
+- CPUとGPUのどちらが速いかは実機で計測する。自動のフォールバックはローカルのバックエンドの間だけで行い、リモートへの切り替えは禁止する。
+- 温度、メモリ、バッテリーを監視し、フレームの抽出と索引の処理を遅くするか一時停止する。Androidの制約に反して、バックグラウンドで無制限に動かさない。
+- 推論のキャンセル、メモリの解放、モデルの再ロード、描画バッファが逼迫したときの対処をテストする。
 
 ## 11. UIアーキテクチャ
 
-- Kotlin + Compose + Material 3 Expressive、`StateFlow<UiState>`とUnidirectional Data Flow、Navigationによる画面状態管理。
-- グリッドは安定したassetIdキー、ページング、スクロール位置の復元、Coil系のサムネイルキャッシュを適切に活用。
-- 詳細表示は画像と動画のビューワーを同じAssetIdで開くが、動画プレイヤーは専用モジュール。
-- 検索結果の動画カードにタイムコードバッジとシーン代表フレーム。結果タップで`PlayVideoAt(assetId, startMs)`を呼ぶ。
-- AIのスキャン・ダウンロードは画面を離れても進捗確認可能にする。通知可否とバックグラウンド制限を尊重。
-- 写真表示の高画質デコード/HDR経路と、AI用の縮小・正規化フレーム経路を分離する。
-- モデル選択UIに`READY / INDEXING / NOT_INDEXED / STALE`の状態を表示。選択時に自動外部送信や無断大量索引生成をしない。
-- TalkBack、ジェスチャー代替操作、ボタンのタップ領域、動的文字サイズ、ダークモード対応。
+- デザインシステム（M3Eのトークン、コンポーネントの対応、状態の表示、アクセシビリティ）は[`DESIGN.md`](./DESIGN.md)に従い、`core/designsystem`に実装する。
+- Kotlin、Compose、Material 3 Expressiveを使い、`StateFlow<UiState>`による単方向のデータフローと、Navigationで画面の状態を管理する。
+- グリッドでは、変わらないassetIdをキーにし、ページング、スクロール位置の復元、Coil系のサムネイルキャッシュを使う。
+- 詳細表示では画像と動画のビューワーを同じAssetIdで開くが、動画プレイヤーは専用のモジュールにする。
+- 検索結果の動画のカードにはタイムコードのバッジとシーンの代表フレームを表示する。結果をタップしたら`PlayVideoAt(assetId, startMs)`を呼ぶ。
+- AIのスキャンとダウンロードは、画面を離れても進捗を確かめられるようにする。通知の可否とバックグラウンドの制限に従う。
+- 写真を表示するための高画質のデコードとHDRの経路と、AIに渡すための縮小、正規化したフレームの経路は分ける。
+- モデルの選択画面には空間の状態（`embedding_spaces.lifecycle_state`）を[`DESIGN.md`](./DESIGN.md) §5の表示で示す。モデルを選んだだけで、自動で外部に送信したり、無断で大量の索引を作ったりしない。
+- TalkBack、ジェスチャーの代わりの操作、ボタンのタップ領域、文字の大きさの変更、ダークモードに対応する。
 
 ## 12. 安定性、バックアップ、ライセンス
 
-- 初版のDBはRoom database version 1、バックアップ形式は`format_version=1`のJSONとする。リリース後に変更する時点で、DB Migrationとエクスポート形式の変換を用意する。
-- モデル配布物のダイジェスト（`model_profiles.artifact_revision`）を検証する。モデルの再ダウンロード/中断再開/削除は独立したモデル管理UIで操作する。
-- ネイティブライブラリ使用時はAndroidの16KBページサイズ適合を確認。ABI、GPUドライバ、モデルバージョンでの互換性をCIと実機で検証。
-- アプリ・モデル・ライブラリ・アセットのライセンスをそれぞれ確認する。アプリのOSSライセンスは別ADRで定義する。
-- 難しいケース（大きいRAW、Motion Photo、HDR、非常に長い動画、SDカード、権限部分許可）は非対応でも原本を変えず、状態と回避策を提示する。
+- 初版のDBはRoom database version 1とし、バックアップの形式は`format_version=1`のJSONとする。リリース後に変えるときに、DBのMigrationとエクスポート形式の変換を用意する。
+- モデルの配布物のダイジェスト（`model_profiles.artifact_revision`）を検証する。モデルの再ダウンロード、中断からの再開、削除は、独立したモデル管理の画面で行う。
+- ネイティブライブラリを使うときは、Androidの16KBのページサイズに対応しているかを確かめる。ABI、GPUドライバー、モデルのバージョンによる互換性を、CIと実機で検証する。
+- アプリ、モデル、ライブラリ、アセットのライセンスをそれぞれ確かめる。アプリのOSSライセンスは別のADRで決める。
+- 大きなRAW、Motion Photo、HDR、非常に長い動画、SDカード、権限の部分的な許可のような難しいケースは、対応できなくても原本を変えず、状態と回避策を示す。
 
 ## 13. テスト計画
 
-### 13.0 テスト環境の役割分担
+### 13.0 テスト環境の分担
 
-| 層 | 環境 | 主な検証内容 | 実行タイミング |
+| 層 | 環境 | 主な検証内容 | 実行するタイミング |
 | --- | --- | --- | --- |
-| L1 | JVM / ホストSQLite | 3NF・制約・トリガー（`tests/`の参照DDL検証）、Domain/UseCase、DAOロジック、データ移行・インポート | PRごと（CI） |
-| L2 | Android Emulator（Gradle Managed Devices） | Compose UI、MediaStore、権限変更・部分許可、Room、EXIF、動画再生/シーク、仮想SDカードの抜去/再接続 | PRごと（CI） |
-| L3 | 基準端末（実機） | LiteRT-LMの実モデル推論（CPU/GPU）、速度・発熱・電力・RAM、動画インデックス生成、120Hz描画、物理SDカード、OEM固有挙動 | マイルストーンごと |
+| L1 | JVM / ホストSQLite | 3NF、制約、トリガー（`tests/`の参照DDLの検証）、Domain/UseCase、DAOのロジック、データの移行とインポート | PRごと（CI） |
+| L2 | Android Emulator（Gradle Managed Devices） | Compose UI、MediaStore、権限の変更と部分的な許可、Room、EXIF、動画の再生とシーク、仮想SDカードの抜き差し | PRごと（CI） |
+| L3 | 基準端末（実機） | LiteRT-LMでの実モデルの推論（CPU/GPU）、速度、発熱、電力、RAM、動画のインデックス作成、120Hzの描画、物理SDカード、OEM固有の挙動 | マイルストーンごと |
 
-- L2の対象APIは最小API（PRD §14の候補: API 33）から最新安定版までの主要バージョン。CIの負荷に応じて組合せを絞るが、最小APIと最新APIは必ず含める。
-- L2ではAIを`core/testing`のFake Providerに置き換え、機能・状態遷移のみを検証する。x86_64エミュレーターではLiteRT-LMのARM64向けGPU実装を再現できないため、実モデルの品質・速度の判定はL3でのみ行う。
-- L1はAndroid/Room非依存の参照検証であり、Room実装の生成スキーマと参照DDLの一致はL2で検証する。
+- L2で対象にするAPIは、最小API（PRD §14の候補はAPI 33）から最新の安定版までの主なバージョンとする。CIの負荷に応じて組み合わせを絞るが、最小APIと最新APIは必ず含める。
+- L2ではAIを`core/testing`のFake Providerに置き換え、機能と状態遷移だけを検証する。x86_64のエミュレーターではLiteRT-LMのARM64向けのGPU実装を再現できないので、実際のモデルの品質と速度はL3でだけ判断する。
+- L1はAndroidとRoomに依存しない参照の検証で、Roomの実装が作るスキーマと参照DDLが一致するかはL2で検証する。
 
 ### 13.1 自動テスト
 
-- Unit: ID同一性、モデル空間署名、タスク別EgressPolicy、検索クエリ解析、RRF順位統合、タイムスタンプ境界。
-- Room: 生成スキーマと参照DDL（`database/schema.sql`）の一致、外部キー、複数索引の同時保持、ジョブ再開の冪等性、DBインポート。MigrationTestはversion 2を作る時点から追加。
-- Integration: MediaStore権限差分、Content URIの移動、SD抜去/再接続、EXIF編集、動画フレーム抽出失敗、モデル切替。
-- Contract: 5 API形式のモックサーバー、SSEイベント、429/403/timeout/partial success、モデル能力不足。
-- UI: 初回オンボーディング、AI未導入ギャラリー、索引一時停止、動画再生位置、メタデータ差分、アクセシビリティ。
+- Unit: IDの同一性、モデルの空間の署名、タスクごとのEgressPolicy、検索クエリの解析、RRFによる順位の統合、タイムスタンプの境界。
+- Room: 生成されるスキーマと参照DDL（`database/schema.sql`）の一致、外部キー、複数の索引の同時保持、ジョブの再開の冪等性、DBのインポート。MigrationTestは、リリース後にスキーマを変更するときに追加する。
+- Integration: MediaStoreの権限の差分、Content URIの移動、SDの抜き差し、EXIFの編集、動画のフレーム抽出の失敗、モデルの切り替え。
+- Contract: 5つのAPI形式のモックサーバー、SSEのイベント、429/403/timeout/partial success、モデルの能力不足。
+- UI: 初回のオンボーディング、AI未導入のギャラリー、索引の一時停止、動画の再生位置、メタデータの差分、アクセシビリティ。
 
-### 13.2 検索品質・端末性能
+### 13.2 検索品質と端末の性能
 
-- Golden Set: 少なくとも写真100〜300件と異なる場面を持つ動画50件以上（暫定）。EXIF GPSあり/なし、OCR、手動メモ、多言語、長尺動画、短時間のシーン変化を含める。
-- Metrics: Precision@10, Recall@20, MRR、動画ではSegment Hit@K、シーク開始誤差（ms）、カバレッジ率、索引秒/分動画、電力、熱、RAMピーク。
-- 基準端末（RAM構成も記録）でCPU/GPU、量子化、フレームサンプリング、メモリ圧迫、120Hzグリッド描画を計測。
-- 1万画像+500動画を性能基準データとし、実行時間は仮値。実機計測でPass/Fail閾値を見直す。
+- Golden Set: 写真を100〜300件、異なる場面を含む動画を50件以上（暫定）用意する。EXIFのGPSがあるものとないもの、OCR、手動のメモ、多言語、長い動画、短い時間でのシーンの変化を含める。
+- Metrics: Precision@10、Recall@20、MRR、動画ではSegment Hit@K、シーク開始の誤差（ms）、カバレッジ率、動画1分あたりの索引の秒数、電力、熱、RAMのピーク。
+- 基準端末（RAMの構成も記録する）で、CPUとGPU、量子化、フレームのサンプリング、メモリの逼迫、120Hzでのグリッドの描画を計測する。
+- 1万枚の画像と500本の動画を性能の基準データとする。実行時間の目標は仮の値で、実機の計測でPassとFailの閾値を見直す。
 
-### 13.3 障害注入の例
+### 13.3 障害を注入するテストの例
 
-1. 動画抽出中にプロセスkill→再起動→チェックポイントから再開、重複frameIdなし。
-2. 新索引を60%作成中にキャンセル→旧READY索引は検索可能。
-3. 外部APIの許可OFFのままモデルID設定→通信ゼロをモックで検証。
-4. EXIF編集時に権限拒否→DB内部設定を失わず原本も変更しない。
-5. 低ストレージ・バッテリー節約・熱上昇→進捗保存、一時停止、復旧可能。
-6. 動画から該当フレームが得られない→誤った動画区間を成功表示しない。
-7. SDカード再マウントでURI変更→対象候補を再紐付け、曖昧な同一性を保留。
+1. 動画の抽出中にプロセスをkillし、再起動したらチェックポイントから再開し、frameIdが重複しないこと。
+2. 新しい索引を60%作ったところでキャンセルしても、古いREADYの索引で検索できること。
+3. 外部APIの許可をOFFにしたままモデルIDを設定しても、通信が発生しないことをモックで確かめる。
+4. EXIFの編集で権限が拒否されても、DB内の設定を失わず、原本も変えないこと。
+5. ストレージ不足、バッテリーの節約、温度の上昇が起きたら、進捗を保存して一時停止し、あとで復旧できること。
+6. 動画から該当するフレームを取れなかったときに、誤った動画の区間を成功として表示しないこと。
+7. SDカードを再マウントしてURIが変わったら、候補を対応付け直し、同一性があいまいなものは保留にすること。
 
-## 14. リスクと防止策
+## 14. リスクと対策
 
-| リスク | 想定障害 | 対策 |
+| リスク | 想定される障害 | 対策 |
 |---|---|---|
-| R-01 動画索引の膨張 | 保存量/時間/熱の増大 | フレーム上限、近接重複排除、スキャン品質、圧縮/次元削減を計測 |
-| R-02 短い動画シーンの見落とし | Recall低下 | シーン変化候補、深掘り再スキャン、品質表示 |
-| R-03 不安定なMediaStore識別子 | ユーザーメタデータの誤紐付け | 独立assetId、ハッシュ照合、曖昧一致は確認 |
-| R-04 異なるモデルの混用 | 無意味な検索結果 | EmbeddingSpace署名、検索時の厳密な一致チェック |
-| R-05 原本EXIFの破損 | 写真損傷 | DB編集優先、書込許可、コピー方式、再読込検証、形式制限 |
-| R-06 予期しない通信/課金 | 写真流出・従量費用 | 用途別Allowlist、送信前プレビュー、初期OFF、ソフト予算 |
-| R-07 Androidバックグラウンド制限 | 不完全な索引 | ジョブ分割、チェックポイント、FGSタイムアウト対応 |
-| R-08 端末ごとの推論差 | メモリ不足・発熱 | 基準端末での計測、CPU/GPUプローブ、優先度調停、モデル解放 |
-| R-09 位置推定の誤り | 誤った位置検索/EXIF汚染 | Evidence出典と確度、推定は未確定、原本自動書込禁止 |
-| R-10 Google風UIを過度に模倣 | UX衝突・商標等の懸念 | Material公式コンポーネント採用、ブランド/固有画面コピー禁止 |
+| R-01 動画の索引の肥大 | 保存量、処理時間、熱の増加 | フレームの上限、近いフレームの重複の除去、スキャン品質、圧縮と次元削減を計測する |
+| R-02 短い動画シーンの見落とし | Recallの低下 | シーンの変化の候補、細かい再スキャン、品質の表示 |
+| R-03 MediaStoreの識別子が変わる | ユーザーのメタデータの誤った紐付け | 独立したassetId、ハッシュでの照合、あいまいな一致は確認する |
+| R-04 異なるモデルの混用 | 意味のない検索結果 | EmbeddingSpaceの署名、検索時の厳密な一致の確認 |
+| R-05 原本のEXIFの破損 | 写真の損傷 | DBでの編集を優先、書き込みの許可、コピーでの書き出し、読み込み直しての検証、形式の制限 |
+| R-06 予期しない通信と課金 | 写真の流出、従量課金 | 用途ごとの許可リスト、送信前のプレビュー、初期値はOFF、端末内の予算の目安 |
+| R-07 Androidのバックグラウンドの制限 | 不完全な索引 | ジョブの分割、チェックポイント、FGSのタイムアウトへの対応 |
+| R-08 端末ごとの推論の差 | メモリ不足、発熱 | 基準端末での計測、CPUとGPUの調査、優先度の調停、モデルの解放 |
+| R-09 位置の推定の誤り | 誤った位置での検索、EXIFへの誤った値の混入 | 根拠の出典と確度、推定は未確定のままにする、原本への自動の書き込みを禁止 |
+| R-10 Google風のUIを模倣しすぎる | UXの食い違い、商標などの懸念 | Material公式のコンポーネントを使い、ブランドと固有の画面をコピーしない |
 
-## 15. ADR一覧
+## 15. ADRの一覧
 
 | ADR | 決定 |
 |---|---|
-| [ADR-0001](./adr/ADR-0001-Androidネイティブ採用.md) | AndroidネイティブとKotlin-firstを採用 |
-| [ADR-0002](./adr/ADR-0002-ローカルファーストと外部API許可.md) | ローカルファーストと外部API許可 |
-| [ADR-0003](./adr/ADR-0003-Embedding空間分離と切替.md) | Embedding空間を独立保持し即時切替可能にする |
-| [ADR-0004](./adr/ADR-0004-メタデータDB正本と原本安全編集.md) | メタデータはDB正本とし原本編集を明示操作にする |
-| [ADR-0005](./adr/ADR-0005-正本スキーマ第三正規形を必須とする.md) | 正本データベースは最低でも第三正規形を必須とする |
+| [ADR-0001](./adr/ADR-0001-Androidネイティブ採用.md) | AndroidネイティブとKotlin-firstを採用する |
+| [ADR-0002](./adr/ADR-0002-ローカルファーストと外部API許可.md) | ローカルファーストとし、外部APIは許可制にする |
+| [ADR-0003](./adr/ADR-0003-Embedding空間分離と切替.md) | Embedding空間を別々に保持し、すぐに切り替えられるようにする |
+| [ADR-0004](./adr/ADR-0004-メタデータDB正本と原本安全編集.md) | メタデータはDBの値を正とし、原本の編集は明示的な操作にする |
+| [ADR-0005](./adr/ADR-0005-正本スキーマ第三正規形を必須とする.md) | データベースの基本テーブルは第三正規形以上を必須とする |
 | [ADR-0006](./adr/ADR-0006-動画AI検索を初期必須機能とする.md) | 動画のシーン検索を初期リリースの必須機能とする |
-| [ADR-0007](./adr/ADR-0007-メタデータ競合解決と多値管理.md) | メタデータ競合解決と多値管理 |
-| [ADR-0008](./adr/ADR-0008-メディア同一性と誤統合防止.md) | メディア同一性と誤統合防止 |
-| [ADR-0009](./adr/ADR-0009-アクセス権限と検索隔離.md) | アクセス権限と検索隔離 |
-| [ADR-0010](./adr/ADR-0010-バックアップと復元の明示操作.md) | バックアップと復元の明示操作 |
+| [ADR-0007](./adr/ADR-0007-メタデータ競合解決と多値管理.md) | メタデータの競合の解決と複数の値の管理 |
+| [ADR-0008](./adr/ADR-0008-メディア同一性と誤統合防止.md) | メディアの同一性と誤った統合の防止 |
+| [ADR-0009](./adr/ADR-0009-アクセス権限と検索隔離.md) | アクセス権限と検索の隔離 |
+| [ADR-0010](./adr/ADR-0010-バックアップと復元の明示操作.md) | バックアップと復元は明示的な操作で行う |
 
-未起票: モデル能力ベースのAPIアダプター、EXIF書き戻しの対応形式、アプリのOSSライセンス。
+まだ書いていないADR: モデルの能力に基づくAPIアダプター、EXIFの書き戻しに対応する形式、アプリのOSSライセンス。
 
-## 16. 最初の技術検証（アーキテクチャの成立条件）
+## 16. 最初の技術検証（このアーキテクチャが成り立つ条件）
 
-詳細な実施計画・測定項目・合格条件は[`docs/verification/AI_SEARCH_SPIKE.md`](./docs/verification/AI_SEARCH_SPIKE.md)を正本とする。未実行の計画であり、現時点の性能保証ではない。
+詳しい実施計画、測定項目、合格の条件は[`docs/verification/AI_SEARCH_SPIKE.md`](./docs/verification/AI_SEARCH_SPIKE.md)に従う。まだ実行していない計画で、現時点の性能を保証するものではない。
 
-**Spike A: 動画検索の成立**
-- 基準端末で動画のフレーム抽出・Embedding保存・日本語検索・時刻へのシークを縦貫で実装。
-- 代表フレームの抽出レート/上限によるRecallと熱負荷を比較。
-- 基準シーンを探索できない場合、R0動画要件を延期するのではなく抽出密度・セグメント化・モデル条件を見直す。
+スパイクはAからGの7つで、このアーキテクチャが成り立つかどうかに特に関わるのは次の4つである。
 
-**Spike B: 2つのEmbedding索引共存**
-- 同じ写真と動画セグメントを2つの空間に登録。インデックスの指紋による隔離・READYの切替・旧空間保持・失効処理を検証。
+- Spike B（動画の検索）: 基準端末で、動画のフレーム抽出、Embeddingの保存、日本語での検索、時刻へのシークを一通り実装し、代表フレームの抽出の頻度と上限を変えてRecallと熱の負荷を比べる。基準のシーンを見つけられないときも、R0の動画の要件を延期せず、抽出の密度、セグメントの分け方、モデルの条件を見直す。
+- Spike C（複数のEmbedding空間）: 同じ写真と動画のセグメントを2つの空間に登録し、インデックスの指紋による隔離、READYの切り替え、古い空間の保持、無効化の処理を検証する。
+- Spike F（MediaStoreのデータの永続性）: 移動、名前の変更、権限の変更、SDの抜き差し、ファイルの複製、原本への書き戻しを繰り返し、タグと注釈の紐付けがおかしくならないかを検証する。
+- Spike G（リモートAPIの安全な分離）: 5つの形式の接続設定を登録し、用途ごとの許可がOFFなら、テスト環境でネットワークへのアクセスが起きないことを検証する。
 
-**Spike C: MediaStoreデータ永続性**
-- 移動、リネーム、権限変更、SD抜去/復帰、ファイル複製、原本書き戻しを繰り返し、タグと注釈の紐付けが破損しないか検証。
-
-**Spike D: リモートAPIの安全な分離**
-- 5形式の接続設定を登録し、用途別許可がOFFならテスト環境でネットワークアクセスが発生しないことを検証。
-
-## 17. 主要公式資料（2026-10-18）
+## 17. 主な公式資料（2026-10-18）
 
 - Material 3 Compose: https://developer.android.com/develop/ui/compose/designsystems/material3
 - MediaStore access / generation / edits: https://developer.android.com/training/data-storage/shared/media

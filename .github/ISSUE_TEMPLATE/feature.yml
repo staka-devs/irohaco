@@ -1,0 +1,35 @@
+name: Feature / Task
+description: 実装・設定・テスト・ドキュメントの作業
+labels: []
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: 目的
+      description: 何のために行うか
+    validations:
+      required: true
+  - type: input
+    id: refs
+    attributes:
+      label: 要求ID・設計参照
+      placeholder: "例: GAL-001, ADR-0003, DESIGN §3"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 受け入れ条件
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: 今回作らないもの
+  - type: input
+    id: depends
+    attributes:
+      label: 依存Issue
+      placeholder: "例: #3"
