@@ -97,6 +97,18 @@ Irohaco/
 └── tests/                      # 参照DDLの制約テスト
 ```
 
+ビルドの構成は次のとおりとする。
+
+| 項目 | 値 |
+|---|---|
+| minSdk | 33（PRD §14の候補。基準端末と依存ランタイムを確かめて変えるときは、こことPRD §14を直す） |
+| compileSdk / targetSdk | 37 |
+| ビルド | Gradle 9.8.1、Android Gradle Plugin 9.4.1、Kotlin 2.4.21、JDK 17 |
+| 依存のバージョン | `gradle/libs.versions.toml`で管理する |
+| 開発環境 | `.devcontainer/`のDockerイメージで、JDKとAndroid SDKをそろえてビルドする |
+
+`core/domain`は純粋なKotlinのモジュールとし、AndroidX、Room、LiteRT-LM、HTTPクライアントの依存を宣言するとビルドが失敗する（`core/domain/build.gradle.kts`）。
+
 ### 1.2 主なUse Case
 
 - `ObserveGallery` / `ListMedia` / `OpenMedia` / `PlayVideoAt`

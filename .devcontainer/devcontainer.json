@@ -1,0 +1,5 @@
+{
+  "name": "Irohaco Android build",
+  "build": { "dockerfile": "Dockerfile" },
+  "mounts": ["source=irohaco-gradle,target=/root/.gradle,type=volume"]
+}
