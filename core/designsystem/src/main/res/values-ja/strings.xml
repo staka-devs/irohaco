@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="status_ready">検索できます</string>
+    <string name="status_building">索引作成中 %1$d%%</string>
+    <string name="status_not_indexed">未索引</string>
+    <string name="status_stale">更新が必要</string>
+    <string name="status_failed">失敗</string>
+    <string name="status_failed_with_reason">失敗：%1$s</string>
+    <string name="status_deleting">削除中</string>
+    <string name="status_offline">SDカード未接続</string>
+    <string name="status_inaccessible">アクセス権限がありません</string>
+    <string name="status_low_coverage">低カバレッジ</string>
+    <string name="status_ai_not_installed">AIモデル未導入</string>
+    <string name="loading">読み込み中</string>
+</resources>
