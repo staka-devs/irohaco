@@ -30,7 +30,8 @@ jobs:
           java-version: '17'
       - uses: android-actions/setup-android@v4
       - uses: gradle/actions/setup-gradle@v6
-      - run: ./gradlew build lint test --console=plain
+      # verifyRoborazziDebug makes the unit tests compare screenshots with src/test/screenshots.
+      - run: ./gradlew build lint verifyRoborazziDebug --console=plain
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -38,4 +39,5 @@ jobs:
           path: |
             **/build/reports/lint-results-*.html
             **/build/test-results/**/*.xml
+            **/build/outputs/roborazzi/**
           retention-days: 7

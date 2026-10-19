@@ -173,7 +173,7 @@ core/designsystem/
 ```
 
 - 共通コンポーネントには`@IrohacoPreviews`のプレビューを付ける。
-- designsystemの全コンポーネントと主な画面には、Light、Dark、文字の倍率2.0のスクリーンショットテストを用意し、CIで比べる。テストのツールはM0のIssueで選ぶ。
+- designsystemの全コンポーネントと主な画面には、Light、Dark、文字の倍率2.0のスクリーンショットテストを用意し、CIで比べる。ツールはRoborazziで、`@IrohacoPreviews`を付けたプレビューから自動でテストを作る。参照画像は`src/test/screenshots/`に置き、見た目を意図して変えたときは`./gradlew recordRoborazziDebug`で撮り直してコミットする。
 - feature層で`Color(0x`、`MaterialTheme`以外のテーマ、opt-inの注釈を使っていないかを、独自のLintルールかDetektのルールで調べる。
 - 文字列はすべてリソースに置き、日本語と英語を用意する。
 
