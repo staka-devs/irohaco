@@ -2,7 +2,7 @@
 
 - 文書ID: IRO-DB-001
 - バージョン: 1.0.0
-- 状態: 確定（初版、Room database version 1）。Androidでの Room の実装は未着手
+- 状態: 確定（初版、Room database version 1）。Roomの実装は`core/database`
 - 作成日: 2026-10-18
 - 確定日: 2026-10-19
 - 対応PRD: `../PRD.md`
@@ -261,8 +261,12 @@ erDiagram
 
 ## 9. Roomへの移植の方針
 
-- `schema.sql` は構造と制約を固定する参照用のDDLで、Room database version 1そのものとする。初版のリリース前には古いスキーマが存在しないので、移行の経路（`Migration`）は持たない。本番ではKotlinのRoom Entity / DAOで同じテーブルを作り、Roomが生成するスキーマのJSONをCIで比較して検証する。
-- `PRAGMA foreign_keys=ON`、FKのインデックス、UNIQUE、CHECK、部分的なUNIQUE、トリガーが同じかを検証する。Roomのアノテーションだけでは表せない制約とトリガーは、`RoomDatabase.Callback.onCreate`で追加する。
+- `schema.sql` は構造と制約を固定する参照用のDDLで、Room database version 1そのものとする。初版のリリース前には古いスキーマが存在しないので、移行の経路（`Migration`）は持たない。
+- RoomのエンティティではCHECK制約とトリガーを表せない。そのため、アプリはエンティティからDBを作らない。初回の起動で`schema.sql`をそのまま実行してDBを作り、Roomには事前に用意したDB（`createFromFile`）として渡す。Roomは開くときに、すべてのエンティティを実際のテーブルと照合する（列、型、NOT NULL、主キー、外部キー、インデックス）。一致しなければDBを開かない。
+- エンティティは`database/generate_room_entities.py`で`schema.sql`から生成し、手で編集しない。`schema.sql`を変えたら生成し直し、Roomのスキーマのエクスポート（`core/database/schemas/`）も一緒にコミットする。
+- Roomのバージョンは2.8系、SQLiteのドライバーはAndroidに標準で入っているものを使う。`schema.sql`はminSdkのSQLite（3.32系）にある機能だけを使う。
+- Roomは外部キーの検査を自動では有効にしないので、接続を開くたびに`PRAGMA foreign_keys=ON`を実行する。
+- Roomはテーブルの定義の中に書いたUNIQUE制約を認識しない。外部キーの親として参照する列の組には、名前付きの`CREATE UNIQUE INDEX`を使う。
 - `saved_search_roots`で保存した検索とツリーの根を結び、子のノードは`parent_node_id`だけを持つ。子に`search_id`を重複して保存すると、親から検索IDへの推移従属が生まれるので禁止する。
 - `metadata_override_sets`のREMOVEは「行はあるが、対応する値が0件」として表し、上書きがない状態（行そのものがない）と区別する。操作の種類（edit_mode）と値を同じ列に混ぜない。
 - `fallbackToDestructiveMigration` は使わない。リリース後にスキーマを変えるときは、その時点で、データを消さないMigrationと、失敗したときの復旧の手順を用意する。
@@ -271,7 +275,6 @@ erDiagram
 
 ## 10. 初期の実装で決める項目
 
-- Roomのバージョンと、同梱するSQLiteドライバーの方式。
 - 長い動画の時間のチャンクごとの、フレームの密度と容量の上限と、分割して索引し直す方法（1本の動画のフレーム数に固定の上限は設けない。PRD §5.2）。
 - 元のファイルが変わったかの判定（mtimeとサイズ、部分ハッシュ、完全なハッシュの組み合わせ）。
 - 画面から検索のプロファイルを保存したりモデルを切り替えたりするときの、トランザクションの単位。

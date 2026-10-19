@@ -29,6 +29,12 @@ class SchemaTest(unittest.TestCase):
     def test_fk_integrity(self):
         self.assertEqual(self.db.execute('PRAGMA foreign_key_check').fetchall(), [])
 
+    def test_primary_keys_are_not_null(self):
+        # SQLite lets a non-INTEGER PRIMARY KEY hold NULL unless NOT NULL is declared; Room also requires it.
+        tables = [r[0] for r in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+        nullable = [f'{t}.{c[1]}' for t in tables for c in self.db.execute(f"PRAGMA table_info('{t}')") if c[5] and not c[3]]
+        self.assertEqual(nullable, [])
+
     def test_reject_orphan_media_tag(self):
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute("INSERT INTO media_tags VALUES ('a1','missing')")

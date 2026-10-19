@@ -229,7 +229,7 @@ data class LocationEvidence(
 基本テーブル（派生データ以外のテーブル）はすべて第3正規形（3NF）以上にすることを確定した方針とする。同じ業務上の属性を重複して持つ横長のテーブルや、多対多の関係をJSONや配列に詰めた基本テーブルは禁止する。スキーマの詳細はこの文書より次の資料を優先する。
 
 - [`database/DATABASE_DESIGN.md`](./database/DATABASE_DESIGN.md): ER図、候補キー、関数従属性、FK、不変条件、Roomへの移植の方針。
-- [`database/schema.sql`](./database/schema.sql): 参照用のDDL（Room database version 1）。Roomで同じスキーマを作り、一致を検証する。
+- [`database/schema.sql`](./database/schema.sql): 参照用のDDL（Room database version 1）。アプリはこのDDLを実行してDBを作り、Roomが開くときにエンティティとの一致を検証する（DATABASE_DESIGN §9）。
 - [`database/INDEX_STATE_MACHINE.md`](./database/INDEX_STATE_MACHINE.md): カタログの同期、ジョブと索引の状態遷移、クラッシュからの復旧、変更の影響範囲ごとの作り直しの方針。
 - [`adr/ADR-0005-正本スキーマ第三正規形を必須とする.md`](./adr/ADR-0005-正本スキーマ第三正規形を必須とする.md): この判断の記録。
 
@@ -626,12 +626,12 @@ AiResourceManager
 
 - L2で対象にするAPIは、最小API（PRD §14の候補はAPI 33）から最新の安定版までの主なバージョンとする。CIの負荷に応じて組み合わせを絞るが、最小APIと最新APIは必ず含める。
 - L2ではAIを`core/testing`のFake Providerに置き換え、機能と状態遷移だけを検証する。x86_64のエミュレーターではLiteRT-LMのARM64向けのGPU実装を再現できないので、実際のモデルの品質と速度はL3でだけ判断する。
-- L1はAndroidとRoomに依存しない参照の検証で、Roomの実装が作るスキーマと参照DDLが一致するかはL2で検証する。
+- L1にはAndroidとRoomに依存しない参照DDLの検証と、Robolectricで動かすRoomの検証が含まれる。参照DDLから作ったDBをRoomが受け入れること、外部キー、CHECK制約、トリガーが効くことはL1で確かめる。
 
 ### 13.1 自動テスト
 
 - Unit: IDの同一性、モデルの空間の署名、タスクごとのEgressPolicy、検索クエリの解析、RRFによる順位の統合、タイムスタンプの境界。
-- Room: 生成されるスキーマと参照DDL（`database/schema.sql`）の一致、外部キー、複数の索引の同時保持、ジョブの再開の冪等性、DBのインポート。MigrationTestは、リリース後にスキーマを変更するときに追加する。
+- Room: 参照DDL（`database/schema.sql`）から作ったDBとエンティティの一致、外部キー、複数の索引の同時保持、ジョブの再開の冪等性、DBのインポート。MigrationTestは、リリース後にスキーマを変更するときに追加する。
 - Integration: MediaStoreの権限の差分、Content URIの移動、SDの抜き差し、EXIFの編集、動画のフレーム抽出の失敗、モデルの切り替え。
 - Contract: 5つのAPI形式のモックサーバー、SSEのイベント、429/403/timeout/partial success、モデルの能力不足。
 - UI: 初回のオンボーディング、AI未導入のギャラリー、索引の一時停止、動画の再生位置、メタデータの差分、アクセシビリティ。

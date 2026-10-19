@@ -1,0 +1,3357 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "b6a150b1ed5ba3c988e09382e8b0001a",
+    "entities": [
+      {
+        "tableName": "album_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`album_id` TEXT NOT NULL, `asset_id` TEXT NOT NULL, `sort_order` INTEGER NOT NULL, PRIMARY KEY(`album_id`, `asset_id`), FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`album_id`) REFERENCES `albums`(`album_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "albumId",
+            "columnName": "album_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sort_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "album_id",
+            "asset_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          },
+          {
+            "table": "albums",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "album_id"
+            ],
+            "referencedColumns": [
+              "album_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "albums",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`album_id` TEXT NOT NULL, `title` TEXT NOT NULL, `album_kind` TEXT NOT NULL, `parent_album_id` TEXT, PRIMARY KEY(`album_id`), FOREIGN KEY(`parent_album_id`) REFERENCES `albums`(`album_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "albumId",
+            "columnName": "album_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "albumKind",
+            "columnName": "album_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parentAlbumId",
+            "columnName": "parent_album_id",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "album_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "albums",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "parent_album_id"
+            ],
+            "referencedColumns": [
+              "album_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "annotation_subjects",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`subject_id` TEXT NOT NULL, `asset_id` TEXT, `segment_id` TEXT, PRIMARY KEY(`subject_id`), FOREIGN KEY(`segment_id`) REFERENCES `video_segments`(`segment_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "subjectId",
+            "columnName": "subject_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "segmentId",
+            "columnName": "segment_id",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "subject_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ux_annotation_subject_asset",
+            "unique": true,
+            "columnNames": [
+              "asset_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `ux_annotation_subject_asset` ON `${TABLE_NAME}` (`asset_id`)"
+          },
+          {
+            "name": "ux_annotation_subject_segment",
+            "unique": true,
+            "columnNames": [
+              "segment_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `ux_annotation_subject_segment` ON `${TABLE_NAME}` (`segment_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "video_segments",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "segment_id"
+            ],
+            "referencedColumns": [
+              "segment_id"
+            ]
+          },
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "asset_current_revisions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`asset_id` TEXT NOT NULL, `revision_id` TEXT NOT NULL, PRIMARY KEY(`asset_id`), FOREIGN KEY(`asset_id`, `revision_id`) REFERENCES `media_revisions`(`asset_id`, `revision_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revisionId",
+            "columnName": "revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "asset_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "media_revisions",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id",
+              "revision_id"
+            ],
+            "referencedColumns": [
+              "asset_id",
+              "revision_id"
+            ]
+          },
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "asset_privacy_rules",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`asset_id` TEXT NOT NULL, `allow_ai_indexing` INTEGER NOT NULL DEFAULT 1, `allow_remote_send` INTEGER NOT NULL DEFAULT 0, `updated_at` INTEGER NOT NULL, PRIMARY KEY(`asset_id`), FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "allowAiIndexing",
+            "columnName": "allow_ai_indexing",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "allowRemoteSend",
+            "columnName": "allow_remote_send",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "asset_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "backup_archive_entries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`backup_id` TEXT NOT NULL, `entity_kind` TEXT NOT NULL, `exported_entity_id` TEXT NOT NULL, `content_sha256` TEXT NOT NULL, PRIMARY KEY(`backup_id`, `entity_kind`, `exported_entity_id`), FOREIGN KEY(`backup_id`) REFERENCES `backup_archives`(`backup_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "backupId",
+            "columnName": "backup_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entityKind",
+            "columnName": "entity_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exportedEntityId",
+            "columnName": "exported_entity_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentSha256",
+            "columnName": "content_sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "backup_id",
+            "entity_kind",
+            "exported_entity_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "backup_archives",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "backup_id"
+            ],
+            "referencedColumns": [
+              "backup_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "backup_archives",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`backup_id` TEXT NOT NULL, `format_version` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `archive_ref` TEXT NOT NULL, `manifest_sha256` TEXT NOT NULL, `encryption_code` TEXT NOT NULL, `state` TEXT NOT NULL, PRIMARY KEY(`backup_id`))",
+        "fields": [
+          {
+            "fieldPath": "backupId",
+            "columnName": "backup_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "formatVersion",
+            "columnName": "format_version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archiveRef",
+            "columnName": "archive_ref",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "manifestSha256",
+            "columnName": "manifest_sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "encryptionCode",
+            "columnName": "encryption_code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "backup_id"
+          ]
+        }
+      },
+      {
+        "tableName": "catalog_sync_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`volume_id` TEXT NOT NULL, `media_store_version` TEXT, `last_generation` INTEGER, `last_successful_sync_at` INTEGER, PRIMARY KEY(`volume_id`), FOREIGN KEY(`volume_id`) REFERENCES `storage_volumes`(`volume_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "volumeId",
+            "columnName": "volume_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaStoreVersion",
+            "columnName": "media_store_version",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastGeneration",
+            "columnName": "last_generation",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastSuccessfulSyncAt",
+            "columnName": "last_successful_sync_at",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "volume_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "storage_volumes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "volume_id"
+            ],
+            "referencedColumns": [
+              "volume_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "egress_grants",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`connection_id` TEXT NOT NULL, `task_code` TEXT NOT NULL, `payload_type` TEXT NOT NULL, `granted_at` INTEGER NOT NULL, PRIMARY KEY(`connection_id`, `task_code`, `payload_type`), FOREIGN KEY(`connection_id`) REFERENCES `provider_connections`(`connection_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "connectionId",
+            "columnName": "connection_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "taskCode",
+            "columnName": "task_code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadType",
+            "columnName": "payload_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grantedAt",
+            "columnName": "granted_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "connection_id",
+            "task_code",
+            "payload_type"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "provider_connections",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "connection_id"
+            ],
+            "referencedColumns": [
+              "connection_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "embedding_spaces",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`space_id` TEXT NOT NULL, `model_profile_id` TEXT NOT NULL, `dimension` INTEGER NOT NULL, `value_format` TEXT NOT NULL DEFAULT 'FLOAT32_LE', `normalization` TEXT NOT NULL, `query_prefix` TEXT, `corpus_prefix` TEXT, `preprocessing_signature` TEXT NOT NULL, `space_signature` TEXT NOT NULL, `lifecycle_state` TEXT NOT NULL, PRIMARY KEY(`space_id`), FOREIGN KEY(`model_profile_id`) REFERENCES `model_profiles`(`model_profile_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "spaceId",
+            "columnName": "space_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modelProfileId",
+            "columnName": "model_profile_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dimension",
+            "columnName": "dimension",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "valueFormat",
+            "columnName": "value_format",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'FLOAT32_LE'"
+          },
+          {
+            "fieldPath": "normalization",
+            "columnName": "normalization",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "queryPrefix",
+            "columnName": "query_prefix",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "corpusPrefix",
+            "columnName": "corpus_prefix",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "preprocessingSignature",
+            "columnName": "preprocessing_signature",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spaceSignature",
+            "columnName": "space_signature",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lifecycleState",
+            "columnName": "lifecycle_state",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "space_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "model_profiles",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "model_profile_id"
+            ],
+            "referencedColumns": [
+              "model_profile_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "embedding_targets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`target_id` TEXT NOT NULL, `asset_id` TEXT, `frame_id` TEXT, `annotation_id` TEXT, `ocr_id` TEXT, PRIMARY KEY(`target_id`), FOREIGN KEY(`ocr_id`) REFERENCES `ocr_observations`(`ocr_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`annotation_id`) REFERENCES `semantic_annotations`(`annotation_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`frame_id`) REFERENCES `sampled_frames`(`frame_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "targetId",
+            "columnName": "target_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "frameId",
+            "columnName": "frame_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "annotationId",
+            "columnName": "annotation_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "ocrId",
+            "columnName": "ocr_id",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "target_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ux_embed_target_annotation",
+            "unique": true,
+            "columnNames": [
+              "annotation_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `ux_embed_target_annotation` ON `${TABLE_NAME}` (`annotation_id`)"
+          },
+          {
+            "name": "ux_embed_target_asset",
+            "unique": true,
+            "columnNames": [
+              "asset_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `ux_embed_target_asset` ON `${TABLE_NAME}` (`asset_id`)"
+          },
+          {
+            "name": "ux_embed_target_frame",
+            "unique": true,
+            "columnNames": [
+              "frame_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `ux_embed_target_frame` ON `${TABLE_NAME}` (`frame_id`)"
+          },
+          {
+            "name": "ux_embed_target_ocr",
+            "unique": true,
+            "columnNames": [
+              "ocr_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `ux_embed_target_ocr` ON `${TABLE_NAME}` (`ocr_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "ocr_observations",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "ocr_id"
+            ],
+            "referencedColumns": [
+              "ocr_id"
+            ]
+          },
+          {
+            "table": "semantic_annotations",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "annotation_id"
+            ],
+            "referencedColumns": [
+              "annotation_id"
+            ]
+          },
+          {
+            "table": "sampled_frames",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "frame_id"
+            ],
+            "referencedColumns": [
+              "frame_id"
+            ]
+          },
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "embedding_vectors",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`vector_id` TEXT NOT NULL, `space_id` TEXT NOT NULL, `target_id` TEXT NOT NULL, `source_revision_digest` TEXT NOT NULL, `vector_blob` BLOB NOT NULL, `created_at` INTEGER NOT NULL, PRIMARY KEY(`vector_id`), FOREIGN KEY(`target_id`) REFERENCES `embedding_targets`(`target_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`space_id`) REFERENCES `embedding_spaces`(`space_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "vectorId",
+            "columnName": "vector_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spaceId",
+            "columnName": "space_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetId",
+            "columnName": "target_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRevisionDigest",
+            "columnName": "source_revision_digest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "vectorBlob",
+            "columnName": "vector_blob",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "vector_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_embed_vectors_space_target",
+            "unique": false,
+            "columnNames": [
+              "space_id",
+              "target_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_embed_vectors_space_target` ON `${TABLE_NAME}` (`space_id`, `target_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "embedding_targets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "target_id"
+            ],
+            "referencedColumns": [
+              "target_id"
+            ]
+          },
+          {
+            "table": "embedding_spaces",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "space_id"
+            ],
+            "referencedColumns": [
+              "space_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "frame_extraction_profiles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`extraction_profile_id` TEXT NOT NULL, `strategy` TEXT NOT NULL, `interval_ms` INTEGER NOT NULL, `max_frames` INTEGER NOT NULL, `profile_digest` TEXT NOT NULL, PRIMARY KEY(`extraction_profile_id`))",
+        "fields": [
+          {
+            "fieldPath": "extractionProfileId",
+            "columnName": "extraction_profile_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "strategy",
+            "columnName": "strategy",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "intervalMs",
+            "columnName": "interval_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxFrames",
+            "columnName": "max_frames",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileDigest",
+            "columnName": "profile_digest",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "extraction_profile_id"
+          ]
+        }
+      },
+      {
+        "tableName": "identity_candidate_signals",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`discovery_id` TEXT NOT NULL, `asset_id` TEXT NOT NULL, `signal_code` TEXT NOT NULL, `signal_digest` TEXT, PRIMARY KEY(`discovery_id`, `asset_id`, `signal_code`), FOREIGN KEY(`discovery_id`, `asset_id`) REFERENCES `identity_candidates`(`discovery_id`, `asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "discoveryId",
+            "columnName": "discovery_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "signalCode",
+            "columnName": "signal_code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "signalDigest",
+            "columnName": "signal_digest",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "discovery_id",
+            "asset_id",
+            "signal_code"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "identity_candidates",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "discovery_id",
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "discovery_id",
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "identity_candidates",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`discovery_id` TEXT NOT NULL, `asset_id` TEXT NOT NULL, `confidence` REAL NOT NULL, `candidate_state` TEXT NOT NULL, PRIMARY KEY(`discovery_id`, `asset_id`), FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`discovery_id`) REFERENCES `media_discoveries`(`discovery_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "discoveryId",
+            "columnName": "discovery_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateState",
+            "columnName": "candidate_state",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "discovery_id",
+            "asset_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          },
+          {
+            "table": "media_discoveries",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "discovery_id"
+            ],
+            "referencedColumns": [
+              "discovery_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "identity_resolutions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`discovery_id` TEXT NOT NULL, `resolution_kind` TEXT NOT NULL, `selected_asset_id` TEXT, `decided_by` TEXT NOT NULL, `resolved_at` INTEGER NOT NULL, PRIMARY KEY(`discovery_id`), FOREIGN KEY(`selected_asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`discovery_id`) REFERENCES `media_discoveries`(`discovery_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "discoveryId",
+            "columnName": "discovery_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resolutionKind",
+            "columnName": "resolution_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "selectedAssetId",
+            "columnName": "selected_asset_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "decidedBy",
+            "columnName": "decided_by",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resolvedAt",
+            "columnName": "resolved_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "discovery_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "selected_asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          },
+          {
+            "table": "media_discoveries",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "discovery_id"
+            ],
+            "referencedColumns": [
+              "discovery_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "indexing_job_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`job_id` TEXT NOT NULL, `target_id` TEXT NOT NULL, `source_revision_digest` TEXT NOT NULL, `state` TEXT NOT NULL, `attempts` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`job_id`, `target_id`, `source_revision_digest`), FOREIGN KEY(`target_id`) REFERENCES `embedding_targets`(`target_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`job_id`) REFERENCES `indexing_jobs`(`job_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "jobId",
+            "columnName": "job_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetId",
+            "columnName": "target_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRevisionDigest",
+            "columnName": "source_revision_digest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attempts",
+            "columnName": "attempts",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "job_id",
+            "target_id",
+            "source_revision_digest"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_job_items_state",
+            "unique": false,
+            "columnNames": [
+              "job_id",
+              "state"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_job_items_state` ON `${TABLE_NAME}` (`job_id`, `state`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "embedding_targets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "target_id"
+            ],
+            "referencedColumns": [
+              "target_id"
+            ]
+          },
+          {
+            "table": "indexing_jobs",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "job_id"
+            ],
+            "referencedColumns": [
+              "job_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "indexing_jobs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`job_id` TEXT NOT NULL, `space_id` TEXT NOT NULL, `job_kind` TEXT NOT NULL, `state` TEXT NOT NULL, `requested_by_user` INTEGER NOT NULL, `requested_at` INTEGER NOT NULL, PRIMARY KEY(`job_id`), FOREIGN KEY(`space_id`) REFERENCES `embedding_spaces`(`space_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "jobId",
+            "columnName": "job_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spaceId",
+            "columnName": "space_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "jobKind",
+            "columnName": "job_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "requestedByUser",
+            "columnName": "requested_by_user",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "requestedAt",
+            "columnName": "requested_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "job_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "embedding_spaces",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "space_id"
+            ],
+            "referencedColumns": [
+              "space_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "location_evidence",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`evidence_id` TEXT NOT NULL, `asset_id` TEXT NOT NULL, `evidence_source` TEXT NOT NULL, `evidence_status` TEXT NOT NULL, `latitude` REAL, `longitude` REAL, `place_text` TEXT, `confidence` REAL, `explanation` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`evidence_id`), FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "evidenceId",
+            "columnName": "evidence_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceSource",
+            "columnName": "evidence_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceStatus",
+            "columnName": "evidence_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "placeText",
+            "columnName": "place_text",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "explanation",
+            "columnName": "explanation",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "evidence_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_location_asset_status",
+            "unique": false,
+            "columnNames": [
+              "asset_id",
+              "evidence_status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_location_asset_status` ON `${TABLE_NAME}` (`asset_id`, `evidence_status`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "location_evidence_support",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`evidence_id` TEXT NOT NULL, `supporting_asset_id` TEXT NOT NULL, PRIMARY KEY(`evidence_id`, `supporting_asset_id`), FOREIGN KEY(`supporting_asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`evidence_id`) REFERENCES `location_evidence`(`evidence_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "evidenceId",
+            "columnName": "evidence_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "supportingAssetId",
+            "columnName": "supporting_asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "evidence_id",
+            "supporting_asset_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "supporting_asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          },
+          {
+            "table": "location_evidence",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "evidence_id"
+            ],
+            "referencedColumns": [
+              "evidence_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_access_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`access_event_id` TEXT NOT NULL, `asset_id` TEXT, `source_id` TEXT, `access_event_code` TEXT NOT NULL, `observed_at` INTEGER NOT NULL, PRIMARY KEY(`access_event_id`), FOREIGN KEY(`source_id`) REFERENCES `media_sources`(`source_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "accessEventId",
+            "columnName": "access_event_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "source_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "accessEventCode",
+            "columnName": "access_event_code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observedAt",
+            "columnName": "observed_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "access_event_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_access_events_asset",
+            "unique": false,
+            "columnNames": [
+              "asset_id",
+              "observed_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_access_events_asset` ON `${TABLE_NAME}` (`asset_id`, `observed_at`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media_sources",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "source_id"
+            ],
+            "referencedColumns": [
+              "source_id"
+            ]
+          },
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_assets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`asset_id` TEXT NOT NULL, `media_kind` TEXT NOT NULL, `first_seen_at` INTEGER NOT NULL, `tombstoned_at` INTEGER, PRIMARY KEY(`asset_id`))",
+        "fields": [
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaKind",
+            "columnName": "media_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstSeenAt",
+            "columnName": "first_seen_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tombstonedAt",
+            "columnName": "tombstoned_at",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "asset_id"
+          ]
+        }
+      },
+      {
+        "tableName": "media_discoveries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`discovery_id` TEXT NOT NULL, `volume_id` TEXT NOT NULL, `provider_media_store_id` INTEGER, `observed_uri` TEXT NOT NULL, `observed_size_bytes` INTEGER NOT NULL, `observed_at` INTEGER NOT NULL, `discovery_state` TEXT NOT NULL, PRIMARY KEY(`discovery_id`), FOREIGN KEY(`volume_id`) REFERENCES `storage_volumes`(`volume_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "discoveryId",
+            "columnName": "discovery_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "volumeId",
+            "columnName": "volume_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerMediaStoreId",
+            "columnName": "provider_media_store_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "observedUri",
+            "columnName": "observed_uri",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observedSizeBytes",
+            "columnName": "observed_size_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observedAt",
+            "columnName": "observed_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "discoveryState",
+            "columnName": "discovery_state",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "discovery_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_discovery_volume",
+            "unique": false,
+            "columnNames": [
+              "volume_id",
+              "provider_media_store_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_discovery_volume` ON `${TABLE_NAME}` (`volume_id`, `provider_media_store_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "storage_volumes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "volume_id"
+            ],
+            "referencedColumns": [
+              "volume_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_ratings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`asset_id` TEXT NOT NULL, `rating` INTEGER, `is_favorite` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`asset_id`), FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rating",
+            "columnName": "rating",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isFavorite",
+            "columnName": "is_favorite",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "asset_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_revisions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`revision_id` TEXT NOT NULL, `asset_id` TEXT NOT NULL, `file_digest` TEXT NOT NULL, `visual_digest` TEXT, `observed_at` INTEGER NOT NULL, `width_px` INTEGER, `height_px` INTEGER, `duration_ms` INTEGER, PRIMARY KEY(`revision_id`), FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "revisionId",
+            "columnName": "revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileDigest",
+            "columnName": "file_digest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "visualDigest",
+            "columnName": "visual_digest",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "observedAt",
+            "columnName": "observed_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "widthPx",
+            "columnName": "width_px",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "heightPx",
+            "columnName": "height_px",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "duration_ms",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "revision_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ux_media_revisions_asset_revision",
+            "unique": true,
+            "columnNames": [
+              "asset_id",
+              "revision_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `ux_media_revisions_asset_revision` ON `${TABLE_NAME}` (`asset_id`, `revision_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_sources",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`source_id` TEXT NOT NULL, `asset_id` TEXT NOT NULL, `volume_id` TEXT NOT NULL, `media_store_id` INTEGER, `content_uri` TEXT NOT NULL, `display_name` TEXT NOT NULL, `relative_path` TEXT, `mime_type` TEXT NOT NULL, `file_size_bytes` INTEGER NOT NULL, `observed_modified_at` INTEGER, `access_state` TEXT NOT NULL, PRIMARY KEY(`source_id`), FOREIGN KEY(`volume_id`) REFERENCES `storage_volumes`(`volume_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "sourceId",
+            "columnName": "source_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "volumeId",
+            "columnName": "volume_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaStoreId",
+            "columnName": "media_store_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "contentUri",
+            "columnName": "content_uri",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relativePath",
+            "columnName": "relative_path",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mime_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileSizeBytes",
+            "columnName": "file_size_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observedModifiedAt",
+            "columnName": "observed_modified_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "accessState",
+            "columnName": "access_state",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "source_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_media_sources_access",
+            "unique": false,
+            "columnNames": [
+              "access_state"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_media_sources_access` ON `${TABLE_NAME}` (`access_state`)"
+          },
+          {
+            "name": "ix_media_sources_asset",
+            "unique": false,
+            "columnNames": [
+              "asset_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_media_sources_asset` ON `${TABLE_NAME}` (`asset_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "storage_volumes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "volume_id"
+            ],
+            "referencedColumns": [
+              "volume_id"
+            ]
+          },
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "media_tags",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`asset_id` TEXT NOT NULL, `tag_id` TEXT NOT NULL, PRIMARY KEY(`asset_id`, `tag_id`), FOREIGN KEY(`tag_id`) REFERENCES `tags`(`tag_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tagId",
+            "columnName": "tag_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "asset_id",
+            "tag_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_media_tags_tag",
+            "unique": false,
+            "columnNames": [
+              "tag_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_media_tags_tag` ON `${TABLE_NAME}` (`tag_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "tags",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "tag_id"
+            ],
+            "referencedColumns": [
+              "tag_id"
+            ]
+          },
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "metadata_conflicts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`conflict_id` TEXT NOT NULL, `override_id` TEXT NOT NULL, `base_revision_id` TEXT NOT NULL, `remote_revision_id` TEXT NOT NULL, `observed_local_revision_no` INTEGER NOT NULL, `detected_at` INTEGER NOT NULL, `resolution_code` TEXT, `resolved_at` INTEGER, PRIMARY KEY(`conflict_id`), FOREIGN KEY(`remote_revision_id`) REFERENCES `media_revisions`(`revision_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`base_revision_id`) REFERENCES `media_revisions`(`revision_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`override_id`) REFERENCES `metadata_override_sets`(`override_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "conflictId",
+            "columnName": "conflict_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "overrideId",
+            "columnName": "override_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "baseRevisionId",
+            "columnName": "base_revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteRevisionId",
+            "columnName": "remote_revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observedLocalRevisionNo",
+            "columnName": "observed_local_revision_no",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "detectedAt",
+            "columnName": "detected_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resolutionCode",
+            "columnName": "resolution_code",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "resolvedAt",
+            "columnName": "resolved_at",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "conflict_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_metadata_conflicts_open",
+            "unique": false,
+            "columnNames": [
+              "override_id",
+              "detected_at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_metadata_conflicts_open` ON `${TABLE_NAME}` (`override_id`, `detected_at`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media_revisions",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "remote_revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          },
+          {
+            "table": "media_revisions",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "base_revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          },
+          {
+            "table": "metadata_override_sets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "override_id"
+            ],
+            "referencedColumns": [
+              "override_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "metadata_observations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`revision_id` TEXT NOT NULL, `namespace` TEXT NOT NULL, `tag_name` TEXT NOT NULL, `occurrence` INTEGER NOT NULL DEFAULT 0, `text_value` TEXT, `int_value` INTEGER, `real_value` REAL, `blob_value` BLOB, PRIMARY KEY(`revision_id`, `namespace`, `tag_name`, `occurrence`), FOREIGN KEY(`revision_id`) REFERENCES `media_revisions`(`revision_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "revisionId",
+            "columnName": "revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "namespace",
+            "columnName": "namespace",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tagName",
+            "columnName": "tag_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occurrence",
+            "columnName": "occurrence",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "textValue",
+            "columnName": "text_value",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "intValue",
+            "columnName": "int_value",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "realValue",
+            "columnName": "real_value",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "blobValue",
+            "columnName": "blob_value",
+            "affinity": "BLOB"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "revision_id",
+            "namespace",
+            "tag_name",
+            "occurrence"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "media_revisions",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "metadata_override_sets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`override_id` TEXT NOT NULL, `asset_id` TEXT NOT NULL, `namespace` TEXT NOT NULL, `tag_name` TEXT NOT NULL, `edit_mode` TEXT NOT NULL, `local_revision_no` INTEGER NOT NULL, `modified_at` INTEGER NOT NULL, PRIMARY KEY(`override_id`), FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "overrideId",
+            "columnName": "override_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "namespace",
+            "columnName": "namespace",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tagName",
+            "columnName": "tag_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "editMode",
+            "columnName": "edit_mode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localRevisionNo",
+            "columnName": "local_revision_no",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modifiedAt",
+            "columnName": "modified_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "override_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "metadata_override_values",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`override_id` TEXT NOT NULL, `occurrence` INTEGER NOT NULL, `text_value` TEXT, `int_value` INTEGER, `real_value` REAL, `blob_value` BLOB, PRIMARY KEY(`override_id`, `occurrence`), FOREIGN KEY(`override_id`) REFERENCES `metadata_override_sets`(`override_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "overrideId",
+            "columnName": "override_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occurrence",
+            "columnName": "occurrence",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "textValue",
+            "columnName": "text_value",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "intValue",
+            "columnName": "int_value",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "realValue",
+            "columnName": "real_value",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "blobValue",
+            "columnName": "blob_value",
+            "affinity": "BLOB"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "override_id",
+            "occurrence"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "metadata_override_sets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "override_id"
+            ],
+            "referencedColumns": [
+              "override_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "metadata_sync_baselines",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`override_id` TEXT NOT NULL, `base_revision_id` TEXT NOT NULL, `base_local_revision_no` INTEGER NOT NULL, `checked_at` INTEGER NOT NULL, PRIMARY KEY(`override_id`), FOREIGN KEY(`base_revision_id`) REFERENCES `media_revisions`(`revision_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`override_id`) REFERENCES `metadata_override_sets`(`override_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "overrideId",
+            "columnName": "override_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "baseRevisionId",
+            "columnName": "base_revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "baseLocalRevisionNo",
+            "columnName": "base_local_revision_no",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "checkedAt",
+            "columnName": "checked_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "override_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "media_revisions",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "base_revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          },
+          {
+            "table": "metadata_override_sets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "override_id"
+            ],
+            "referencedColumns": [
+              "override_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "metadata_write_operation_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`operation_id` TEXT NOT NULL, `override_id` TEXT NOT NULL, `written_local_revision_no` INTEGER NOT NULL, PRIMARY KEY(`operation_id`, `override_id`), FOREIGN KEY(`override_id`) REFERENCES `metadata_override_sets`(`override_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`operation_id`) REFERENCES `metadata_write_operations`(`operation_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "operationId",
+            "columnName": "operation_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "overrideId",
+            "columnName": "override_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "writtenLocalRevisionNo",
+            "columnName": "written_local_revision_no",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "operation_id",
+            "override_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "metadata_override_sets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "override_id"
+            ],
+            "referencedColumns": [
+              "override_id"
+            ]
+          },
+          {
+            "table": "metadata_write_operations",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "operation_id"
+            ],
+            "referencedColumns": [
+              "operation_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "metadata_write_operations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`operation_id` TEXT NOT NULL, `asset_id` TEXT NOT NULL, `before_revision_id` TEXT, `after_revision_id` TEXT, `operation_state` TEXT NOT NULL, `backup_artifact_ref` TEXT, `requested_at` INTEGER NOT NULL, PRIMARY KEY(`operation_id`), FOREIGN KEY(`asset_id`, `after_revision_id`) REFERENCES `media_revisions`(`asset_id`, `revision_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`asset_id`, `before_revision_id`) REFERENCES `media_revisions`(`asset_id`, `revision_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "operationId",
+            "columnName": "operation_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "beforeRevisionId",
+            "columnName": "before_revision_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "afterRevisionId",
+            "columnName": "after_revision_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "operationState",
+            "columnName": "operation_state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "backupArtifactRef",
+            "columnName": "backup_artifact_ref",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "requestedAt",
+            "columnName": "requested_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "operation_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "media_revisions",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id",
+              "after_revision_id"
+            ],
+            "referencedColumns": [
+              "asset_id",
+              "revision_id"
+            ]
+          },
+          {
+            "table": "media_revisions",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id",
+              "before_revision_id"
+            ],
+            "referencedColumns": [
+              "asset_id",
+              "revision_id"
+            ]
+          },
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "model_capabilities",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`model_profile_id` TEXT NOT NULL, `capability_code` TEXT NOT NULL, PRIMARY KEY(`model_profile_id`, `capability_code`), FOREIGN KEY(`model_profile_id`) REFERENCES `model_profiles`(`model_profile_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "modelProfileId",
+            "columnName": "model_profile_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capabilityCode",
+            "columnName": "capability_code",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "model_profile_id",
+            "capability_code"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "model_profiles",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "model_profile_id"
+            ],
+            "referencedColumns": [
+              "model_profile_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "model_profiles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`model_profile_id` TEXT NOT NULL, `connection_id` TEXT NOT NULL, `provider_model_id` TEXT NOT NULL, `artifact_revision` TEXT, `display_name` TEXT NOT NULL, PRIMARY KEY(`model_profile_id`), FOREIGN KEY(`connection_id`) REFERENCES `provider_connections`(`connection_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "modelProfileId",
+            "columnName": "model_profile_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "connectionId",
+            "columnName": "connection_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerModelId",
+            "columnName": "provider_model_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "artifactRevision",
+            "columnName": "artifact_revision",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "model_profile_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "provider_connections",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "connection_id"
+            ],
+            "referencedColumns": [
+              "connection_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ocr_observations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`ocr_id` TEXT NOT NULL, `asset_id` TEXT, `frame_id` TEXT, `text` TEXT NOT NULL, `engine_revision` TEXT NOT NULL, PRIMARY KEY(`ocr_id`), FOREIGN KEY(`frame_id`) REFERENCES `sampled_frames`(`frame_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "ocrId",
+            "columnName": "ocr_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "assetId",
+            "columnName": "asset_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "frameId",
+            "columnName": "frame_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "engineRevision",
+            "columnName": "engine_revision",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "ocr_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_ocr_asset",
+            "unique": false,
+            "columnNames": [
+              "asset_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_ocr_asset` ON `${TABLE_NAME}` (`asset_id`)"
+          },
+          {
+            "name": "ix_ocr_frame",
+            "unique": false,
+            "columnNames": [
+              "frame_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_ocr_frame` ON `${TABLE_NAME}` (`frame_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "sampled_frames",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "frame_id"
+            ],
+            "referencedColumns": [
+              "frame_id"
+            ]
+          },
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "provider_connections",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`connection_id` TEXT NOT NULL, `protocol` TEXT NOT NULL, `base_url` TEXT, `credential_ref` TEXT, PRIMARY KEY(`connection_id`))",
+        "fields": [
+          {
+            "fieldPath": "connectionId",
+            "columnName": "connection_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "protocol",
+            "columnName": "protocol",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "baseUrl",
+            "columnName": "base_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "credentialRef",
+            "columnName": "credential_ref",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "connection_id"
+          ]
+        }
+      },
+      {
+        "tableName": "restore_asset_bindings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`restore_id` TEXT NOT NULL, `exported_asset_id` TEXT NOT NULL, `local_asset_id` TEXT, `match_decision` TEXT NOT NULL, PRIMARY KEY(`restore_id`, `exported_asset_id`), FOREIGN KEY(`local_asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`restore_id`) REFERENCES `restore_sessions`(`restore_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "restoreId",
+            "columnName": "restore_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exportedAssetId",
+            "columnName": "exported_asset_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localAssetId",
+            "columnName": "local_asset_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "matchDecision",
+            "columnName": "match_decision",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "restore_id",
+            "exported_asset_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_restore_bindings_target",
+            "unique": false,
+            "columnNames": [
+              "local_asset_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_restore_bindings_target` ON `${TABLE_NAME}` (`local_asset_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "media_assets",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "local_asset_id"
+            ],
+            "referencedColumns": [
+              "asset_id"
+            ]
+          },
+          {
+            "table": "restore_sessions",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "restore_id"
+            ],
+            "referencedColumns": [
+              "restore_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "restore_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`restore_id` TEXT NOT NULL, `backup_id` TEXT NOT NULL, `restore_state` TEXT NOT NULL, `started_at` INTEGER NOT NULL, `completed_at` INTEGER, PRIMARY KEY(`restore_id`), FOREIGN KEY(`backup_id`) REFERENCES `backup_archives`(`backup_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "restoreId",
+            "columnName": "restore_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "backupId",
+            "columnName": "backup_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "restoreState",
+            "columnName": "restore_state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "started_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completedAt",
+            "columnName": "completed_at",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "restore_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "backup_archives",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "backup_id"
+            ],
+            "referencedColumns": [
+              "backup_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "sampled_frames",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`frame_id` TEXT NOT NULL, `segment_id` TEXT NOT NULL, `timestamp_ms` INTEGER NOT NULL, `frame_digest` TEXT NOT NULL, PRIMARY KEY(`frame_id`), FOREIGN KEY(`segment_id`) REFERENCES `video_segments`(`segment_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "frameId",
+            "columnName": "frame_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "segmentId",
+            "columnName": "segment_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestampMs",
+            "columnName": "timestamp_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "frameDigest",
+            "columnName": "frame_digest",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "frame_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_sampled_frames_segment",
+            "unique": false,
+            "columnNames": [
+              "segment_id",
+              "timestamp_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_sampled_frames_segment` ON `${TABLE_NAME}` (`segment_id`, `timestamp_ms`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "video_segments",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "segment_id"
+            ],
+            "referencedColumns": [
+              "segment_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "saved_search_roots",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`saved_search_id` TEXT NOT NULL, `root_node_id` TEXT NOT NULL, PRIMARY KEY(`saved_search_id`), FOREIGN KEY(`root_node_id`) REFERENCES `search_rule_nodes`(`rule_node_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`saved_search_id`) REFERENCES `saved_searches`(`saved_search_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "savedSearchId",
+            "columnName": "saved_search_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rootNodeId",
+            "columnName": "root_node_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "saved_search_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "search_rule_nodes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "root_node_id"
+            ],
+            "referencedColumns": [
+              "rule_node_id"
+            ]
+          },
+          {
+            "table": "saved_searches",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "saved_search_id"
+            ],
+            "referencedColumns": [
+              "saved_search_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "saved_searches",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`saved_search_id` TEXT NOT NULL, `name` TEXT NOT NULL, `search_profile_id` TEXT NOT NULL, PRIMARY KEY(`saved_search_id`), FOREIGN KEY(`search_profile_id`) REFERENCES `search_profiles`(`search_profile_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "savedSearchId",
+            "columnName": "saved_search_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "searchProfileId",
+            "columnName": "search_profile_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "saved_search_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "search_profiles",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "search_profile_id"
+            ],
+            "referencedColumns": [
+              "search_profile_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "search_profile_spaces",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`search_profile_id` TEXT NOT NULL, `space_id` TEXT NOT NULL, `priority` INTEGER NOT NULL, PRIMARY KEY(`search_profile_id`, `space_id`), FOREIGN KEY(`space_id`) REFERENCES `embedding_spaces`(`space_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`search_profile_id`) REFERENCES `search_profiles`(`search_profile_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "searchProfileId",
+            "columnName": "search_profile_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spaceId",
+            "columnName": "space_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priority",
+            "columnName": "priority",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "search_profile_id",
+            "space_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "embedding_spaces",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "space_id"
+            ],
+            "referencedColumns": [
+              "space_id"
+            ]
+          },
+          {
+            "table": "search_profiles",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "search_profile_id"
+            ],
+            "referencedColumns": [
+              "search_profile_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "search_profiles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`search_profile_id` TEXT NOT NULL, `name` TEXT NOT NULL, `fusion_strategy` TEXT NOT NULL, PRIMARY KEY(`search_profile_id`))",
+        "fields": [
+          {
+            "fieldPath": "searchProfileId",
+            "columnName": "search_profile_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fusionStrategy",
+            "columnName": "fusion_strategy",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "search_profile_id"
+          ]
+        }
+      },
+      {
+        "tableName": "search_rule_nodes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rule_node_id` TEXT NOT NULL, `parent_node_id` TEXT, `sibling_order` INTEGER NOT NULL, `node_kind` TEXT NOT NULL, `field_code` TEXT, `comparator` TEXT, `scalar_value` TEXT, PRIMARY KEY(`rule_node_id`), FOREIGN KEY(`parent_node_id`) REFERENCES `search_rule_nodes`(`rule_node_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "ruleNodeId",
+            "columnName": "rule_node_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parentNodeId",
+            "columnName": "parent_node_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "siblingOrder",
+            "columnName": "sibling_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeKind",
+            "columnName": "node_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fieldCode",
+            "columnName": "field_code",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "comparator",
+            "columnName": "comparator",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "scalarValue",
+            "columnName": "scalar_value",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "rule_node_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ux_rule_sibling",
+            "unique": true,
+            "columnNames": [
+              "parent_node_id",
+              "sibling_order"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `ux_rule_sibling` ON `${TABLE_NAME}` (`parent_node_id`, `sibling_order`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "search_rule_nodes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "parent_node_id"
+            ],
+            "referencedColumns": [
+              "rule_node_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "search_rule_set_values",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rule_node_id` TEXT NOT NULL, `value` TEXT NOT NULL, PRIMARY KEY(`rule_node_id`, `value`), FOREIGN KEY(`rule_node_id`) REFERENCES `search_rule_nodes`(`rule_node_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "ruleNodeId",
+            "columnName": "rule_node_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "rule_node_id",
+            "value"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "search_rule_nodes",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "rule_node_id"
+            ],
+            "referencedColumns": [
+              "rule_node_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "semantic_annotation_revisions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`annotation_id` TEXT NOT NULL, `revision_no` INTEGER NOT NULL, `author` TEXT NOT NULL, `model_profile_id` TEXT, `text` TEXT NOT NULL, `modified_at` INTEGER NOT NULL, PRIMARY KEY(`annotation_id`, `revision_no`), FOREIGN KEY(`model_profile_id`) REFERENCES `model_profiles`(`model_profile_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`annotation_id`) REFERENCES `semantic_annotations`(`annotation_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "annotationId",
+            "columnName": "annotation_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revisionNo",
+            "columnName": "revision_no",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "author",
+            "columnName": "author",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modelProfileId",
+            "columnName": "model_profile_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "text",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modifiedAt",
+            "columnName": "modified_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "annotation_id",
+            "revision_no"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "model_profiles",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "model_profile_id"
+            ],
+            "referencedColumns": [
+              "model_profile_id"
+            ]
+          },
+          {
+            "table": "semantic_annotations",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "annotation_id"
+            ],
+            "referencedColumns": [
+              "annotation_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "semantic_annotations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`annotation_id` TEXT NOT NULL, `subject_id` TEXT NOT NULL, `annotation_kind` TEXT NOT NULL, `searchable` INTEGER NOT NULL DEFAULT 1, `exportable` INTEGER NOT NULL DEFAULT 1, `created_at` INTEGER NOT NULL, PRIMARY KEY(`annotation_id`), FOREIGN KEY(`subject_id`) REFERENCES `annotation_subjects`(`subject_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "annotationId",
+            "columnName": "annotation_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subjectId",
+            "columnName": "subject_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "annotationKind",
+            "columnName": "annotation_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "searchable",
+            "columnName": "searchable",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "exportable",
+            "columnName": "exportable",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "annotation_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_semantic_annotations_subject",
+            "unique": false,
+            "columnNames": [
+              "subject_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_semantic_annotations_subject` ON `${TABLE_NAME}` (`subject_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "annotation_subjects",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "subject_id"
+            ],
+            "referencedColumns": [
+              "subject_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "smart_album_rules",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`album_id` TEXT NOT NULL, `saved_search_id` TEXT NOT NULL, PRIMARY KEY(`album_id`), FOREIGN KEY(`saved_search_id`) REFERENCES `saved_searches`(`saved_search_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`album_id`) REFERENCES `albums`(`album_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "albumId",
+            "columnName": "album_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "savedSearchId",
+            "columnName": "saved_search_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "album_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "saved_searches",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "saved_search_id"
+            ],
+            "referencedColumns": [
+              "saved_search_id"
+            ]
+          },
+          {
+            "table": "albums",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "album_id"
+            ],
+            "referencedColumns": [
+              "album_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "storage_volumes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`volume_id` TEXT NOT NULL, `provider_volume_name` TEXT NOT NULL, `state` TEXT NOT NULL, PRIMARY KEY(`volume_id`))",
+        "fields": [
+          {
+            "fieldPath": "volumeId",
+            "columnName": "volume_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerVolumeName",
+            "columnName": "provider_volume_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "volume_id"
+          ]
+        }
+      },
+      {
+        "tableName": "tags",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tag_id` TEXT NOT NULL, `name` TEXT NOT NULL, `parent_tag_id` TEXT, PRIMARY KEY(`tag_id`), FOREIGN KEY(`parent_tag_id`) REFERENCES `tags`(`tag_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "tagId",
+            "columnName": "tag_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "parentTagId",
+            "columnName": "parent_tag_id",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tag_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ux_root_tags_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `ux_root_tags_name` ON `${TABLE_NAME}` (`name`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "tags",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "parent_tag_id"
+            ],
+            "referencedColumns": [
+              "tag_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "task_model_assignments",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`task_code` TEXT NOT NULL, `model_profile_id` TEXT NOT NULL, PRIMARY KEY(`task_code`), FOREIGN KEY(`model_profile_id`) REFERENCES `model_profiles`(`model_profile_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "taskCode",
+            "columnName": "task_code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modelProfileId",
+            "columnName": "model_profile_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "task_code"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "model_profiles",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "model_profile_id"
+            ],
+            "referencedColumns": [
+              "model_profile_id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "video_segments",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`segment_id` TEXT NOT NULL, `revision_id` TEXT NOT NULL, `extraction_profile_id` TEXT NOT NULL, `start_ms` INTEGER NOT NULL, `end_ms` INTEGER NOT NULL, PRIMARY KEY(`segment_id`), FOREIGN KEY(`extraction_profile_id`) REFERENCES `frame_extraction_profiles`(`extraction_profile_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`revision_id`) REFERENCES `media_revisions`(`revision_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "segmentId",
+            "columnName": "segment_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revisionId",
+            "columnName": "revision_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "extractionProfileId",
+            "columnName": "extraction_profile_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startMs",
+            "columnName": "start_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endMs",
+            "columnName": "end_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "segment_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "ix_video_segments_revision",
+            "unique": false,
+            "columnNames": [
+              "revision_id",
+              "start_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_video_segments_revision` ON `${TABLE_NAME}` (`revision_id`, `start_ms`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "frame_extraction_profiles",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "extraction_profile_id"
+            ],
+            "referencedColumns": [
+              "extraction_profile_id"
+            ]
+          },
+          {
+            "table": "media_revisions",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "revision_id"
+            ],
+            "referencedColumns": [
+              "revision_id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b6a150b1ed5ba3c988e09382e8b0001a')"
+    ]
+  }
+}
