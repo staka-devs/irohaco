@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Activity
 import android.content.ClipData
 import android.content.Context
+import android.content.res.Resources
+import androidx.compose.ui.platform.LocalResources
 import android.provider.MediaStore
 import androidx.activity.compose.BackHandler
 import androidx.activity.result.IntentSenderRequest
@@ -16,7 +18,9 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import dev.irohaco.core.contracts.FileOperationResult
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.res.pluralStringResource
@@ -109,6 +113,7 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
     val access by viewModel.access.collectAsStateWithLifecycle()
     val cells = viewModel.cells.collectAsLazyPagingItems()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
+    val folders by viewModel.folders.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.refreshAccess() }
     LifecycleResumeEffect(Unit) {
@@ -131,6 +136,47 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
             if (answer == SnackbarResult.ActionPerformed) restore.launch(trashRequest(context, uris, trashed = false))
         }
     }
+    // Move and rename change files other apps own, so the system asks the user first; copy only reads.
+    var pending by remember { mutableStateOf<Pending?>(null) }
+    var afterGrant by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val deniedMessage = stringResource(R.string.timeline_change_denied)
+    val notFoundMessage = stringResource(R.string.timeline_not_found)
+    val resources = LocalResources.current
+    val write = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) afterGrant?.invoke() else scope.launch { snackbar.showSnackbar(deniedMessage) }
+        afterGrant = null
+    }
+    fun withWriteGrant(items: List<TimelineItem>, action: () -> Unit) {
+        afterGrant = action
+        write.launch(writeRequest(context, items.map { Uri.parse(it.contentUri) }))
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.outcomes.collect { snackbar.showSnackbar(outcomeMessage(resources, it)) }
+    }
+    when (val p = pending) {
+        is Pending.Folder -> FolderDialog(
+            title = stringResource(if (p.operation == TimelineViewModel.Operation.MOVE) R.string.timeline_move_to else R.string.timeline_copy_to),
+            folders = folders,
+            onPick = { folder ->
+                pending = null
+                if (p.operation == TimelineViewModel.Operation.MOVE) {
+                    withWriteGrant(p.items) { viewModel.move(p.items, folder) }
+                } else {
+                    viewModel.copy(p.items, folder)
+                }
+            },
+            onDismiss = { pending = null },
+        )
+        is Pending.Rename -> RenameDialog(
+            currentName = p.name,
+            onRename = { base ->
+                pending = null
+                withWriteGrant(listOf(p.item)) { viewModel.rename(p.item, base) }
+            },
+            onDismiss = { pending = null },
+        )
+        null -> Unit
+    }
     BackHandler(enabled = selection.isNotEmpty()) { viewModel.clearSelection() }
     TimelineContent(
         access = access,
@@ -150,9 +196,50 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
             trashed = items.map { Uri.parse(it.contentUri) }
             trash.launch(trashRequest(context, trashed, trashed = true))
         },
+        onMove = { items ->
+            viewModel.loadFolders()
+            pending = Pending.Folder(TimelineViewModel.Operation.MOVE, items)
+        },
+        onCopy = { items ->
+            viewModel.loadFolders()
+            pending = Pending.Folder(TimelineViewModel.Operation.COPY, items)
+        },
+        onRename = { item ->
+            scope.launch {
+                val name = viewModel.currentName(item)
+                if (name == null) {
+                    snackbar.showSnackbar(notFoundMessage)
+                } else {
+                    pending = Pending.Rename(item, name)
+                }
+            }
+        },
         snackbar = snackbar,
     )
 }
+
+/** A move, copy or rename waiting for the user's choice in a dialog. */
+private sealed interface Pending {
+    data class Folder(val operation: TimelineViewModel.Operation, val items: List<TimelineItem>) : Pending
+
+    data class Rename(val item: TimelineItem, val name: String) : Pending
+}
+
+private fun outcomeMessage(resources: Resources, outcome: TimelineViewModel.Outcome): String =
+    when (outcome.result) {
+        FileOperationResult.DONE -> when (outcome.operation) {
+            TimelineViewModel.Operation.MOVE -> resources.getQuantityString(R.plurals.timeline_moved, outcome.count, outcome.count)
+            TimelineViewModel.Operation.COPY -> resources.getQuantityString(R.plurals.timeline_copied, outcome.count, outcome.count)
+            TimelineViewModel.Operation.RENAME -> resources.getString(R.string.timeline_renamed)
+        }
+        FileOperationResult.NOT_FOUND -> resources.getString(R.string.timeline_not_found)
+        FileOperationResult.NAME_TAKEN -> resources.getString(R.string.timeline_name_taken)
+        FileOperationResult.FAILED -> resources.getString(R.string.timeline_operation_failed)
+    }
+
+/** The system dialog that lets this app change files other apps own (GAL-005). */
+private fun writeRequest(context: Context, uris: List<Uri>): IntentSenderRequest =
+    IntentSenderRequest.Builder(MediaStore.createWriteRequest(context.contentResolver, uris).intentSender).build()
 
 /** Hands the selected files to another app with read access only. */
 private fun shareIntent(items: List<TimelineItem>): Intent {
@@ -189,6 +276,9 @@ internal fun TimelineContent(
     onClearSelection: () -> Unit = {},
     onShare: (List<TimelineItem>) -> Unit = {},
     onTrash: (List<TimelineItem>) -> Unit = {},
+    onMove: (List<TimelineItem>) -> Unit = {},
+    onCopy: (List<TimelineItem>) -> Unit = {},
+    onRename: (TimelineItem) -> Unit = {},
     snackbar: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     BoxWithConstraints {
@@ -251,6 +341,9 @@ internal fun TimelineContent(
                         onSelectRange = onSelectRange,
                         onShare = onShare,
                         onTrash = onTrash,
+                        onMove = onMove,
+                        onCopy = onCopy,
+                        onRename = onRename,
                     )
                 }
             }
@@ -271,6 +364,9 @@ private fun TimelineGrid(
     onSelectRange: (Map<String, TimelineItem>) -> Unit,
     onShare: (List<TimelineItem>) -> Unit,
     onTrash: (List<TimelineItem>) -> Unit,
+    onMove: (List<TimelineItem>) -> Unit,
+    onCopy: (List<TimelineItem>) -> Unit,
+    onRename: (TimelineItem) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
     val currentSelection by rememberUpdatedState(selection)
@@ -352,6 +448,17 @@ private fun TimelineGrid(
             ) {
                 IconButton(onClick = { onShare(selection.values.toList()) }) {
                     Icon(painterResource(IrohacoIcons.Share), stringResource(R.string.timeline_share))
+                }
+                IconButton(onClick = { onMove(selection.values.toList()) }) {
+                    Icon(painterResource(IrohacoIcons.Move), stringResource(R.string.timeline_move))
+                }
+                IconButton(onClick = { onCopy(selection.values.toList()) }) {
+                    Icon(painterResource(IrohacoIcons.Copy), stringResource(R.string.timeline_copy))
+                }
+                if (selection.size == 1) {
+                    IconButton(onClick = { onRename(selection.values.first()) }) {
+                        Icon(painterResource(IrohacoIcons.Edit), stringResource(R.string.timeline_rename))
+                    }
                 }
                 IconButton(onClick = { onTrash(selection.values.toList()) }) {
                     Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.timeline_delete))

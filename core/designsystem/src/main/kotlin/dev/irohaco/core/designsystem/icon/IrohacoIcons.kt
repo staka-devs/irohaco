@@ -34,6 +34,9 @@ object IrohacoIcons {
     @DrawableRes val PlayCircleFilled = R.drawable.ic_play_circle_filled
     @DrawableRes val Info = R.drawable.ic_info
     @DrawableRes val Share = R.drawable.ic_share
+    @DrawableRes val Move = R.drawable.ic_drive_file_move
+    @DrawableRes val Copy = R.drawable.ic_content_copy
+    @DrawableRes val Edit = R.drawable.ic_edit
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val Settings = R.drawable.ic_settings
     @DrawableRes val Check = R.drawable.ic_check

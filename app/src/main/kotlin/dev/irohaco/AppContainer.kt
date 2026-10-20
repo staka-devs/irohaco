@@ -1,6 +1,12 @@
 package dev.irohaco
 
 import android.content.Context
+import android.util.Log
+import dev.irohaco.core.application.OrganizeMedia
+import dev.irohaco.infrastructure.media.AndroidMediaFiles
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.media3.common.Player
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
@@ -58,6 +64,8 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     val getTimelinePage by lazy { GetTimelinePage(RoomTimelineReader(database)) }
 
+    val organizeMedia by lazy { OrganizeMedia(AndroidMediaFiles(appContext)) }
+
     val syncMediaCatalog: SyncMediaCatalog by lazy {
         SyncMediaCatalog(
             source = MediaStoreCatalogSource(appContext),
@@ -66,5 +74,17 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
             newId = { UUID.randomUUID().toString() },
             now = System::currentTimeMillis,
         )
+    }
+
+    /** Runs on resume and after the app changes files itself. */
+    suspend fun syncCatalog() {
+        try {
+            withContext(Dispatchers.IO) { syncMediaCatalog() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // A failed sync leaves the catalog as it was; the gallery keeps working and the next resume retries.
+            Log.w("Irohaco", "Catalog sync failed", e)
+        }
     }
 }

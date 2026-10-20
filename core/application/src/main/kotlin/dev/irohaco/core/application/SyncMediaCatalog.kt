@@ -12,6 +12,8 @@ import dev.irohaco.core.contracts.VolumeSync
 import dev.irohaco.core.domain.AssetAvailability
 import dev.irohaco.core.domain.LibraryAccess
 import dev.irohaco.core.domain.MediaLibraryAccess
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Brings the catalog in line with MediaStore (ARCHITECTURE §6.1). Needs no user action and never
@@ -32,7 +34,10 @@ class SyncMediaCatalog(
     private val newId: () -> String,
     private val now: () -> Long,
 ) {
-    suspend operator fun invoke() {
+    // Two overlapping syncs would both see a new file as new and register it twice.
+    private val running = Mutex()
+
+    suspend operator fun invoke() = running.withLock {
         val access = access.current()
         val mounted = source.volumes()
         val known = store.volumes()

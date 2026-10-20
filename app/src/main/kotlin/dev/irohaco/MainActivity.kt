@@ -1,7 +1,6 @@
 package dev.irohaco
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -39,10 +38,7 @@ import dev.irohaco.ui.DestinationPlaceholder
 import dev.irohaco.ui.IrohacoApp
 import dev.irohaco.ui.ScreenViewModelStores
 import dev.irohaco.ui.TopLevelDestination
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val container get() = (application as IrohacoApplication).container
@@ -52,7 +48,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Resume covers launch, returning from the permission dialog and returning from system settings.
         lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.RESUMED) { syncCatalog() }
+            repeatOnLifecycle(Lifecycle.State.RESUMED) { container.syncCatalog() }
         }
         setContent {
             val themeColor by container.themeColorSettings.observe().collectAsStateWithLifecycle(ThemeColor.Device)
@@ -97,7 +93,9 @@ class MainActivity : ComponentActivity() {
         IrohacoApp { destination ->
             when (destination) {
                 TopLevelDestination.PHOTOS -> TimelineScreen(
-                    viewModel { TimelineViewModel(container.getTimelinePage, container.getLibraryAccess) },
+                    viewModel {
+                        TimelineViewModel(container.getTimelinePage, container.getLibraryAccess, container.organizeMedia, container::syncCatalog)
+                    },
                     onOpenMedia = onOpenMedia,
                     onOpenSettings = onOpenSettings,
                 )
@@ -128,17 +126,6 @@ class MainActivity : ComponentActivity() {
             onDispose { if (!isChangingConfigurations) stores.clear(route) }
         }
         CompositionLocalProvider(LocalViewModelStoreOwner provides owner, content = content)
-    }
-
-    private suspend fun syncCatalog() {
-        try {
-            withContext(Dispatchers.IO) { container.syncMediaCatalog() }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // A failed sync leaves the catalog as it was; the gallery keeps working and the next resume retries.
-            Log.w("Irohaco", "Catalog sync failed", e)
-        }
     }
 }
 

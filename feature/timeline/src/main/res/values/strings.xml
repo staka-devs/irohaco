@@ -53,4 +53,29 @@
         <item quantity="one">Moved %d item to the trash</item>
         <item quantity="other">Moved %d items to the trash</item>
     </plurals>
+    <string name="timeline_move">Move</string>
+    <string name="timeline_copy">Copy</string>
+    <string name="timeline_rename">Rename</string>
+    <string name="timeline_move_to">Move to</string>
+    <string name="timeline_copy_to">Copy to</string>
+    <string name="timeline_new_folder">New folder</string>
+    <string name="timeline_new_folder_hint">Created in Pictures</string>
+    <string name="timeline_create_folder">Use new folder</string>
+    <string name="timeline_no_folders">No folders yet</string>
+    <string name="timeline_rename_name">Name</string>
+    <string name="timeline_invalid_name">Enter a name without \"/\"</string>
+    <string name="timeline_cancel">Cancel</string>
+    <string name="timeline_change_denied">The change was not allowed</string>
+    <string name="timeline_not_found">The file is no longer there</string>
+    <string name="timeline_name_taken">A file with this name is already there</string>
+    <string name="timeline_operation_failed">The file could not be changed</string>
+    <string name="timeline_renamed">Renamed</string>
+    <plurals name="timeline_moved">
+        <item quantity="one">Moved %d item</item>
+        <item quantity="other">Moved %d items</item>
+    </plurals>
+    <plurals name="timeline_copied">
+        <item quantity="one">Copied %d item</item>
+        <item quantity="other">Copied %d items</item>
+    </plurals>
 </resources>

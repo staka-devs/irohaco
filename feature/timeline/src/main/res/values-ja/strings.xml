@@ -53,4 +53,29 @@
         <item quantity="one">%d件をゴミ箱に移動しました</item>
         <item quantity="other">%d件をゴミ箱に移動しました</item>
     </plurals>
+    <string name="timeline_move">移動</string>
+    <string name="timeline_copy">コピー</string>
+    <string name="timeline_rename">名前の変更</string>
+    <string name="timeline_move_to">移動先</string>
+    <string name="timeline_copy_to">コピー先</string>
+    <string name="timeline_new_folder">新しいフォルダ</string>
+    <string name="timeline_new_folder_hint">Picturesの中に作ります</string>
+    <string name="timeline_create_folder">新しいフォルダを使う</string>
+    <string name="timeline_no_folders">フォルダがまだありません</string>
+    <string name="timeline_rename_name">名前</string>
+    <string name="timeline_invalid_name">「/」を含まない名前を入力してください</string>
+    <string name="timeline_cancel">キャンセル</string>
+    <string name="timeline_change_denied">変更は許可されませんでした</string>
+    <string name="timeline_not_found">ファイルが見つかりません</string>
+    <string name="timeline_name_taken">同じ名前のファイルがすでにあります</string>
+    <string name="timeline_operation_failed">ファイルを変更できませんでした</string>
+    <string name="timeline_renamed">名前を変更しました</string>
+    <plurals name="timeline_moved">
+        <item quantity="one">%d件を移動しました</item>
+        <item quantity="other">%d件を移動しました</item>
+    </plurals>
+    <plurals name="timeline_copied">
+        <item quantity="one">%d件をコピーしました</item>
+        <item quantity="other">%d件をコピーしました</item>
+    </plurals>
 </resources>
