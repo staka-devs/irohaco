@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import dev.irohaco.core.contracts.DateGrouping
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineSortKey
 import dev.irohaco.core.designsystem.component.IrohacoBottomSheet
@@ -29,9 +30,21 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.domain.MediaKind
 
 @Composable
-internal fun SortSheet(query: TimelineQuery, onChange: (TimelineQuery) -> Unit, onDismiss: () -> Unit) {
-    IrohacoBottomSheet(onDismiss = onDismiss) { SortContent(query, onChange) }
+internal fun SortSheet(
+    query: TimelineQuery,
+    onChange: (TimelineQuery) -> Unit,
+    onDismiss: () -> Unit,
+    grouping: DateGrouping = DateGrouping.DAY,
+    onGrouping: (DateGrouping) -> Unit = {},
+) {
+    IrohacoBottomSheet(onDismiss = onDismiss) { SortContent(query, onChange, grouping, onGrouping) }
 }
+
+private val GROUPINGS = listOf(
+    DateGrouping.YEAR to R.string.timeline_group_year,
+    DateGrouping.MONTH to R.string.timeline_group_month,
+    DateGrouping.DAY to R.string.timeline_group_day,
+)
 
 private val SORTS = listOf(
     Triple(TimelineSortKey.TAKEN, true, R.string.timeline_sort_newest),
@@ -49,7 +62,12 @@ private val KINDS = listOf(null to R.string.timeline_kind_all, MediaKind.IMAGE t
 /** Filter by kind with a connected button group, then one of the sort orders (GAL-006, DESIGN §3). */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun SortContent(query: TimelineQuery, onChange: (TimelineQuery) -> Unit) {
+internal fun SortContent(
+    query: TimelineQuery,
+    onChange: (TimelineQuery) -> Unit,
+    grouping: DateGrouping = DateGrouping.DAY,
+    onGrouping: (DateGrouping) -> Unit = {},
+) {
     Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
         Text(
             stringResource(R.string.timeline_sort_title),
@@ -73,6 +91,32 @@ internal fun SortContent(query: TimelineQuery, onChange: (TimelineQuery) -> Unit
                 ) { Text(stringResource(label)) }
             }
         }
+        // Date headers exist only when sorted by date, so their unit is offered only then.
+        if (query.sortKey == TimelineSortKey.TAKEN) {
+            Text(
+                stringResource(R.string.timeline_group_title),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = IrohacoSpacing.l, end = IrohacoSpacing.l, top = IrohacoSpacing.s),
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
+                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+            ) {
+                GROUPINGS.forEachIndexed { index, (unit, label) ->
+                    ToggleButton(
+                        checked = grouping == unit,
+                        onCheckedChange = { onGrouping(unit) },
+                        shapes = when (index) {
+                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                            GROUPINGS.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) { Text(stringResource(label)) }
+                }
+            }
+        }
         Column(Modifier.selectableGroup().padding(bottom = IrohacoSpacing.l)) {
             SORTS.forEach { (key, descending, label) ->
                 val selected = query.sortKey == key && query.descending == descending
@@ -92,6 +136,6 @@ internal fun SortContent(query: TimelineQuery, onChange: (TimelineQuery) -> Unit
 @Composable
 private fun SortContentPreview() {
     IrohacoTheme(dynamicColor = false) {
-        Surface { SortContent(TimelineQuery(TimelineSortKey.NAME, descending = false, kind = MediaKind.IMAGE), {}) }
+        Surface { SortContent(TimelineQuery(kind = MediaKind.IMAGE), {}, DateGrouping.MONTH) }
     }
 }

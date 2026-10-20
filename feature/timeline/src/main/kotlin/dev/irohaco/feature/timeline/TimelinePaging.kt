@@ -6,6 +6,7 @@ import androidx.paging.PagingState
 import androidx.paging.insertSeparators
 import androidx.paging.map
 import dev.irohaco.core.application.GetTimelinePage
+import dev.irohaco.core.contracts.DateGrouping
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
 import java.time.Instant
@@ -50,12 +51,29 @@ internal class TimelinePagingSource(
         state.anchorPosition?.let { max(0, it - state.config.initialLoadSize / 2) }
 }
 
-/** Puts a date header before the first item of each local day. */
-internal fun PagingData<TimelineItem>.withDateHeaders(zone: ZoneId): PagingData<TimelineCell> =
+/**
+ * Puts a header before the first item of each local day, month or year (GAL-012). A header carries
+ * the first day of its group; the cells keep their own day for their descriptions.
+ */
+internal fun PagingData<TimelineItem>.withDateHeaders(zone: ZoneId, grouping: DateGrouping = DateGrouping.DAY): PagingData<TimelineCell> =
     mediaCells(zone)
         .insertSeparators { before: TimelineCell.Media?, after: TimelineCell.Media? ->
-            if (after != null && after.date != before?.date) TimelineCell.Header(after.date) else null
+            val group = after?.date?.groupStart(grouping)
+            if (group != null && group != before?.date?.groupStart(grouping)) TimelineCell.Header(group) else null
         }
+
+internal fun LocalDate.groupStart(grouping: DateGrouping): LocalDate = when (grouping) {
+    DateGrouping.YEAR -> withDayOfYear(1)
+    DateGrouping.MONTH -> withDayOfMonth(1)
+    DateGrouping.DAY -> this
+}
+
+/** The first day after the group that starts on [start]. */
+internal fun groupEnd(start: LocalDate, grouping: DateGrouping): LocalDate = when (grouping) {
+    DateGrouping.YEAR -> start.plusYears(1)
+    DateGrouping.MONTH -> start.plusMonths(1)
+    DateGrouping.DAY -> start.plusDays(1)
+}
 
 /** Dates mean nothing as headers when the grid is sorted by name or size; the cells keep them for their labels. */
 internal fun PagingData<TimelineItem>.withoutHeaders(zone: ZoneId): PagingData<TimelineCell> = mediaCells(zone).map { it }
