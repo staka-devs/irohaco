@@ -30,4 +30,6 @@ object IrohacoIcons {
     @DrawableRes val FolderFilled = R.drawable.ic_folder_filled
     @DrawableRes val ZoomIn = R.drawable.ic_zoom_in
     @DrawableRes val ZoomOut = R.drawable.ic_zoom_out
+    @DrawableRes val ArrowBack = R.drawable.ic_arrow_back
+    @DrawableRes val PlayCircleFilled = R.drawable.ic_play_circle_filled
 }

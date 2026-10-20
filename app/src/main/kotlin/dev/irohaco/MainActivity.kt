@@ -5,13 +5,25 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.irohaco.core.designsystem.motion.LocalSharedMediaScope
+import dev.irohaco.core.designsystem.motion.SharedMediaScope
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.feature.timeline.TimelineScreen
 import dev.irohaco.feature.timeline.TimelineViewModel
+import dev.irohaco.feature.timeline.viewer.MediaViewerScreen
+import dev.irohaco.feature.timeline.viewer.ViewerViewModel
 import dev.irohaco.ui.DestinationPlaceholder
 import dev.irohaco.ui.IrohacoApp
 import dev.irohaco.ui.TopLevelDestination
@@ -32,12 +44,31 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             IrohacoTheme {
-                IrohacoApp { destination ->
-                    when (destination) {
-                        TopLevelDestination.PHOTOS -> TimelineScreen(
-                            viewModel { TimelineViewModel(container.getTimelinePage, container.getLibraryAccess) },
-                        )
-                        else -> DestinationPlaceholder(destination)
+                // The viewer opens over the shell; the shell keeps its saved state (tab, scroll position) meanwhile.
+                var viewing by rememberSaveable { mutableStateOf<String?>(null) }
+                val screens = rememberSaveableStateHolder()
+                SharedTransitionLayout {
+                    AnimatedContent(targetState = viewing, label = "viewer") { assetId ->
+                        CompositionLocalProvider(LocalSharedMediaScope provides SharedMediaScope(this@SharedTransitionLayout, this)) {
+                            if (assetId == null) {
+                                screens.SaveableStateProvider("shell") {
+                                    IrohacoApp { destination ->
+                                        when (destination) {
+                                            TopLevelDestination.PHOTOS -> TimelineScreen(
+                                                viewModel { TimelineViewModel(container.getTimelinePage, container.getLibraryAccess) },
+                                                onOpenMedia = { viewing = it },
+                                            )
+                                            else -> DestinationPlaceholder(destination)
+                                        }
+                                    }
+                                }
+                            } else {
+                                MediaViewerScreen(
+                                    viewModel(key = "viewer-$assetId") { ViewerViewModel(container.getTimelinePage, assetId) },
+                                    onBack = { viewing = null },
+                                )
+                            }
+                        }
                     }
                 }
             }

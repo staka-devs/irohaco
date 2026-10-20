@@ -9,6 +9,7 @@ import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
@@ -63,6 +64,7 @@ import androidx.paging.compose.itemKey
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.designsystem.component.MediaThumbnail
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
+import dev.irohaco.core.designsystem.motion.sharedMedia
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
@@ -83,7 +85,7 @@ private val MEDIA_PERMISSIONS: Array<String> =
 
 /** The Photos tab (PRD GAL-001, DESIGN §4.1). */
 @Composable
-fun TimelineScreen(viewModel: TimelineViewModel) {
+fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) -> Unit) {
     val access by viewModel.access.collectAsStateWithLifecycle()
     val cells = viewModel.cells.collectAsLazyPagingItems()
     val context = LocalContext.current
@@ -99,6 +101,7 @@ fun TimelineScreen(viewModel: TimelineViewModel) {
         onOpenSettings = {
             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))
         },
+        onOpenMedia = onOpenMedia,
     )
 }
 
@@ -108,6 +111,7 @@ internal fun TimelineContent(
     cells: LazyPagingItems<TimelineCell>,
     onRequestAccess: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenMedia: (String) -> Unit = {},
 ) {
     BoxWithConstraints {
         // Column ranges per width class (DESIGN §4.1): Compact 3–5, Medium 5–7, Expanded 6–10.
@@ -148,6 +152,7 @@ internal fun TimelineContent(
                         bottomPadding = padding.calculateBottomPadding(),
                         onFewerColumns = { chosen = (columns - 1).coerceIn(range) },
                         onMoreColumns = { chosen = (columns + 1).coerceIn(range) },
+                        onOpenMedia = onOpenMedia,
                     )
                 }
             }
@@ -162,6 +167,7 @@ private fun TimelineGrid(
     bottomPadding: Dp,
     onFewerColumns: () -> Unit,
     onMoreColumns: () -> Unit,
+    onOpenMedia: (String) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
     val formatter = rememberDateFormatter()
@@ -201,7 +207,12 @@ private fun TimelineGrid(
                         } else {
                             stringResource(R.string.timeline_photo_description, date)
                         }
-                        MediaThumbnail(model = cell.item.contentUri, contentDescription = description, selected = false)
+                        MediaThumbnail(
+                            model = cell.item.contentUri,
+                            contentDescription = description,
+                            selected = false,
+                            modifier = Modifier.sharedMedia(cell.item.assetId).clickable { onOpenMedia(cell.item.assetId) },
+                        )
                     }
                     null -> MediaThumbnail(model = null, contentDescription = "", selected = false)
                 }

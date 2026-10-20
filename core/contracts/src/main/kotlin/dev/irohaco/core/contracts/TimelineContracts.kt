@@ -21,6 +21,9 @@ interface TimelineReader {
 
     suspend fun page(offset: Int, limit: Int): List<TimelineItem>
 
+    /** The offset of an asset in that order, or null when it is not on the timeline. */
+    suspend fun indexOf(assetId: String): Int?
+
     /** Emits whenever the catalog behind the timeline may have changed. */
     fun changes(): Flow<Unit>
 }
