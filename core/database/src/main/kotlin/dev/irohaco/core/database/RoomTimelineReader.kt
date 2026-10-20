@@ -16,6 +16,10 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
 
     override suspend fun indexOf(assetId: String): Int? = db.timelineDao().indexOf(assetId)
 
+    /**
+     * Emits once on subscription as well: a sync that finishes after the first page loads but before
+     * this flow is collected would otherwise leave the timeline showing stale rows.
+     */
     override fun changes(): Flow<Unit> =
-        db.invalidationTracker.createFlow("media_sources", "media_assets", emitInitialState = false).map { }
+        db.invalidationTracker.createFlow("media_sources", "media_assets", emitInitialState = true).map { }
 }
