@@ -47,3 +47,12 @@ interface TimelineSettings {
 
     suspend fun setPinchHintShown()
 }
+
+/** What to do about a shared photo's GPS when it has one (PRD MET-003). */
+enum class ShareLocationPolicy { ASK, STRIP, KEEP }
+
+interface SharingSettings {
+    val shareLocationPolicy: Flow<ShareLocationPolicy>
+
+    suspend fun setShareLocationPolicy(policy: ShareLocationPolicy)
+}

@@ -15,4 +15,8 @@
     <string name="settings_contrast_standard">標準</string>
     <string name="settings_contrast_medium">中</string>
     <string name="settings_contrast_high">高</string>
+    <string name="settings_share_location">共有時の位置情報</string>
+    <string name="settings_share_location_ask">毎回確認する</string>
+    <string name="settings_share_location_strip">いつも外す</string>
+    <string name="settings_share_location_keep">いつも含める</string>
 </resources>

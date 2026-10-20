@@ -163,4 +163,15 @@
     <string name="timeline_select_group">Select all of %1$s</string>
     <string name="timeline_unselect_group">Unselect all of %1$s</string>
     <string name="timeline_pinch_hint">Pinch with two fingers to change the number of columns</string>
+    <string name="share_location_title">Share the location too?</string>
+    <string name="share_location_body">The photos you are sharing have the place they were taken.</string>
+    <string name="share_location_strip">Remove location</string>
+    <string name="share_location_keep">Share with location</string>
+    <string name="share_location_unremovable_title">Some items can\'t have their location removed</string>
+    <plurals name="share_location_unremovable_body">
+        <item quantity="one">%d item keeps its location, usually a video.</item>
+        <item quantity="other">%d items keep their location, usually videos.</item>
+    </plurals>
+    <string name="share_location_unremovable_include">Share them anyway</string>
+    <string name="share_location_unremovable_exclude">Leave them out</string>
 </resources>

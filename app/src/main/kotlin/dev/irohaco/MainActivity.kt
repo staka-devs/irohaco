@@ -61,7 +61,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Resume covers launch, returning from the permission dialog and returning from system settings.
         lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.RESUMED) { container.syncCatalog() }
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                container.syncCatalog()
+                container.prepareShare.cleanUp() // stale share-cache copies past their retention window (MET-003)
+            }
         }
         setContent {
             val themeColor by container.themeColorSettings.observe().collectAsStateWithLifecycle(ThemeColor.Device)
@@ -157,7 +160,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun FullScreen(route: String, open: (String) -> Unit, onBack: () -> Unit) {
         when {
-            route == Route.SETTINGS -> SettingsScreen(viewModel { SettingsViewModel(container.themeColorSettings) }, onBack)
+            route == Route.SETTINGS -> SettingsScreen(viewModel { SettingsViewModel(container.themeColorSettings, container.sharingSettings) }, onBack)
             route == Route.IDENTITY -> IdentityScreen(viewModel { IdentityViewModel(container.reconcileIdentity) }, onBack)
             Route.isList(route) -> {
                 val list = Route.parseList(route)
