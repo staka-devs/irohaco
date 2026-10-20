@@ -13,17 +13,27 @@ data class TimelineItem(
     val sortTimeMs: Long,
 )
 
+enum class TimelineSortKey { TAKEN, NAME, SIZE }
+
+/** The order and filter of the timeline (PRD GAL-006). Taken time falls back to the modification time. */
+data class TimelineQuery(
+    val sortKey: TimelineSortKey = TimelineSortKey.TAKEN,
+    val descending: Boolean = true,
+    /** Null shows photos and videos. */
+    val kind: MediaKind? = null,
+)
+
 /**
- * Offset paging over a stable order (sort time, then asset id, newest first). Offsets let the UI
- * refresh around the visible position when the catalog changes, so scrolling does not jump.
+ * Offset paging over a stable order: the sort key, then the asset id in the same direction. Offsets
+ * let the UI refresh around the visible position when the catalog changes, so scrolling does not jump.
  */
 interface TimelineReader {
-    suspend fun count(): Int
+    suspend fun count(query: TimelineQuery): Int
 
-    suspend fun page(offset: Int, limit: Int): List<TimelineItem>
+    suspend fun page(query: TimelineQuery, offset: Int, limit: Int): List<TimelineItem>
 
     /** The offset of an asset in that order, or null when it is not on the timeline. */
-    suspend fun indexOf(assetId: String): Int?
+    suspend fun indexOf(query: TimelineQuery, assetId: String): Int?
 
     /** Emits whenever the catalog behind the timeline may have changed. */
     fun changes(): Flow<Unit>

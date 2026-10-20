@@ -11,6 +11,8 @@ import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.OrganizeMedia
 import dev.irohaco.core.contracts.FileOperationResult
 import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.contracts.TimelineQuery
+import dev.irohaco.core.contracts.TimelineSortKey
 import dev.irohaco.core.domain.MediaLibraryAccess
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -23,7 +25,7 @@ import kotlinx.coroutines.launch
 import java.time.ZoneId
 
 class TimelineViewModel(
-    getPage: GetTimelinePage,
+    private val getPage: GetTimelinePage,
     private val getAccess: GetLibraryAccess,
     private val organize: OrganizeMedia,
     /** Syncs the catalog after this screen changed files, so the grid shows the result. */
@@ -36,8 +38,24 @@ class TimelineViewModel(
         Pager(PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = true, jumpThreshold = PAGE_SIZE * 4)) {
             TimelinePagingSource(getPage).also { source = it }
         }.flow
-            .map { it.withDateHeaders(zone) }
+            .map { if (getPage.query.value.sortKey == TimelineSortKey.TAKEN) it.withDateHeaders(zone) else it.withoutHeaders(zone) }
             .cachedIn(viewModelScope)
+
+    /** The order and filter, shared with the viewer (GAL-006). */
+    val query: StateFlow<TimelineQuery> = getPage.query.asStateFlow()
+
+    private val _scrollToTop = Channel<Unit>(Channel.CONFLATED)
+
+    /** A new order makes the old position meaningless, so the grid starts again from the top. */
+    val scrollToTop: Flow<Unit> = _scrollToTop.receiveAsFlow()
+
+    fun setQuery(query: TimelineQuery) {
+        if (query == getPage.query.value) return
+        getPage.query.value = query
+        source?.invalidate()
+        _scrollToTop.trySend(Unit)
+        clearSelection() // selected items may no longer be shown
+    }
 
     private val _access = MutableStateFlow(getAccess())
     val access: StateFlow<MediaLibraryAccess> = _access.asStateFlow()

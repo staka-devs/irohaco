@@ -6,6 +6,8 @@ import dev.irohaco.core.contracts.CatalogChanges
 import dev.irohaco.core.contracts.CatalogVolume
 import dev.irohaco.core.contracts.MediaStoreEntry
 import dev.irohaco.core.contracts.NewCatalogAsset
+import dev.irohaco.core.contracts.TimelineQuery
+import dev.irohaco.core.contracts.TimelineSortKey
 import dev.irohaco.core.domain.AssetAvailability
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.test.runTest
@@ -44,20 +46,59 @@ class RoomTimelineReaderTest {
             ),
         )
 
-        assertEquals(4, reader.count())
-        val first = reader.page(offset = 0, limit = 2)
+        assertEquals(4, reader.count(newest))
+        val first = reader.page(newest, offset = 0, limit = 2)
         assertEquals(listOf("c", "a"), first.map { it.assetId }) // same time: asset id breaks the tie
-        val rest = reader.page(offset = 2, limit = 10)
+        val rest = reader.page(newest, offset = 2, limit = 10)
         assertEquals(listOf("b" to 200L, "d" to 100L), rest.map { it.assetId to it.sortTimeMs })
-        assertEquals(listOf(0, 1, 2, 3), listOf("c", "a", "b", "d").map { reader.indexOf(it) })
-        assertEquals(null, reader.indexOf("hidden"))
+        assertEquals(listOf(0, 1, 2, 3), listOf("c", "a", "b", "d").map { reader.indexOf(newest, it) })
+        assertEquals(null, reader.indexOf(newest, "hidden"))
     }
 
-    private fun asset(name: String, id: Long, taken: Long?, modified: Long) = NewCatalogAsset(
+    @Test
+    fun `sorts by name or size in either direction and filters by kind`() = runTest {
+        RoomCatalogStore(db).apply(
+            CatalogChanges(
+                observedAtMs = 1,
+                newVolumes = listOf(CatalogVolume("v1", "external_primary", null, null)),
+                newAssets = listOf(
+                    asset("a", id = 1, taken = 1, modified = 1, fileName = "beach.jpg", size = 300),
+                    asset("b", id = 2, taken = 2, modified = 1, fileName = "Apple.jpg", size = 100),
+                    asset("c", id = 3, taken = 3, modified = 1, fileName = "clip.mp4", size = 300, kind = MediaKind.VIDEO),
+                ),
+            ),
+        )
+        suspend fun order(query: TimelineQuery) = reader.page(query, 0, 10).map { it.assetId }
+
+        assertEquals(listOf("b", "a", "c"), order(TimelineQuery(TimelineSortKey.NAME, descending = false))) // case-insensitive
+        assertEquals(listOf("c", "a", "b"), order(TimelineQuery(TimelineSortKey.NAME, descending = true)))
+        assertEquals(listOf("c", "a", "b"), order(TimelineQuery(TimelineSortKey.SIZE, descending = true))) // equal size: id breaks the tie
+        assertEquals(listOf("b", "a", "c"), order(TimelineQuery(TimelineSortKey.SIZE, descending = false)))
+        assertEquals(listOf("a", "b", "c"), order(TimelineQuery(TimelineSortKey.TAKEN, descending = false)))
+
+        val videos = TimelineQuery(kind = MediaKind.VIDEO)
+        assertEquals(1, reader.count(videos))
+        assertEquals(listOf("c"), order(videos))
+        assertEquals(null, reader.indexOf(videos, "a"))
+        val photosByName = TimelineQuery(TimelineSortKey.NAME, descending = false, kind = MediaKind.IMAGE)
+        assertEquals(listOf(0, 1), listOf("b", "a").map { reader.indexOf(photosByName, it) })
+    }
+
+    private val newest = TimelineQuery()
+
+    private fun asset(
+        name: String,
+        id: Long,
+        taken: Long?,
+        modified: Long,
+        fileName: String = "$id.jpg",
+        size: Long = 1,
+        kind: MediaKind = MediaKind.IMAGE,
+    ) = NewCatalogAsset(
         discoveryId = "d-$name",
         assetId = name,
         sourceId = "s-$name",
         volumeId = "v1",
-        entry = MediaStoreEntry(id, MediaKind.IMAGE, "content://media/$id", "$id.jpg", null, "image/jpeg", 1, modified, taken),
+        entry = MediaStoreEntry(id, kind, "content://media/$id", fileName, null, "image/jpeg", size, modified, taken),
     )
 }

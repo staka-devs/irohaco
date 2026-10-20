@@ -95,7 +95,10 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.domain.LibraryAccess
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.core.domain.MediaLibraryAccess
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
+import dev.irohaco.core.contracts.TimelineQuery
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -114,6 +117,7 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
     val cells = viewModel.cells.collectAsLazyPagingItems()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
     val folders by viewModel.folders.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.refreshAccess() }
     LifecycleResumeEffect(Unit) {
@@ -215,6 +219,9 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
             }
         },
         snackbar = snackbar,
+        query = query,
+        onQueryChange = viewModel::setQuery,
+        scrollToTop = viewModel.scrollToTop,
     )
 }
 
@@ -280,7 +287,12 @@ internal fun TimelineContent(
     onCopy: (List<TimelineItem>) -> Unit = {},
     onRename: (TimelineItem) -> Unit = {},
     snackbar: SnackbarHostState = remember { SnackbarHostState() },
+    query: TimelineQuery = TimelineQuery(),
+    onQueryChange: (TimelineQuery) -> Unit = {},
+    scrollToTop: Flow<Unit> = emptyFlow(),
 ) {
+    var sorting by rememberSaveable { mutableStateOf(false) }
+    if (sorting) SortSheet(query, onQueryChange, onDismiss = { sorting = false })
     BoxWithConstraints {
         // Column ranges per width class (DESIGN §4.1): Compact 3–5, Medium 5–7, Expanded 6–10.
         val range = when {
@@ -312,6 +324,9 @@ internal fun TimelineContent(
                             Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.timeline_settings))
                         }
                         if (!noAccess) {
+                            IconButton(onClick = { sorting = true }) {
+                                Icon(painterResource(IrohacoIcons.Sort), stringResource(R.string.timeline_sort))
+                            }
                             IconButton(onClick = { chosen = (columns - 1).coerceIn(range) }, enabled = columns > range.first) {
                                 Icon(painterResource(IrohacoIcons.ZoomIn), stringResource(R.string.timeline_columns_fewer))
                             }
@@ -344,6 +359,7 @@ internal fun TimelineContent(
                         onMove = onMove,
                         onCopy = onCopy,
                         onRename = onRename,
+                        scrollToTop = scrollToTop,
                     )
                 }
             }
@@ -367,8 +383,10 @@ private fun TimelineGrid(
     onMove: (List<TimelineItem>) -> Unit,
     onCopy: (List<TimelineItem>) -> Unit,
     onRename: (TimelineItem) -> Unit,
+    scrollToTop: Flow<Unit>,
 ) {
     val gridState = rememberLazyGridState()
+    LaunchedEffect(scrollToTop) { scrollToTop.collect { gridState.scrollToItem(0) } }
     val currentSelection by rememberUpdatedState(selection)
     val selectRange by rememberUpdatedState(onSelectRange)
     val formatter = rememberDateFormatter()

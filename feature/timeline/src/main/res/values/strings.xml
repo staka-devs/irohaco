@@ -78,4 +78,15 @@
         <item quantity="one">Copied %d item</item>
         <item quantity="other">Copied %d items</item>
     </plurals>
+    <string name="timeline_sort">Sort and filter</string>
+    <string name="timeline_sort_title">Sort and filter</string>
+    <string name="timeline_sort_newest">Date taken, newest first</string>
+    <string name="timeline_sort_oldest">Date taken, oldest first</string>
+    <string name="timeline_sort_name_asc">File name, A to Z</string>
+    <string name="timeline_sort_name_desc">File name, Z to A</string>
+    <string name="timeline_sort_largest">Size, largest first</string>
+    <string name="timeline_sort_smallest">Size, smallest first</string>
+    <string name="timeline_kind_all">All</string>
+    <string name="timeline_kind_photos">Photos</string>
+    <string name="timeline_kind_videos">Videos</string>
 </resources>
