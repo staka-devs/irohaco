@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -38,10 +39,15 @@ enum class TopLevelDestination(@StringRes val label: Int, @DrawableRes val icon:
 /**
  * The app shell. NavigationSuiteScaffold shows a short navigation bar on Compact widths and a wide
  * navigation rail on wider windows. Back from another tab returns to Photos before leaving the app.
+ * Each tab keeps its saved state (such as the scroll position) while another tab is shown.
  */
 @Composable
-fun IrohacoApp(initialDestination: TopLevelDestination = TopLevelDestination.PHOTOS) {
+fun IrohacoApp(
+    initialDestination: TopLevelDestination = TopLevelDestination.PHOTOS,
+    destinationContent: @Composable (TopLevelDestination) -> Unit = { DestinationPlaceholder(it) },
+) {
     var current by rememberSaveable { mutableStateOf(initialDestination) }
+    val tabStates = rememberSaveableStateHolder()
     BackHandler(enabled = current != TopLevelDestination.PHOTOS) { current = TopLevelDestination.PHOTOS }
     NavigationSuiteScaffold(
         navigationItems = {
@@ -61,13 +67,13 @@ fun IrohacoApp(initialDestination: TopLevelDestination = TopLevelDestination.PHO
             }
         },
     ) {
-        DestinationPlaceholder(current)
+        tabStates.SaveableStateProvider(current.name) { destinationContent(current) }
     }
 }
 
 /** Stands in for each tab until its feature Issue (M0-10 timeline and later) replaces it. */
 @Composable
-private fun DestinationPlaceholder(destination: TopLevelDestination) {
+internal fun DestinationPlaceholder(destination: TopLevelDestination) {
     Scaffold(topBar = { TopAppBar(title = { Text(stringResource(destination.label)) }) }) { padding ->
         Box(Modifier.fillMaxSize().padding(padding))
     }
