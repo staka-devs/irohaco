@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -24,7 +25,12 @@ import java.time.ZoneId
 
 /** The grid of a folder, album, tag or the favorites; tapping opens the viewer over the same list. */
 @Composable
-internal fun MediaGrid(items: LazyPagingItems<TimelineItem>, padding: PaddingValues, onOpenMedia: (String) -> Unit) {
+internal fun MediaGrid(
+    items: LazyPagingItems<TimelineItem>,
+    padding: PaddingValues,
+    onOpenMedia: (String) -> Unit,
+    header: LazyGridScope.() -> Unit = {},
+) {
     val formatter = rememberDateFormatter()
     val zone = ZoneId.systemDefault()
     LazyVerticalGrid(
@@ -34,6 +40,7 @@ internal fun MediaGrid(items: LazyPagingItems<TimelineItem>, padding: PaddingVal
         verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs),
         modifier = Modifier.fillMaxSize(),
     ) {
+        header()
         items(count = items.itemCount, key = items.itemKey { it.assetId }) { index ->
             val item = items[index]
             if (item == null) {

@@ -63,6 +63,8 @@
 | M1-23 | 設定画面のカテゴリ分け | feature / app | APP-001, DESIGN §3 | M0-08 |
 | M1-24 | テーマ色の選び方の見直し | feature / designsystem | APP-002, DESIGN §2.1 | M1-23 |
 | M1-25 | スクロール中のサムネイルの表示の遅れの解消（MediaStoreの縮小画像、先読み、キャッシュ） | feature / viewer | GAL-001, NFR-002 | M0-10 |
+| M1-26 | 動画のサムネイルに再生時間と再生の印を出す | feature / viewer | GAL-001 | M0-10 |
+| M1-27 | スクロール中に上部のバーを隠す | feature / viewer | GAL-001, DESIGN §3 | M0-10 |
 
 ### M2: AI索引・検索・セマンティックメモ・複数索引
 

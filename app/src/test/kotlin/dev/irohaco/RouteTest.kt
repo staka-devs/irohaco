@@ -15,13 +15,12 @@ class RouteTest {
     }
 
     @Test
-    fun `folder routes keep the volume and the path, even odd ones`() {
-        val folder = FolderRef("v@1", "Pictures/a@b|c/")
-        assertTrue(Route.isFolder(Route.folder(folder)))
-        assertFalse(Route.isFolder(Route.viewer("a-1")))
-        assertEquals(folder, Route.parseFolder(Route.folder(folder)))
-        assertEquals(FolderRef("v", ""), Route.parseFolder(Route.folder(FolderRef("v", ""))))
-        assertEquals(Route.Viewer("a-1", null, MediaList.Folder(folder)), Route.parseViewer(Route.viewer("a-1", MediaList.Folder(folder))))
+    fun `a viewer over a folder keeps the volume and the path, even odd ones`() {
+        val folder = MediaList.Folder(FolderRef("v@1", "Pictures/a@b|c/"))
+        assertEquals(Route.Viewer("a-1", null, folder), Route.parseViewer(Route.viewer("a-1", folder)))
+        val root = MediaList.Folder(FolderRef("v", ""))
+        assertEquals(Route.Viewer("a-1", null, root), Route.parseViewer(Route.viewer("a-1", root)))
+        assertFalse(Route.isList(Route.viewer("a-1", root)))
     }
 
     @Test

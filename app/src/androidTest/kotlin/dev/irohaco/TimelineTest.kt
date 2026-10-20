@@ -77,10 +77,15 @@ class TimelineTest {
     @Test
     fun opensTheFolderFromTheLibraryAndItsPhotoInTheViewer() {
         compose.onNode(hasText(context.getString(R.string.destination_library))).performClick()
-        // insertTestImage puts the file in Pictures/IrohacoTest/.
+        // insertTestImage puts the file in Pictures/IrohacoTest/; the tree starts folded at the top level.
+        val expandPictures = hasContentDescription(context.getString(TimelineR.string.library_expand, "Pictures"))
+        compose.waitUntilAtLeastOneExists(expandPictures, timeoutMillis = 15_000)
+        compose.onNode(expandPictures).performClick()
         val folder = hasText("IrohacoTest")
-        compose.waitUntilAtLeastOneExists(folder, timeoutMillis = 15_000)
+        compose.waitUntilAtLeastOneExists(folder, timeoutMillis = 5_000)
         compose.onAllNodes(folder).onFirst().performClick()
+        // The folder pane shows where it is: the breadcrumbs lead back to Pictures.
+        compose.waitUntilAtLeastOneExists(hasText("Pictures"), timeoutMillis = 5_000)
 
         val thumbnail = hasContentDescription(context.getString(TimelineR.string.timeline_photo_description, ""), substring = true)
         compose.waitUntilAtLeastOneExists(thumbnail, timeoutMillis = 5_000)
@@ -92,5 +97,10 @@ class TimelineTest {
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntilAtLeastOneExists(thumbnail, timeoutMillis = 5_000)
         compose.waitUntilAtLeastOneExists(back, timeoutMillis = 5_000) // the folder's own back button
+
+        // Back from the folder returns to the tree, still unfolded.
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilDoesNotExist(back, timeoutMillis = 5_000)
+        compose.waitUntilAtLeastOneExists(folder, timeoutMillis = 5_000)
     }
 }

@@ -1,21 +1,29 @@
 package dev.irohaco.feature.timeline.library
 
-import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.ViewModel
@@ -25,6 +33,7 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.GetTimelinePage
@@ -34,12 +43,15 @@ import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.designsystem.component.BadgeStatus
 import dev.irohaco.core.designsystem.component.StatusBadge
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
+import dev.irohaco.core.designsystem.preview.IrohacoPreviews
+import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.feature.timeline.R
 import dev.irohaco.feature.timeline.TimelinePagingSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -54,12 +66,22 @@ class FolderViewModel(getPage: GetTimelinePage, private val browse: BrowseLibrar
         Pager(PagingConfig(pageSize = 120, enablePlaceholders = true)) { TimelinePagingSource(getPage, query).also { source = it } }
             .flow.cachedIn(viewModelScope)
 
+    private val volumeFolders = browse.folders().map { all -> all.filter { it.folder.volumeId == folder.volumeId } }
+
     /** Null while unknown; the volume name and whether its card is out. */
-    val volume: StateFlow<Pair<String, Boolean>?> = browse.folders()
-        .map { folders -> folders.firstOrNull { it.folder == folder }?.let { it.volumeName to it.offline } }
+    val volume: StateFlow<Pair<String, Boolean>?> = volumeFolders
+        .map { folders -> folders.firstOrNull()?.let { it.volumeName to it.offline } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** The subfolders, listed before the photos and videos (GAL-011). */
+    internal val children: StateFlow<List<FolderLine>> = volumeFolders
+        .map { childrenOf(folderTree(it), folder.relativePath) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val excluded: StateFlow<Boolean> = browse.excludedFolders().map { folder in it }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val pinned: StateFlow<Boolean> = browse.pinnedFolders().map { folder in it }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     init {
@@ -69,26 +91,78 @@ class FolderViewModel(getPage: GetTimelinePage, private val browse: BrowseLibrar
     fun setExcluded(excluded: Boolean) {
         viewModelScope.launch { browse.setExcluded(folder, excluded) }
     }
+
+    fun setPinned(pinned: Boolean) {
+        viewModelScope.launch { browse.setPinned(folder, pinned) }
+    }
 }
 
-/** One folder's photos and videos (PRD GAL-002). */
+/** One folder: breadcrumbs, its subfolders, then its photos and videos (PRD GAL-002, GAL-011). */
 @Composable
-fun FolderScreen(viewModel: FolderViewModel, onOpenMedia: (String) -> Unit, onBack: () -> Unit) {
-    val items = viewModel.items.collectAsLazyPagingItems()
+internal fun FolderPane(
+    viewModel: FolderViewModel,
+    showBack: Boolean,
+    onBack: () -> Unit,
+    onOpenFolder: (FolderRef) -> Unit,
+    onOpenMedia: (String) -> Unit,
+) {
     val volume by viewModel.volume.collectAsStateWithLifecycle()
+    val children by viewModel.children.collectAsStateWithLifecycle()
     val excluded by viewModel.excluded.collectAsStateWithLifecycle()
-    val path = viewModel.folder.relativePath
-    BackHandler(onBack = onBack)
+    val pinned by viewModel.pinned.collectAsStateWithLifecycle()
+    FolderContent(
+        folder = viewModel.folder,
+        volumeName = volume?.first,
+        offline = volume?.second == true,
+        children = children,
+        items = viewModel.items.collectAsLazyPagingItems(),
+        excluded = excluded,
+        pinned = pinned,
+        showBack = showBack,
+        onBack = onBack,
+        onOpenFolder = onOpenFolder,
+        onOpenMedia = onOpenMedia,
+        onExclude = viewModel::setExcluded,
+        onPin = viewModel::setPinned,
+    )
+}
+
+@Composable
+internal fun FolderContent(
+    folder: FolderRef,
+    volumeName: String?,
+    offline: Boolean,
+    children: List<FolderLine>,
+    items: LazyPagingItems<TimelineItem>,
+    excluded: Boolean,
+    pinned: Boolean,
+    showBack: Boolean,
+    onBack: () -> Unit,
+    onOpenFolder: (FolderRef) -> Unit,
+    onOpenMedia: (String) -> Unit,
+    onExclude: (Boolean) -> Unit,
+    onPin: (Boolean) -> Unit,
+) {
+    val rootLabel = volumeName?.let { volumeLabel(it) }.orEmpty()
+    val crumbs = breadcrumbs(folder.relativePath)
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(path.trimEnd('/').substringAfterLast('/').ifEmpty { volume?.let { volumeLabel(it.first) }.orEmpty() }) },
+                title = { Text(crumbs.lastOrNull()?.first ?: rootLabel) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back)) }
+                    if (showBack) {
+                        IconButton(onClick = onBack) { Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back)) }
+                    }
                 },
                 actions = {
-                    // Shows what tapping does: hide this folder from the timeline, or show it again.
-                    IconButton(onClick = { viewModel.setExcluded(!excluded) }) {
+                    // Each button shows what a tap does.
+                    IconButton(onClick = { onPin(!pinned) }) {
+                        Icon(
+                            painterResource(if (pinned) IrohacoIcons.PushPinFilled else IrohacoIcons.PushPin),
+                            stringResource(if (pinned) R.string.library_unpin else R.string.library_pin),
+                        )
+                    }
+                    IconButton(onClick = { onExclude(!excluded) }) {
                         Icon(
                             painterResource(if (excluded) IrohacoIcons.Visibility else IrohacoIcons.VisibilityOff),
                             stringResource(if (excluded) R.string.library_include else R.string.library_exclude),
@@ -98,7 +172,7 @@ fun FolderScreen(viewModel: FolderViewModel, onOpenMedia: (String) -> Unit, onBa
             )
         },
     ) { padding ->
-        if (volume?.second == true) {
+        if (offline) {
             Column(
                 Modifier.fillMaxSize().padding(padding).padding(IrohacoSpacing.xl),
                 verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.l, Alignment.CenterVertically),
@@ -107,8 +181,66 @@ fun FolderScreen(viewModel: FolderViewModel, onOpenMedia: (String) -> Unit, onBa
                 StatusBadge(BadgeStatus.Offline)
                 Text(stringResource(R.string.library_offline_body), style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
             }
-        } else {
-            MediaGrid(items, padding, onOpenMedia)
+            return@Scaffold
         }
+        MediaGrid(items, padding, onOpenMedia) {
+            if (crumbs.isNotEmpty()) {
+                item(key = "breadcrumbs", span = { GridItemSpan(maxLineSpan) }) {
+                    Breadcrumbs(rootLabel, crumbs) { onOpenFolder(FolderRef(folder.volumeId, it)) }
+                }
+            }
+            for (child in children) {
+                item(key = "folder-${child.path}", span = { GridItemSpan(maxLineSpan) }) {
+                    ListItem(
+                        headlineContent = { Text(child.name) },
+                        supportingContent = { Text(pluralStringResource(R.plurals.library_items, child.totalCount, child.totalCount)) },
+                        leadingContent = { Icon(painterResource(IrohacoIcons.Folder), contentDescription = null) },
+                        modifier = Modifier.clickable { onOpenFolder(FolderRef(folder.volumeId, child.path)) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The volume, then each folder down to this one; tapping a step opens that folder. The last step is where you are. */
+@Composable
+private fun Breadcrumbs(rootLabel: String, crumbs: List<Pair<String, String>>, onOpen: (String) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = IrohacoSpacing.s),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(onClick = { onOpen("") }) { Text(rootLabel) }
+        crumbs.forEachIndexed { index, (name, path) ->
+            Icon(painterResource(IrohacoIcons.ChevronRight), contentDescription = null)
+            if (index == crumbs.lastIndex) {
+                Text(name, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = IrohacoSpacing.m))
+            } else {
+                TextButton(onClick = { onOpen(path) }) { Text(name) }
+            }
+        }
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun FolderPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        FolderContent(
+            folder = FolderRef("in", "Pictures/Trip/"),
+            volumeName = "external_primary",
+            offline = false,
+            children = listOf(FolderLine("2026", 3, "Pictures/Trip/2026/", null, totalCount = 12)),
+            items = flowOf(PagingData.from(List(5) { TimelineItem("a$it", dev.irohaco.core.domain.MediaKind.IMAGE, "content://preview/$it", 0) }))
+                .collectAsLazyPagingItems(),
+            excluded = false,
+            pinned = true,
+            showBack = true,
+            onBack = {},
+            onOpenFolder = {},
+            onOpenMedia = {},
+            onExclude = {},
+            onPin = {},
+        )
     }
 }

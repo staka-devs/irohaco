@@ -36,7 +36,6 @@ import dev.irohaco.feature.timeline.library.AlbumsScreen
 import dev.irohaco.feature.timeline.library.AlbumsViewModel
 import dev.irohaco.feature.timeline.library.CollectionScreen
 import dev.irohaco.feature.timeline.library.CollectionViewModel
-import dev.irohaco.feature.timeline.library.FolderScreen
 import dev.irohaco.feature.timeline.library.IdentityScreen
 import dev.irohaco.feature.timeline.library.IdentityViewModel
 import dev.irohaco.feature.timeline.library.MediaList
@@ -90,8 +89,7 @@ class MainActivity : ComponentActivity() {
                             if (target == Route.SHELL) {
                                 shellState.SaveableStateProvider(Route.SHELL) {
                                     Shell(
-                                        onOpenMedia = { open(Route.viewer(it)) },
-                                        onOpenFolder = { open(Route.folder(it)) },
+                                        onOpenMedia = { assetId, list -> open(Route.viewer(assetId, list)) },
                                         onOpenList = { open(Route.list(it)) },
                                         onOpenCandidates = { open(Route.IDENTITY) },
                                         onOpenSettings = { open(Route.SETTINGS) },
@@ -111,8 +109,7 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Shell(
-        onOpenMedia: (String) -> Unit,
-        onOpenFolder: (FolderRef) -> Unit,
+        onOpenMedia: (assetId: String, list: MediaList?) -> Unit,
         onOpenList: (MediaList) -> Unit,
         onOpenSettings: () -> Unit,
         onOpenCandidates: () -> Unit,
@@ -131,7 +128,7 @@ class MainActivity : ComponentActivity() {
                             container.manageCollections,
                         )
                     },
-                    onOpenMedia = onOpenMedia,
+                    onOpenMedia = { onOpenMedia(it, null) },
                     onOpenSettings = onOpenSettings,
                 )
                 TopLevelDestination.ALBUMS -> AlbumsScreen(
@@ -141,7 +138,12 @@ class MainActivity : ComponentActivity() {
                 )
                 TopLevelDestination.LIBRARY -> LibraryScreen(
                     viewModel { LibraryViewModel(container.browseLibrary, container.manageCollections, container.reconcileIdentity) },
-                    onOpenFolder = onOpenFolder,
+                    folderViewModel = { folder ->
+                        viewModel(key = "folder:${Route.list(MediaList.Folder(folder))}") {
+                            FolderViewModel(container.getTimelinePage, container.browseLibrary, folder)
+                        }
+                    },
+                    onOpenMedia = { assetId, folder -> onOpenMedia(assetId, MediaList.Folder(folder)) },
                     onOpenTag = { onOpenList(MediaList.Tag(it)) },
                     onOpenSettings = onOpenSettings,
                     onOpenCandidates = onOpenCandidates,
@@ -156,14 +158,6 @@ class MainActivity : ComponentActivity() {
         when {
             route == Route.SETTINGS -> SettingsScreen(viewModel { SettingsViewModel(container.themeColorSettings) }, onBack)
             route == Route.IDENTITY -> IdentityScreen(viewModel { IdentityViewModel(container.reconcileIdentity) }, onBack)
-            Route.isFolder(route) -> {
-                val folder = Route.parseFolder(route)
-                FolderScreen(
-                    viewModel { FolderViewModel(container.getTimelinePage, container.browseLibrary, folder) },
-                    onOpenMedia = { open(Route.viewer(it, MediaList.Folder(folder))) },
-                    onBack = onBack,
-                )
-            }
             Route.isList(route) -> {
                 val list = Route.parseList(route)
                 CollectionScreen(
@@ -212,7 +206,6 @@ object Route {
     const val SETTINGS = "settings"
     const val IDENTITY = "identity"
     private const val VIEWER = "viewer:"
-    private const val FOLDER = "folder:"
     private const val LIST = "list:"
     private const val SEP = '\u0000'
 
@@ -231,13 +224,6 @@ object Route {
         val list = parts.getOrNull(1)?.let(::decode)
         return if (at < 0) Viewer(head, null, list) else Viewer(head.substring(0, at), head.substring(at + 1).toLongOrNull(), list)
     }
-
-    /** A folder has its own screen (offline state, hiding from the timeline). */
-    fun folder(folder: FolderRef) = FOLDER + encode(MediaList.Folder(folder))
-
-    fun isFolder(route: String) = route.startsWith(FOLDER)
-
-    fun parseFolder(route: String): FolderRef = (decode(route.removePrefix(FOLDER)) as MediaList.Folder).folder
 
     fun list(list: MediaList) = LIST + encode(list)
 

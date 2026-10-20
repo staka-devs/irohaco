@@ -93,7 +93,6 @@
     <string name="library_empty">No photos or videos yet</string>
     <string name="library_internal">Internal storage</string>
     <string name="library_sd_card">SD card (%1$s)</string>
-    <string name="library_root">Top level</string>
     <string name="library_excluded">%1$s · hidden from Photos</string>
     <string name="library_exclude">Hide from Photos</string>
     <string name="library_include">Show in Photos</string>
@@ -146,4 +145,15 @@
     <string name="details_headline">Headline</string>
     <string name="details_creator">Creator</string>
     <string name="details_copyright">Copyright</string>
+    <string name="library_pick_folder">Pick a folder</string>
+    <string name="library_layout_grid">Show as cards</string>
+    <string name="library_layout_tree">Show as a tree</string>
+    <string name="library_expand">Expand %1$s</string>
+    <string name="library_collapse">Collapse %1$s</string>
+    <string name="library_pinned">Pinned folders</string>
+    <string name="library_pinned_menu">Options for %1$s</string>
+    <string name="library_pin">Pin to the top of Library</string>
+    <string name="library_unpin">Unpin</string>
+    <string name="library_move_up">Move up</string>
+    <string name="library_move_down">Move down</string>
 </resources>

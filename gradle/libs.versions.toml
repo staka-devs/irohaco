@@ -3,6 +3,7 @@ agp = "9.4.1"
 kotlin = "2.4.21"
 composeBom = "2026.09.00"
 material3 = "1.5.0-beta01"
+materialAdaptive = "1.3.0"
 activityCompose = "1.13.0"
 roborazzi = "1.76.0"
 robolectric = "4.17"
@@ -28,6 +29,8 @@ androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = 
 # Pinned above the BOM's 1.4.0: DESIGN.md §1 requires the 1.5 series for the M3 Expressive APIs.
 androidx-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 androidx-compose-material3-navigation-suite = { module = "androidx.compose.material3:material3-adaptive-navigation-suite", version.ref = "material3" }
+androidx-compose-material3-adaptive-layout = { module = "androidx.compose.material3.adaptive:adaptive-layout", version.ref = "materialAdaptive" }
+androidx-compose-material3-adaptive-navigation = { module = "androidx.compose.material3.adaptive:adaptive-navigation", version.ref = "materialAdaptive" }
 androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
