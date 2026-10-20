@@ -87,8 +87,25 @@ class MetadataParsingTest {
             </rdf:Description></rdf:RDF></x:xmpmeta>
         """.trimIndent()
         assertEquals(XmpFields(Detail.Value("Festival night"), Detail.Value(listOf("fireworks", "summer"))), parseXmp(xmp))
-        assertEquals(XmpFields(Detail.Unreadable, Detail.Unreadable), parseXmp("<x:xmpmeta><dc:subject>"))
+        assertEquals(XmpFields(Detail.Unreadable, Detail.Unreadable, Detail.Unreadable, Detail.Unreadable, Detail.Unreadable), parseXmp("<x:xmpmeta><dc:subject>"))
         assertEquals(XmpFields(Detail.Missing, Detail.Missing), parseXmp("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"/>"))
+    }
+
+    @Test
+    fun `XMP headline as an attribute, creators and rights`() {
+        val xmp = """
+            <x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            <rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"
+                photoshop:Headline="Harbour at dawn">
+              <dc:creator><rdf:Seq><rdf:li>A. Photographer</rdf:li><rdf:li>B. Assistant</rdf:li></rdf:Seq></dc:creator>
+              <dc:rights><rdf:Alt><rdf:li xml:lang="x-default">© 2026 A. Photographer</rdf:li></rdf:Alt></dc:rights>
+            </rdf:Description></rdf:RDF></x:xmpmeta>
+        """.trimIndent()
+        val fields = parseXmp(xmp)
+        assertEquals(Detail.Value("Harbour at dawn"), fields.headline)
+        assertEquals(Detail.Value("A. Photographer, B. Assistant"), fields.creator)
+        assertEquals(Detail.Value("© 2026 A. Photographer"), fields.copyright)
+        assertEquals(Detail.Missing, fields.description)
     }
 
     @Test

@@ -74,7 +74,9 @@ class AndroidMediaDetailsReader(private val context: Context) : MediaDetailsRead
 
     private fun photoDetails(row: Row, source: Uri, locationAllowed: Boolean): MediaDetails {
         val photo = try {
-            context.contentResolver.openInputStream(source)?.use { readPhotoFields(it, locationAllowed) } ?: PhotoFields.unreadable
+            // IPTC sits in the JPEG header; reading it first walks only the header segments.
+            val iptc = context.contentResolver.openInputStream(source)?.use { readIptc(it) } ?: IptcFields.missing
+            context.contentResolver.openInputStream(source)?.use { readPhotoFields(it, locationAllowed, iptc) } ?: PhotoFields.unreadable
         } catch (e: IOException) {
             if (e is FileNotFoundException) throw e
             PhotoFields.unreadable
@@ -85,6 +87,7 @@ class AndroidMediaDetailsReader(private val context: Context) : MediaDetailsRead
             camera = photo.camera, lens = photo.lens, fNumber = photo.fNumber, exposureSeconds = photo.exposureSeconds,
             iso = photo.iso, focalLengthMm = photo.focalLengthMm, location = photo.location,
             description = photo.description, keywords = photo.keywords,
+            headline = photo.headline, creator = photo.creator, copyright = photo.copyright,
         )
     }
 
