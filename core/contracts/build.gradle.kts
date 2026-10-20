@@ -13,5 +13,6 @@ kotlin {
 
 dependencies {
     api(project(":core:domain"))
+    api(libs.kotlinx.coroutines.core)
     testImplementation(kotlin("test"))
 }

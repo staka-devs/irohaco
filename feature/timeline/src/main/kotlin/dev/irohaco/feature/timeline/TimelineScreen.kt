@@ -1,0 +1,318 @@
+package dev.irohaco.feature.timeline
+
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import android.text.format.DateFormat
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.LoadState
+import androidx.paging.PagingData
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
+import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.designsystem.component.MediaThumbnail
+import dev.irohaco.core.designsystem.icon.IrohacoIcons
+import dev.irohaco.core.designsystem.preview.IrohacoPreviews
+import dev.irohaco.core.designsystem.theme.IrohacoTheme
+import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
+import dev.irohaco.core.domain.LibraryAccess
+import dev.irohaco.core.domain.MediaKind
+import dev.irohaco.core.domain.MediaLibraryAccess
+import kotlinx.coroutines.flow.flowOf
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+
+private val MEDIA_PERMISSIONS: Array<String> =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+    } else {
+        arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+    }
+
+/** The Photos tab (PRD GAL-001, DESIGN §4.1). */
+@Composable
+fun TimelineScreen(viewModel: TimelineViewModel) {
+    val access by viewModel.access.collectAsStateWithLifecycle()
+    val cells = viewModel.cells.collectAsLazyPagingItems()
+    val context = LocalContext.current
+    val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.refreshAccess() }
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshAccess()
+        onPauseOrDispose { }
+    }
+    TimelineContent(
+        access = access,
+        cells = cells,
+        onRequestAccess = { request.launch(MEDIA_PERMISSIONS) },
+        onOpenSettings = {
+            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))
+        },
+    )
+}
+
+@Composable
+internal fun TimelineContent(
+    access: MediaLibraryAccess,
+    cells: LazyPagingItems<TimelineCell>,
+    onRequestAccess: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    BoxWithConstraints {
+        // Column ranges per width class (DESIGN §4.1): Compact 3–5, Medium 5–7, Expanded 6–10.
+        val range = when {
+            maxWidth < 600.dp -> 3..5
+            maxWidth < 840.dp -> 5..7
+            else -> 6..10
+        }
+        var chosen by rememberSaveable { mutableIntStateOf(range.first + 1) }
+        val columns = chosen.coerceIn(range)
+        val noAccess = access.images == LibraryAccess.NONE && access.videos == LibraryAccess.NONE
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.timeline_title)) },
+                    actions = {
+                        if (!noAccess) {
+                            IconButton(onClick = { chosen = (columns - 1).coerceIn(range) }, enabled = columns > range.first) {
+                                Icon(painterResource(IrohacoIcons.ZoomIn), stringResource(R.string.timeline_columns_fewer))
+                            }
+                            IconButton(onClick = { chosen = (columns + 1).coerceIn(range) }, enabled = columns < range.last) {
+                                Icon(painterResource(IrohacoIcons.ZoomOut), stringResource(R.string.timeline_columns_more))
+                            }
+                        }
+                    },
+                )
+            },
+        ) { padding ->
+            when {
+                noAccess -> PermissionPrompt(padding, onRequestAccess, onOpenSettings)
+                else -> Column(Modifier.padding(top = padding.calculateTopPadding())) {
+                    if (access.images == LibraryAccess.SELECTED || access.videos == LibraryAccess.SELECTED) {
+                        PartialAccessBar(onRequestAccess)
+                    }
+                    TimelineGrid(
+                        cells = cells,
+                        columns = columns,
+                        bottomPadding = padding.calculateBottomPadding(),
+                        onFewerColumns = { chosen = (columns - 1).coerceIn(range) },
+                        onMoreColumns = { chosen = (columns + 1).coerceIn(range) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimelineGrid(
+    cells: LazyPagingItems<TimelineCell>,
+    columns: Int,
+    bottomPadding: Dp,
+    onFewerColumns: () -> Unit,
+    onMoreColumns: () -> Unit,
+) {
+    val gridState = rememberLazyGridState()
+    val formatter = rememberDateFormatter()
+    // The pinch detector is installed once, so it must call the latest callbacks.
+    val fewer by rememberUpdatedState(onFewerColumns)
+    val more by rememberUpdatedState(onMoreColumns)
+    if (cells.itemCount == 0 && cells.loadState.refresh is LoadState.NotLoading) {
+        Text(
+            stringResource(R.string.timeline_empty),
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(IrohacoSpacing.xxl),
+        )
+        return
+    }
+    Box(Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            state = gridState,
+            contentPadding = PaddingValues(bottom = bottomPadding),
+            horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs),
+            verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs),
+            modifier = Modifier.fillMaxSize().pinchToChangeColumns({ fewer() }, { more() }),
+        ) {
+            items(
+                count = cells.itemCount,
+                key = cells.itemKey { if (it is TimelineCell.Header) "date-${it.date}" else (it as TimelineCell.Media).item.assetId },
+                contentType = cells.itemContentType { it::class },
+                span = { index -> GridItemSpan(if (cells.peek(index) is TimelineCell.Header) maxLineSpan else 1) },
+            ) { index ->
+                when (val cell = cells[index]) {
+                    is TimelineCell.Header -> DateHeader(cell.date, formatter)
+                    is TimelineCell.Media -> {
+                        val date = formatter.format(cell.date)
+                        val description = if (cell.item.kind == MediaKind.VIDEO) {
+                            stringResource(R.string.timeline_video_description, date)
+                        } else {
+                            stringResource(R.string.timeline_photo_description, date)
+                        }
+                        MediaThumbnail(model = cell.item.contentUri, contentDescription = description, selected = false)
+                    }
+                    null -> MediaThumbnail(model = null, contentDescription = "", selected = false)
+                }
+            }
+        }
+        // The date of the first visible row stays at the top while scrolling (DESIGN §4.1).
+        val pinned by remember(cells) {
+            derivedStateOf {
+                // The list is empty until the first page arrives.
+                val index = gridState.firstVisibleItemIndex
+                when (val cell = if (index < cells.itemCount) cells.peek(index) else null) {
+                    is TimelineCell.Header -> cell.date
+                    is TimelineCell.Media -> cell.date
+                    null -> null
+                }
+            }
+        }
+        pinned?.let { DateHeader(it, formatter) }
+    }
+}
+
+@Composable
+private fun DateHeader(date: LocalDate, formatter: DateTimeFormatter) {
+    Text(
+        text = formatter.format(date),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
+    )
+}
+
+@Composable
+private fun rememberDateFormatter(): DateTimeFormatter {
+    val locale = LocalConfiguration.current.locales[0]
+    return remember(locale) { DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, "yMMMdE"), locale) }
+}
+
+@Composable
+private fun PartialAccessBar(onChange: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = IrohacoSpacing.l, end = IrohacoSpacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.timeline_partial_access), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = onChange) { Text(stringResource(R.string.timeline_partial_access_change)) }
+        }
+    }
+}
+
+@Composable
+private fun PermissionPrompt(padding: PaddingValues, onRequest: () -> Unit, onOpenSettings: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(padding).padding(IrohacoSpacing.xl),
+        verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.l, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(stringResource(R.string.timeline_permission_title), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.timeline_permission_body), style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+        Button(onClick = onRequest) { Text(stringResource(R.string.timeline_permission_grant)) }
+        // After a permanent denial the system dialog no longer appears, so settings is the way back.
+        TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.timeline_permission_settings)) }
+    }
+}
+
+/** Two-finger pinch: spreading shows fewer, larger thumbnails; pinching in shows more. One finger still scrolls. */
+private fun Modifier.pinchToChangeColumns(onFewer: () -> Unit, onMore: () -> Unit): Modifier = this.then(
+    Modifier.pointerInput(Unit) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            var zoom = 1f
+            do {
+                val event = awaitPointerEvent()
+                if (event.changes.count { it.pressed } >= 2) {
+                    zoom *= event.calculateZoom()
+                    if (zoom > PINCH_STEP) {
+                        onFewer()
+                        zoom = 1f
+                    } else if (zoom < 1 / PINCH_STEP) {
+                        onMore()
+                        zoom = 1f
+                    }
+                    event.changes.forEach { it.consume() }
+                }
+            } while (event.changes.any { it.pressed })
+        }
+    },
+)
+
+private const val PINCH_STEP = 1.3f
+
+private val previewItems = (0 until 9).map { i ->
+    TimelineItem("a$i", if (i % 4 == 0) MediaKind.VIDEO else MediaKind.IMAGE, "content://preview/$i", LocalDate.of(2026, 10, if (i < 4) 20 else 18).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+}
+
+@IrohacoPreviews
+@Composable
+private fun TimelinePreview() {
+    IrohacoTheme(dynamicColor = false) {
+        val cells = flowOf(PagingData.from(previewItems).withDateHeaders(ZoneOffset.UTC)).collectAsLazyPagingItems()
+        TimelineContent(MediaLibraryAccess(LibraryAccess.SELECTED, LibraryAccess.FULL), cells, {}, {})
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun TimelinePermissionPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        val cells = flowOf(PagingData.empty<TimelineCell>()).collectAsLazyPagingItems()
+        TimelineContent(MediaLibraryAccess(LibraryAccess.NONE, LibraryAccess.NONE), cells, {}, {})
+    }
+}

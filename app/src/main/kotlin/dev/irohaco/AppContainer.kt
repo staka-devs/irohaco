@@ -1,10 +1,13 @@
 package dev.irohaco
 
 import android.content.Context
+import dev.irohaco.core.application.GetLibraryAccess
+import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.SyncMediaCatalog
 import dev.irohaco.core.database.IrohacoDatabase
 import dev.irohaco.core.database.IrohacoDatabaseFactory
 import dev.irohaco.core.database.RoomCatalogStore
+import dev.irohaco.core.database.RoomTimelineReader
 import dev.irohaco.infrastructure.media.AndroidMediaLibraryAccess
 import dev.irohaco.infrastructure.media.MediaStoreCatalogSource
 import java.util.UUID
@@ -16,10 +19,16 @@ class AppContainer(context: Context) {
     /** Opens on first use; the caller must be off the main thread. */
     val database: IrohacoDatabase by lazy { IrohacoDatabaseFactory.open(appContext) }
 
+    private val libraryAccess by lazy { AndroidMediaLibraryAccess(appContext) }
+
+    val getLibraryAccess by lazy { GetLibraryAccess(libraryAccess) }
+
+    val getTimelinePage by lazy { GetTimelinePage(RoomTimelineReader(database)) }
+
     val syncMediaCatalog: SyncMediaCatalog by lazy {
         SyncMediaCatalog(
             source = MediaStoreCatalogSource(appContext),
-            access = AndroidMediaLibraryAccess(appContext),
+            access = libraryAccess,
             store = RoomCatalogStore(database),
             newId = { UUID.randomUUID().toString() },
             now = System::currentTimeMillis,

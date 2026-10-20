@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="timeline_title">Photos</string>
+    <string name="timeline_permission_title">Allow access to your photos and videos</string>
+    <string name="timeline_permission_body">Irohaco shows the photos and videos on this device. They are not sent anywhere.</string>
+    <string name="timeline_permission_grant">Allow</string>
+    <string name="timeline_permission_settings">Open settings</string>
+    <string name="timeline_partial_access">Showing only the photos and videos you selected</string>
+    <string name="timeline_partial_access_change">Change</string>
+    <string name="timeline_empty">No photos or videos yet</string>
+    <string name="timeline_photo_description">Photo, %1$s</string>
+    <string name="timeline_video_description">Video, %1$s</string>
+    <string name="timeline_columns_fewer">Fewer columns</string>
+    <string name="timeline_columns_more">More columns</string>
+</resources>

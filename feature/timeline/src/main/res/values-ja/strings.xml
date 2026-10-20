@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="timeline_title">写真</string>
+    <string name="timeline_permission_title">写真と動画へのアクセスを許可してください</string>
+    <string name="timeline_permission_body">Irohacoは、この端末の写真と動画を表示します。写真と動画を端末の外へ送ることはありません。</string>
+    <string name="timeline_permission_grant">許可する</string>
+    <string name="timeline_permission_settings">設定を開く</string>
+    <string name="timeline_partial_access">選んだ写真と動画だけを表示しています</string>
+    <string name="timeline_partial_access_change">選び直す</string>
+    <string name="timeline_empty">写真や動画はまだありません</string>
+    <string name="timeline_photo_description">写真、%1$s</string>
+    <string name="timeline_video_description">動画、%1$s</string>
+    <string name="timeline_columns_fewer">列を減らす</string>
+    <string name="timeline_columns_more">列を増やす</string>
+</resources>
