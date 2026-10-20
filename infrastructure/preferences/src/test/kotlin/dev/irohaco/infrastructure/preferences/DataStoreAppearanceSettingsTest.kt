@@ -2,6 +2,7 @@ package dev.irohaco.infrastructure.preferences
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import dev.irohaco.core.domain.ThemeColor
+import dev.irohaco.core.domain.ThemeContrast
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -24,6 +25,10 @@ class DataStoreAppearanceSettingsTest {
         assertEquals(ThemeColor.Seed(0x2196F3), settings.themeColor.first())
         settings.setThemeColor(ThemeColor.Device)
         assertEquals(ThemeColor.Device, settings.themeColor.first())
+
+        assertEquals(ThemeContrast.DEVICE, settings.themeContrast.first())
+        settings.setThemeContrast(ThemeContrast.HIGH)
+        assertEquals(ThemeContrast.HIGH, settings.themeContrast.first())
     }
 
     @Test
@@ -32,5 +37,6 @@ class DataStoreAppearanceSettingsTest {
         assertEquals(ThemeColor.Device, DataStoreAppearanceSettings.decode("blue"))
         assertEquals(ThemeColor.Device, DataStoreAppearanceSettings.decode(null))
         assertEquals("#2196F3", DataStoreAppearanceSettings.encode(ThemeColor.Seed(0x2196F3)))
+        assertEquals(ThemeContrast.DEVICE, DataStoreAppearanceSettings.decodeContrast("LOUD"))
     }
 }

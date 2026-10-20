@@ -5,4 +5,14 @@
     <string name="settings_theme_color">テーマの色</string>
     <string name="settings_theme_color_device">端末の壁紙に合わせる</string>
     <string name="settings_theme_color_device_summary">壁紙から端末が作る色を使います</string>
+    <string name="settings_theme_color_palette">パレットから選ぶ</string>
+    <string name="settings_theme_color_custom">カスタム</string>
+    <string name="settings_custom_hex_label">色（#RRGGBB）</string>
+    <string name="settings_custom_hex_error">#RRGGBBの形で入力してください</string>
+    <string name="settings_palette_shade">%1$s %2$s</string>
+    <string name="settings_contrast">コントラスト</string>
+    <string name="settings_contrast_device">端末の設定に合わせる</string>
+    <string name="settings_contrast_standard">標準</string>
+    <string name="settings_contrast_medium">中</string>
+    <string name="settings_contrast_high">高</string>
 </resources>

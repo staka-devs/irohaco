@@ -26,7 +26,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.irohaco.core.designsystem.motion.LocalSharedMediaScope
 import dev.irohaco.core.designsystem.motion.SharedMediaScope
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
+import dev.irohaco.core.designsystem.theme.SchemeContrast
 import dev.irohaco.core.domain.ThemeColor
+import dev.irohaco.core.domain.ThemeContrast
 import dev.irohaco.feature.settings.SettingsScreen
 import dev.irohaco.feature.settings.SettingsViewModel
 import dev.irohaco.feature.timeline.TimelineScreen
@@ -54,7 +56,16 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val themeColor by container.themeColorSettings.observe().collectAsStateWithLifecycle(ThemeColor.Device)
-            IrohacoTheme(seedColor = (themeColor as? ThemeColor.Seed)?.let { Color(0xFF000000 or it.rgb.toLong()) }) {
+            val contrast by container.themeColorSettings.observeContrast().collectAsStateWithLifecycle(ThemeContrast.DEVICE)
+            IrohacoTheme(
+                seedColor = (themeColor as? ThemeColor.Seed)?.let { Color(0xFF000000 or it.rgb.toLong()) },
+                contrast = when (contrast) {
+                    ThemeContrast.DEVICE -> null
+                    ThemeContrast.STANDARD -> SchemeContrast.STANDARD
+                    ThemeContrast.MEDIUM -> SchemeContrast.MEDIUM
+                    ThemeContrast.HIGH -> SchemeContrast.HIGH
+                },
+            ) {
                 // Full-screen pages open over the shell, which keeps its saved state (tab, scroll position) meanwhile.
                 var route by rememberSaveable { mutableStateOf(Route.SHELL) }
                 val shellState = rememberSaveableStateHolder()
