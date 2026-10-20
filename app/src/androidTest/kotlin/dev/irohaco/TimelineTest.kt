@@ -11,7 +11,6 @@ import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
-import dev.irohaco.core.database.IrohacoDatabaseFactory
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -23,7 +22,8 @@ import dev.irohaco.feature.timeline.R as TimelineR
 @RunWith(AndroidJUnit4::class)
 class TimelineTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val image = insertTestImage(context).also { context.deleteDatabase(IrohacoDatabaseFactory.NAME) }
+    // The app keeps its database open across tests; the resume-time sync picks this file up without a reset.
+    private val image = insertTestImage(context)
     private val compose = createAndroidComposeRule<MainActivity>()
 
     @get:Rule val rules: RuleChain = RuleChain
