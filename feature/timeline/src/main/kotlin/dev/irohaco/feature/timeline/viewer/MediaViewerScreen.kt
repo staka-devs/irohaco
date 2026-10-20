@@ -86,6 +86,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
     val items = viewModel.items.collectAsLazyPagingItems()
     val playing by viewModel.playing.collectAsStateWithLifecycle()
     val details by viewModel.details.collectAsStateWithLifecycle()
+    var detailsOf by remember { mutableStateOf<TimelineItem?>(null) }
     val marks by viewModel.marks.collectAsStateWithLifecycle()
     val tags by viewModel.tags.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
@@ -100,7 +101,6 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
             onDismiss = { tagging = false },
         )
     }
-    var detailsOf by remember { mutableStateOf<TimelineItem?>(null) }
     val allowLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         detailsOf?.let(viewModel::showDetails) // read again: GPS may now be readable
     }
