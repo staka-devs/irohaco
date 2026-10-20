@@ -20,9 +20,10 @@ object IrohacoDatabaseFactory {
     const val NAME = "irohaco.db"
     private const val SCHEMA_ASSET = "schema.sql"
 
+    /** [name] other than [NAME] lets tests keep their own file away from the app's open database. */
     @WorkerThread
-    fun open(context: Context): IrohacoDatabase =
-        open(context, context.assets.open(SCHEMA_ASSET).bufferedReader().use { it.readText() }, NAME)
+    fun open(context: Context, name: String = NAME): IrohacoDatabase =
+        open(context, context.assets.open(SCHEMA_ASSET).bufferedReader().use { it.readText() }, name)
 
     @WorkerThread
     internal fun open(context: Context, schemaSql: String, name: String): IrohacoDatabase {

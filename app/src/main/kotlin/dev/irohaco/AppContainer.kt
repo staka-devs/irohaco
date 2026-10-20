@@ -8,6 +8,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import dev.irohaco.core.application.GetLibraryAccess
+import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.SyncMediaCatalog
 import dev.irohaco.core.application.ThemeColorSettings
@@ -15,6 +16,7 @@ import dev.irohaco.core.database.IrohacoDatabase
 import dev.irohaco.core.database.IrohacoDatabaseFactory
 import dev.irohaco.core.database.RoomCatalogStore
 import dev.irohaco.core.database.RoomTimelineReader
+import dev.irohaco.infrastructure.media.AndroidMediaDetailsReader
 import dev.irohaco.infrastructure.media.AndroidMediaLibraryAccess
 import dev.irohaco.infrastructure.media.MediaStoreCatalogSource
 import dev.irohaco.infrastructure.preferences.DataStoreAppearanceSettings
@@ -23,11 +25,11 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import java.util.UUID
 
 /** Wires adapters to use cases (CONTRIBUTING §3.1: the app module is where dependencies are assembled). */
-class AppContainer(context: Context) {
+class AppContainer(context: Context, private val databaseName: String = IrohacoDatabaseFactory.NAME) {
     private val appContext = context.applicationContext
 
     /** Opens on first use; the caller must be off the main thread. */
-    val database: IrohacoDatabase by lazy { IrohacoDatabaseFactory.open(appContext) }
+    val database: IrohacoDatabase by lazy { IrohacoDatabaseFactory.open(appContext, databaseName) }
 
     private val libraryAccess by lazy { AndroidMediaLibraryAccess(appContext) }
 
@@ -51,6 +53,8 @@ class AppContainer(context: Context) {
         val renderers = DefaultRenderersFactory(appContext).setMediaCodecSelector(selector).setEnableDecoderFallback(true)
         return ExoPlayer.Builder(appContext, renderers).build()
     }
+
+    val getMediaDetails by lazy { GetMediaDetails(AndroidMediaDetailsReader(appContext)) }
 
     val getTimelinePage by lazy { GetTimelinePage(RoomTimelineReader(database)) }
 

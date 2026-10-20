@@ -1,9 +1,12 @@
 package dev.irohaco.feature.timeline.viewer
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,6 +19,7 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -80,7 +84,18 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
     val start by viewModel.start.collectAsStateWithLifecycle()
     val items = viewModel.items.collectAsLazyPagingItems()
     val playing by viewModel.playing.collectAsStateWithLifecycle()
+    val details by viewModel.details.collectAsStateWithLifecycle()
+    var detailsOf by remember { mutableStateOf<TimelineItem?>(null) }
+    val allowLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        detailsOf?.let(viewModel::showDetails) // read again: GPS may now be readable
+    }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.pause() }
+    MediaDetailsSheet(
+        state = details,
+        kind = detailsOf?.kind ?: MediaKind.IMAGE,
+        onDismiss = viewModel::hideDetails,
+        onAllowLocation = { allowLocation.launch(Manifest.permission.ACCESS_MEDIA_LOCATION) },
+    )
     when (val s = start) {
         ViewerViewModel.Start.NotFound -> LaunchedEffect(Unit) { onBack() } // the asset left the timeline meanwhile
         is ViewerViewModel.Start.At -> MediaViewerContent(
@@ -90,6 +105,10 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
             playing = playing,
             onPlay = viewModel::play,
             onPageChanged = { assetId -> if (playing != null && playing?.first != assetId) viewModel.stop() },
+            onShowDetails = { item ->
+                detailsOf = item
+                viewModel.showDetails(item)
+            },
         )
         ViewerViewModel.Start.Loading -> Box(Modifier.fillMaxSize().background(IrohacoViewerColors.background))
     }
@@ -103,7 +122,9 @@ internal fun MediaViewerContent(
     playing: Pair<String, Player>? = null,
     onPlay: (TimelineItem) -> Unit = {},
     onPageChanged: (assetId: String?) -> Unit = {},
+    onShowDetails: (TimelineItem) -> Unit = {},
 ) {
+    var current by remember { mutableStateOf<TimelineItem?>(null) }
     var chrome by rememberSaveable { mutableStateOf(true) }
     BackHandler(onBack = onBack)
     SystemBarsVisible(chrome)
@@ -111,6 +132,7 @@ internal fun MediaViewerContent(
         if (items.itemCount > 0) {
             val pager = rememberPagerState(initialPage = startIndex.coerceAtMost(items.itemCount - 1)) { items.itemCount }
             val zoom = remember { ZoomState() }
+            LaunchedEffect(pager.currentPage, items.itemCount) { current = items.peek(pager.currentPage) }
             LaunchedEffect(pager.settledPage) {
                 zoom.reset()
                 onPageChanged(items.peek(pager.settledPage)?.assetId) // playback stays on the page it started on
@@ -142,6 +164,12 @@ internal fun MediaViewerContent(
             Row(Modifier.fillMaxWidth().background(IrohacoViewerColors.scrim).statusBarsPadding()) {
                 IconButton(onClick = onBack) {
                     Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back), tint = IrohacoViewerColors.content)
+                }
+                Spacer(Modifier.weight(1f))
+                current?.let { item ->
+                    IconButton(onClick = { onShowDetails(item) }) {
+                        Icon(painterResource(IrohacoIcons.Info), stringResource(R.string.details_open), tint = IrohacoViewerColors.content)
+                    }
                 }
             }
         }

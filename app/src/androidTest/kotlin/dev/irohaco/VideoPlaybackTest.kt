@@ -10,7 +10,6 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
-import dev.irohaco.core.database.IrohacoDatabaseFactory
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -24,7 +23,8 @@ import dev.irohaco.feature.timeline.R as TimelineR
 class VideoPlaybackTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
-    private val video = insertTestVideo(context, instrumentation.context.assets).also { context.deleteDatabase(IrohacoDatabaseFactory.NAME) }
+    // The app keeps its database open across tests; the resume-time sync picks this file up without a reset.
+    private val video = insertTestVideo(context, instrumentation.context.assets)
     private val compose = createAndroidComposeRule<MainActivity>()
 
     @get:Rule val rules: RuleChain = RuleChain

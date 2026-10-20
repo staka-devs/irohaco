@@ -17,4 +17,27 @@
     <string name="viewer_video_description">動画</string>
     <string name="timeline_settings">設定</string>
     <string name="viewer_play">再生</string>
+    <string name="details_title">詳細</string>
+    <string name="details_open">詳細</string>
+    <string name="details_file">ファイル名</string>
+    <string name="details_folder">フォルダ</string>
+    <string name="details_size">大きさ</string>
+    <string name="details_type">形式</string>
+    <string name="details_pixels">画素数</string>
+    <string name="details_taken">撮影日時</string>
+    <string name="details_duration">長さ</string>
+    <string name="details_camera">カメラ</string>
+    <string name="details_lens">レンズ</string>
+    <string name="details_aperture">F値</string>
+    <string name="details_shutter">シャッター速度</string>
+    <string name="details_iso">ISO感度</string>
+    <string name="details_focal_length">焦点距離</string>
+    <string name="details_location">位置情報</string>
+    <string name="details_description">説明</string>
+    <string name="details_keywords">キーワード</string>
+    <string name="details_missing">なし</string>
+    <string name="details_no_permission">許可が必要です</string>
+    <string name="details_unreadable">読み取れません</string>
+    <string name="details_allow_location">位置情報を許可する</string>
+    <string name="details_file_unavailable">このファイルを開けません。移動、削除されたか、アクセスの許可が取り消された可能性があります。</string>
 </resources>
