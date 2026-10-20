@@ -28,6 +28,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dev.irohaco.core.application.BrowseLibrary
+import dev.irohaco.core.application.ManageCollections
+import dev.irohaco.core.contracts.Tag
+import kotlinx.coroutines.flow.flowOf
 import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.LibraryFolder
 import dev.irohaco.core.designsystem.component.BadgeStatus
@@ -41,7 +44,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 
-class LibraryViewModel(browse: BrowseLibrary) : ViewModel() {
+class LibraryViewModel(browse: BrowseLibrary, collections: ManageCollections? = null) : ViewModel() {
+    val tags: StateFlow<List<Tag>> =
+        (collections?.tags() ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     /** Null until the first read, so the screen does not flash "no folders". */
     val folders: StateFlow<List<LibraryFolder>?> =
         browse.folders().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -52,10 +58,16 @@ class LibraryViewModel(browse: BrowseLibrary) : ViewModel() {
 
 /** The Library tab: folders per volume (PRD GAL-002, DESIGN §4.4). */
 @Composable
-fun LibraryScreen(viewModel: LibraryViewModel, onOpenFolder: (FolderRef) -> Unit, onOpenSettings: () -> Unit) {
+fun LibraryScreen(
+    viewModel: LibraryViewModel,
+    onOpenFolder: (FolderRef) -> Unit,
+    onOpenTag: (String) -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     val folders by viewModel.folders.collectAsStateWithLifecycle()
     val excluded by viewModel.excluded.collectAsStateWithLifecycle()
-    LibraryContent(folders, excluded, onOpenFolder, onOpenSettings)
+    val tags by viewModel.tags.collectAsStateWithLifecycle()
+    LibraryContent(folders, excluded, onOpenFolder, onOpenSettings, tags, onOpenTag)
 }
 
 @Composable
@@ -64,6 +76,8 @@ internal fun LibraryContent(
     excluded: Set<FolderRef>,
     onOpenFolder: (FolderRef) -> Unit,
     onOpenSettings: () -> Unit,
+    tags: List<Tag> = emptyList(),
+    onOpenTag: (String) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -93,6 +107,23 @@ internal fun LibraryContent(
                 item(key = "volume-$volumeId") { VolumeHeader(first.volumeName, first.offline) }
                 items(folderTree(volumeFolders), key = { "$volumeId/${it.path}" }) { line ->
                     FolderItem(line, excluded = line.folder?.folder in excluded, onOpen = onOpenFolder)
+                }
+            }
+            if (tags.isNotEmpty()) {
+                item(key = "tags") {
+                    Text(
+                        stringResource(R.string.library_tags),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
+                    )
+                }
+                items(tags, key = { "tag-${it.tagId}" }) { tag ->
+                    ListItem(
+                        headlineContent = { Text(tag.name) },
+                        supportingContent = { Text(pluralStringResource(R.plurals.library_items, tag.itemCount, tag.itemCount)) },
+                        leadingContent = { Icon(painterResource(IrohacoIcons.Label), contentDescription = null) },
+                        modifier = Modifier.clickable { onOpenTag(tag.tagId) },
+                    )
                 }
             }
         }
@@ -152,6 +183,7 @@ private fun LibraryPreview() {
             excluded = setOf(FolderRef("in", "Pictures/Screenshots/")),
             onOpenFolder = {},
             onOpenSettings = {},
+            tags = listOf(Tag("t1", "Trip", 24)),
         )
     }
 }

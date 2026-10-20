@@ -76,6 +76,7 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.designsystem.tokens.IrohacoViewerColors
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.R
+import dev.irohaco.feature.timeline.TagDialog
 import kotlinx.coroutines.flow.flowOf
 
 /** The full-screen photo viewer (PRD GAL-003, DESIGN §4.6). */
@@ -86,6 +87,19 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
     val playing by viewModel.playing.collectAsStateWithLifecycle()
     val details by viewModel.details.collectAsStateWithLifecycle()
     val marks by viewModel.marks.collectAsStateWithLifecycle()
+    val tags by viewModel.tags.collectAsStateWithLifecycle()
+    val allTags by viewModel.allTags.collectAsStateWithLifecycle()
+    var tagging by remember { mutableStateOf(false) }
+    if (tagging) {
+        TagDialog(
+            tags = allTags,
+            onAdd = { name ->
+                tagging = false
+                detailsOf?.let { viewModel.addTag(it, name) }
+            },
+            onDismiss = { tagging = false },
+        )
+    }
     var detailsOf by remember { mutableStateOf<TimelineItem?>(null) }
     val allowLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         detailsOf?.let(viewModel::showDetails) // read again: GPS may now be readable
@@ -98,6 +112,9 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
         onAllowLocation = { allowLocation.launch(Manifest.permission.ACCESS_MEDIA_LOCATION) },
         rating = marks.rating,
         onRate = { rating -> detailsOf?.let { viewModel.setRating(it, rating) } },
+        tags = tags,
+        onAddTag = { tagging = true },
+        onRemoveTag = { tagId -> detailsOf?.let { viewModel.removeTag(it, tagId) } },
     )
     when (val s = start) {
         ViewerViewModel.Start.NotFound -> LaunchedEffect(Unit) { onBack() } // the asset left the timeline meanwhile

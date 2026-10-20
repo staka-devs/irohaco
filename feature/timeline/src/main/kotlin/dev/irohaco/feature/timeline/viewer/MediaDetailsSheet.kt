@@ -12,6 +12,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconToggleButton
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.InputChip
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import dev.irohaco.core.contracts.Tag
 import androidx.compose.ui.res.painterResource
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.component.IrohacoBottomSheet
@@ -45,12 +50,15 @@ internal fun MediaDetailsSheet(
     onAllowLocation: () -> Unit,
     rating: Int? = null,
     onRate: (Int?) -> Unit = {},
+    tags: List<Tag> = emptyList(),
+    onAddTag: () -> Unit = {},
+    onRemoveTag: (String) -> Unit = {},
 ) {
     if (state == ViewerViewModel.Details.Hidden) return
     IrohacoBottomSheet(onDismiss = onDismiss) {
         when (state) {
             ViewerViewModel.Details.Loading -> ExpressiveLoading(Modifier.padding(IrohacoSpacing.xl))
-            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate)
+            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate, tags, onAddTag, onRemoveTag)
             ViewerViewModel.Details.Hidden -> Unit
         }
     }
@@ -63,6 +71,9 @@ internal fun MediaDetailsContent(
     onAllowLocation: () -> Unit,
     rating: Int? = null,
     onRate: (Int?) -> Unit = {},
+    tags: List<Tag> = emptyList(),
+    onAddTag: () -> Unit = {},
+    onRemoveTag: (String) -> Unit = {},
 ) {
     Column(
         Modifier
@@ -74,6 +85,7 @@ internal fun MediaDetailsContent(
     ) {
         Text(stringResource(R.string.details_title), style = MaterialTheme.typography.titleLarge)
         RatingRow(rating, onRate)
+        TagsRow(tags, onAddTag, onRemoveTag)
         when (result) {
             MediaDetailsResult.FileUnavailable -> Text(stringResource(R.string.details_file_unavailable), style = MaterialTheme.typography.bodyLarge)
             is MediaDetailsResult.Read -> DetailRows(result.details, kind, onAllowLocation)
@@ -129,6 +141,30 @@ private fun RatingRow(rating: Int?, onRate: (Int?) -> Unit) {
                     )
                 }
             }
+        }
+    }
+}
+
+/** The asset's tags as chips; each chip removes its tag (GAL-007). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TagsRow(tags: List<Tag>, onAdd: () -> Unit, onRemove: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.details_tags), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+            tags.forEach { tag ->
+                InputChip(
+                    selected = false,
+                    onClick = { onRemove(tag.tagId) },
+                    label = { Text(tag.name) },
+                    trailingIcon = { Icon(painterResource(IrohacoIcons.Close), stringResource(R.string.details_remove_tag, tag.name)) },
+                )
+            }
+            AssistChip(
+                onClick = onAdd,
+                label = { Text(stringResource(R.string.tags_add)) },
+                leadingIcon = { Icon(painterResource(IrohacoIcons.NewLabel), contentDescription = null) },
+            )
         }
     }
 }
@@ -192,6 +228,7 @@ private fun MediaDetailsPreview() {
                 MediaKind.IMAGE,
                 onAllowLocation = {},
                 rating = 3,
+                tags = listOf(Tag("t1", "harbour", 0), Tag("t2", "Trip", 0)),
             )
         }
     }

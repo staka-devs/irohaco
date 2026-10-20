@@ -32,7 +32,12 @@ import dev.irohaco.feature.settings.SettingsScreen
 import dev.irohaco.feature.settings.SettingsViewModel
 import dev.irohaco.feature.timeline.TimelineScreen
 import dev.irohaco.feature.timeline.TimelineViewModel
+import dev.irohaco.feature.timeline.library.AlbumsScreen
+import dev.irohaco.feature.timeline.library.AlbumsViewModel
+import dev.irohaco.feature.timeline.library.CollectionScreen
+import dev.irohaco.feature.timeline.library.CollectionViewModel
 import dev.irohaco.feature.timeline.library.FolderScreen
+import dev.irohaco.feature.timeline.library.MediaList
 import dev.irohaco.feature.timeline.library.FolderViewModel
 import dev.irohaco.feature.timeline.library.LibraryScreen
 import dev.irohaco.feature.timeline.library.LibraryViewModel
@@ -85,6 +90,7 @@ class MainActivity : ComponentActivity() {
                                     Shell(
                                         onOpenMedia = { open(Route.viewer(it)) },
                                         onOpenFolder = { open(Route.folder(it)) },
+                                        onOpenList = { open(Route.list(it)) },
                                         onOpenSettings = { open(Route.SETTINGS) },
                                     )
                                 }
@@ -101,7 +107,12 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun Shell(onOpenMedia: (String) -> Unit, onOpenFolder: (FolderRef) -> Unit, onOpenSettings: () -> Unit) {
+    private fun Shell(
+        onOpenMedia: (String) -> Unit,
+        onOpenFolder: (FolderRef) -> Unit,
+        onOpenList: (MediaList) -> Unit,
+        onOpenSettings: () -> Unit,
+    ) {
         IrohacoApp { destination ->
             when (destination) {
                 TopLevelDestination.PHOTOS -> TimelineScreen(
@@ -113,14 +124,21 @@ class MainActivity : ComponentActivity() {
                             container::syncCatalog,
                             container.browseLibrary.excludedFolders(),
                             container.markMedia,
+                            container.manageCollections,
                         )
                     },
                     onOpenMedia = onOpenMedia,
                     onOpenSettings = onOpenSettings,
                 )
+                TopLevelDestination.ALBUMS -> AlbumsScreen(
+                    viewModel { AlbumsViewModel(container.getTimelinePage, container.manageCollections) },
+                    onOpen = onOpenList,
+                    onOpenSettings = onOpenSettings,
+                )
                 TopLevelDestination.LIBRARY -> LibraryScreen(
-                    viewModel { LibraryViewModel(container.browseLibrary) },
+                    viewModel { LibraryViewModel(container.browseLibrary, container.manageCollections) },
                     onOpenFolder = onOpenFolder,
+                    onOpenTag = { onOpenList(MediaList.Tag(it)) },
                     onOpenSettings = onOpenSettings,
                 )
                 else -> DestinationPlaceholder(destination)
@@ -136,7 +154,15 @@ class MainActivity : ComponentActivity() {
                 val folder = Route.parseFolder(route)
                 FolderScreen(
                     viewModel { FolderViewModel(container.getTimelinePage, container.browseLibrary, folder) },
-                    onOpenMedia = { open(Route.viewer(it, folder)) },
+                    onOpenMedia = { open(Route.viewer(it, MediaList.Folder(folder))) },
+                    onBack = onBack,
+                )
+            }
+            Route.isList(route) -> {
+                val list = Route.parseList(route)
+                CollectionScreen(
+                    viewModel { CollectionViewModel(container.getTimelinePage, container.manageCollections, list) },
+                    onOpenMedia = { open(Route.viewer(it, list)) },
                     onBack = onBack,
                 )
             }
@@ -145,9 +171,12 @@ class MainActivity : ComponentActivity() {
                 MediaViewerScreen(
                     viewModel {
                         val page = container.getTimelinePage
-                        // From a folder, swiping stays in that folder; from the timeline, it follows the timeline.
-                        val query = viewer.folder?.let { page.query.value.copy(folder = it, excludedFolders = emptySet()) } ?: page.query.value
-                        ViewerViewModel(page, viewer.assetId, viewer.startMs, container::newVideoPlayer, container.getMediaDetails, query, container.markMedia)
+                        // From a folder, album or tag, swiping stays in it; from the timeline, it follows the timeline.
+                        val query = viewer.list?.query(page.query.value) ?: page.query.value
+                        ViewerViewModel(
+                            page, viewer.assetId, viewer.startMs, container::newVideoPlayer, container.getMediaDetails, query,
+                            container.markMedia, container.manageCollections,
+                        )
                     },
                     onBack,
                 )
@@ -169,20 +198,21 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * Routes over the shell, kept as strings so they survive in saved state. A NUL separates the folder
- * parts, because no volume id or path can contain one.
+ * Routes over the shell, kept as strings so they survive in saved state. A NUL separates the parts
+ * of a list, because no id or path can contain one.
  */
 object Route {
     const val SHELL = "shell"
     const val SETTINGS = "settings"
     private const val VIEWER = "viewer:"
     private const val FOLDER = "folder:"
+    private const val LIST = "list:"
     private const val SEP = '\u0000'
 
-    data class Viewer(val assetId: String, val startMs: Long?, val folder: FolderRef?)
+    data class Viewer(val assetId: String, val startMs: Long?, val list: MediaList?)
 
-    /** The viewer over the timeline, or over one folder when [folder] is given. */
-    fun viewer(assetId: String, folder: FolderRef? = null) = VIEWER + assetId + folder?.let { "$SEP${encode(it)}" }.orEmpty()
+    /** The viewer over the timeline, or over a folder, album, tag or the favorites when [list] is given. */
+    fun viewer(assetId: String, list: MediaList? = null) = VIEWER + assetId + list?.let { "$SEP${encode(it)}" }.orEmpty()
 
     /** PlayVideoAt (ARCHITECTURE §1.2): opens the viewer on a video and plays it from [startMs]. */
     fun playVideoAt(assetId: String, startMs: Long) = "$VIEWER$assetId@$startMs"
@@ -191,17 +221,37 @@ object Route {
         val parts = route.removePrefix(VIEWER).split(SEP, limit = 2)
         val head = parts[0]
         val at = head.lastIndexOf('@')
-        val folder = parts.getOrNull(1)?.let(::decode)
-        return if (at < 0) Viewer(head, null, folder) else Viewer(head.substring(0, at), head.substring(at + 1).toLongOrNull(), folder)
+        val list = parts.getOrNull(1)?.let(::decode)
+        return if (at < 0) Viewer(head, null, list) else Viewer(head.substring(0, at), head.substring(at + 1).toLongOrNull(), list)
     }
 
-    fun folder(folder: FolderRef) = FOLDER + encode(folder)
+    /** A folder has its own screen (offline state, hiding from the timeline). */
+    fun folder(folder: FolderRef) = FOLDER + encode(MediaList.Folder(folder))
 
     fun isFolder(route: String) = route.startsWith(FOLDER)
 
-    fun parseFolder(route: String): FolderRef = decode(route.removePrefix(FOLDER))
+    fun parseFolder(route: String): FolderRef = (decode(route.removePrefix(FOLDER)) as MediaList.Folder).folder
 
-    private fun encode(folder: FolderRef) = "${folder.volumeId}$SEP${folder.relativePath}"
+    fun list(list: MediaList) = LIST + encode(list)
 
-    private fun decode(value: String): FolderRef = value.split(SEP, limit = 2).let { FolderRef(it[0], it.getOrElse(1) { "" }) }
+    fun isList(route: String) = route.startsWith(LIST)
+
+    fun parseList(route: String): MediaList = decode(route.removePrefix(LIST))
+
+    private fun encode(list: MediaList): String = when (list) {
+        is MediaList.Folder -> "f$SEP${list.folder.volumeId}$SEP${list.folder.relativePath}"
+        is MediaList.Album -> "a$SEP${list.albumId}"
+        is MediaList.Tag -> "t$SEP${list.tagId}"
+        MediaList.Favorites -> "v"
+    }
+
+    private fun decode(value: String): MediaList {
+        val parts = value.split(SEP, limit = 3)
+        return when (parts[0]) {
+            "f" -> MediaList.Folder(FolderRef(parts[1], parts.getOrElse(2) { "" }))
+            "a" -> MediaList.Album(parts[1])
+            "t" -> MediaList.Tag(parts[1])
+            else -> MediaList.Favorites
+        }
+    }
 }

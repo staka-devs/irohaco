@@ -3,7 +3,9 @@ package dev.irohaco
 import android.content.Context
 import android.util.Log
 import dev.irohaco.core.application.BrowseLibrary
+import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.application.MarkMedia
+import dev.irohaco.core.database.RoomCollectionsStore
 import dev.irohaco.core.application.OrganizeMedia
 import dev.irohaco.core.database.RoomMarksStore
 import dev.irohaco.core.database.RoomLibraryReader
@@ -72,6 +74,8 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val getTimelinePage by lazy { GetTimelinePage(RoomTimelineReader(database)) }
 
     val markMedia by lazy { MarkMedia(RoomMarksStore(database)) }
+
+    val manageCollections by lazy { ManageCollections(RoomCollectionsStore(database)) }
 
     val organizeMedia by lazy { OrganizeMedia(AndroidMediaFiles(appContext)) }
 

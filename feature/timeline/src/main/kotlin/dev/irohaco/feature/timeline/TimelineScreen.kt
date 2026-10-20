@@ -51,6 +51,8 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -118,6 +120,8 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
     val selection by viewModel.selection.collectAsStateWithLifecycle()
     val folders by viewModel.folders.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
+    val tags by viewModel.tags.collectAsStateWithLifecycle()
+    val albums by viewModel.albums.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.refreshAccess() }
     LifecycleResumeEffect(Unit) {
@@ -171,6 +175,26 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
             },
             onDismiss = { pending = null },
         )
+        is Pending.Tag -> TagDialog(
+            tags = tags,
+            onAdd = { name ->
+                pending = null
+                viewModel.addTag(p.items, name)
+            },
+            onDismiss = { pending = null },
+        )
+        is Pending.Album -> AlbumPickerDialog(
+            albums = albums,
+            onPick = { id ->
+                pending = null
+                viewModel.addToAlbum(p.items, id)
+            },
+            onCreate = { title ->
+                pending = null
+                viewModel.addToAlbum(p.items, null, title)
+            },
+            onDismiss = { pending = null },
+        )
         is Pending.Rename -> RenameDialog(
             currentName = p.name,
             onRename = { base ->
@@ -201,6 +225,8 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
             trash.launch(trashRequest(context, trashed, trashed = true))
         },
         onFavorite = { viewModel.setFavorite(it, true) },
+        onTag = { pending = Pending.Tag(it) },
+        onAlbum = { pending = Pending.Album(it) },
         onMove = { items ->
             viewModel.loadFolders()
             pending = Pending.Folder(TimelineViewModel.Operation.MOVE, items)
@@ -231,6 +257,10 @@ private sealed interface Pending {
     data class Folder(val operation: TimelineViewModel.Operation, val items: List<TimelineItem>) : Pending
 
     data class Rename(val item: TimelineItem, val name: String) : Pending
+
+    data class Tag(val items: List<TimelineItem>) : Pending
+
+    data class Album(val items: List<TimelineItem>) : Pending
 }
 
 private fun outcomeMessage(resources: Resources, outcome: TimelineViewModel.Outcome): String =
@@ -288,6 +318,8 @@ internal fun TimelineContent(
     onCopy: (List<TimelineItem>) -> Unit = {},
     onRename: (TimelineItem) -> Unit = {},
     onFavorite: (List<TimelineItem>) -> Unit = {},
+    onTag: (List<TimelineItem>) -> Unit = {},
+    onAlbum: (List<TimelineItem>) -> Unit = {},
     snackbar: SnackbarHostState = remember { SnackbarHostState() },
     query: TimelineQuery = TimelineQuery(),
     onQueryChange: (TimelineQuery) -> Unit = {},
@@ -362,6 +394,8 @@ internal fun TimelineContent(
                         onCopy = onCopy,
                         onRename = onRename,
                         onFavorite = onFavorite,
+                        onTag = onTag,
+                        onAlbum = onAlbum,
                         scrollToTop = scrollToTop,
                     )
                 }
@@ -387,6 +421,8 @@ private fun TimelineGrid(
     onCopy: (List<TimelineItem>) -> Unit,
     onRename: (TimelineItem) -> Unit,
     onFavorite: (List<TimelineItem>) -> Unit,
+    onTag: (List<TimelineItem>) -> Unit,
+    onAlbum: (List<TimelineItem>) -> Unit,
     scrollToTop: Flow<Unit>,
 ) {
     val gridState = rememberLazyGridState()
@@ -474,19 +510,49 @@ private fun TimelineGrid(
                 IconButton(onClick = { onFavorite(selection.values.toList()) }) {
                     Icon(painterResource(IrohacoIcons.Favorite), stringResource(R.string.timeline_favorite))
                 }
-                IconButton(onClick = { onMove(selection.values.toList()) }) {
-                    Icon(painterResource(IrohacoIcons.Move), stringResource(R.string.timeline_move))
+                IconButton(onClick = { onTag(selection.values.toList()) }) {
+                    Icon(painterResource(IrohacoIcons.NewLabel), stringResource(R.string.tags_add))
                 }
-                IconButton(onClick = { onCopy(selection.values.toList()) }) {
-                    Icon(painterResource(IrohacoIcons.Copy), stringResource(R.string.timeline_copy))
-                }
-                if (selection.size == 1) {
-                    IconButton(onClick = { onRename(selection.values.first()) }) {
-                        Icon(painterResource(IrohacoIcons.Edit), stringResource(R.string.timeline_rename))
-                    }
+                IconButton(onClick = { onAlbum(selection.values.toList()) }) {
+                    Icon(painterResource(IrohacoIcons.LibraryAdd), stringResource(R.string.albums_add_to))
                 }
                 IconButton(onClick = { onTrash(selection.values.toList()) }) {
                     Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.timeline_delete))
+                }
+                // File operations are less frequent, so they wait behind "more" and keep the toolbar narrow.
+                Box {
+                    var more by remember { mutableStateOf(false) }
+                    IconButton(onClick = { more = true }) {
+                        Icon(painterResource(IrohacoIcons.MoreVert), stringResource(R.string.timeline_more))
+                    }
+                    DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.timeline_move)) },
+                            leadingIcon = { Icon(painterResource(IrohacoIcons.Move), contentDescription = null) },
+                            onClick = {
+                                more = false
+                                onMove(selection.values.toList())
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.timeline_copy)) },
+                            leadingIcon = { Icon(painterResource(IrohacoIcons.Copy), contentDescription = null) },
+                            onClick = {
+                                more = false
+                                onCopy(selection.values.toList())
+                            },
+                        )
+                        if (selection.size == 1) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.timeline_rename)) },
+                                leadingIcon = { Icon(painterResource(IrohacoIcons.Edit), contentDescription = null) },
+                                onClick = {
+                                    more = false
+                                    onRename(selection.values.first())
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }

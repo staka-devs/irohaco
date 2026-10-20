@@ -14,6 +14,8 @@ import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.AssetMarks
 import dev.irohaco.core.application.MarkMedia
+import dev.irohaco.core.application.ManageCollections
+import dev.irohaco.core.contracts.Tag
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flatMapLatest
@@ -48,6 +50,7 @@ class ViewerViewModel(
     /** The list the viewer was opened from: the timeline's choice, or one folder of the library. */
     private val query: TimelineQuery = getPage.query.value,
     private val mark: MarkMedia? = null,
+    private val collections: ManageCollections? = null,
 ) : ViewModel() {
     private val current = MutableStateFlow<String?>(null)
 
@@ -56,6 +59,22 @@ class ViewerViewModel(
     val marks: StateFlow<AssetMarks> = current
         .flatMapLatest { id -> if (id == null || mark == null) flowOf(AssetMarks()) else mark.marks(id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AssetMarks())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val tags: StateFlow<List<Tag>> = current
+        .flatMapLatest { id -> if (id == null || collections == null) flowOf(emptyList()) else collections.tagsOf(id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val allTags: StateFlow<List<Tag>> =
+        (collections?.tags() ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun addTag(item: TimelineItem, name: String) {
+        viewModelScope.launch { collections?.addTag(listOf(item), name) }
+    }
+
+    fun removeTag(item: TimelineItem, tagId: String) {
+        viewModelScope.launch { collections?.removeTag(item.assetId, tagId) }
+    }
 
     fun showing(item: TimelineItem?) {
         current.value = item?.assetId

@@ -1,6 +1,7 @@
 package dev.irohaco
 
 import dev.irohaco.core.contracts.FolderRef
+import dev.irohaco.feature.timeline.library.MediaList
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -20,6 +21,15 @@ class RouteTest {
         assertFalse(Route.isFolder(Route.viewer("a-1")))
         assertEquals(folder, Route.parseFolder(Route.folder(folder)))
         assertEquals(FolderRef("v", ""), Route.parseFolder(Route.folder(FolderRef("v", ""))))
-        assertEquals(Route.Viewer("a-1", null, folder), Route.parseViewer(Route.viewer("a-1", folder)))
+        assertEquals(Route.Viewer("a-1", null, MediaList.Folder(folder)), Route.parseViewer(Route.viewer("a-1", MediaList.Folder(folder))))
+    }
+
+    @Test
+    fun `album, tag and favorites routes round-trip`() {
+        listOf(MediaList.Album("al-1"), MediaList.Tag("t-1"), MediaList.Favorites).forEach { list ->
+            assertTrue(Route.isList(Route.list(list)))
+            assertEquals(list, Route.parseList(Route.list(list)))
+            assertEquals(Route.Viewer("a-1", null, list), Route.parseViewer(Route.viewer("a-1", list)))
+        }
     }
 }

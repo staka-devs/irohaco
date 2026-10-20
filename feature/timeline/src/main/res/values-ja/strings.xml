@@ -110,4 +110,19 @@
     <string name="details_rating">評価</string>
     <string name="details_rate">星%1$d</string>
     <string name="details_clear_rating">評価を消す</string>
+    <string name="timeline_more">その他</string>
+    <string name="tags_add">タグを追加</string>
+    <string name="tags_name">タグ</string>
+    <string name="details_tags">タグ</string>
+    <string name="details_remove_tag">%1$sを外す</string>
+    <string name="library_tags">タグ</string>
+    <string name="albums_title">アルバム</string>
+    <string name="albums_favorites">お気に入り</string>
+    <string name="albums_create">アルバムを作成</string>
+    <string name="albums_name">アルバムの名前</string>
+    <string name="albums_ok">作成</string>
+    <string name="albums_add_to">アルバムに追加</string>
+    <string name="albums_new">新しいアルバム</string>
+    <string name="albums_create_and_add">作成して追加</string>
+    <string name="albums_empty_list">まだ何もありません</string>
 </resources>

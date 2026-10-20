@@ -29,6 +29,9 @@ data class TimelineQuery(
     /** Folders the user hid from the timeline. */
     val excludedFolders: Set<FolderRef> = emptySet(),
     val favoritesOnly: Boolean = false,
+    val tagId: String? = null,
+    /** An album shows its items in the order they were added, whatever [sortKey] says. */
+    val albumId: String? = null,
 )
 
 /**
@@ -73,6 +76,30 @@ interface MarksStore {
 
     /** 1 to 5 stars, or null for no rating. */
     suspend fun setRating(assetId: String, rating: Int?)
+}
+
+data class Tag(val tagId: String, val name: String, val itemCount: Int)
+
+data class Album(val albumId: String, val title: String, val itemCount: Int, val coverUri: String?)
+
+/** Tags and user albums (PRD GAL-007). Both point at assets, so they survive moves and unplugged cards. */
+interface CollectionsStore {
+    fun tags(): Flow<List<Tag>>
+
+    fun tagsOf(assetId: String): Flow<List<Tag>>
+
+    /** Finds the tag by name or creates it, then puts it on every asset. */
+    suspend fun addTag(assetIds: Collection<String>, name: String)
+
+    suspend fun removeTag(assetId: String, tagId: String)
+
+    /** Counts and covers come from available media only. */
+    fun albums(): Flow<List<Album>>
+
+    suspend fun createAlbum(title: String): String
+
+    /** Appends in the given order; assets already in the album keep their place. */
+    suspend fun addToAlbum(albumId: String, assetIds: List<String>)
 }
 
 enum class FileOperationResult { DONE, NOT_FOUND, NAME_TAKEN, FAILED }
