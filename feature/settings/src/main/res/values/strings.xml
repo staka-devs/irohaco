@@ -5,4 +5,14 @@
     <string name="settings_theme_color">Theme colour</string>
     <string name="settings_theme_color_device">Match the wallpaper</string>
     <string name="settings_theme_color_device_summary">Uses the colours your device picks from the wallpaper</string>
+    <string name="settings_theme_color_palette">Choose from the palette</string>
+    <string name="settings_theme_color_custom">Custom</string>
+    <string name="settings_custom_hex_label">Colour (#RRGGBB)</string>
+    <string name="settings_custom_hex_error">Enter the colour as #RRGGBB</string>
+    <string name="settings_palette_shade">%1$s %2$s</string>
+    <string name="settings_contrast">Contrast</string>
+    <string name="settings_contrast_device">Match the device setting</string>
+    <string name="settings_contrast_standard">Standard</string>
+    <string name="settings_contrast_medium">Medium</string>
+    <string name="settings_contrast_high">High</string>
 </resources>

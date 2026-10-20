@@ -42,7 +42,8 @@ feature層では色の値（`Color(0x…)`）、dpとspの数値、`tween`の持
 ### 2.1 Color
 
 - 既定は端末の壁紙から作られるDynamic Color（Material You。`dynamicLightColorScheme` / `dynamicDarkColorScheme`）にする。
-- 設定の「テーマの色」で、ユーザーは用意した色（Material 500の10色。`IrohacoSeedColors`）から1つを選べる。選んだ色をシードにし、MaterialKolorでLightとDarkのスキームを作る。端末のコントラストの設定（Android 14以降の標準、中、高）にも合わせる。
+- 設定の「テーマの色」で、ユーザーはMaterial UIのカラーパレット（19の色相と、それぞれの50〜900とA100〜A700の266色。`MaterialPalette`）から選ぶか、`#RRGGBB`で色を指定できる。選んだ色をシードにし、MaterialKolorでLightとDarkのスキームを作る。
+- 設定の「コントラスト」で、「端末の設定に合わせる」（既定。Android 14以降のシステムの設定）、「標準」、「中」、「高」を選べる。端末の壁紙の色を使うときに標準以外を選んだ場合は、壁紙から作られた主の色をシードにしてスキームを作り直す。
 - Dynamic Colorを使えないとき、プレビュー、スクリーンショットテストでは、Blue 500（#2196F3）をシードにしたスキームを使う。
 - 色は役割で選ぶ。主操作は`primary`、補助の操作は`secondary`か`tertiary`、面は`surface*`、エラーは`error`を使う。面の階層は`surfaceContainerLowest`から`Highest`までの5段で表し、影より面の色で区別する。
 - ビューワーと動画プレイヤーは、テーマに関係なく黒背景にし、前景は白系にする。重ねるUIは`scrim`系の半透明の背景に載せる。
