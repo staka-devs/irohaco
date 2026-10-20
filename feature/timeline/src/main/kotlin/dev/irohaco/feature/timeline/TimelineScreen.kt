@@ -538,7 +538,7 @@ private fun DateHeader(date: LocalDate, formatter: DateTimeFormatter) {
 }
 
 @Composable
-private fun rememberDateFormatter(): DateTimeFormatter {
+internal fun rememberDateFormatter(): DateTimeFormatter {
     val locale = LocalConfiguration.current.locales[0]
     return remember(locale) { DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, "yMMMdE"), locale) }
 }

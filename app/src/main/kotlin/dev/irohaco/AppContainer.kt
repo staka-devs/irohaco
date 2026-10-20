@@ -2,7 +2,10 @@ package dev.irohaco
 
 import android.content.Context
 import android.util.Log
+import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.OrganizeMedia
+import dev.irohaco.core.database.RoomLibraryReader
+import dev.irohaco.infrastructure.preferences.DataStoreLibrarySettings
 import dev.irohaco.infrastructure.media.AndroidMediaFiles
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -42,9 +45,11 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val getLibraryAccess by lazy { GetLibraryAccess(libraryAccess) }
 
     /** One DataStore per file for the whole process, as DataStore requires. */
-    val themeColorSettings by lazy {
-        ThemeColorSettings(DataStoreAppearanceSettings(PreferenceDataStoreFactory.create { appContext.preferencesDataStoreFile("settings") }))
-    }
+    private val settingsStore by lazy { PreferenceDataStoreFactory.create { appContext.preferencesDataStoreFile("settings") } }
+
+    val themeColorSettings by lazy { ThemeColorSettings(DataStoreAppearanceSettings(settingsStore)) }
+
+    val browseLibrary by lazy { BrowseLibrary(RoomLibraryReader(database), DataStoreLibrarySettings(settingsStore)) }
 
     /**
      * One player per open viewer; the viewer's ViewModel releases it. Decoder fallback retries with

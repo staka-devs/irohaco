@@ -10,6 +10,7 @@ import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.OrganizeMedia
 import dev.irohaco.core.contracts.FileOperationResult
+import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineSortKey
@@ -19,7 +20,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import java.time.ZoneId
@@ -30,6 +33,8 @@ class TimelineViewModel(
     private val organize: OrganizeMedia,
     /** Syncs the catalog after this screen changed files, so the grid shows the result. */
     private val onLibraryChanged: suspend () -> Unit,
+    /** Folders hidden from the timeline (GAL-002); the viewer opened from here hides them too. */
+    excludedFolders: Flow<Set<FolderRef>> = emptyFlow(),
     zone: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
     private var source: TimelinePagingSource? = null
@@ -62,6 +67,12 @@ class TimelineViewModel(
 
     init {
         viewModelScope.launch { getPage.changes().collect { source?.invalidate() } }
+        viewModelScope.launch {
+            excludedFolders.collect { excluded ->
+                getPage.query.update { it.copy(excludedFolders = excluded) }
+                source?.invalidate()
+            }
+        }
     }
 
     /** Selected items in the order they were picked; empty means the grid is not in selection mode. */

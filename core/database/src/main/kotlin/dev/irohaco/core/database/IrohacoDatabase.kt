@@ -71,6 +71,7 @@ import androidx.room.RoomDatabase
 abstract class IrohacoDatabase : RoomDatabase() {
     abstract fun catalogDao(): CatalogDao
     abstract fun timelineDao(): TimelineDao
+    abstract fun libraryDao(): LibraryDao
 }
 
 @Entity(

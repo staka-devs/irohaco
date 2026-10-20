@@ -15,12 +15,19 @@ data class TimelineItem(
 
 enum class TimelineSortKey { TAKEN, NAME, SIZE }
 
+/** A folder on one volume, such as "DCIM/Camera/"; the volume root is "" (PRD GAL-002). */
+data class FolderRef(val volumeId: String, val relativePath: String)
+
 /** The order and filter of the timeline (PRD GAL-006). Taken time falls back to the modification time. */
 data class TimelineQuery(
     val sortKey: TimelineSortKey = TimelineSortKey.TAKEN,
     val descending: Boolean = true,
     /** Null shows photos and videos. */
     val kind: MediaKind? = null,
+    /** Only this folder, without its subfolders; null shows the whole library. */
+    val folder: FolderRef? = null,
+    /** Folders the user hid from the timeline. */
+    val excludedFolders: Set<FolderRef> = emptySet(),
 )
 
 /**
@@ -36,6 +43,22 @@ interface TimelineReader {
     suspend fun indexOf(query: TimelineQuery, assetId: String): Int?
 
     /** Emits whenever the catalog behind the timeline may have changed. */
+    fun changes(): Flow<Unit>
+}
+
+/** A folder that holds photos or videos, counted on the library screen (GAL-002, AC-010). */
+data class LibraryFolder(
+    val folder: FolderRef,
+    /** MediaStore's volume name: "external_primary" is the built-in storage, others are SD cards. */
+    val volumeName: String,
+    /** The SD card is out; the folder and its count stay as they were when it was last seen. */
+    val offline: Boolean,
+    val itemCount: Int,
+)
+
+interface LibraryReader {
+    suspend fun folders(): List<LibraryFolder>
+
     fun changes(): Flow<Unit>
 }
 

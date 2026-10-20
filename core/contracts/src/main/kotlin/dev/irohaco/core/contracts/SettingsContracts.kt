@@ -14,3 +14,10 @@ interface AppearanceSettings {
 
     suspend fun setThemeContrast(contrast: ThemeContrast)
 }
+
+/** Folders the user hid from the timeline (GAL-002). They stay in the library, where the user can show them again. */
+interface LibrarySettings {
+    val excludedFolders: Flow<Set<FolderRef>>
+
+    suspend fun setExcluded(folder: FolderRef, excluded: Boolean)
+}
