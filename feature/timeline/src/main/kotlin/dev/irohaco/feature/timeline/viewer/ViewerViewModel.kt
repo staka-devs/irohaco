@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import dev.irohaco.core.domain.Detail
+import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.TimelinePagingSource
@@ -66,6 +68,25 @@ class ViewerViewModel(
     val format: StateFlow<MediaFormat> = currentItem
         .flatMapLatest { item -> flow { emit(if (item == null || formatProbe == null) MediaFormat() else formatProbe.probe(item.contentUri, item.kind)) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MediaFormat())
+
+    /** GPS of the page on screen, read the same way as the details sheet (PRD GAL-013). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val location: StateFlow<Detail<GeoPoint>> = currentItem
+        .flatMapLatest { item ->
+            flow {
+                emit(
+                    if (item == null || getDetails == null) {
+                        Detail.Missing
+                    } else {
+                        when (val result = getDetails(item)) {
+                            is MediaDetailsResult.Read -> result.details.location
+                            MediaDetailsResult.FileUnavailable -> Detail.Missing
+                        }
+                    },
+                )
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Detail.Missing)
 
     /** Favorite and rating of the page on screen (PRD GAL-007). */
     @OptIn(ExperimentalCoroutinesApi::class)
