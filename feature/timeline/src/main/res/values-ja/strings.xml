@@ -102,4 +102,12 @@
         <item quantity="one">%d件</item>
         <item quantity="other">%d件</item>
     </plurals>
+    <string name="timeline_sort_rating_high">評価（高い順）</string>
+    <string name="timeline_sort_rating_low">評価（低い順）</string>
+    <string name="timeline_favorite">お気に入りに追加</string>
+    <string name="viewer_favorite">お気に入りに追加</string>
+    <string name="viewer_unfavorite">お気に入りから外す</string>
+    <string name="details_rating">評価</string>
+    <string name="details_rate">星%1$d</string>
+    <string name="details_clear_rating">評価を消す</string>
 </resources>

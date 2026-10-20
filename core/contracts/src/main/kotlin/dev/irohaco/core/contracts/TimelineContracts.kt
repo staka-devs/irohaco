@@ -13,7 +13,7 @@ data class TimelineItem(
     val sortTimeMs: Long,
 )
 
-enum class TimelineSortKey { TAKEN, NAME, SIZE }
+enum class TimelineSortKey { TAKEN, NAME, SIZE, RATING }
 
 /** A folder on one volume, such as "DCIM/Camera/"; the volume root is "" (PRD GAL-002). */
 data class FolderRef(val volumeId: String, val relativePath: String)
@@ -28,6 +28,7 @@ data class TimelineQuery(
     val folder: FolderRef? = null,
     /** Folders the user hid from the timeline. */
     val excludedFolders: Set<FolderRef> = emptySet(),
+    val favoritesOnly: Boolean = false,
 )
 
 /**
@@ -60,6 +61,18 @@ interface LibraryReader {
     suspend fun folders(): List<LibraryFolder>
 
     fun changes(): Flow<Unit>
+}
+
+/** What the user marked on an asset (PRD GAL-007). It belongs to the asset, so moving or unplugging the file keeps it. */
+data class AssetMarks(val favorite: Boolean = false, val rating: Int? = null)
+
+interface MarksStore {
+    fun marks(assetId: String): Flow<AssetMarks>
+
+    suspend fun setFavorite(assetIds: Collection<String>, favorite: Boolean)
+
+    /** 1 to 5 stars, or null for no rating. */
+    suspend fun setRating(assetId: String, rating: Int?)
 }
 
 enum class FileOperationResult { DONE, NOT_FOUND, NAME_TAKEN, FAILED }
