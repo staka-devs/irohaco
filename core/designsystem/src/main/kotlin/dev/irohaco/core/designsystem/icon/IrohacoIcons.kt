@@ -60,4 +60,5 @@ object IrohacoIcons {
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val Settings = R.drawable.ic_settings
     @DrawableRes val Check = R.drawable.ic_check
+    @DrawableRes val Map = R.drawable.ic_map
 }

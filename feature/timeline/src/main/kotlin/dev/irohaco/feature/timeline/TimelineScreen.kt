@@ -301,7 +301,7 @@ private fun writeRequest(context: Context, uris: List<Uri>): IntentSenderRequest
     IntentSenderRequest.Builder(MediaStore.createWriteRequest(context.contentResolver, uris).intentSender).build()
 
 /** Hands the selected files to another app with read access only. */
-private fun shareIntent(items: List<TimelineItem>): Intent {
+internal fun shareIntent(items: List<TimelineItem>): Intent {
     val uris = ArrayList(items.map { Uri.parse(it.contentUri) })
     val type = when {
         items.all { it.kind == MediaKind.IMAGE } -> "image/*"
@@ -318,7 +318,7 @@ private fun shareIntent(items: List<TimelineItem>): Intent {
 }
 
 /** The system dialog that moves files to, or back from, the trash (GAL-005). */
-private fun trashRequest(context: Context, uris: List<Uri>, trashed: Boolean): IntentSenderRequest =
+internal fun trashRequest(context: Context, uris: List<Uri>, trashed: Boolean): IntentSenderRequest =
     IntentSenderRequest.Builder(MediaStore.createTrashRequest(context.contentResolver, uris, trashed).intentSender).build()
 
 @Composable
