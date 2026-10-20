@@ -2,6 +2,7 @@ package dev.irohaco.core.application
 
 import dev.irohaco.core.contracts.FileOperationResult
 import dev.irohaco.core.contracts.MediaDetailsReader
+import dev.irohaco.core.contracts.CollectionsStore
 import dev.irohaco.core.contracts.MarksStore
 import dev.irohaco.core.contracts.MediaFiles
 import dev.irohaco.core.contracts.MediaLibraryAccessPort
@@ -71,6 +72,23 @@ class MarkMedia(private val store: MarksStore) {
     suspend fun setFavorite(items: List<TimelineItem>, favorite: Boolean) = store.setFavorite(items.map { it.assetId }, favorite)
 
     suspend fun setRating(assetId: String, rating: Int?) = store.setRating(assetId, rating)
+}
+
+/** Tags and user albums (PRD GAL-007). */
+class ManageCollections(private val store: CollectionsStore) {
+    fun tags() = store.tags()
+
+    fun tagsOf(assetId: String) = store.tagsOf(assetId)
+
+    suspend fun addTag(items: List<TimelineItem>, name: String) = store.addTag(items.map { it.assetId }, name)
+
+    suspend fun removeTag(assetId: String, tagId: String) = store.removeTag(assetId, tagId)
+
+    fun albums() = store.albums()
+
+    suspend fun createAlbum(title: String) = store.createAlbum(title)
+
+    suspend fun addToAlbum(albumId: String, items: List<TimelineItem>) = store.addToAlbum(albumId, items.map { it.assetId })
 }
 
 /** The details sheet's data, read from the file each time it opens (PRD MET-001). */

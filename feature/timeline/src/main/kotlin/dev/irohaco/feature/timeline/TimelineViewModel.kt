@@ -9,6 +9,12 @@ import androidx.paging.cachedIn
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.MarkMedia
+import dev.irohaco.core.application.ManageCollections
+import dev.irohaco.core.contracts.Album
+import dev.irohaco.core.contracts.Tag
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import dev.irohaco.core.application.OrganizeMedia
 import dev.irohaco.core.contracts.FileOperationResult
 import dev.irohaco.core.contracts.FolderRef
@@ -37,6 +43,7 @@ class TimelineViewModel(
     /** Folders hidden from the timeline (GAL-002); the viewer opened from here hides them too. */
     excludedFolders: Flow<Set<FolderRef>> = emptyFlow(),
     private val mark: MarkMedia? = null,
+    private val collections: ManageCollections? = null,
     zone: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
     private var source: TimelinePagingSource? = null
@@ -130,6 +137,28 @@ class TimelineViewModel(
     fun setFavorite(items: List<TimelineItem>, favorite: Boolean) {
         viewModelScope.launch {
             mark?.setFavorite(items, favorite)
+            clearSelection()
+        }
+    }
+
+    val tags: StateFlow<List<Tag>> =
+        (collections?.tags() ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val albums: StateFlow<List<Album>> =
+        (collections?.albums() ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun addTag(items: List<TimelineItem>, name: String) {
+        viewModelScope.launch {
+            collections?.addTag(items, name)
+            clearSelection()
+        }
+    }
+
+    fun addToAlbum(items: List<TimelineItem>, albumId: String?, newTitle: String? = null) {
+        viewModelScope.launch {
+            val collections = collections ?: return@launch
+            val id = albumId ?: collections.createAlbum(newTitle ?: return@launch)
+            collections.addToAlbum(id, items)
             clearSelection()
         }
     }

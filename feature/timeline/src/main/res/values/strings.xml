@@ -110,4 +110,19 @@
     <string name="details_rating">Rating</string>
     <string name="details_rate">%1$d stars</string>
     <string name="details_clear_rating">Clear rating</string>
+    <string name="timeline_more">More</string>
+    <string name="tags_add">Add tag</string>
+    <string name="tags_name">Tag</string>
+    <string name="details_tags">Tags</string>
+    <string name="details_remove_tag">Remove %1$s</string>
+    <string name="library_tags">Tags</string>
+    <string name="albums_title">Albums</string>
+    <string name="albums_favorites">Favorites</string>
+    <string name="albums_create">New album</string>
+    <string name="albums_name">Album name</string>
+    <string name="albums_ok">Create</string>
+    <string name="albums_add_to">Add to album</string>
+    <string name="albums_new">New album</string>
+    <string name="albums_create_and_add">Create and add</string>
+    <string name="albums_empty_list">Nothing here yet</string>
 </resources>

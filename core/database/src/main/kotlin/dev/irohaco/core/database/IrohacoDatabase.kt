@@ -73,6 +73,7 @@ abstract class IrohacoDatabase : RoomDatabase() {
     abstract fun timelineDao(): TimelineDao
     abstract fun libraryDao(): LibraryDao
     abstract fun marksDao(): MarksDao
+    abstract fun collectionsDao(): CollectionsDao
 }
 
 @Entity(

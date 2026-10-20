@@ -44,6 +44,11 @@ object IrohacoIcons {
     @DrawableRes val FavoriteFilled = R.drawable.ic_favorite_filled
     @DrawableRes val Star = R.drawable.ic_star
     @DrawableRes val StarFilled = R.drawable.ic_star_filled
+    @DrawableRes val Label = R.drawable.ic_label
+    @DrawableRes val NewLabel = R.drawable.ic_new_label
+    @DrawableRes val LibraryAdd = R.drawable.ic_library_add
+    @DrawableRes val Add = R.drawable.ic_add
+    @DrawableRes val MoreVert = R.drawable.ic_more_vert
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val Settings = R.drawable.ic_settings
     @DrawableRes val Check = R.drawable.ic_check

@@ -11,14 +11,14 @@ import kotlinx.coroutines.flow.map
 
 class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
     override suspend fun count(query: TimelineQuery): Int =
-        db.timelineDao().count(SimpleSQLiteQuery("SELECT count(*) $FROM ${where(query)}", args(query)))
+        db.timelineDao().count(SimpleSQLiteQuery("SELECT count(*) ${from(query)} ${where(query)}", arrayOf(*fromArgs(query), *args(query))))
 
     override suspend fun page(query: TimelineQuery, offset: Int, limit: Int): List<TimelineItem> =
         db.timelineDao().page(
             SimpleSQLiteQuery(
                 """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs
-                   $FROM ${where(query)} ORDER BY ${orderBy(query)} LIMIT ? OFFSET ?""",
-                arrayOf(*args(query), limit, offset),
+                   ${from(query)} ${where(query)} ORDER BY ${orderBy(query)} LIMIT ? OFFSET ?""",
+                arrayOf(*fromArgs(query), *args(query), limit, offset),
             ),
         ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs) }
 
@@ -26,8 +26,8 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
         db.timelineDao().indexOf(
             SimpleSQLiteQuery(
                 """SELECT rn FROM (SELECT a.asset_id AS id, ROW_NUMBER() OVER (ORDER BY ${orderBy(query)}) - 1 AS rn
-                   $FROM ${where(query)}) WHERE id = ?""",
-                arrayOf(*args(query), assetId),
+                   ${from(query)} ${where(query)}) WHERE id = ?""",
+                arrayOf(*fromArgs(query), *args(query), assetId),
             ),
         )
 
@@ -36,7 +36,7 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
      * this flow is collected would otherwise leave the timeline showing stale rows.
      */
     override fun changes(): Flow<Unit> =
-        db.invalidationTracker.createFlow("media_sources", "media_assets", "media_ratings", emitInitialState = true).map { }
+        db.invalidationTracker.createFlow("media_sources", "media_assets", "media_ratings", "media_tags", "album_items", emitInitialState = true).map { }
 
     private companion object {
         // shortcut: no index on the sort expressions yet; add them if M0-13 measures slow pages at 10k items.
@@ -47,10 +47,17 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
         // The volume root has a null relative path in MediaStore; FolderRef calls it "".
         const val PATH = "COALESCE(s.relative_path, '')"
 
+        /** An album joins its items for their order; the album id is the only placeholder here. */
+        fun from(query: TimelineQuery): String =
+            FROM + if (query.albumId != null) " JOIN album_items ai ON ai.asset_id = a.asset_id AND ai.album_id = ?" else ""
+
+        fun fromArgs(query: TimelineQuery): Array<Any> = listOfNotNull(query.albumId).toTypedArray()
+
         fun where(query: TimelineQuery): String = buildString {
             append("WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL")
             if (query.kind != null) append(" AND a.media_kind = ?")
             if (query.favoritesOnly) append(" AND r.is_favorite = 1")
+            if (query.tagId != null) append(" AND EXISTS (SELECT 1 FROM media_tags mt WHERE mt.asset_id = a.asset_id AND mt.tag_id = ?)")
             if (query.folder != null) append(" AND s.volume_id = ? AND $PATH = ?")
             repeat(query.excludedFolders.size) { append(" AND NOT (s.volume_id = ? AND $PATH = ?)") }
         }
@@ -59,11 +66,13 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
         fun args(query: TimelineQuery): Array<Any> = buildList {
             query.kind?.let { add(it.name) }
             query.folder?.let { add(it.volumeId); add(it.relativePath) }
+            query.tagId?.let { add(it) }
             query.excludedFolders.forEach { add(it.volumeId); add(it.relativePath) }
         }.toTypedArray()
 
         /** The asset id breaks ties in the same direction, so pages never overlap or skip. */
         fun orderBy(query: TimelineQuery): String {
+            if (query.albumId != null) return "ai.sort_order ASC, a.asset_id ASC"
             val key = when (query.sortKey) {
                 TimelineSortKey.TAKEN -> TIME
                 TimelineSortKey.NAME -> "s.display_name COLLATE NOCASE"
