@@ -89,4 +89,17 @@
     <string name="timeline_kind_all">すべて</string>
     <string name="timeline_kind_photos">写真</string>
     <string name="timeline_kind_videos">動画</string>
+    <string name="library_title">ライブラリ</string>
+    <string name="library_empty">写真と動画はまだありません</string>
+    <string name="library_internal">内蔵ストレージ</string>
+    <string name="library_sd_card">SDカード（%1$s）</string>
+    <string name="library_root">最上位</string>
+    <string name="library_excluded">%1$s・写真のタブに表示しない</string>
+    <string name="library_exclude">写真のタブに表示しない</string>
+    <string name="library_include">写真のタブに表示する</string>
+    <string name="library_offline_body">このフォルダのあるSDカードが接続されていません。写真、タグ、アルバムは残っていて、SDカードを挿すと元に戻ります。</string>
+    <plurals name="library_items">
+        <item quantity="one">%d件</item>
+        <item quantity="other">%d件</item>
+    </plurals>
 </resources>

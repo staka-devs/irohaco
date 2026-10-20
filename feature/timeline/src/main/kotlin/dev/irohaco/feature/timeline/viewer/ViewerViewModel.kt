@@ -11,6 +11,7 @@ import androidx.paging.cachedIn
 import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.TimelinePagingSource
@@ -37,6 +38,8 @@ class ViewerViewModel(
     startPositionMs: Long? = null,
     private val newPlayer: () -> Player,
     private val getDetails: GetMediaDetails? = null,
+    /** The list the viewer was opened from: the timeline's choice, or one folder of the library. */
+    private val query: TimelineQuery = getPage.query.value,
 ) : ViewModel() {
     sealed interface Start {
         data object Loading : Start
@@ -51,7 +54,7 @@ class ViewerViewModel(
         val index = (_start.first { it is Start.At } as Start.At).index
         emitAll(
             Pager(PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = true), initialKey = max(0, index - PAGE_SIZE / 2)) {
-                TimelinePagingSource(getPage)
+                TimelinePagingSource(getPage, query)
             }.flow,
         )
     }.cachedIn(viewModelScope)
@@ -64,10 +67,10 @@ class ViewerViewModel(
 
     init {
         viewModelScope.launch {
-            val index = getPage.indexOf(assetId)
+            val index = getPage.indexOf(assetId, query)
             _start.value = index?.let { Start.At(it) } ?: Start.NotFound
             if (index != null && startPositionMs != null) {
-                getPage(index, 1).firstOrNull()?.takeIf { it.kind == MediaKind.VIDEO }?.let { play(it, startPositionMs) }
+                getPage(index, 1, query).firstOrNull()?.takeIf { it.kind == MediaKind.VIDEO }?.let { play(it, startPositionMs) }
             }
         }
     }

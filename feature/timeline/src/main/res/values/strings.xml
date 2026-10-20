@@ -89,4 +89,17 @@
     <string name="timeline_kind_all">All</string>
     <string name="timeline_kind_photos">Photos</string>
     <string name="timeline_kind_videos">Videos</string>
+    <string name="library_title">Library</string>
+    <string name="library_empty">No photos or videos yet</string>
+    <string name="library_internal">Internal storage</string>
+    <string name="library_sd_card">SD card (%1$s)</string>
+    <string name="library_root">Top level</string>
+    <string name="library_excluded">%1$s · hidden from Photos</string>
+    <string name="library_exclude">Hide from Photos</string>
+    <string name="library_include">Show in Photos</string>
+    <string name="library_offline_body">The SD card holding this folder is not connected. Its photos, tags and albums are kept and come back when you insert the card.</string>
+    <plurals name="library_items">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
 </resources>

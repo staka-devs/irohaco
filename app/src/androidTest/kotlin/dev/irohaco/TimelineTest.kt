@@ -16,7 +16,9 @@ import androidx.test.rule.GrantPermissionRule
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
 import org.junit.rules.RuleChain
+import kotlinx.coroutines.runBlocking
 import org.junit.runner.RunWith
 import dev.irohaco.feature.timeline.R as TimelineR
 
@@ -28,8 +30,14 @@ class TimelineTest {
     private val image = insertTestImage(context)
     private val compose = createAndroidComposeRule<MainActivity>()
 
+    // Files earlier tests deleted stay on the timeline until a sync; without this the grid could open one of them first.
+    private val syncFirst = object : ExternalResource() {
+        override fun before() = runBlocking { (context.applicationContext as IrohacoApplication).container.syncCatalog() }
+    }
+
     @get:Rule val rules: RuleChain = RuleChain
         .outerRule(GrantPermissionRule.grant(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO))
+        .around(syncFirst)
         .around(compose)
 
     @After
@@ -63,5 +71,26 @@ class TimelineTest {
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntilDoesNotExist(back, timeoutMillis = 5_000)
         compose.waitUntilAtLeastOneExists(thumbnail, timeoutMillis = 5_000)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun opensTheFolderFromTheLibraryAndItsPhotoInTheViewer() {
+        compose.onNode(hasText(context.getString(R.string.destination_library))).performClick()
+        // insertTestImage puts the file in Pictures/IrohacoTest/.
+        val folder = hasText("IrohacoTest")
+        compose.waitUntilAtLeastOneExists(folder, timeoutMillis = 15_000)
+        compose.onAllNodes(folder).onFirst().performClick()
+
+        val thumbnail = hasContentDescription(context.getString(TimelineR.string.timeline_photo_description, ""), substring = true)
+        compose.waitUntilAtLeastOneExists(thumbnail, timeoutMillis = 5_000)
+        compose.onAllNodes(thumbnail).onFirst().performClick()
+        val back = hasContentDescription(context.getString(TimelineR.string.viewer_back))
+        compose.waitUntilAtLeastOneExists(hasContentDescription(context.getString(TimelineR.string.details_open)), timeoutMillis = 5_000)
+
+        // Back from the viewer returns to the folder, not to the tabs.
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilAtLeastOneExists(thumbnail, timeoutMillis = 5_000)
+        compose.waitUntilAtLeastOneExists(back, timeoutMillis = 5_000) // the folder's own back button
     }
 }

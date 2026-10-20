@@ -43,10 +43,22 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
         const val FROM = "FROM media_sources s JOIN media_assets a ON a.asset_id = s.asset_id"
         const val TIME = "COALESCE(s.observed_taken_at, s.observed_modified_at, a.first_seen_at)"
 
-        fun where(query: TimelineQuery): String =
-            "WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL" + if (query.kind != null) " AND a.media_kind = ?" else ""
+        // The volume root has a null relative path in MediaStore; FolderRef calls it "".
+        const val PATH = "COALESCE(s.relative_path, '')"
 
-        fun args(query: TimelineQuery): Array<Any> = listOfNotNull(query.kind?.name).toTypedArray()
+        fun where(query: TimelineQuery): String = buildString {
+            append("WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL")
+            if (query.kind != null) append(" AND a.media_kind = ?")
+            if (query.folder != null) append(" AND s.volume_id = ? AND $PATH = ?")
+            repeat(query.excludedFolders.size) { append(" AND NOT (s.volume_id = ? AND $PATH = ?)") }
+        }
+
+        /** In the order of the placeholders in [where]. */
+        fun args(query: TimelineQuery): Array<Any> = buildList {
+            query.kind?.let { add(it.name) }
+            query.folder?.let { add(it.volumeId); add(it.relativePath) }
+            query.excludedFolders.forEach { add(it.volumeId); add(it.relativePath) }
+        }.toTypedArray()
 
         /** The asset id breaks ties in the same direction, so pages never overlap or skip. */
         fun orderBy(query: TimelineQuery): String {

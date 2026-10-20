@@ -38,6 +38,8 @@ object IrohacoIcons {
     @DrawableRes val Copy = R.drawable.ic_content_copy
     @DrawableRes val Edit = R.drawable.ic_edit
     @DrawableRes val Sort = R.drawable.ic_sort
+    @DrawableRes val Visibility = R.drawable.ic_visibility
+    @DrawableRes val VisibilityOff = R.drawable.ic_visibility_off
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val Settings = R.drawable.ic_settings
     @DrawableRes val Check = R.drawable.ic_check
