@@ -142,6 +142,8 @@
     <string name="viewer_format_hdr_sdr">HDR · shown as SDR on this screen</string>
     <string name="viewer_format_motion_photo">Motion Photo · still image only</string>
     <string name="viewer_cannot_show">This format cannot be shown. You can still open its details.</string>
+    <string name="viewer_show_on_map">Show on map</string>
+    <string name="viewer_trashed">Moved to trash</string>
     <string name="details_headline">Headline</string>
     <string name="details_creator">Creator</string>
     <string name="details_copyright">Copyright</string>
