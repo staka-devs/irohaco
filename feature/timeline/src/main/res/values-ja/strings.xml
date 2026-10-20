@@ -142,6 +142,8 @@
     <string name="viewer_format_hdr_sdr">HDR・この画面ではSDRで表示しています</string>
     <string name="viewer_format_motion_photo">Motion Photo・静止画だけを表示しています</string>
     <string name="viewer_cannot_show">この形式は表示できません。詳細は開けます。</string>
+    <string name="viewer_show_on_map">地図上で表示</string>
+    <string name="viewer_trashed">ゴミ箱に移動しました</string>
     <string name="details_headline">見出し</string>
     <string name="details_creator">作成者</string>
     <string name="details_copyright">著作権</string>

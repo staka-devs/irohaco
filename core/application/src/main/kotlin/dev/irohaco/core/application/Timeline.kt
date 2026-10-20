@@ -34,6 +34,8 @@ class GetTimelinePage(private val reader: TimelineReader) {
 
     suspend fun between(fromMs: Long, untilMs: Long, query: TimelineQuery = this.query.value) = reader.between(query, fromMs, untilMs)
 
+    suspend fun labelAt(index: Int, query: TimelineQuery = this.query.value) = reader.labelAt(query, index)
+
     fun changes() = reader.changes()
 }
 

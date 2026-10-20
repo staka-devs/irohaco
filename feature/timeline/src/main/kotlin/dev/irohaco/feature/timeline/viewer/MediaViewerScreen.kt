@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,8 +20,8 @@ import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -27,13 +29,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,6 +55,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -75,6 +85,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.text.style.TextAlign
+import dev.irohaco.core.domain.Detail
+import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaFormat
 import coil3.request.ImageRequest
 import dev.irohaco.core.contracts.TimelineItem
@@ -88,7 +100,13 @@ import dev.irohaco.core.designsystem.tokens.IrohacoViewerColors
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.R
 import dev.irohaco.feature.timeline.TagDialog
+import dev.irohaco.feature.timeline.shareIntent
+import dev.irohaco.feature.timeline.trashRequest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /** The full-screen photo viewer (PRD GAL-003, DESIGN §4.6). */
 @Composable
@@ -100,6 +118,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
     var detailsOf by remember { mutableStateOf<TimelineItem?>(null) }
     val marks by viewModel.marks.collectAsStateWithLifecycle()
     val format by viewModel.format.collectAsStateWithLifecycle()
+    val location by viewModel.location.collectAsStateWithLifecycle()
     HdrWindow(format.hdr)
     val tags by viewModel.tags.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
@@ -118,6 +137,21 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
         detailsOf?.let(viewModel::showDetails) // read again: GPS may now be readable
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.pause() }
+    val context = LocalContext.current
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var trashedUri by remember { mutableStateOf<Uri?>(null) }
+    val trashedMessage = stringResource(R.string.viewer_trashed)
+    val undoLabel = stringResource(R.string.timeline_undo)
+    val restore = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { }
+    val trash = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+        val uri = trashedUri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val answer = snackbar.showSnackbar(trashedMessage, actionLabel = undoLabel, duration = SnackbarDuration.Long)
+            if (answer == SnackbarResult.ActionPerformed) restore.launch(trashRequest(context, listOf(uri), trashed = false))
+        }
+    }
     MediaDetailsSheet(
         state = details,
         kind = detailsOf?.kind ?: MediaKind.IMAGE,
@@ -129,25 +163,35 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
         onAddTag = { tagging = true },
         onRemoveTag = { tagId -> detailsOf?.let { viewModel.removeTag(it, tagId) } },
     )
-    when (val s = start) {
-        ViewerViewModel.Start.NotFound -> LaunchedEffect(Unit) { onBack() } // the asset left the timeline meanwhile
-        is ViewerViewModel.Start.At -> MediaViewerContent(
-            items = items,
-            startIndex = s.index,
-            onBack = onBack,
-            playing = playing,
-            onPlay = viewModel::play,
-            onPageChanged = { assetId -> if (playing != null && playing?.first != assetId) viewModel.stop() },
-            onShowDetails = { item ->
-                detailsOf = item
-                viewModel.showDetails(item)
-            },
-            favorite = marks.favorite,
-            onCurrentChanged = viewModel::showing,
-            onToggleFavorite = { viewModel.setFavorite(it, !marks.favorite) },
-            format = format,
-        )
-        ViewerViewModel.Start.Loading -> Box(Modifier.fillMaxSize().background(IrohacoViewerColors.background))
+    Box(Modifier.fillMaxSize()) {
+        when (val s = start) {
+            ViewerViewModel.Start.NotFound -> LaunchedEffect(Unit) { onBack() } // the asset left the timeline meanwhile
+            is ViewerViewModel.Start.At -> MediaViewerContent(
+                items = items,
+                startIndex = s.index,
+                onBack = onBack,
+                playing = playing,
+                onPlay = viewModel::play,
+                onPageChanged = { assetId -> if (playing != null && playing?.first != assetId) viewModel.stop() },
+                onShowDetails = { item ->
+                    detailsOf = item
+                    viewModel.showDetails(item)
+                },
+                favorite = marks.favorite,
+                onCurrentChanged = viewModel::showing,
+                onToggleFavorite = { viewModel.setFavorite(it, !marks.favorite) },
+                format = format,
+                hasLocation = location is Detail.Value<GeoPoint>,
+                onShare = { item -> context.startActivity(shareIntent(listOf(item))) },
+                onShowOnMap = { (location as? Detail.Value<GeoPoint>)?.value?.let { context.startActivity(mapIntent(it)) } },
+                onTrash = { item ->
+                    trashedUri = Uri.parse(item.contentUri)
+                    trash.launch(trashRequest(context, listOf(Uri.parse(item.contentUri)), trashed = true))
+                },
+            )
+            ViewerViewModel.Start.Loading -> Box(Modifier.fillMaxSize().background(IrohacoViewerColors.background))
+        }
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
 }
 
@@ -164,6 +208,10 @@ internal fun MediaViewerContent(
     onCurrentChanged: (TimelineItem?) -> Unit = {},
     onToggleFavorite: (TimelineItem) -> Unit = {},
     format: MediaFormat = MediaFormat(),
+    hasLocation: Boolean = false,
+    onShare: (TimelineItem) -> Unit = {},
+    onShowOnMap: (TimelineItem) -> Unit = {},
+    onTrash: (TimelineItem) -> Unit = {},
 ) {
     var current by remember { mutableStateOf<TimelineItem?>(null) }
     LaunchedEffect(current) { onCurrentChanged(current) }
@@ -204,11 +252,18 @@ internal fun MediaViewerContent(
         }
         AnimatedVisibility(visible = chrome, enter = fadeIn(), exit = fadeOut()) {
             Column(Modifier.fillMaxWidth().background(IrohacoViewerColors.scrim).statusBarsPadding()) {
-            Row(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
                     Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back), tint = IrohacoViewerColors.content)
                 }
-                Spacer(Modifier.weight(1f))
+                val dateTimeFormatter = rememberDateTimeFormatter()
+                Text(
+                    text = current?.let { dateTimeFormatter.format(Instant.ofEpochMilli(it.sortTimeMs).atZone(ZoneId.systemDefault())) } ?: "",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = IrohacoViewerColors.content,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f).padding(horizontal = IrohacoSpacing.s),
+                )
                 current?.let { item ->
                     IconButton(onClick = { onToggleFavorite(item) }) {
                         Icon(
@@ -220,12 +275,60 @@ internal fun MediaViewerContent(
                     IconButton(onClick = { onShowDetails(item) }) {
                         Icon(painterResource(IrohacoIcons.Info), stringResource(R.string.details_open), tint = IrohacoViewerColors.content)
                     }
+                    Box {
+                        var menu by remember { mutableStateOf(false) }
+                        IconButton(onClick = { menu = true }) {
+                            Icon(painterResource(IrohacoIcons.MoreVert), stringResource(R.string.timeline_more), tint = IrohacoViewerColors.content)
+                        }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            ViewerActionsMenu(
+                                hasLocation = hasLocation,
+                                onShare = { menu = false; onShare(item) },
+                                onShowOnMap = { menu = false; onShowOnMap(item) },
+                                onShowDetails = { menu = false; onShowDetails(item) },
+                                onTrash = { menu = false; onTrash(item) },
+                            )
+                        }
+                    }
                 }
             }
             FormatLabels(format)
             }
         }
     }
+}
+
+/** The viewer's "more" menu (PRD GAL-013): share, the file's location, its details and the trash. */
+@Composable
+private fun ColumnScope.ViewerActionsMenu(
+    hasLocation: Boolean,
+    onShare: () -> Unit,
+    onShowOnMap: () -> Unit,
+    onShowDetails: () -> Unit,
+    onTrash: () -> Unit,
+) {
+    DropdownMenuItem(
+        text = { Text(stringResource(R.string.timeline_share)) },
+        leadingIcon = { Icon(painterResource(IrohacoIcons.Share), contentDescription = null) },
+        onClick = onShare,
+    )
+    if (hasLocation) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.viewer_show_on_map)) },
+            leadingIcon = { Icon(painterResource(IrohacoIcons.Map), contentDescription = null) },
+            onClick = onShowOnMap,
+        )
+    }
+    DropdownMenuItem(
+        text = { Text(stringResource(R.string.details_open)) },
+        leadingIcon = { Icon(painterResource(IrohacoIcons.Info), contentDescription = null) },
+        onClick = onShowDetails,
+    )
+    DropdownMenuItem(
+        text = { Text(stringResource(R.string.timeline_delete)) },
+        leadingIcon = { Icon(painterResource(IrohacoIcons.Delete), contentDescription = null) },
+        onClick = onTrash,
+    )
 }
 
 @Composable
@@ -306,6 +409,17 @@ private suspend fun PointerInputScope.detectZoom(zoom: ZoomState) {
 
 private fun Size.center() = Offset(width / 2f, height / 2f)
 
+/** The date and time shown in the viewer's bar (PRD GAL-013). */
+@Composable
+private fun rememberDateTimeFormatter(): DateTimeFormatter {
+    val locale = LocalConfiguration.current.locales[0]
+    return remember(locale) { DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "yMMMdEjm"), locale) }
+}
+
+/** Opens the device's map app at this point (PRD GAL-013); no app data about it is shown first. */
+internal fun mapIntent(point: GeoPoint): Intent =
+    Intent(Intent.ACTION_VIEW, Uri.parse("geo:${point.latitude},${point.longitude}?q=${point.latitude},${point.longitude}"))
+
 /** Hides the status and navigation bars while the overlays are hidden, and shows light icons on black. */
 @Composable
 private fun SystemBarsVisible(visible: Boolean) {
@@ -344,7 +458,17 @@ private fun MediaViewerPreview() {
         val items = flowOf(
             PagingData.from(listOf(TimelineItem("v1", MediaKind.VIDEO, "content://preview/v1", 0))),
         ).collectAsLazyPagingItems()
-        MediaViewerContent(items, startIndex = 0, onBack = {})
+        MediaViewerContent(items, startIndex = 0, onBack = {}, hasLocation = true)
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun ViewerMenuPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        Surface {
+            Column { ViewerActionsMenu(hasLocation = true, onShare = {}, onShowOnMap = {}, onShowDetails = {}, onTrash = {}) }
+        }
     }
 }
 

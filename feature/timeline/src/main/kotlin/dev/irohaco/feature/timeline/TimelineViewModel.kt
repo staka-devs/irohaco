@@ -158,6 +158,9 @@ class TimelineViewModel(
         }
     }
 
+    /** What the fast scrollbar's bubble names at this position (PRD GAL-014). */
+    suspend fun labelAt(index: Int) = getPage.labelAt(index)
+
     /** The user's default for a shared photo's GPS (PRD MET-003). */
     val shareLocationPolicy: StateFlow<ShareLocationPolicy> = (sharingSettings?.shareLocationPolicy ?: flowOf(ShareLocationPolicy.ASK))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ShareLocationPolicy.ASK)
