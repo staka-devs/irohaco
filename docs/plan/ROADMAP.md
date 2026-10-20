@@ -52,6 +52,16 @@
 | M1-12 | Spike C: 2つのEmbedding索引の共存と切替 | spike / ai | ADR-0003 | M1-11 |
 | M1-13 | Spike F: MediaStore永続性（移動・リネーム・SD抜去/復帰） | spike / media | ARCH §16 | M1-09 |
 | M1-14 | スパイク結果の判定とM2の計画の見直し | docs / ai | AI_SEARCH_SPIKE | M1-11〜13 |
+| M1-15 | フォルダのツリー（展開/折りたたみ、パンくず、リスト/グリッド切替、よく使うフォルダの固定） | feature / media | GAL-011, DESIGN §4 | M1-07 |
+| M1-16 | 日付のグループ化（年/月/日）と見出しからの一括選択、ピンチの案内 | feature / viewer | GAL-012 | M1-04, M1-06 |
+| M1-17 | ビューワーの撮影日時・場所の既定表示と操作メニュー（地図上で表示） | feature / viewer | GAL-013 | M1-03 |
+| M1-18 | グリッドの高速スクロール（スクラバー、日付の表示） | feature / viewer | GAL-001, GAL-014 | M1-16 |
+| M1-19 | 共有時に位置情報を外す | feature / metadata | GAL-005, MET-003 | M1-04 |
+| M1-20 | ゴミ箱の一覧・復元・完全な削除 | feature / media | GAL-015 | M1-04 |
+| M1-21 | アニメーション画像（GIF/アニメーションWebP）の再生 | feature / viewer | GAL-016 | M1-01 |
+| M1-22 | GPSの読み取りと地図から探す（外部の地図タイルは許可を得てから） | feature / media | GAL-017, PRD §6, §10 | M1-17 |
+| M1-23 | 設定画面のカテゴリ分け | feature / app | APP-001, DESIGN §3 | M0-08 |
+| M1-24 | テーマ色の選び方の見直し | feature / designsystem | APP-002, DESIGN §2.1 | M1-23 |
 
 ### M2: AI索引・検索・セマンティックメモ・複数索引
 
@@ -107,4 +117,4 @@
 
 ## 3. 計画に入れないもの
 
-R1とR2の要求（GAL-008、GAL-010、MET-004、API-009、音声検索、ANN、Rustによるネイティブ化）は、R0のIssueに含めない。必要になったときにIssueを作る。
+R1とR2の要求（GAL-008、GAL-010、GAL-012のファイル名での区切り、GAL-018〜021、MET-004、API-009、音声検索、ANN、Rustによるネイティブ化）は、R0のIssueに含めない。必要になったときにIssueを作る。
