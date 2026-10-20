@@ -63,7 +63,10 @@ roborazzi {
 }
 
 dependencies {
+    implementation(project(":core:application"))
+    implementation(project(":core:database"))
     implementation(project(":core:designsystem"))
+    implementation(project(":infrastructure:android-media"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material3.navigation.suite)
@@ -85,4 +88,6 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }

@@ -405,6 +405,10 @@ interface VideoUnderstandingProvider {
 - アプリ内の既存の注釈と索引を残したまま、新しいURIとの対応を付ける。
 - ユーザーが許可した範囲から外れた写真は、すぐには削除しない。`INACCESSIBLE`にして、表示と検索の対象から一時的に外すなど、扱いを画面に示す。
 - 通常のカタログ表示のためのメタデータの同期には、ユーザーがAIインデックスを開始する操作を必要としない。
+- 新しく見つけたメディアは、まず`media_discoveries`に記録し、`NEW_ASSET`として新しいAssetにする（USE_CASES UC-ID-01）。同じボリュームで同じMediaStoreのIDを持つものは、続いている同じソースとして更新する。既存のAssetとの自動の統合はしない。
+- 世代の差分には削除が現れないので、同期のたびにボリュームごとのIDの一覧と比べる。見えなくなったメディアは、その種類の写真と動画へのアクセスがすべて許可されていれば`MISSING_CANDIDATE`、選んだものだけが許可されていれば`INACCESSIBLE`にする。見えるようになったものは`AVAILABLE`に戻す。
+- 今見えないボリュームは`OFFLINE`にし、そのボリュームのソースも`OFFLINE`にする。どの場合も行は消さない。
+- カタログ同期は`media_revisions`を作らない。撮影日時はMediaStoreの`DATE_TAKEN`を`media_sources.observed_taken_at`に持つので、タイムラインは中身のハッシュを待たずに表示できる。
 
 ### 6.2 AIインデックスの実行の流れ
 

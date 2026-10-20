@@ -9,7 +9,7 @@ plugins {
 }
 
 // These modules stay pure Kotlin (CONTRIBUTING §3.1): declaring or pulling in any of these groups fails the build.
-val pureKotlinModules = setOf(":core:domain", ":core:contracts")
+val pureKotlinModules = setOf(":core:domain", ":core:contracts", ":core:application")
 val forbiddenGroups = listOf(
     "androidx",          // Android Framework, Room
     "com.android",

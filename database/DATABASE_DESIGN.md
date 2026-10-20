@@ -142,7 +142,7 @@ erDiagram
 | 関係 | 候補キーと識別子 | 主な関数従属性 | 3NFにするための分け方 |
 |---|---|---|---|
 | `media_assets` | `asset_id` | `asset_id → media_kind, first_seen_at, tombstoned_at` | 物理ファイルの情報は持たない |
-| `media_sources` | `source_id`、非NULLの`(volume_id,media_store_id)` | `source_id → asset_id, uri, name, mime, access_state,...` | ボリューム名は`storage_volumes`に持つ |
+| `media_sources` | `source_id`、非NULLの`(volume_id,media_store_id)` | `source_id → asset_id, uri, name, mime, observed_taken_at, access_state,...` | ボリューム名は`storage_volumes`に持つ。`observed_taken_at`はMediaStoreの`DATE_TAKEN`で、ソースを観測した値である |
 | `media_revisions` | `revision_id` | `revision_id → asset_id, file_digest, visual_digest, dimensions,...` | 現在のrevisionを指すポインタは別の関係にする |
 | `video_segments` | `segment_id` | `segment_id → revision_id, extraction_profile_id, start_ms, end_ms` | `asset_id`を持たない |
 | `sampled_frames` | `frame_id` | `frame_id → segment_id, timestamp_ms, frame_digest` | `asset_id`と`revision_id`を持たない |
@@ -276,7 +276,7 @@ erDiagram
 ## 10. 初期の実装で決める項目
 
 - 長い動画の時間のチャンクごとの、フレームの密度と容量の上限と、分割して索引し直す方法（1本の動画のフレーム数に固定の上限は設けない。PRD §5.2）。
-- 元のファイルが変わったかの判定（mtimeとサイズ、部分ハッシュ、完全なハッシュの組み合わせ）。
+- 元のファイルが変わったかの判定（mtimeとサイズ、部分ハッシュ、完全なハッシュの組み合わせ）。カタログ同期は`media_revisions`を作らず、中身を読む処理（AIのインデックス作成、同一性の判定、メタデータの読み取り）が最初にrevisionを記録する。
 - 画面から検索のプロファイルを保存したりモデルを切り替えたりするときの、トランザクションの単位。
 - 将来DBを分ける場合も含めたベクトルの格納の方式（SQLiteのBLOBから独立したベクトルの索引へ）。
 - ContentResolverへの書き戻しとファイルの置き換えは、OS、メーカー、コンテナによって挙動が違う。安全に失敗できるかを実機でテストする。
