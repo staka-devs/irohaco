@@ -25,11 +25,11 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import java.util.UUID
 
 /** Wires adapters to use cases (CONTRIBUTING §3.1: the app module is where dependencies are assembled). */
-class AppContainer(context: Context) {
+class AppContainer(context: Context, private val databaseName: String = IrohacoDatabaseFactory.NAME) {
     private val appContext = context.applicationContext
 
     /** Opens on first use; the caller must be off the main thread. */
-    val database: IrohacoDatabase by lazy { IrohacoDatabaseFactory.open(appContext) }
+    val database: IrohacoDatabase by lazy { IrohacoDatabaseFactory.open(appContext, databaseName) }
 
     private val libraryAccess by lazy { AndroidMediaLibraryAccess(appContext) }
 

@@ -5,7 +5,6 @@ import android.content.ContentUris
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
-import dev.irohaco.core.database.IrohacoDatabaseFactory
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -21,17 +20,18 @@ class CatalogSyncTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val resolver = context.contentResolver
-    private val container = AppContainer(context)
+    // Its own file: deleting the app's database under the running app would break the other tests.
+    private val container = AppContainer(context, TEST_DATABASE)
 
     @After
     fun tearDown() {
         container.database.close()
-        context.deleteDatabase(IrohacoDatabaseFactory.NAME)
+        context.deleteDatabase(TEST_DATABASE)
     }
 
     @Test
     fun importsANewImageAndMarksItMissingAfterItIsDeleted() = runTest {
-        context.deleteDatabase(IrohacoDatabaseFactory.NAME)
+        context.deleteDatabase(TEST_DATABASE)
         val uri = insertTestImage(context)
         val id = ContentUris.parseId(uri)
         try {
@@ -49,3 +49,5 @@ class CatalogSyncTest {
             .query("SELECT access_state FROM media_sources WHERE media_store_id = ?", arrayOf<Any>(mediaStoreId))
             .use { it.moveToFirst(); it.getString(0) }
 }
+
+private const val TEST_DATABASE = "catalog-sync-test.db"
