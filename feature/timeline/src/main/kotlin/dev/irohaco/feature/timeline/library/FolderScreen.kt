@@ -39,6 +39,7 @@ import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.designsystem.component.BadgeStatus
 import dev.irohaco.core.designsystem.component.StatusBadge
@@ -56,7 +57,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class FolderViewModel(getPage: GetTimelinePage, private val browse: BrowseLibrary, val folder: FolderRef) : ViewModel() {
+class FolderViewModel(private val getPage: GetTimelinePage, private val browse: BrowseLibrary, val folder: FolderRef) : ViewModel() {
     /** The timeline's order and kind, limited to this folder; exclusions do not hide the folder from itself. */
     val query: TimelineQuery = MediaList.Folder(folder).query(getPage.query.value)
 
@@ -65,6 +66,9 @@ class FolderViewModel(getPage: GetTimelinePage, private val browse: BrowseLibrar
     val items: Flow<PagingData<TimelineItem>> =
         Pager(PagingConfig(pageSize = 120, enablePlaceholders = true)) { TimelinePagingSource(getPage, query).also { source = it } }
             .flow.cachedIn(viewModelScope)
+
+    /** What the fast scrollbar's bubble names at this position (PRD GAL-014). */
+    suspend fun labelAt(index: Int) = getPage.labelAt(index, query)
 
     private val volumeFolders = browse.folders().map { all -> all.filter { it.folder.volumeId == folder.volumeId } }
 
@@ -124,6 +128,7 @@ internal fun FolderPane(
         onOpenMedia = onOpenMedia,
         onExclude = viewModel::setExcluded,
         onPin = viewModel::setPinned,
+        labelAt = viewModel::labelAt,
     )
 }
 
@@ -142,6 +147,7 @@ internal fun FolderContent(
     onOpenMedia: (String) -> Unit,
     onExclude: (Boolean) -> Unit,
     onPin: (Boolean) -> Unit,
+    labelAt: suspend (Int) -> TimelineLabel? = { null },
 ) {
     val rootLabel = volumeName?.let { volumeLabel(it) }.orEmpty()
     val crumbs = breadcrumbs(folder.relativePath)
@@ -183,7 +189,7 @@ internal fun FolderContent(
             }
             return@Scaffold
         }
-        MediaGrid(items, padding, onOpenMedia) {
+        MediaGrid(items, padding, onOpenMedia, labelAt = labelAt) {
             if (crumbs.isNotEmpty()) {
                 item(key = "breadcrumbs", span = { GridItemSpan(maxLineSpan) }) {
                     Breadcrumbs(rootLabel, crumbs) { onOpenFolder(FolderRef(folder.volumeId, it)) }
