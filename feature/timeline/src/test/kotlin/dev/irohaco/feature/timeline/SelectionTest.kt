@@ -17,6 +17,15 @@ class SelectionTest {
     private fun media(id: String) = TimelineCell.Media(item(id), day)
 
     @Test
+    fun `a group's button selects all of it, and unselects it once all are selected`() {
+        val group = listOf(item("a"), item("b"))
+        val some = mapOf("a" to item("a"), "x" to item("x"))
+        val all = some.toggledGroup(group)
+        assertEquals(setOf("a", "b", "x"), all.keys)
+        assertEquals(setOf("x"), all.toggledGroup(group).keys)
+    }
+
+    @Test
     fun `dragging selects the cells between the start and the finger, skipping headers`() {
         val selected = rangeSelection(emptyMap(), cells::getOrNull, from = 2, to = 6)
         assertEquals(listOf("b", "c", "d", "e"), selected.keys.toList())

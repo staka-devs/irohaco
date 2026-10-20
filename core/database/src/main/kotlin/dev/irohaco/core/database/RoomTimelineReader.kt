@@ -31,6 +31,15 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
             ),
         )
 
+    override suspend fun between(query: TimelineQuery, fromMs: Long, untilMs: Long): List<TimelineItem> =
+        db.timelineDao().page(
+            SimpleSQLiteQuery(
+                """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs
+                   ${from(query)} ${where(query)} AND $TIME >= ? AND $TIME < ? ORDER BY ${orderBy(query)}""",
+                arrayOf(*fromArgs(query), *args(query), fromMs, untilMs),
+            ),
+        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs) }
+
     /**
      * Emits once on subscription as well: a sync that finishes after the first page loads but before
      * this flow is collected would otherwise leave the timeline showing stale rows.

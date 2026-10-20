@@ -11,6 +11,10 @@ import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.contracts.Album
+import dev.irohaco.core.contracts.DateGrouping
+import dev.irohaco.core.contracts.TimelineSettings
+import java.time.Instant
+import java.time.LocalDate
 import dev.irohaco.core.contracts.Tag
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flowOf
@@ -44,15 +48,35 @@ class TimelineViewModel(
     excludedFolders: Flow<Set<FolderRef>> = emptyFlow(),
     private val mark: MarkMedia? = null,
     private val collections: ManageCollections? = null,
-    zone: ZoneId = ZoneId.systemDefault(),
+    private val settings: TimelineSettings? = null,
+    private val zone: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
     private var source: TimelinePagingSource? = null
+
+    private val _grouping = MutableStateFlow(DateGrouping.DAY)
+
+    /** The unit of the date headers, from the settings (GAL-012). */
+    val dateGrouping: StateFlow<DateGrouping> = _grouping.asStateFlow()
+
+    fun setDateGrouping(grouping: DateGrouping) {
+        viewModelScope.launch { settings?.setDateGrouping(grouping) }
+    }
+
+    /** Whether to tell the user once that pinching changes the number of columns. */
+    val showPinchHint: StateFlow<Boolean> = (settings?.pinchHintShown?.map { !it } ?: flowOf(false))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun pinchHintShown() {
+        viewModelScope.launch { settings?.setPinchHintShown() }
+    }
 
     val cells: Flow<PagingData<TimelineCell>> =
         Pager(PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = true, jumpThreshold = PAGE_SIZE * 4)) {
             TimelinePagingSource(getPage).also { source = it }
         }.flow
-            .map { if (getPage.query.value.sortKey == TimelineSortKey.TAKEN) it.withDateHeaders(zone) else it.withoutHeaders(zone) }
+            .map {
+                if (getPage.query.value.sortKey == TimelineSortKey.TAKEN) it.withDateHeaders(zone, _grouping.value) else it.withoutHeaders(zone)
+            }
             .cachedIn(viewModelScope)
 
     /** The order and filter, shared with the viewer (GAL-006). */
@@ -77,6 +101,12 @@ class TimelineViewModel(
     init {
         viewModelScope.launch { getPage.changes().collect { source?.invalidate() } }
         viewModelScope.launch {
+            settings?.dateGrouping?.collect {
+                _grouping.value = it
+                source?.invalidate()
+            }
+        }
+        viewModelScope.launch {
             excludedFolders.collect { excluded ->
                 getPage.query.update { it.copy(excludedFolders = excluded) }
                 source?.invalidate()
@@ -88,8 +118,15 @@ class TimelineViewModel(
     private val _selection = MutableStateFlow<Map<String, TimelineItem>>(emptyMap())
     val selection: StateFlow<Map<String, TimelineItem>> = _selection.asStateFlow()
 
+    private val _selectedGroups = MutableStateFlow<Set<LocalDate>>(emptySet())
+
+    /** Groups (by their first day) whose header selected all of them; their header shows as selected. */
+    val selectedGroups: StateFlow<Set<LocalDate>> = _selectedGroups.asStateFlow()
+
     fun toggle(item: TimelineItem) {
         _selection.value = _selection.value.toggled(item)
+        val day = Instant.ofEpochMilli(item.sortTimeMs).atZone(zone).toLocalDate()
+        _selectedGroups.value -= day.groupStart(_grouping.value)
     }
 
     fun setSelection(selection: Map<String, TimelineItem>) {
@@ -98,6 +135,21 @@ class TimelineViewModel(
 
     fun clearSelection() {
         _selection.value = emptyMap()
+        _selectedGroups.value = emptySet()
+    }
+
+    /** Selects every item of the group starting on [start], loaded or not; again, unselects them. */
+    fun toggleGroup(start: LocalDate) {
+        viewModelScope.launch {
+            val grouping = _grouping.value
+            val group = getPage.between(
+                start.atStartOfDay(zone).toInstant().toEpochMilli(),
+                groupEnd(start, grouping).atStartOfDay(zone).toInstant().toEpochMilli(),
+            )
+            val all = start in _selectedGroups.value
+            _selection.value = if (all) _selection.value - group.map { it.assetId }.toSet() else _selection.value.toggledGroup(group)
+            _selectedGroups.value = if (all) _selectedGroups.value - start else _selectedGroups.value + start
+        }
     }
 
     enum class Operation { MOVE, COPY, RENAME }

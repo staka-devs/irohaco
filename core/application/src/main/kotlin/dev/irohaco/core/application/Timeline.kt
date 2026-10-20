@@ -28,6 +28,8 @@ class GetTimelinePage(private val reader: TimelineReader) {
 
     suspend fun indexOf(assetId: String, query: TimelineQuery = this.query.value) = reader.indexOf(query, assetId)
 
+    suspend fun between(fromMs: Long, untilMs: Long, query: TimelineQuery = this.query.value) = reader.between(query, fromMs, untilMs)
+
     fun changes() = reader.changes()
 }
 

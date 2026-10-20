@@ -47,6 +47,9 @@ interface TimelineReader {
     /** The offset of an asset in that order, or null when it is not on the timeline. */
     suspend fun indexOf(query: TimelineQuery, assetId: String): Int?
 
+    /** Every item whose sort time is in [fromMs, untilMs), in the query's order: a whole date group. */
+    suspend fun between(query: TimelineQuery, fromMs: Long, untilMs: Long): List<TimelineItem>
+
     /** Emits whenever the catalog behind the timeline may have changed. */
     fun changes(): Flow<Unit>
 }

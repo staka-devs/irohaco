@@ -20,3 +20,11 @@ internal fun rangeSelection(
 /** Adds or removes one item, keeping the order in which items were selected. */
 internal fun Map<String, TimelineItem>.toggled(item: TimelineItem): Map<String, TimelineItem> =
     LinkedHashMap(this).apply { if (remove(item.assetId) == null) put(item.assetId, item) }
+
+/** Selects the whole group, or unselects it when every item of it is already selected (GAL-012). */
+internal fun Map<String, TimelineItem>.toggledGroup(group: List<TimelineItem>): Map<String, TimelineItem> =
+    if (group.isNotEmpty() && group.all { it.assetId in this }) {
+        LinkedHashMap(this).apply { group.forEach { remove(it.assetId) } }
+    } else {
+        LinkedHashMap(this).apply { group.forEach { putIfAbsent(it.assetId, it) } }
+    }

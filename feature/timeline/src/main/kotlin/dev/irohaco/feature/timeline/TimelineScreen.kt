@@ -101,6 +101,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import dev.irohaco.core.contracts.TimelineQuery
+import dev.irohaco.core.contracts.DateGrouping
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -122,6 +123,9 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
     val query by viewModel.query.collectAsStateWithLifecycle()
     val tags by viewModel.tags.collectAsStateWithLifecycle()
     val albums by viewModel.albums.collectAsStateWithLifecycle()
+    val grouping by viewModel.dateGrouping.collectAsStateWithLifecycle()
+    val selectedGroups by viewModel.selectedGroups.collectAsStateWithLifecycle()
+    val showPinchHint by viewModel.showPinchHint.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.refreshAccess() }
     LifecycleResumeEffect(Unit) {
@@ -160,6 +164,14 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
     }
     LaunchedEffect(viewModel) {
         viewModel.outcomes.collect { snackbar.showSnackbar(outcomeMessage(resources, it)) }
+    }
+    val pinchHint = stringResource(R.string.timeline_pinch_hint)
+    val hasAccess = access.images != LibraryAccess.NONE || access.videos != LibraryAccess.NONE
+    LaunchedEffect(showPinchHint, hasAccess) {
+        if (!showPinchHint || !hasAccess) return@LaunchedEffect
+        // Marked first, so leaving the screen while it shows does not show it again.
+        viewModel.pinchHintShown()
+        snackbar.showSnackbar(pinchHint, withDismissAction = true)
     }
     when (val p = pending) {
         is Pending.Folder -> FolderDialog(
@@ -249,6 +261,10 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
         query = query,
         onQueryChange = viewModel::setQuery,
         scrollToTop = viewModel.scrollToTop,
+        grouping = grouping,
+        onGrouping = viewModel::setDateGrouping,
+        selectedGroups = selectedGroups,
+        onToggleGroup = viewModel::toggleGroup,
     )
 }
 
@@ -324,9 +340,13 @@ internal fun TimelineContent(
     query: TimelineQuery = TimelineQuery(),
     onQueryChange: (TimelineQuery) -> Unit = {},
     scrollToTop: Flow<Unit> = emptyFlow(),
+    grouping: DateGrouping = DateGrouping.DAY,
+    onGrouping: (DateGrouping) -> Unit = {},
+    selectedGroups: Set<LocalDate> = emptySet(),
+    onToggleGroup: (LocalDate) -> Unit = {},
 ) {
     var sorting by rememberSaveable { mutableStateOf(false) }
-    if (sorting) SortSheet(query, onQueryChange, onDismiss = { sorting = false })
+    if (sorting) SortSheet(query, onQueryChange, onDismiss = { sorting = false }, grouping = grouping, onGrouping = onGrouping)
     BoxWithConstraints {
         // Column ranges per width class (DESIGN §4.1): Compact 3–5, Medium 5–7, Expanded 6–10.
         val range = when {
@@ -397,6 +417,9 @@ internal fun TimelineContent(
                         onTag = onTag,
                         onAlbum = onAlbum,
                         scrollToTop = scrollToTop,
+                        grouping = grouping,
+                        selectedGroups = selectedGroups,
+                        onToggleGroup = onToggleGroup,
                     )
                 }
             }
@@ -424,12 +447,22 @@ private fun TimelineGrid(
     onTag: (List<TimelineItem>) -> Unit,
     onAlbum: (List<TimelineItem>) -> Unit,
     scrollToTop: Flow<Unit>,
+    grouping: DateGrouping,
+    selectedGroups: Set<LocalDate>,
+    onToggleGroup: (LocalDate) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
     LaunchedEffect(scrollToTop) { scrollToTop.collect { gridState.scrollToItem(0) } }
     val currentSelection by rememberUpdatedState(selection)
     val selectRange by rememberUpdatedState(onSelectRange)
     val formatter = rememberDateFormatter()
+    val headerFormatter = rememberDateFormatter(
+        when (grouping) {
+            DateGrouping.YEAR -> "y"
+            DateGrouping.MONTH -> "yMMMM"
+            DateGrouping.DAY -> "yMMMdE"
+        },
+    )
     // The pinch detector is installed once, so it must call the latest callbacks.
     val fewer by rememberUpdatedState(onFewerColumns)
     val more by rememberUpdatedState(onMoreColumns)
@@ -461,7 +494,7 @@ private fun TimelineGrid(
                 span = { index -> GridItemSpan(if (cells.peek(index) is TimelineCell.Header) maxLineSpan else 1) },
             ) { index ->
                 when (val cell = cells[index]) {
-                    is TimelineCell.Header -> DateHeader(cell.date, formatter)
+                    is TimelineCell.Header -> DateHeader(cell.date, headerFormatter, cell.date in selectedGroups) { onToggleGroup(cell.date) }
                     is TimelineCell.Media -> {
                         val date = formatter.format(cell.date)
                         val description = if (cell.item.kind == MediaKind.VIDEO) {
@@ -493,12 +526,12 @@ private fun TimelineGrid(
                 val index = gridState.firstVisibleItemIndex
                 when (val cell = if (index < cells.itemCount) cells.peek(index) else null) {
                     is TimelineCell.Header -> cell.date
-                    is TimelineCell.Media -> cell.date
+                    is TimelineCell.Media -> cell.date.groupStart(grouping)
                     null -> null
                 }
             }
         }
-        pinned?.let { DateHeader(it, formatter) }
+        pinned?.let { DateHeader(it, headerFormatter, it in selectedGroups) { onToggleGroup(it) } }
         if (selection.isNotEmpty()) {
             HorizontalFloatingToolbar(
                 expanded = true,
@@ -598,22 +631,32 @@ private fun Modifier.dragToSelect(
     }
 }
 
+/** The header of a date group; its button selects the whole group, even outside selection mode (GAL-012). */
 @Composable
-private fun DateHeader(date: LocalDate, formatter: DateTimeFormatter) {
-    Text(
-        text = formatter.format(date),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier
+private fun DateHeader(date: LocalDate, formatter: DateTimeFormatter, selected: Boolean, onToggle: () -> Unit) {
+    val label = formatter.format(date)
+    Row(
+        Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
-    )
+            .padding(start = IrohacoSpacing.l),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        IconButton(onClick = onToggle) {
+            Icon(
+                painterResource(if (selected) IrohacoIcons.CheckCircleFilled else IrohacoIcons.CheckCircle),
+                stringResource(if (selected) R.string.timeline_unselect_group else R.string.timeline_select_group, label),
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 @Composable
-internal fun rememberDateFormatter(): DateTimeFormatter {
+internal fun rememberDateFormatter(skeleton: String = "yMMMdE"): DateTimeFormatter {
     val locale = LocalConfiguration.current.locales[0]
-    return remember(locale) { DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, "yMMMdE"), locale) }
+    return remember(locale, skeleton) { DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale) }
 }
 
 @Composable
@@ -701,5 +744,32 @@ private fun TimelineSelectionPreview() {
             MediaLibraryAccess(LibraryAccess.FULL, LibraryAccess.FULL), cells, {}, {},
             selection = previewItems.take(2).associateBy { it.assetId },
         )
+    }
+}
+
+private val groupedPreviewItems = listOf(LocalDate.of(2026, 10, 20), LocalDate.of(2026, 9, 3), LocalDate.of(2025, 12, 24)).flatMapIndexed { g, day ->
+    (0 until 4).map { i -> TimelineItem("g$g-$i", MediaKind.IMAGE, "content://preview/$g$i", day.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()) }
+}
+
+@IrohacoPreviews
+@Composable
+private fun TimelineMonthsPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        val cells = flowOf(PagingData.from(groupedPreviewItems).withDateHeaders(ZoneOffset.UTC, DateGrouping.MONTH)).collectAsLazyPagingItems()
+        TimelineContent(
+            MediaLibraryAccess(LibraryAccess.FULL, LibraryAccess.FULL), cells, {}, {},
+            grouping = DateGrouping.MONTH,
+            selection = groupedPreviewItems.take(4).associateBy { it.assetId },
+            selectedGroups = setOf(LocalDate.of(2026, 10, 1)),
+        )
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun TimelineYearsPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        val cells = flowOf(PagingData.from(groupedPreviewItems).withDateHeaders(ZoneOffset.UTC, DateGrouping.YEAR)).collectAsLazyPagingItems()
+        TimelineContent(MediaLibraryAccess(LibraryAccess.FULL, LibraryAccess.FULL), cells, {}, {}, grouping = DateGrouping.YEAR)
     }
 }

@@ -126,6 +126,7 @@ class MainActivity : ComponentActivity() {
                             container.browseLibrary.excludedFolders(),
                             container.markMedia,
                             container.manageCollections,
+                            container.timelineSettings,
                         )
                     },
                     onOpenMedia = { onOpenMedia(it, null) },

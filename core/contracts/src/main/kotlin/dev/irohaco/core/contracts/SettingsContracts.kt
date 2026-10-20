@@ -33,3 +33,17 @@ interface LibrarySettings {
 
 /** The library as a folder tree, or as cards of the top-level folders. */
 enum class LibraryLayout { TREE, GRID }
+
+/** The unit of the timeline's date headers (GAL-012). */
+enum class DateGrouping { YEAR, MONTH, DAY }
+
+interface TimelineSettings {
+    val dateGrouping: Flow<DateGrouping>
+
+    suspend fun setDateGrouping(grouping: DateGrouping)
+
+    /** Whether the one-time hint that pinching changes the columns was shown. */
+    val pinchHintShown: Flow<Boolean>
+
+    suspend fun setPinchHintShown()
+}
