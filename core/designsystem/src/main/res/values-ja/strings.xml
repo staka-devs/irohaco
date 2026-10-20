@@ -12,4 +12,14 @@
     <string name="status_low_coverage">低カバレッジ</string>
     <string name="status_ai_not_installed">AIモデル未導入</string>
     <string name="loading">読み込み中</string>
+    <string name="color_blue">青</string>
+    <string name="color_indigo">藍</string>
+    <string name="color_purple">紫</string>
+    <string name="color_pink">ピンク</string>
+    <string name="color_red">赤</string>
+    <string name="color_orange">オレンジ</string>
+    <string name="color_amber">琥珀</string>
+    <string name="color_green">緑</string>
+    <string name="color_teal">青緑</string>
+    <string name="color_brown">茶</string>
 </resources>

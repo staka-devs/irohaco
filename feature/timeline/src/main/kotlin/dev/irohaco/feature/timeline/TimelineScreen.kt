@@ -85,7 +85,7 @@ private val MEDIA_PERMISSIONS: Array<String> =
 
 /** The Photos tab (PRD GAL-001, DESIGN §4.1). */
 @Composable
-fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) -> Unit) {
+fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) -> Unit, onOpenSettings: () -> Unit) {
     val access by viewModel.access.collectAsStateWithLifecycle()
     val cells = viewModel.cells.collectAsLazyPagingItems()
     val context = LocalContext.current
@@ -98,10 +98,11 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
         access = access,
         cells = cells,
         onRequestAccess = { request.launch(MEDIA_PERMISSIONS) },
-        onOpenSettings = {
+        onOpenSystemSettings = {
             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))
         },
         onOpenMedia = onOpenMedia,
+        onOpenSettings = onOpenSettings,
     )
 }
 
@@ -110,8 +111,9 @@ internal fun TimelineContent(
     access: MediaLibraryAccess,
     cells: LazyPagingItems<TimelineCell>,
     onRequestAccess: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onOpenSystemSettings: () -> Unit,
     onOpenMedia: (String) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     BoxWithConstraints {
         // Column ranges per width class (DESIGN §4.1): Compact 3–5, Medium 5–7, Expanded 6–10.
@@ -128,6 +130,9 @@ internal fun TimelineContent(
                 TopAppBar(
                     title = { Text(stringResource(R.string.timeline_title)) },
                     actions = {
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.timeline_settings))
+                        }
                         if (!noAccess) {
                             IconButton(onClick = { chosen = (columns - 1).coerceIn(range) }, enabled = columns > range.first) {
                                 Icon(painterResource(IrohacoIcons.ZoomIn), stringResource(R.string.timeline_columns_fewer))
@@ -141,7 +146,7 @@ internal fun TimelineContent(
             },
         ) { padding ->
             when {
-                noAccess -> PermissionPrompt(padding, onRequestAccess, onOpenSettings)
+                noAccess -> PermissionPrompt(padding, onRequestAccess, onOpenSystemSettings)
                 else -> Column(Modifier.padding(top = padding.calculateTopPadding())) {
                     if (access.images == LibraryAccess.SELECTED || access.videos == LibraryAccess.SELECTED) {
                         PartialAccessBar(onRequestAccess)
@@ -266,7 +271,7 @@ private fun PartialAccessBar(onChange: () -> Unit) {
 }
 
 @Composable
-private fun PermissionPrompt(padding: PaddingValues, onRequest: () -> Unit, onOpenSettings: () -> Unit) {
+private fun PermissionPrompt(padding: PaddingValues, onRequest: () -> Unit, onOpenSystemSettings: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(padding).padding(IrohacoSpacing.xl),
         verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.l, Alignment.CenterVertically),
@@ -276,7 +281,7 @@ private fun PermissionPrompt(padding: PaddingValues, onRequest: () -> Unit, onOp
         Text(stringResource(R.string.timeline_permission_body), style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
         Button(onClick = onRequest) { Text(stringResource(R.string.timeline_permission_grant)) }
         // After a permanent denial the system dialog no longer appears, so settings is the way back.
-        TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.timeline_permission_settings)) }
+        TextButton(onClick = onOpenSystemSettings) { Text(stringResource(R.string.timeline_permission_settings)) }
     }
 }
 
