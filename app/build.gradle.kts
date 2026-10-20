@@ -71,6 +71,7 @@ dependencies {
     implementation(project(":feature:settings"))
     implementation(project(":infrastructure:preferences"))
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.media3.exoplayer)
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

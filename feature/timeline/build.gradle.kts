@@ -44,6 +44,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.paging.compose)
     implementation(libs.coil.compose)
+    implementation(libs.androidx.media3.common)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
 

@@ -1,6 +1,12 @@
 package dev.irohaco
 
 import android.content.Context
+import androidx.media3.common.Player
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.SyncMediaCatalog
@@ -30,6 +36,20 @@ class AppContainer(context: Context) {
     /** One DataStore per file for the whole process, as DataStore requires. */
     val themeColorSettings by lazy {
         ThemeColorSettings(DataStoreAppearanceSettings(PreferenceDataStoreFactory.create { appContext.preferencesDataStoreFile("settings") }))
+    }
+
+    /**
+     * One player per open viewer; the viewer's ViewModel releases it. Decoder fallback retries with
+     * another decoder when one fails to start. The emulator's goldfish H.264 decoder fails on CI's
+     * software GPU, so emulator-only goldfish codecs go last; real devices have none.
+     */
+    @OptIn(UnstableApi::class)
+    fun newVideoPlayer(): Player {
+        val selector = MediaCodecSelector { mimeType, secure, tunneling ->
+            MediaCodecSelector.DEFAULT.getDecoderInfos(mimeType, secure, tunneling).sortedBy { it.name.startsWith("c2.goldfish.") }
+        }
+        val renderers = DefaultRenderersFactory(appContext).setMediaCodecSelector(selector).setEnableDecoderFallback(true)
+        return ExoPlayer.Builder(appContext, renderers).build()
     }
 
     val getTimelinePage by lazy { GetTimelinePage(RoomTimelineReader(database)) }

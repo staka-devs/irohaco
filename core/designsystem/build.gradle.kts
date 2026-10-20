@@ -42,6 +42,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.coil.compose)
     implementation(libs.material.kolor)
+    api(libs.androidx.media3.common) // VideoPlayer takes a media3 Player
+    implementation(libs.androidx.media3.ui.compose.material3)
 
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.junit)

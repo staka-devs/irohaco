@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -51,7 +52,10 @@ import androidx.compose.ui.unit.toSize
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.Player
 import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -59,6 +63,7 @@ import androidx.paging.compose.itemKey
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.designsystem.component.VideoPlayer
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.motion.sharedMedia
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
@@ -74,15 +79,31 @@ import kotlinx.coroutines.flow.flowOf
 fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
     val start by viewModel.start.collectAsStateWithLifecycle()
     val items = viewModel.items.collectAsLazyPagingItems()
+    val playing by viewModel.playing.collectAsStateWithLifecycle()
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.pause() }
     when (val s = start) {
         ViewerViewModel.Start.NotFound -> LaunchedEffect(Unit) { onBack() } // the asset left the timeline meanwhile
-        is ViewerViewModel.Start.At -> MediaViewerContent(items, s.index, onBack)
+        is ViewerViewModel.Start.At -> MediaViewerContent(
+            items = items,
+            startIndex = s.index,
+            onBack = onBack,
+            playing = playing,
+            onPlay = viewModel::play,
+            onPageChanged = { assetId -> if (playing != null && playing?.first != assetId) viewModel.stop() },
+        )
         ViewerViewModel.Start.Loading -> Box(Modifier.fillMaxSize().background(IrohacoViewerColors.background))
     }
 }
 
 @Composable
-internal fun MediaViewerContent(items: LazyPagingItems<TimelineItem>, startIndex: Int, onBack: () -> Unit) {
+internal fun MediaViewerContent(
+    items: LazyPagingItems<TimelineItem>,
+    startIndex: Int,
+    onBack: () -> Unit,
+    playing: Pair<String, Player>? = null,
+    onPlay: (TimelineItem) -> Unit = {},
+    onPageChanged: (assetId: String?) -> Unit = {},
+) {
     var chrome by rememberSaveable { mutableStateOf(true) }
     BackHandler(onBack = onBack)
     SystemBarsVisible(chrome)
@@ -90,18 +111,31 @@ internal fun MediaViewerContent(items: LazyPagingItems<TimelineItem>, startIndex
         if (items.itemCount > 0) {
             val pager = rememberPagerState(initialPage = startIndex.coerceAtMost(items.itemCount - 1)) { items.itemCount }
             val zoom = remember { ZoomState() }
-            LaunchedEffect(pager.settledPage) { zoom.reset() }
+            LaunchedEffect(pager.settledPage) {
+                zoom.reset()
+                onPageChanged(items.peek(pager.settledPage)?.assetId) // playback stays on the page it started on
+            }
             HorizontalPager(
                 state = pager,
                 userScrollEnabled = !zoom.isZoomed,
                 key = items.itemKey { it.assetId },
                 beyondViewportPageCount = 1,
             ) { page ->
-                MediaPage(
-                    item = items[page],
-                    zoom = if (page == pager.currentPage) zoom else null,
-                    onTap = { chrome = !chrome },
-                )
+                val item = items[page]
+                val player = playing?.takeIf { it.first == item?.assetId }?.second
+                if (item != null && player != null) {
+                    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { chrome = !chrome }) }) {
+                        VideoPlayer(player, showControls = chrome, modifier = Modifier.fillMaxSize().navigationBarsPadding())
+                    }
+                } else {
+                    MediaPage(
+                        item = item,
+                        // Videos are not zoomed; their page shows a frame and the play button.
+                        zoom = if (page == pager.currentPage && item?.kind != MediaKind.VIDEO) zoom else null,
+                        onTap = { chrome = !chrome },
+                        onPlay = { item?.let(onPlay) },
+                    )
+                }
             }
         }
         AnimatedVisibility(visible = chrome, enter = fadeIn(), exit = fadeOut()) {
@@ -115,7 +149,7 @@ internal fun MediaViewerContent(items: LazyPagingItems<TimelineItem>, startIndex
 }
 
 @Composable
-private fun MediaPage(item: TimelineItem?, zoom: ZoomState?, onTap: () -> Unit) {
+private fun MediaPage(item: TimelineItem?, zoom: ZoomState?, onTap: () -> Unit, onPlay: () -> Unit) {
     var size by remember { mutableStateOf(Size.Zero) }
     val gestures = if (zoom == null) {
         Modifier.pointerInput(Unit) { detectTapGestures(onTap = { onTap() }) }
@@ -151,12 +185,14 @@ private fun MediaPage(item: TimelineItem?, zoom: ZoomState?, onTap: () -> Unit) 
                 },
         )
         if (item.kind == MediaKind.VIDEO) {
-            Icon(
-                painterResource(IrohacoIcons.PlayCircleFilled),
-                contentDescription = null,
-                tint = IrohacoViewerColors.content,
-                modifier = Modifier.size(72.dp),
-            )
+            IconButton(onClick = onPlay, modifier = Modifier.size(96.dp)) {
+                Icon(
+                    painterResource(IrohacoIcons.PlayCircleFilled),
+                    contentDescription = stringResource(R.string.viewer_play),
+                    tint = IrohacoViewerColors.content,
+                    modifier = Modifier.size(72.dp),
+                )
+            }
         }
     }
 }

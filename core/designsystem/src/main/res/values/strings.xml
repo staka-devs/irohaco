@@ -22,4 +22,6 @@
     <string name="color_green">Green</string>
     <string name="color_teal">Teal</string>
     <string name="color_brown">Brown</string>
+    <string name="video_playing">Playing</string>
+    <string name="video_paused">Paused</string>
 </resources>

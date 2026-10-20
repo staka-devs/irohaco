@@ -23,3 +23,20 @@ fun insertTestImage(context: Context): Uri {
     resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
     return uri
 }
+
+/** Inserts the 2-second H.264 clip from the test assets into MediaStore as this app; the caller deletes it. */
+fun insertTestVideo(context: Context, testAssets: android.content.res.AssetManager): Uri {
+    val resolver = context.contentResolver
+    val uri = resolver.insert(
+        MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
+        ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "irohaco-l2-${UUID.randomUUID()}.mp4")
+            put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/IrohacoTest")
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        },
+    )!!
+    resolver.openOutputStream(uri)!!.use { out -> testAssets.open("test-video.mp4").use { it.copyTo(out) } }
+    resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+    return uri
+}
