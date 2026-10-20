@@ -117,8 +117,11 @@ private fun DetailRows(details: MediaDetails, kind: MediaKind, onAllowLocation: 
         TextButton(onClick = onAllowLocation) { Text(stringResource(R.string.details_allow_location)) }
     }
     if (kind == MediaKind.IMAGE) {
+        Row(R.string.details_headline, details.headline) { it }
         Row(R.string.details_description, details.description) { it }
         Row(R.string.details_keywords, details.keywords) { it.joinToString() }
+        Row(R.string.details_creator, details.creator) { it }
+        Row(R.string.details_copyright, details.copyright) { it }
     }
 }
 

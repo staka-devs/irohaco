@@ -37,6 +37,9 @@ data class MediaDetails(
     val location: Detail<GeoPoint>,
     val description: Detail<String>,
     val keywords: Detail<List<String>>,
+    val headline: Detail<String> = Detail.Missing,
+    val creator: Detail<String> = Detail.Missing,
+    val copyright: Detail<String> = Detail.Missing,
 )
 
 sealed interface MediaDetailsResult {

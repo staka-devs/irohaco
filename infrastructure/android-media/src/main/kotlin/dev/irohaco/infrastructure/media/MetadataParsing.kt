@@ -25,11 +25,15 @@ internal data class PhotoFields(
     val location: Detail<GeoPoint>,
     val description: Detail<String>,
     val keywords: Detail<List<String>>,
+    val headline: Detail<String> = Detail.Missing,
+    val creator: Detail<String> = Detail.Missing,
+    val copyright: Detail<String> = Detail.Missing,
 ) {
     companion object {
         val unreadable = PhotoFields(
             Detail.Unreadable, Detail.Unreadable, Detail.Unreadable, Detail.Unreadable, Detail.Unreadable,
             Detail.Unreadable, Detail.Unreadable, Detail.Unreadable, Detail.Unreadable, Detail.Unreadable,
+            Detail.Unreadable, Detail.Unreadable, Detail.Unreadable,
         )
     }
 }
@@ -40,7 +44,7 @@ private val EXIF_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy:MM:
  * Reads EXIF and XMP from a photo. Without [locationAllowed] the OS has already removed GPS from the
  * stream, so the location is reported as NoPermission rather than Missing.
  */
-internal fun readPhotoFields(input: InputStream, locationAllowed: Boolean): PhotoFields {
+internal fun readPhotoFields(input: InputStream, locationAllowed: Boolean, iptc: IptcFields = IptcFields.missing): PhotoFields {
     val exif = try {
         ExifInterface(input)
     } catch (e: IOException) {
@@ -59,8 +63,12 @@ internal fun readPhotoFields(input: InputStream, locationAllowed: Boolean): Phot
             !locationAllowed -> Detail.NoPermission
             else -> exif.latLong?.let { Detail.Value(GeoPoint(it[0], it[1])) } ?: Detail.Missing
         },
-        description = xmp?.description?.takeIf { it is Detail.Value } ?: exif.text(ExifInterface.TAG_IMAGE_DESCRIPTION),
-        keywords = xmp?.keywords ?: Detail.Missing,
+        // XMP first, then IPTC, then the EXIF description (#83).
+        description = preferXmp(xmp?.description, iptc.caption).takeIf { it is Detail.Value } ?: exif.text(ExifInterface.TAG_IMAGE_DESCRIPTION),
+        keywords = preferXmp(xmp?.keywords, iptc.keywords),
+        headline = preferXmp(xmp?.headline, iptc.headline),
+        creator = preferXmp(xmp?.creator, iptc.creator),
+        copyright = preferXmp(xmp?.copyright, iptc.copyright),
     )
 }
 
@@ -97,14 +105,28 @@ private fun <T, R> Detail<T>.map(transform: (T) -> R): Detail<R> = when (this) {
     Detail.Unreadable -> Detail.Unreadable
 }
 
-internal data class XmpFields(val description: Detail<String>, val keywords: Detail<List<String>>)
+internal data class XmpFields(
+    val description: Detail<String>,
+    val keywords: Detail<List<String>>,
+    val headline: Detail<String> = Detail.Missing,
+    val creator: Detail<String> = Detail.Missing,
+    val copyright: Detail<String> = Detail.Missing,
+)
 
 private const val DUBLIN_CORE = "http://purl.org/dc/elements/1.1/"
+private const val PHOTOSHOP_NS = "http://ns.adobe.com/photoshop/1.0/"
+private val DC_LISTS = setOf("description", "subject", "creator", "rights")
 
-/** dc:description and dc:subject from an XMP packet; a malformed packet makes both Unreadable. */
+/**
+ * dc:description, dc:subject, dc:creator, dc:rights and photoshop:Headline (an element or an
+ * attribute) from an XMP packet; a malformed packet makes them all Unreadable.
+ */
 internal fun parseXmp(xmp: String): XmpFields {
     var description: String? = null
+    var copyright: String? = null
+    var headline: String? = null
     val keywords = mutableListOf<String>()
+    val creators = mutableListOf<String>()
     try {
         val parser = Xml.newPullParser().apply {
             setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
@@ -113,12 +135,22 @@ internal fun parseXmp(xmp: String): XmpFields {
         var field: String? = null
         while (parser.next() != XmlPullParser.END_DOCUMENT) {
             when (parser.eventType) {
-                XmlPullParser.START_TAG -> when {
-                    parser.namespace == DUBLIN_CORE && parser.name in setOf("description", "subject") -> field = parser.name
-                    parser.name == "li" && field != null -> {
-                        val text = parser.nextText().trim()
-                        if (text.isNotEmpty()) {
-                            if (field == "description") description = description ?: text else keywords += text
+                XmlPullParser.START_TAG -> {
+                    headline = headline ?: parser.getAttributeValue(PHOTOSHOP_NS, "Headline")?.trim()?.takeIf { it.isNotEmpty() }
+                    when {
+                        parser.namespace == DUBLIN_CORE && parser.name in DC_LISTS -> field = parser.name
+                        parser.namespace == PHOTOSHOP_NS && parser.name == "Headline" ->
+                            headline = headline ?: parser.nextText().trim().takeIf { it.isNotEmpty() }
+                        parser.name == "li" && field != null -> {
+                            val text = parser.nextText().trim()
+                            if (text.isNotEmpty()) {
+                                when (field) {
+                                    "description" -> description = description ?: text
+                                    "rights" -> copyright = copyright ?: text
+                                    "creator" -> creators += text
+                                    else -> keywords += text
+                                }
+                            }
                         }
                     }
                 }
@@ -126,15 +158,20 @@ internal fun parseXmp(xmp: String): XmpFields {
             }
         }
     } catch (e: XmlPullParserException) {
-        return XmpFields(Detail.Unreadable, Detail.Unreadable)
+        return XMP_UNREADABLE
     } catch (e: IOException) {
-        return XmpFields(Detail.Unreadable, Detail.Unreadable)
+        return XMP_UNREADABLE
     }
     return XmpFields(
         description = description?.let { Detail.Value(it) } ?: Detail.Missing,
         keywords = if (keywords.isEmpty()) Detail.Missing else Detail.Value(keywords),
+        headline = headline?.let { Detail.Value(it) } ?: Detail.Missing,
+        creator = if (creators.isEmpty()) Detail.Missing else Detail.Value(creators.joinToString(", ")),
+        copyright = copyright?.let { Detail.Value(it) } ?: Detail.Missing,
     )
 }
+
+private val XMP_UNREADABLE = XmpFields(Detail.Unreadable, Detail.Unreadable, Detail.Unreadable, Detail.Unreadable, Detail.Unreadable)
 
 private val ISO_6709 = Regex("""^([+-]\d+(?:\.\d+)?)([+-]\d+(?:\.\d+)?)""")
 
