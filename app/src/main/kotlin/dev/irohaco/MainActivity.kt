@@ -37,6 +37,8 @@ import dev.irohaco.feature.timeline.library.AlbumsViewModel
 import dev.irohaco.feature.timeline.library.CollectionScreen
 import dev.irohaco.feature.timeline.library.CollectionViewModel
 import dev.irohaco.feature.timeline.library.FolderScreen
+import dev.irohaco.feature.timeline.library.IdentityScreen
+import dev.irohaco.feature.timeline.library.IdentityViewModel
 import dev.irohaco.feature.timeline.library.MediaList
 import dev.irohaco.feature.timeline.library.FolderViewModel
 import dev.irohaco.feature.timeline.library.LibraryScreen
@@ -91,6 +93,7 @@ class MainActivity : ComponentActivity() {
                                         onOpenMedia = { open(Route.viewer(it)) },
                                         onOpenFolder = { open(Route.folder(it)) },
                                         onOpenList = { open(Route.list(it)) },
+                                        onOpenCandidates = { open(Route.IDENTITY) },
                                         onOpenSettings = { open(Route.SETTINGS) },
                                     )
                                 }
@@ -112,6 +115,7 @@ class MainActivity : ComponentActivity() {
         onOpenFolder: (FolderRef) -> Unit,
         onOpenList: (MediaList) -> Unit,
         onOpenSettings: () -> Unit,
+        onOpenCandidates: () -> Unit,
     ) {
         IrohacoApp { destination ->
             when (destination) {
@@ -136,10 +140,11 @@ class MainActivity : ComponentActivity() {
                     onOpenSettings = onOpenSettings,
                 )
                 TopLevelDestination.LIBRARY -> LibraryScreen(
-                    viewModel { LibraryViewModel(container.browseLibrary, container.manageCollections) },
+                    viewModel { LibraryViewModel(container.browseLibrary, container.manageCollections, container.reconcileIdentity) },
                     onOpenFolder = onOpenFolder,
                     onOpenTag = { onOpenList(MediaList.Tag(it)) },
                     onOpenSettings = onOpenSettings,
+                    onOpenCandidates = onOpenCandidates,
                 )
                 else -> DestinationPlaceholder(destination)
             }
@@ -150,6 +155,7 @@ class MainActivity : ComponentActivity() {
     private fun FullScreen(route: String, open: (String) -> Unit, onBack: () -> Unit) {
         when {
             route == Route.SETTINGS -> SettingsScreen(viewModel { SettingsViewModel(container.themeColorSettings) }, onBack)
+            route == Route.IDENTITY -> IdentityScreen(viewModel { IdentityViewModel(container.reconcileIdentity) }, onBack)
             Route.isFolder(route) -> {
                 val folder = Route.parseFolder(route)
                 FolderScreen(
@@ -204,6 +210,7 @@ class MainActivity : ComponentActivity() {
 object Route {
     const val SHELL = "shell"
     const val SETTINGS = "settings"
+    const val IDENTITY = "identity"
     private const val VIEWER = "viewer:"
     private const val FOLDER = "folder:"
     private const val LIST = "list:"

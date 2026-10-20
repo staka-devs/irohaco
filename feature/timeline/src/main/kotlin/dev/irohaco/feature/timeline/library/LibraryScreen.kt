@@ -29,6 +29,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.ManageCollections
+import dev.irohaco.core.application.ReconcileIdentity
+import kotlinx.coroutines.flow.map
 import dev.irohaco.core.contracts.Tag
 import kotlinx.coroutines.flow.flowOf
 import dev.irohaco.core.contracts.FolderRef
@@ -44,7 +46,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 
-class LibraryViewModel(browse: BrowseLibrary, collections: ManageCollections? = null) : ViewModel() {
+class LibraryViewModel(browse: BrowseLibrary, collections: ManageCollections? = null, reconcile: ReconcileIdentity? = null) : ViewModel() {
+    val candidateCount: StateFlow<Int> = (reconcile?.pending()?.map { it.size } ?: flowOf(0))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
     val tags: StateFlow<List<Tag>> =
         (collections?.tags() ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -63,11 +68,13 @@ fun LibraryScreen(
     onOpenFolder: (FolderRef) -> Unit,
     onOpenTag: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenCandidates: () -> Unit = {},
 ) {
+    val candidates by viewModel.candidateCount.collectAsStateWithLifecycle()
     val folders by viewModel.folders.collectAsStateWithLifecycle()
     val excluded by viewModel.excluded.collectAsStateWithLifecycle()
     val tags by viewModel.tags.collectAsStateWithLifecycle()
-    LibraryContent(folders, excluded, onOpenFolder, onOpenSettings, tags, onOpenTag)
+    LibraryContent(folders, excluded, onOpenFolder, onOpenSettings, tags, onOpenTag, candidates, onOpenCandidates)
 }
 
 @Composable
@@ -78,6 +85,8 @@ internal fun LibraryContent(
     onOpenSettings: () -> Unit,
     tags: List<Tag> = emptyList(),
     onOpenTag: (String) -> Unit = {},
+    candidates: Int = 0,
+    onOpenCandidates: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -102,6 +111,16 @@ internal fun LibraryContent(
         }
         val volumes = folders.orEmpty().groupBy { it.folder.volumeId }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())) {
+            if (candidates > 0) {
+                item(key = "candidates") {
+                    ListItem(
+                        headlineContent = { Text(pluralStringResource(R.plurals.identity_found, candidates, candidates)) },
+                        supportingContent = { Text(stringResource(R.string.identity_check)) },
+                        leadingContent = { Icon(painterResource(IrohacoIcons.FindReplace), contentDescription = null) },
+                        modifier = Modifier.clickable(onClick = onOpenCandidates),
+                    )
+                }
+            }
             for ((volumeId, volumeFolders) in volumes) {
                 val first = volumeFolders.first()
                 item(key = "volume-$volumeId") { VolumeHeader(first.volumeName, first.offline) }

@@ -7,6 +7,8 @@ import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.database.RoomCollectionsStore
 import dev.irohaco.core.application.OrganizeMedia
+import dev.irohaco.core.application.ReconcileIdentity
+import dev.irohaco.core.database.RoomIdentityStore
 import dev.irohaco.core.database.RoomMarksStore
 import dev.irohaco.core.database.RoomLibraryReader
 import dev.irohaco.infrastructure.preferences.DataStoreLibrarySettings
@@ -89,10 +91,15 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
         )
     }
 
-    /** Runs on resume and after the app changes files itself. */
+    val reconcileIdentity by lazy { ReconcileIdentity(RoomIdentityStore(database), ::syncCatalog, System::currentTimeMillis) }
+
+    /** Runs on resume and after the app changes files itself; new files are then matched against missing ones. */
     suspend fun syncCatalog() {
         try {
-            withContext(Dispatchers.IO) { syncMediaCatalog() }
+            withContext(Dispatchers.IO) {
+                syncMediaCatalog()
+                RoomIdentityStore(database).findCandidates()
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

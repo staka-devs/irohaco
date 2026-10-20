@@ -3,6 +3,7 @@ package dev.irohaco.core.contracts
 import dev.irohaco.core.domain.AssetAvailability
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.core.domain.MediaLibraryAccess
+import kotlinx.coroutines.flow.Flow
 
 /** One MediaStore row as it is now (ARCHITECTURE §6.1). */
 data class MediaStoreEntry(
@@ -82,6 +83,37 @@ data class CatalogChanges(
     val availability: Map<String, AssetAvailability> = emptyMap(),
     val syncedVolumes: List<VolumeSync> = emptyList(),
 )
+
+/**
+ * A newly found file that may be a missing one seen again (ADR-0008, UC-ID-01). The new file is
+ * already its own asset; linking moves it, and the user's marks, onto the missing asset.
+ */
+data class IdentityCandidate(
+    val discoveryId: String,
+    val missingAssetId: String,
+    val newAssetId: String,
+    val fileName: String,
+    val missingFolder: String?,
+    val newFolder: String?,
+    val newContentUri: String,
+)
+
+interface IdentityStore {
+    /**
+     * Records candidates for new files whose name and capture time both match a missing asset.
+     * Candidates once decided are never offered again. Returns how many were added.
+     */
+    suspend fun findCandidates(): Int
+
+    /** Undecided candidates whose old asset is still missing. */
+    fun pending(): Flow<List<IdentityCandidate>>
+
+    /** The user says it is the same file (LINK_EXISTING by USER). */
+    suspend fun link(discoveryId: String, missingAssetId: String, atMs: Long)
+
+    /** The user says it is another file; the new asset stays as it is. */
+    suspend fun reject(discoveryId: String, missingAssetId: String)
+}
 
 interface CatalogStore {
     suspend fun volumes(): List<CatalogVolume>
