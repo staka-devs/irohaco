@@ -17,6 +17,7 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures {
         compose = true
@@ -25,6 +26,28 @@ android {
         unitTests {
             isIncludeAndroidResources = true
             all { it.systemProperties["robolectric.pixelCopyRenderMode"] = "hardware" }
+        }
+        // ARCHITECTURE §13.0 L2: the minimum and the latest API on emulators (Gradle Managed Devices).
+        // "Medium Phone" is the generic phone profile; the ci group runs as ciGroupDebugAndroidTest.
+        managedDevices {
+            localDevices {
+                create("api33") {
+                    device = "Medium Phone"
+                    apiLevel = 33
+                    systemImageSource = "aosp-atd"
+                }
+                create("api37") {
+                    device = "Medium Phone"
+                    apiLevel = 37
+                    systemImageSource = "google"
+                }
+            }
+            groups {
+                create("ci") {
+                    targetDevices.add(localDevices["api33"])
+                    targetDevices.add(localDevices["api37"])
+                }
+            }
         }
     }
 }
@@ -56,4 +79,10 @@ dependencies {
     testImplementation(libs.roborazzi.compose.preview.scanner.support)
     testImplementation(libs.composable.preview.scanner)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.espresso.core)
 }
