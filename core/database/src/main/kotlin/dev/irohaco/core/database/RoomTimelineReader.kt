@@ -36,11 +36,12 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
      * this flow is collected would otherwise leave the timeline showing stale rows.
      */
     override fun changes(): Flow<Unit> =
-        db.invalidationTracker.createFlow("media_sources", "media_assets", emitInitialState = true).map { }
+        db.invalidationTracker.createFlow("media_sources", "media_assets", "media_ratings", emitInitialState = true).map { }
 
     private companion object {
         // shortcut: no index on the sort expressions yet; add them if M0-13 measures slow pages at 10k items.
-        const val FROM = "FROM media_sources s JOIN media_assets a ON a.asset_id = s.asset_id"
+        const val FROM = "FROM media_sources s JOIN media_assets a ON a.asset_id = s.asset_id " +
+            "LEFT JOIN media_ratings r ON r.asset_id = a.asset_id"
         const val TIME = "COALESCE(s.observed_taken_at, s.observed_modified_at, a.first_seen_at)"
 
         // The volume root has a null relative path in MediaStore; FolderRef calls it "".
@@ -49,6 +50,7 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
         fun where(query: TimelineQuery): String = buildString {
             append("WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL")
             if (query.kind != null) append(" AND a.media_kind = ?")
+            if (query.favoritesOnly) append(" AND r.is_favorite = 1")
             if (query.folder != null) append(" AND s.volume_id = ? AND $PATH = ?")
             repeat(query.excludedFolders.size) { append(" AND NOT (s.volume_id = ? AND $PATH = ?)") }
         }
@@ -66,6 +68,7 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
                 TimelineSortKey.TAKEN -> TIME
                 TimelineSortKey.NAME -> "s.display_name COLLATE NOCASE"
                 TimelineSortKey.SIZE -> "s.file_size_bytes"
+                TimelineSortKey.RATING -> "COALESCE(r.rating, 0)"
             }
             val direction = if (query.descending) "DESC" else "ASC"
             return "$key $direction, a.asset_id $direction"

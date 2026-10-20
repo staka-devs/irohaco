@@ -2,6 +2,7 @@ package dev.irohaco.core.application
 
 import dev.irohaco.core.contracts.FileOperationResult
 import dev.irohaco.core.contracts.MediaDetailsReader
+import dev.irohaco.core.contracts.MarksStore
 import dev.irohaco.core.contracts.MediaFiles
 import dev.irohaco.core.contracts.MediaLibraryAccessPort
 import dev.irohaco.core.contracts.TimelineItem
@@ -61,6 +62,15 @@ class OrganizeMedia(private val files: MediaFiles) {
         }
         return FileOperationResult.DONE
     }
+}
+
+/** Favorites and ratings (PRD GAL-007). */
+class MarkMedia(private val store: MarksStore) {
+    fun marks(assetId: String) = store.marks(assetId)
+
+    suspend fun setFavorite(items: List<TimelineItem>, favorite: Boolean) = store.setFavorite(items.map { it.assetId }, favorite)
+
+    suspend fun setRating(assetId: String, rating: Int?) = store.setRating(assetId, rating)
 }
 
 /** The details sheet's data, read from the file each time it opens (PRD MET-001). */

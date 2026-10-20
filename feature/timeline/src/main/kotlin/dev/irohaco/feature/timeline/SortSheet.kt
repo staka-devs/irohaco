@@ -40,6 +40,8 @@ private val SORTS = listOf(
     Triple(TimelineSortKey.NAME, true, R.string.timeline_sort_name_desc),
     Triple(TimelineSortKey.SIZE, true, R.string.timeline_sort_largest),
     Triple(TimelineSortKey.SIZE, false, R.string.timeline_sort_smallest),
+    Triple(TimelineSortKey.RATING, true, R.string.timeline_sort_rating_high),
+    Triple(TimelineSortKey.RATING, false, R.string.timeline_sort_rating_low),
 )
 
 private val KINDS = listOf(null to R.string.timeline_kind_all, MediaKind.IMAGE to R.string.timeline_kind_photos, MediaKind.VIDEO to R.string.timeline_kind_videos)

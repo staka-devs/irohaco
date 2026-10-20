@@ -102,4 +102,12 @@
         <item quantity="one">%d item</item>
         <item quantity="other">%d items</item>
     </plurals>
+    <string name="timeline_sort_rating_high">Rating, highest first</string>
+    <string name="timeline_sort_rating_low">Rating, lowest first</string>
+    <string name="timeline_favorite">Add to favorites</string>
+    <string name="viewer_favorite">Add to favorites</string>
+    <string name="viewer_unfavorite">Remove from favorites</string>
+    <string name="details_rating">Rating</string>
+    <string name="details_rate">%1$d stars</string>
+    <string name="details_clear_rating">Clear rating</string>
 </resources>

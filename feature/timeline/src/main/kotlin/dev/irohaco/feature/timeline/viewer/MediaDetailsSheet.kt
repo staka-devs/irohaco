@@ -9,6 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconToggleButton
+import androidx.compose.ui.res.painterResource
+import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.component.IrohacoBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,19 +43,27 @@ internal fun MediaDetailsSheet(
     kind: MediaKind,
     onDismiss: () -> Unit,
     onAllowLocation: () -> Unit,
+    rating: Int? = null,
+    onRate: (Int?) -> Unit = {},
 ) {
     if (state == ViewerViewModel.Details.Hidden) return
     IrohacoBottomSheet(onDismiss = onDismiss) {
         when (state) {
             ViewerViewModel.Details.Loading -> ExpressiveLoading(Modifier.padding(IrohacoSpacing.xl))
-            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation)
+            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate)
             ViewerViewModel.Details.Hidden -> Unit
         }
     }
 }
 
 @Composable
-internal fun MediaDetailsContent(result: MediaDetailsResult, kind: MediaKind, onAllowLocation: () -> Unit) {
+internal fun MediaDetailsContent(
+    result: MediaDetailsResult,
+    kind: MediaKind,
+    onAllowLocation: () -> Unit,
+    rating: Int? = null,
+    onRate: (Int?) -> Unit = {},
+) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -60,6 +73,7 @@ internal fun MediaDetailsContent(result: MediaDetailsResult, kind: MediaKind, on
         verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
     ) {
         Text(stringResource(R.string.details_title), style = MaterialTheme.typography.titleLarge)
+        RatingRow(rating, onRate)
         when (result) {
             MediaDetailsResult.FileUnavailable -> Text(stringResource(R.string.details_file_unavailable), style = MaterialTheme.typography.bodyLarge)
             is MediaDetailsResult.Read -> DetailRows(result.details, kind, onAllowLocation)
@@ -93,6 +107,29 @@ private fun DetailRows(details: MediaDetails, kind: MediaKind, onAllowLocation: 
     if (kind == MediaKind.IMAGE) {
         Row(R.string.details_description, details.description) { it }
         Row(R.string.details_keywords, details.keywords) { it.joinToString() }
+    }
+}
+
+/** Five stars (PRD GAL-007). Tapping the current rating again clears it. */
+@Composable
+private fun RatingRow(rating: Int?, onRate: (Int?) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.details_rating), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.Row(Modifier.selectableGroup()) {
+            for (stars in 1..5) {
+                val filled = rating != null && stars <= rating
+                IconToggleButton(
+                    checked = rating == stars,
+                    onCheckedChange = { onRate(if (rating == stars) null else stars) },
+                ) {
+                    Icon(
+                        painterResource(if (filled) IrohacoIcons.StarFilled else IrohacoIcons.Star),
+                        contentDescription = stringResource(if (rating == stars) R.string.details_clear_rating else R.string.details_rate, stars),
+                        tint = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -154,6 +191,7 @@ private fun MediaDetailsPreview() {
                 ),
                 MediaKind.IMAGE,
                 onAllowLocation = {},
+                rating = 3,
             )
         }
     }

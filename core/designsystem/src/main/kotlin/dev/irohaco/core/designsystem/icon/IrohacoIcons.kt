@@ -40,6 +40,10 @@ object IrohacoIcons {
     @DrawableRes val Sort = R.drawable.ic_sort
     @DrawableRes val Visibility = R.drawable.ic_visibility
     @DrawableRes val VisibilityOff = R.drawable.ic_visibility_off
+    @DrawableRes val Favorite = R.drawable.ic_favorite
+    @DrawableRes val FavoriteFilled = R.drawable.ic_favorite_filled
+    @DrawableRes val Star = R.drawable.ic_star
+    @DrawableRes val StarFilled = R.drawable.ic_star_filled
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val Settings = R.drawable.ic_settings
     @DrawableRes val Check = R.drawable.ic_check

@@ -8,6 +8,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetTimelinePage
+import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.application.OrganizeMedia
 import dev.irohaco.core.contracts.FileOperationResult
 import dev.irohaco.core.contracts.FolderRef
@@ -35,6 +36,7 @@ class TimelineViewModel(
     private val onLibraryChanged: suspend () -> Unit,
     /** Folders hidden from the timeline (GAL-002); the viewer opened from here hides them too. */
     excludedFolders: Flow<Set<FolderRef>> = emptyFlow(),
+    private val mark: MarkMedia? = null,
     zone: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
     private var source: TimelinePagingSource? = null
@@ -121,6 +123,14 @@ class TimelineViewModel(
             onLibraryChanged()
             if (result == FileOperationResult.DONE) clearSelection()
             _outcomes.send(Outcome(operation, result, count))
+        }
+    }
+
+    /** Adds the selection to the favorites, or removes it when every item already is one. */
+    fun setFavorite(items: List<TimelineItem>, favorite: Boolean) {
+        viewModelScope.launch {
+            mark?.setFavorite(items, favorite)
+            clearSelection()
         }
     }
 

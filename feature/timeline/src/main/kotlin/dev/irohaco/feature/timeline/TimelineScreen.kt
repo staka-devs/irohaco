@@ -200,6 +200,7 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
             trashed = items.map { Uri.parse(it.contentUri) }
             trash.launch(trashRequest(context, trashed, trashed = true))
         },
+        onFavorite = { viewModel.setFavorite(it, true) },
         onMove = { items ->
             viewModel.loadFolders()
             pending = Pending.Folder(TimelineViewModel.Operation.MOVE, items)
@@ -286,6 +287,7 @@ internal fun TimelineContent(
     onMove: (List<TimelineItem>) -> Unit = {},
     onCopy: (List<TimelineItem>) -> Unit = {},
     onRename: (TimelineItem) -> Unit = {},
+    onFavorite: (List<TimelineItem>) -> Unit = {},
     snackbar: SnackbarHostState = remember { SnackbarHostState() },
     query: TimelineQuery = TimelineQuery(),
     onQueryChange: (TimelineQuery) -> Unit = {},
@@ -359,6 +361,7 @@ internal fun TimelineContent(
                         onMove = onMove,
                         onCopy = onCopy,
                         onRename = onRename,
+                        onFavorite = onFavorite,
                         scrollToTop = scrollToTop,
                     )
                 }
@@ -383,6 +386,7 @@ private fun TimelineGrid(
     onMove: (List<TimelineItem>) -> Unit,
     onCopy: (List<TimelineItem>) -> Unit,
     onRename: (TimelineItem) -> Unit,
+    onFavorite: (List<TimelineItem>) -> Unit,
     scrollToTop: Flow<Unit>,
 ) {
     val gridState = rememberLazyGridState()
@@ -466,6 +470,9 @@ private fun TimelineGrid(
             ) {
                 IconButton(onClick = { onShare(selection.values.toList()) }) {
                     Icon(painterResource(IrohacoIcons.Share), stringResource(R.string.timeline_share))
+                }
+                IconButton(onClick = { onFavorite(selection.values.toList()) }) {
+                    Icon(painterResource(IrohacoIcons.Favorite), stringResource(R.string.timeline_favorite))
                 }
                 IconButton(onClick = { onMove(selection.values.toList()) }) {
                     Icon(painterResource(IrohacoIcons.Move), stringResource(R.string.timeline_move))

@@ -112,6 +112,7 @@ class MainActivity : ComponentActivity() {
                             container.organizeMedia,
                             container::syncCatalog,
                             container.browseLibrary.excludedFolders(),
+                            container.markMedia,
                         )
                     },
                     onOpenMedia = onOpenMedia,
@@ -146,7 +147,7 @@ class MainActivity : ComponentActivity() {
                         val page = container.getTimelinePage
                         // From a folder, swiping stays in that folder; from the timeline, it follows the timeline.
                         val query = viewer.folder?.let { page.query.value.copy(folder = it, excludedFolders = emptySet()) } ?: page.query.value
-                        ViewerViewModel(page, viewer.assetId, viewer.startMs, container::newVideoPlayer, container.getMediaDetails, query)
+                        ViewerViewModel(page, viewer.assetId, viewer.startMs, container::newVideoPlayer, container.getMediaDetails, query, container.markMedia)
                     },
                     onBack,
                 )

@@ -85,6 +85,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
     val items = viewModel.items.collectAsLazyPagingItems()
     val playing by viewModel.playing.collectAsStateWithLifecycle()
     val details by viewModel.details.collectAsStateWithLifecycle()
+    val marks by viewModel.marks.collectAsStateWithLifecycle()
     var detailsOf by remember { mutableStateOf<TimelineItem?>(null) }
     val allowLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         detailsOf?.let(viewModel::showDetails) // read again: GPS may now be readable
@@ -95,6 +96,8 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
         kind = detailsOf?.kind ?: MediaKind.IMAGE,
         onDismiss = viewModel::hideDetails,
         onAllowLocation = { allowLocation.launch(Manifest.permission.ACCESS_MEDIA_LOCATION) },
+        rating = marks.rating,
+        onRate = { rating -> detailsOf?.let { viewModel.setRating(it, rating) } },
     )
     when (val s = start) {
         ViewerViewModel.Start.NotFound -> LaunchedEffect(Unit) { onBack() } // the asset left the timeline meanwhile
@@ -109,6 +112,9 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
                 detailsOf = item
                 viewModel.showDetails(item)
             },
+            favorite = marks.favorite,
+            onCurrentChanged = viewModel::showing,
+            onToggleFavorite = { viewModel.setFavorite(it, !marks.favorite) },
         )
         ViewerViewModel.Start.Loading -> Box(Modifier.fillMaxSize().background(IrohacoViewerColors.background))
     }
@@ -123,8 +129,12 @@ internal fun MediaViewerContent(
     onPlay: (TimelineItem) -> Unit = {},
     onPageChanged: (assetId: String?) -> Unit = {},
     onShowDetails: (TimelineItem) -> Unit = {},
+    favorite: Boolean = false,
+    onCurrentChanged: (TimelineItem?) -> Unit = {},
+    onToggleFavorite: (TimelineItem) -> Unit = {},
 ) {
     var current by remember { mutableStateOf<TimelineItem?>(null) }
+    LaunchedEffect(current) { onCurrentChanged(current) }
     var chrome by rememberSaveable { mutableStateOf(true) }
     BackHandler(onBack = onBack)
     SystemBarsVisible(chrome)
@@ -167,6 +177,13 @@ internal fun MediaViewerContent(
                 }
                 Spacer(Modifier.weight(1f))
                 current?.let { item ->
+                    IconButton(onClick = { onToggleFavorite(item) }) {
+                        Icon(
+                            painterResource(if (favorite) IrohacoIcons.FavoriteFilled else IrohacoIcons.Favorite),
+                            stringResource(if (favorite) R.string.viewer_unfavorite else R.string.viewer_favorite),
+                            tint = IrohacoViewerColors.content,
+                        )
+                    }
                     IconButton(onClick = { onShowDetails(item) }) {
                         Icon(painterResource(IrohacoIcons.Info), stringResource(R.string.details_open), tint = IrohacoViewerColors.content)
                     }
