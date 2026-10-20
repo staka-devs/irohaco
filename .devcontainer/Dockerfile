@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jdk-noble
+FROM eclipse-temurin:21-jdk-noble
 
 ARG CMDLINE_TOOLS=16111833
 ENV ANDROID_HOME=/opt/android-sdk
