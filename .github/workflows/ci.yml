@@ -58,6 +58,33 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v4
+      # The emulator and the two system images are a few GB, and downloading them on every run fails now and
+      # then. Keep them in the cache, and install them with retries before Gradle needs them.
+      - name: Restore emulator and system images
+        id: sdk-images
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ env.ANDROID_HOME }}/emulator
+            ${{ env.ANDROID_HOME }}/system-images
+          key: emulator-images-${{ runner.os }}-${{ hashFiles('app/build.gradle.kts') }}
+      - name: Install emulator and system images
+        if: steps.sdk-images.outputs.cache-hit != 'true'
+        run: |
+          for attempt in 1 2 3 4; do
+            sdkmanager --install "emulator" "system-images;android-33;aosp_atd;x86_64" "system-images;android-37.0;google_apis;x86_64" && exit 0
+            echo "sdkmanager failed (attempt $attempt); retrying"
+            sleep $((attempt * 20))
+          done
+          exit 1
+      - name: Save emulator and system images
+        if: steps.sdk-images.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ env.ANDROID_HOME }}/emulator
+            ${{ env.ANDROID_HOME }}/system-images
+          key: ${{ steps.sdk-images.outputs.cache-primary-key }}
       - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew ciGroupDebugAndroidTest -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect --console=plain
       - uses: actions/upload-artifact@v7
