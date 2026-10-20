@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">設定</string>
+    <string name="settings_back">戻る</string>
+    <string name="settings_theme_color">テーマの色</string>
+    <string name="settings_theme_color_device">端末の壁紙に合わせる</string>
+    <string name="settings_theme_color_device_summary">壁紙から端末が作る色を使います</string>
+</resources>

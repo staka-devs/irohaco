@@ -41,8 +41,9 @@ feature層では色の値（`Color(0x…)`）、dpとspの数値、`tween`の持
 
 ### 2.1 Color
 
-- Android 12以降はDynamic Color（`dynamicLightColorScheme` / `dynamicDarkColorScheme`）を既定にし、設定で無効にできるようにする。
-- Dynamic Colorを使えないときと無効にしたときは、ブランドのシード色から作った静的なスキーム（Light、Dark、Medium contrast、High contrast）を使う。シード色と生成したスキームは`core/designsystem/color/`に置く。
+- 既定は端末の壁紙から作られるDynamic Color（Material You。`dynamicLightColorScheme` / `dynamicDarkColorScheme`）にする。
+- 設定の「テーマの色」で、ユーザーは用意した色（Material 500の10色。`IrohacoSeedColors`）から1つを選べる。選んだ色をシードにし、MaterialKolorでLightとDarkのスキームを作る。端末のコントラストの設定（Android 14以降の標準、中、高）にも合わせる。
+- Dynamic Colorを使えないとき、プレビュー、スクリーンショットテストでは、Blue 500（#2196F3）をシードにしたスキームを使う。
 - 色は役割で選ぶ。主操作は`primary`、補助の操作は`secondary`か`tertiary`、面は`surface*`、エラーは`error`を使う。面の階層は`surfaceContainerLowest`から`Highest`までの5段で表し、影より面の色で区別する。
 - ビューワーと動画プレイヤーは、テーマに関係なく黒背景にし、前景は白系にする。重ねるUIは`scrim`系の半透明の背景に載せる。
 - 状態は色だけで伝えない（§5）。

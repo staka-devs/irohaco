@@ -13,13 +13,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.irohaco.core.designsystem.motion.LocalSharedMediaScope
 import dev.irohaco.core.designsystem.motion.SharedMediaScope
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
+import dev.irohaco.core.domain.ThemeColor
+import dev.irohaco.feature.settings.SettingsScreen
+import dev.irohaco.feature.settings.SettingsViewModel
 import dev.irohaco.feature.timeline.TimelineScreen
 import dev.irohaco.feature.timeline.TimelineViewModel
 import dev.irohaco.feature.timeline.viewer.MediaViewerScreen
@@ -43,30 +48,38 @@ class MainActivity : ComponentActivity() {
             repeatOnLifecycle(Lifecycle.State.RESUMED) { syncCatalog() }
         }
         setContent {
-            IrohacoTheme {
-                // The viewer opens over the shell; the shell keeps its saved state (tab, scroll position) meanwhile.
-                var viewing by rememberSaveable { mutableStateOf<String?>(null) }
+            val themeColor by container.themeColorSettings.observe().collectAsStateWithLifecycle(ThemeColor.Device)
+            IrohacoTheme(seedColor = (themeColor as? ThemeColor.Seed)?.let { Color(0xFF000000 or it.rgb.toLong()) }) {
+                // Full-screen pages open over the shell, which keeps its saved state (tab, scroll position) meanwhile.
+                var screen by rememberSaveable { mutableStateOf(SHELL) }
                 val screens = rememberSaveableStateHolder()
                 SharedTransitionLayout {
-                    AnimatedContent(targetState = viewing, label = "viewer") { assetId ->
+                    AnimatedContent(targetState = screen, label = "screen") { target ->
                         CompositionLocalProvider(LocalSharedMediaScope provides SharedMediaScope(this@SharedTransitionLayout, this)) {
-                            if (assetId == null) {
-                                screens.SaveableStateProvider("shell") {
+                            when {
+                                target == SHELL -> screens.SaveableStateProvider(SHELL) {
                                     IrohacoApp { destination ->
                                         when (destination) {
                                             TopLevelDestination.PHOTOS -> TimelineScreen(
                                                 viewModel { TimelineViewModel(container.getTimelinePage, container.getLibraryAccess) },
-                                                onOpenMedia = { viewing = it },
+                                                onOpenMedia = { screen = VIEWER + it },
+                                                onOpenSettings = { screen = SETTINGS },
                                             )
                                             else -> DestinationPlaceholder(destination)
                                         }
                                     }
                                 }
-                            } else {
-                                MediaViewerScreen(
-                                    viewModel(key = "viewer-$assetId") { ViewerViewModel(container.getTimelinePage, assetId) },
-                                    onBack = { viewing = null },
+                                target == SETTINGS -> SettingsScreen(
+                                    viewModel { SettingsViewModel(container.themeColorSettings) },
+                                    onBack = { screen = SHELL },
                                 )
+                                else -> {
+                                    val assetId = target.removePrefix(VIEWER)
+                                    MediaViewerScreen(
+                                        viewModel(key = target) { ViewerViewModel(container.getTimelinePage, assetId) },
+                                        onBack = { screen = SHELL },
+                                    )
+                                }
                             }
                         }
                     }
@@ -84,5 +97,11 @@ class MainActivity : ComponentActivity() {
             // A failed sync leaves the catalog as it was; the gallery keeps working and the next resume retries.
             Log.w("Irohaco", "Catalog sync failed", e)
         }
+    }
+
+    private companion object {
+        const val SHELL = "shell"
+        const val SETTINGS = "settings"
+        const val VIEWER = "viewer:"
     }
 }
