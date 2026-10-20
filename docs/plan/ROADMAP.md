@@ -62,6 +62,7 @@
 | M1-22 | GPSの読み取りと地図から探す（外部の地図タイルは許可を得てから） | feature / media | GAL-017, PRD §6, §10 | M1-17 |
 | M1-23 | 設定画面のカテゴリ分け | feature / app | APP-001, DESIGN §3 | M0-08 |
 | M1-24 | テーマ色の選び方の見直し | feature / designsystem | APP-002, DESIGN §2.1 | M1-23 |
+| M1-25 | スクロール中のサムネイルの表示の遅れの解消（MediaStoreの縮小画像、先読み、キャッシュ） | feature / viewer | GAL-001, NFR-002 | M0-10 |
 
 ### M2: AI索引・検索・セマンティックメモ・複数索引
 
