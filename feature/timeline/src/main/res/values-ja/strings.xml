@@ -125,4 +125,17 @@
     <string name="albums_new">新しいアルバム</string>
     <string name="albums_create_and_add">作成して追加</string>
     <string name="albums_empty_list">まだ何もありません</string>
+    <string name="identity_title">別の場所で見つかった写真</string>
+    <string name="identity_body">見つからなくなった写真や動画と、ファイル名と撮影日時が同じファイルが見つかりました。同じ写真なら、お気に入り、評価、タグ、アルバムを引き継ぎます。</string>
+    <string name="identity_was">前の場所: %1$s（見つかりません）</string>
+    <string name="identity_now">見つかった場所: %1$s</string>
+    <string name="identity_same">同じ写真</string>
+    <string name="identity_different">別の写真</string>
+    <string name="identity_recheck">見つからないファイルを再確認</string>
+    <string name="identity_none">確かめるものはありません</string>
+    <string name="identity_check">見つからなくなった写真と同じか確かめてください</string>
+    <plurals name="identity_found">
+        <item quantity="one">見つからなくなった写真かもしれないファイルが%d件あります</item>
+        <item quantity="other">見つからなくなった写真かもしれないファイルが%d件あります</item>
+    </plurals>
 </resources>

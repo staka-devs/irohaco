@@ -125,4 +125,17 @@
     <string name="albums_new">New album</string>
     <string name="albums_create_and_add">Create and add</string>
     <string name="albums_empty_list">Nothing here yet</string>
+    <string name="identity_title">Found elsewhere?</string>
+    <string name="identity_body">These files turned up where a missing photo or video used to be named the same and taken at the same time. If it is the same one, its favorites, rating, tags and albums carry over.</string>
+    <string name="identity_was">Was in %1$s (missing)</string>
+    <string name="identity_now">Now in %1$s</string>
+    <string name="identity_same">Same photo</string>
+    <string name="identity_different">Different photo</string>
+    <string name="identity_recheck">Check missing files again</string>
+    <string name="identity_none">Nothing to check</string>
+    <string name="identity_check">Check whether they are the missing ones</string>
+    <plurals name="identity_found">
+        <item quantity="one">%d file may be a missing one</item>
+        <item quantity="other">%d files may be missing ones</item>
+    </plurals>
 </resources>
