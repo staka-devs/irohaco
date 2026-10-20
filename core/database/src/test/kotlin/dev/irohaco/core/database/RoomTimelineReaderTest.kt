@@ -49,6 +49,8 @@ class RoomTimelineReaderTest {
         assertEquals(listOf("c", "a"), first.map { it.assetId }) // same time: asset id breaks the tie
         val rest = reader.page(offset = 2, limit = 10)
         assertEquals(listOf("b" to 200L, "d" to 100L), rest.map { it.assetId to it.sortTimeMs })
+        assertEquals(listOf(0, 1, 2, 3), listOf("c", "a", "b", "d").map { reader.indexOf(it) })
+        assertEquals(null, reader.indexOf("hidden"))
     }
 
     private fun asset(name: String, id: Long, taken: Long?, modified: Long) = NewCatalogAsset(

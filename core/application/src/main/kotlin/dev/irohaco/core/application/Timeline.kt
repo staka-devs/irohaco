@@ -10,6 +10,8 @@ class GetTimelinePage(private val reader: TimelineReader) {
 
     suspend operator fun invoke(offset: Int, limit: Int) = reader.page(offset, limit)
 
+    suspend fun indexOf(assetId: String) = reader.indexOf(assetId)
+
     fun changes() = reader.changes()
 }
 

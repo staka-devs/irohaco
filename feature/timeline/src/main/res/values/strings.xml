@@ -12,4 +12,7 @@
     <string name="timeline_video_description">Video, %1$s</string>
     <string name="timeline_columns_fewer">Fewer columns</string>
     <string name="timeline_columns_more">More columns</string>
+    <string name="viewer_back">Back</string>
+    <string name="viewer_photo_description">Photo</string>
+    <string name="viewer_video_description">Video</string>
 </resources>

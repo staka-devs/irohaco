@@ -24,6 +24,7 @@ class TimelinePagingTest {
     private val reader = object : TimelineReader {
         override suspend fun count() = items.size
         override suspend fun page(offset: Int, limit: Int) = items.drop(offset).take(limit)
+        override suspend fun indexOf(assetId: String) = items.indexOfFirst { it.assetId == assetId }.takeIf { it >= 0 }
         override fun changes() = emptyFlow<Unit>()
     }
     private val config = PagingConfig(pageSize = 4, initialLoadSize = 4, enablePlaceholders = true)

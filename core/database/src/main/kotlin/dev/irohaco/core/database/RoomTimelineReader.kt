@@ -14,6 +14,8 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
             TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs)
         }
 
+    override suspend fun indexOf(assetId: String): Int? = db.timelineDao().indexOf(assetId)
+
     override fun changes(): Flow<Unit> =
         db.invalidationTracker.createFlow("media_sources", "media_assets", emitInitialState = false).map { }
 }
