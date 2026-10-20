@@ -3,6 +3,7 @@ package dev.irohaco
 import android.Manifest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
@@ -42,6 +43,12 @@ class TimelineTest {
         compose.onAllNodes(thumbnail).onFirst().performClick()
         val back = hasContentDescription(context.getString(TimelineR.string.viewer_back))
         compose.waitUntilAtLeastOneExists(back, timeoutMillis = 5_000)
+
+        // The details sheet reads the real file: its name comes from MediaStore.
+        compose.onNode(hasContentDescription(context.getString(TimelineR.string.details_open))).performClick()
+        compose.waitUntilAtLeastOneExists(hasText("irohaco-l2-", substring = true), timeoutMillis = 5_000)
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() } // closes the sheet
+        compose.waitUntilDoesNotExist(hasText("irohaco-l2-", substring = true), timeoutMillis = 5_000)
 
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntilDoesNotExist(back, timeoutMillis = 5_000)

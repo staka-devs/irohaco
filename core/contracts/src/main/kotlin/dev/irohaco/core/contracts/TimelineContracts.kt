@@ -1,6 +1,7 @@
 package dev.irohaco.core.contracts
 
 import dev.irohaco.core.domain.MediaKind
+import dev.irohaco.core.domain.MediaDetailsResult
 import kotlinx.coroutines.flow.Flow
 
 /** One cell of the timeline (PRD GAL-001): an available photo or video, newest first. */
@@ -26,4 +27,9 @@ interface TimelineReader {
 
     /** Emits whenever the catalog behind the timeline may have changed. */
     fun changes(): Flow<Unit>
+}
+
+/** Reads EXIF, XMP and container metadata of one file when it is asked for (PRD MET-001). */
+fun interface MediaDetailsReader {
+    suspend fun read(contentUri: String, kind: MediaKind): MediaDetailsResult
 }

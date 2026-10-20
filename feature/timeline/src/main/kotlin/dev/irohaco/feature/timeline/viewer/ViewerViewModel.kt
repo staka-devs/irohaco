@@ -8,8 +8,10 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.TimelinePagingSource
 import kotlinx.coroutines.flow.Flow
@@ -34,6 +36,7 @@ class ViewerViewModel(
     assetId: String,
     startPositionMs: Long? = null,
     private val newPlayer: () -> Player,
+    private val getDetails: GetMediaDetails? = null,
 ) : ViewModel() {
     sealed interface Start {
         data object Loading : Start
@@ -67,6 +70,26 @@ class ViewerViewModel(
                 getPage(index, 1).firstOrNull()?.takeIf { it.kind == MediaKind.VIDEO }?.let { play(it, startPositionMs) }
             }
         }
+    }
+
+    sealed interface Details {
+        data object Hidden : Details
+        data object Loading : Details
+        data class Shown(val result: MediaDetailsResult) : Details
+    }
+
+    private val _details = MutableStateFlow<Details>(Details.Hidden)
+    val details: StateFlow<Details> = _details.asStateFlow()
+
+    /** Reads the file each time, so a newly granted location permission shows up (PRD MET-001). */
+    fun showDetails(item: TimelineItem) {
+        val reader = getDetails ?: return
+        _details.value = Details.Loading
+        viewModelScope.launch { _details.value = Details.Shown(reader(item)) }
+    }
+
+    fun hideDetails() {
+        _details.value = Details.Hidden
     }
 
     fun play(item: TimelineItem, fromMs: Long = 0) {

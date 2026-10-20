@@ -8,9 +8,17 @@ android {
     defaultConfig {
         minSdk = 33
     }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
     implementation(project(":core:contracts"))
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.exifinterface)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(kotlin("test"))
 }

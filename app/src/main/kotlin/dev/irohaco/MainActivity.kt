@@ -102,7 +102,7 @@ class MainActivity : ComponentActivity() {
             else -> {
                 val (assetId, startMs) = Route.parseViewer(route)
                 MediaViewerScreen(
-                    viewModel { ViewerViewModel(container.getTimelinePage, assetId, startMs, container::newVideoPlayer) },
+                    viewModel { ViewerViewModel(container.getTimelinePage, assetId, startMs, container::newVideoPlayer, container.getMediaDetails) },
                     onBack,
                 )
             }
