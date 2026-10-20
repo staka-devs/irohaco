@@ -39,13 +39,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class CollectionViewModel(getPage: GetTimelinePage, collections: ManageCollections, val list: MediaList) : ViewModel() {
+class CollectionViewModel(private val getPage: GetTimelinePage, collections: ManageCollections, val list: MediaList) : ViewModel() {
     private val query = list.query(getPage.query.value)
     private var source: TimelinePagingSource? = null
 
     val items: Flow<PagingData<TimelineItem>> =
         Pager(PagingConfig(pageSize = 120, enablePlaceholders = true)) { TimelinePagingSource(getPage, query).also { source = it } }
             .flow.cachedIn(viewModelScope)
+
+    /** What the fast scrollbar's bubble names at this position (PRD GAL-014). */
+    suspend fun labelAt(index: Int) = getPage.labelAt(index, query)
 
     /** The album's or tag's name; null for the favorites, whose name is a string resource. */
     val title: StateFlow<String?> = when (list) {
@@ -83,7 +86,7 @@ fun CollectionScreen(viewModel: CollectionViewModel, onOpenMedia: (String) -> Un
                 modifier = Modifier.fillMaxWidth().padding(padding).padding(IrohacoSpacing.xxl),
             )
         } else {
-            MediaGrid(items, padding, onOpenMedia)
+            MediaGrid(items, padding, onOpenMedia, labelAt = viewModel::labelAt)
         }
     }
 }

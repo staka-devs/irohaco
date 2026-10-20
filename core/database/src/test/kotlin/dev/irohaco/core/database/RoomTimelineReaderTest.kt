@@ -6,6 +6,7 @@ import dev.irohaco.core.contracts.CatalogChanges
 import dev.irohaco.core.contracts.CatalogVolume
 import dev.irohaco.core.contracts.MediaStoreEntry
 import dev.irohaco.core.contracts.NewCatalogAsset
+import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineSortKey
 import dev.irohaco.core.domain.AssetAvailability
@@ -85,6 +86,22 @@ class RoomTimelineReaderTest {
         assertEquals(null, reader.indexOf(videos, "a"))
         val photosByName = TimelineQuery(TimelineSortKey.NAME, descending = false, kind = MediaKind.IMAGE)
         assertEquals(listOf(0, 1), listOf("b", "a").map { reader.indexOf(photosByName, it) })
+    }
+
+    @Test
+    fun `labels a position by the field it is sorted on, for the fast scrollbar`() = runTest {
+        RoomCatalogStore(db).apply(
+            CatalogChanges(
+                observedAtMs = 1,
+                newVolumes = listOf(CatalogVolume("v1", "external_primary", null, null)),
+                newAssets = listOf(asset("a", id = 1, taken = 1_000, modified = 1, fileName = "beach.jpg", size = 300)),
+            ),
+        )
+        assertEquals(TimelineLabel.Taken(1_000), reader.labelAt(TimelineQuery(TimelineSortKey.TAKEN), 0))
+        assertEquals(TimelineLabel.Name('B'), reader.labelAt(TimelineQuery(TimelineSortKey.NAME), 0))
+        assertEquals(TimelineLabel.Size(300), reader.labelAt(TimelineQuery(TimelineSortKey.SIZE), 0))
+        assertEquals(TimelineLabel.Rating(0), reader.labelAt(TimelineQuery(TimelineSortKey.RATING), 0))
+        assertEquals(null, reader.labelAt(newest, 5))
     }
 
     private val newest = TimelineQuery()

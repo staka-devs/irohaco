@@ -16,6 +16,14 @@ data class TimelineItem(
 
 enum class TimelineSortKey { TAKEN, NAME, SIZE, RATING }
 
+/** What to name a position in the timeline, for the fast scrollbar's bubble while dragging (PRD GAL-014). */
+sealed interface TimelineLabel {
+    data class Taken(val epochMs: Long) : TimelineLabel
+    data class Name(val firstChar: Char) : TimelineLabel
+    data class Size(val bytes: Long) : TimelineLabel
+    data class Rating(val rating: Int) : TimelineLabel
+}
+
 /** A folder on one volume, such as "DCIM/Camera/"; the volume root is "" (PRD GAL-002). */
 data class FolderRef(val volumeId: String, val relativePath: String)
 
@@ -49,6 +57,9 @@ interface TimelineReader {
 
     /** Every item whose sort time is in [fromMs, untilMs), in the query's order: a whole date group. */
     suspend fun between(query: TimelineQuery, fromMs: Long, untilMs: Long): List<TimelineItem>
+
+    /** What to name the item at this position, for the fast scrollbar; null past the end. */
+    suspend fun labelAt(query: TimelineQuery, index: Int): TimelineLabel?
 
     /** Emits whenever the catalog behind the timeline may have changed. */
     fun changes(): Flow<Unit>

@@ -65,6 +65,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -88,6 +89,8 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.contracts.TimelineLabel
+import dev.irohaco.core.designsystem.component.FastScrollbar
 import dev.irohaco.core.designsystem.component.MediaThumbnail
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.motion.sharedMedia
@@ -103,6 +106,7 @@ import kotlinx.coroutines.flow.flowOf
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.DateGrouping
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
@@ -265,6 +269,7 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
         onGrouping = viewModel::setDateGrouping,
         selectedGroups = selectedGroups,
         onToggleGroup = viewModel::toggleGroup,
+        labelAt = viewModel::labelAt,
     )
 }
 
@@ -344,6 +349,7 @@ internal fun TimelineContent(
     onGrouping: (DateGrouping) -> Unit = {},
     selectedGroups: Set<LocalDate> = emptySet(),
     onToggleGroup: (LocalDate) -> Unit = {},
+    labelAt: suspend (Int) -> TimelineLabel? = { null },
 ) {
     var sorting by rememberSaveable { mutableStateOf(false) }
     if (sorting) SortSheet(query, onQueryChange, onDismiss = { sorting = false }, grouping = grouping, onGrouping = onGrouping)
@@ -420,6 +426,7 @@ internal fun TimelineContent(
                         grouping = grouping,
                         selectedGroups = selectedGroups,
                         onToggleGroup = onToggleGroup,
+                        labelAt = labelAt,
                     )
                 }
             }
@@ -450,6 +457,7 @@ private fun TimelineGrid(
     grouping: DateGrouping,
     selectedGroups: Set<LocalDate>,
     onToggleGroup: (LocalDate) -> Unit,
+    labelAt: suspend (Int) -> TimelineLabel? = { null },
 ) {
     val gridState = rememberLazyGridState()
     LaunchedEffect(scrollToTop) { scrollToTop.collect { gridState.scrollToItem(0) } }
@@ -532,6 +540,19 @@ private fun TimelineGrid(
             }
         }
         pinned?.let { DateHeader(it, headerFormatter, it in selectedGroups) { onToggleGroup(it) } }
+        val context = LocalContext.current
+        val zone = ZoneId.systemDefault()
+        var dragIndex by remember { mutableStateOf<Int?>(null) }
+        val scrubLabel by produceState<String?>(null, dragIndex) {
+            value = dragIndex?.let { labelAt(it)?.format(headerFormatter, zone, context) }
+        }
+        FastScrollbar(
+            gridState = gridState,
+            itemCount = cells.itemCount,
+            label = scrubLabel,
+            onDragIndex = { dragIndex = it },
+            modifier = Modifier.align(Alignment.CenterEnd).padding(bottom = bottomPadding),
+        )
         if (selection.isNotEmpty()) {
             HorizontalFloatingToolbar(
                 expanded = true,

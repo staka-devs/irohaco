@@ -2,6 +2,7 @@ package dev.irohaco.core.database
 
 import androidx.sqlite.db.SimpleSQLiteQuery
 import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineReader
 import dev.irohaco.core.contracts.TimelineSortKey
@@ -39,6 +40,22 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
                 arrayOf(*fromArgs(query), *args(query), fromMs, untilMs),
             ),
         ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs) }
+
+    override suspend fun labelAt(query: TimelineQuery, index: Int): TimelineLabel? {
+        val row = db.timelineDao().labelRow(
+            SimpleSQLiteQuery(
+                """SELECT $TIME AS takenMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, COALESCE(r.rating, 0) AS rating
+                   ${from(query)} ${where(query)} ORDER BY ${orderBy(query)} LIMIT 1 OFFSET ?""",
+                arrayOf(*fromArgs(query), *args(query), index),
+            ),
+        ) ?: return null
+        return when (query.sortKey) {
+            TimelineSortKey.TAKEN -> TimelineLabel.Taken(row.takenMs)
+            TimelineSortKey.NAME -> TimelineLabel.Name(row.displayName.firstOrNull()?.uppercaseChar() ?: '#')
+            TimelineSortKey.SIZE -> TimelineLabel.Size(row.sizeBytes)
+            TimelineSortKey.RATING -> TimelineLabel.Rating(row.rating)
+        }
+    }
 
     /**
      * Emits once on subscription as well: a sync that finishes after the first page loads but before

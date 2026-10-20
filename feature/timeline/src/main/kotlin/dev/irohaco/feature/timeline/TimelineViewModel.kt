@@ -152,6 +152,9 @@ class TimelineViewModel(
         }
     }
 
+    /** What the fast scrollbar's bubble names at this position (PRD GAL-014). */
+    suspend fun labelAt(index: Int) = getPage.labelAt(index)
+
     enum class Operation { MOVE, COPY, RENAME }
 
     /** What a finished move, copy or rename reports in the Snackbar. */
