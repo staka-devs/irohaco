@@ -7,7 +7,9 @@ import android.content.Context
 import android.provider.MediaStore
 import androidx.activity.compose.BackHandler
 import androidx.activity.result.IntentSenderRequest
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.SnackbarDuration
@@ -314,13 +316,16 @@ private fun TimelineGrid(
                             stringResource(R.string.timeline_photo_description, date)
                         }
                         val selecting = selection.isNotEmpty()
+                        val selectLabel = stringResource(R.string.timeline_select)
                         MediaThumbnail(
                             model = cell.item.contentUri,
                             contentDescription = description,
                             selected = cell.item.assetId in selection,
-                            modifier = Modifier.sharedMedia(cell.item.assetId).clickable {
-                                if (selecting) onToggle(cell.item) else onOpenMedia(cell.item.assetId)
-                            },
+                            modifier = Modifier
+                                .sharedMedia(cell.item.assetId)
+                                .clickable { if (selecting) onToggle(cell.item) else onOpenMedia(cell.item.assetId) }
+                                // The long press itself is the grid's gesture; screen readers get it as an action.
+                                .semantics { onLongClick(selectLabel) { onToggle(cell.item); true } },
                         )
                     }
                     null -> MediaThumbnail(model = null, contentDescription = "", selected = false)
@@ -371,23 +376,28 @@ private fun Modifier.dragToSelect(
         position.x >= item.offset.x && position.x < item.offset.x + item.size.width &&
             position.y >= item.offset.y && position.y < item.offset.y + item.size.height
     }?.index
-    var anchor: Int? = null
-    var before = emptyMap<String, TimelineItem>()
     val cellAt = { index: Int -> if (index < cells.itemCount) cells.peek(index) else null }
-    detectDragGesturesAfterLongPress(
-        onDragStart = { start ->
-            anchor = indexAt(start)?.takeIf { cellAt(it) is TimelineCell.Media }
-            before = selection()
-            anchor?.let { onSelect(rangeSelection(before, cellAt, it, it)) }
-        },
-        onDrag = { change, _ ->
-            val from = anchor ?: return@detectDragGesturesAfterLongPress
-            indexAt(change.position)?.let { onSelect(rangeSelection(before, cellAt, from, it)) }
-            change.consume()
-        },
-        onDragEnd = { anchor = null },
-        onDragCancel = { anchor = null },
-    )
+    // The Initial pass sees the touch before the cells' click handlers, so their consumption cannot cancel the press.
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        val anchor = indexAt(down.position)?.takeIf { cellAt(it) is TimelineCell.Media } ?: return@awaitEachGesture
+        // Lifting or moving past the slop before the timeout leaves the touch to taps and scrolling.
+        val released = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+            while (true) {
+                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                if (!change.pressed || (change.position - down.position).getDistance() > viewConfiguration.touchSlop) break
+            }
+        }
+        if (released != null) return@awaitEachGesture
+        val before = selection()
+        onSelect(rangeSelection(before, cellAt, anchor, anchor))
+        while (true) {
+            val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+            change.consume() // once selecting, the grid neither scrolls nor opens the cell
+            if (!change.pressed) break
+            indexAt(change.position)?.let { onSelect(rangeSelection(before, cellAt, anchor, it)) }
+        }
+    }
 }
 
 @Composable

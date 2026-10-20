@@ -40,6 +40,7 @@
     <string name="details_unreadable">Could not be read</string>
     <string name="details_allow_location">Allow location</string>
     <string name="details_file_unavailable">This file can no longer be opened. It may have been moved or deleted, or access may have been withdrawn.</string>
+    <string name="timeline_select">Select</string>
     <string name="timeline_clear_selection">Clear selection</string>
     <string name="timeline_share">Share</string>
     <string name="timeline_delete">Delete</string>

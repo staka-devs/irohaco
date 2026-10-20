@@ -40,6 +40,7 @@
     <string name="details_unreadable">読み取れません</string>
     <string name="details_allow_location">位置情報を許可する</string>
     <string name="details_file_unavailable">このファイルを開けません。移動、削除されたか、アクセスの許可が取り消された可能性があります。</string>
+    <string name="timeline_select">選択</string>
     <string name="timeline_clear_selection">選択を解除</string>
     <string name="timeline_share">共有</string>
     <string name="timeline_delete">削除</string>
