@@ -22,4 +22,6 @@
     <string name="color_green">緑</string>
     <string name="color_teal">青緑</string>
     <string name="color_brown">茶</string>
+    <string name="video_playing">再生中</string>
+    <string name="video_paused">一時停止中</string>
 </resources>

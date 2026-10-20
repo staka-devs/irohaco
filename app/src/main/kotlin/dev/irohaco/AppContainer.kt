@@ -1,6 +1,8 @@
 package dev.irohaco
 
 import android.content.Context
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.SyncMediaCatalog
@@ -31,6 +33,9 @@ class AppContainer(context: Context) {
     val themeColorSettings by lazy {
         ThemeColorSettings(DataStoreAppearanceSettings(PreferenceDataStoreFactory.create { appContext.preferencesDataStoreFile("settings") }))
     }
+
+    /** One player per open viewer; the viewer's ViewModel releases it. */
+    fun newVideoPlayer(): Player = ExoPlayer.Builder(appContext).build()
 
     val getTimelinePage by lazy { GetTimelinePage(RoomTimelineReader(database)) }
 
