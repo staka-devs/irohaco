@@ -16,7 +16,9 @@ import androidx.test.rule.GrantPermissionRule
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
 import org.junit.rules.RuleChain
+import kotlinx.coroutines.runBlocking
 import org.junit.runner.RunWith
 import dev.irohaco.feature.timeline.R as TimelineR
 
@@ -28,8 +30,14 @@ class TimelineTest {
     private val image = insertTestImage(context)
     private val compose = createAndroidComposeRule<MainActivity>()
 
+    // Files earlier tests deleted stay on the timeline until a sync; without this the grid could open one of them first.
+    private val syncFirst = object : ExternalResource() {
+        override fun before() = runBlocking { (context.applicationContext as IrohacoApplication).container.syncCatalog() }
+    }
+
     @get:Rule val rules: RuleChain = RuleChain
         .outerRule(GrantPermissionRule.grant(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO))
+        .around(syncFirst)
         .around(compose)
 
     @After
