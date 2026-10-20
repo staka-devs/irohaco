@@ -181,7 +181,7 @@ class MainActivity : ComponentActivity() {
                         val query = viewer.list?.query(page.query.value) ?: page.query.value
                         ViewerViewModel(
                             page, viewer.assetId, viewer.startMs, container::newVideoPlayer, container.getMediaDetails, query,
-                            container.markMedia, container.manageCollections,
+                            container.markMedia, container.manageCollections, container.mediaFormatProbe,
                         )
                     },
                     onBack,

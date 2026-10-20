@@ -138,4 +138,9 @@
         <item quantity="one">%d file may be a missing one</item>
         <item quantity="other">%d files may be missing ones</item>
     </plurals>
+    <string name="viewer_format_raw">RAW · showing the preview</string>
+    <string name="viewer_format_hdr">HDR</string>
+    <string name="viewer_format_hdr_sdr">HDR · shown as SDR on this screen</string>
+    <string name="viewer_format_motion_photo">Motion Photo · still image only</string>
+    <string name="viewer_cannot_show">This format cannot be shown. You can still open its details.</string>
 </resources>

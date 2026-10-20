@@ -138,4 +138,9 @@
         <item quantity="one">見つからなくなった写真かもしれないファイルが%d件あります</item>
         <item quantity="other">見つからなくなった写真かもしれないファイルが%d件あります</item>
     </plurals>
+    <string name="viewer_format_raw">RAW・プレビューを表示しています</string>
+    <string name="viewer_format_hdr">HDR</string>
+    <string name="viewer_format_hdr_sdr">HDR・この画面ではSDRで表示しています</string>
+    <string name="viewer_format_motion_photo">Motion Photo・静止画だけを表示しています</string>
+    <string name="viewer_cannot_show">この形式は表示できません。詳細は開けます。</string>
 </resources>

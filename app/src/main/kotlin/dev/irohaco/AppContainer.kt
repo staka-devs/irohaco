@@ -32,6 +32,7 @@ import dev.irohaco.core.database.IrohacoDatabaseFactory
 import dev.irohaco.core.database.RoomCatalogStore
 import dev.irohaco.core.database.RoomTimelineReader
 import dev.irohaco.infrastructure.media.AndroidMediaDetailsReader
+import dev.irohaco.infrastructure.media.AndroidMediaFormatProbe
 import dev.irohaco.infrastructure.media.AndroidMediaLibraryAccess
 import dev.irohaco.infrastructure.media.MediaStoreCatalogSource
 import dev.irohaco.infrastructure.preferences.DataStoreAppearanceSettings
@@ -70,6 +71,8 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
         val renderers = DefaultRenderersFactory(appContext).setMediaCodecSelector(selector).setEnableDecoderFallback(true)
         return ExoPlayer.Builder(appContext, renderers).build()
     }
+
+    val mediaFormatProbe by lazy { AndroidMediaFormatProbe(appContext) }
 
     val getMediaDetails by lazy { GetMediaDetails(AndroidMediaDetailsReader(appContext)) }
 

@@ -30,7 +30,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +64,18 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import coil3.compose.AsyncImage
+import android.content.pm.ActivityInfo
+import android.os.Build
+import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.text.style.TextAlign
+import dev.irohaco.core.domain.MediaFormat
 import coil3.request.ImageRequest
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.designsystem.component.VideoPlayer
@@ -88,6 +99,8 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
     val details by viewModel.details.collectAsStateWithLifecycle()
     var detailsOf by remember { mutableStateOf<TimelineItem?>(null) }
     val marks by viewModel.marks.collectAsStateWithLifecycle()
+    val format by viewModel.format.collectAsStateWithLifecycle()
+    HdrWindow(format.hdr)
     val tags by viewModel.tags.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
     var tagging by remember { mutableStateOf(false) }
@@ -132,6 +145,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
             favorite = marks.favorite,
             onCurrentChanged = viewModel::showing,
             onToggleFavorite = { viewModel.setFavorite(it, !marks.favorite) },
+            format = format,
         )
         ViewerViewModel.Start.Loading -> Box(Modifier.fillMaxSize().background(IrohacoViewerColors.background))
     }
@@ -149,6 +163,7 @@ internal fun MediaViewerContent(
     favorite: Boolean = false,
     onCurrentChanged: (TimelineItem?) -> Unit = {},
     onToggleFavorite: (TimelineItem) -> Unit = {},
+    format: MediaFormat = MediaFormat(),
 ) {
     var current by remember { mutableStateOf<TimelineItem?>(null) }
     LaunchedEffect(current) { onCurrentChanged(current) }
@@ -188,7 +203,8 @@ internal fun MediaViewerContent(
             }
         }
         AnimatedVisibility(visible = chrome, enter = fadeIn(), exit = fadeOut()) {
-            Row(Modifier.fillMaxWidth().background(IrohacoViewerColors.scrim).statusBarsPadding()) {
+            Column(Modifier.fillMaxWidth().background(IrohacoViewerColors.scrim).statusBarsPadding()) {
+            Row(Modifier.fillMaxWidth()) {
                 IconButton(onClick = onBack) {
                     Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back), tint = IrohacoViewerColors.content)
                 }
@@ -205,6 +221,8 @@ internal fun MediaViewerContent(
                         Icon(painterResource(IrohacoIcons.Info), stringResource(R.string.details_open), tint = IrohacoViewerColors.content)
                     }
                 }
+            }
+            FormatLabels(format)
             }
         }
     }
@@ -231,7 +249,19 @@ private fun MediaPage(item: TimelineItem?, zoom: ZoomState?, onTap: () -> Unit, 
         val description = stringResource(
             if (item.kind == MediaKind.VIDEO) R.string.viewer_video_description else R.string.viewer_photo_description,
         )
+        var failed by remember(item.contentUri) { mutableStateOf(false) }
+        if (failed && item.kind == MediaKind.IMAGE) {
+            // Better a reason than a blank page; the details sheet still opens from the bar.
+            Text(
+                stringResource(R.string.viewer_cannot_show),
+                color = IrohacoViewerColors.content,
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(IrohacoSpacing.xl),
+            )
+        }
         AsyncImage(
+            onError = { failed = true },
             // Large enough to stay sharp when zoomed, bounded so huge photos do not exhaust memory.
             model = remember(item.contentUri) { ImageRequest.Builder(context).data(item.contentUri).size(MAX_DECODE_PX).build() },
             contentDescription = description,
@@ -315,5 +345,44 @@ private fun MediaViewerPreview() {
             PagingData.from(listOf(TimelineItem("v1", MediaKind.VIDEO, "content://preview/v1", 0))),
         ).collectAsLazyPagingItems()
         MediaViewerContent(items, startIndex = 0, onBack = {})
+    }
+}
+
+/** What the viewer can and cannot show of the current file (PRD GAL-009). */
+@Composable
+private fun FormatLabels(format: MediaFormat) {
+    val labels = buildList {
+        if (format.raw) add(stringResource(R.string.viewer_format_raw))
+        if (format.hdr) add(stringResource(if (hdrDisplay()) R.string.viewer_format_hdr else R.string.viewer_format_hdr_sdr))
+        if (format.motionPhoto) add(stringResource(R.string.viewer_format_motion_photo))
+    }
+    if (labels.isEmpty()) return
+    Row(
+        Modifier.padding(start = IrohacoSpacing.l, end = IrohacoSpacing.l, bottom = IrohacoSpacing.s),
+        horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
+    ) {
+        labels.forEach { label ->
+            Surface(shape = MaterialTheme.shapes.small, color = IrohacoViewerColors.scrim, contentColor = IrohacoViewerColors.content) {
+                Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = IrohacoSpacing.s, vertical = IrohacoSpacing.xs))
+            }
+        }
+    }
+}
+
+/** Whether this screen can show HDR; before Android 14 the gain map is never used. */
+@Composable
+private fun hdrDisplay(): Boolean {
+    val context = LocalContext.current
+    return Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && context.display.isHdrSdrRatioAvailable
+}
+
+/** Switches the window to HDR while an HDR photo is on screen, and back when it leaves. */
+@Composable
+private fun HdrWindow(hdr: Boolean) {
+    val activity = LocalActivity.current ?: return
+    val supported = hdrDisplay()
+    DisposableEffect(hdr, supported) {
+        if (hdr && supported) activity.window.colorMode = ActivityInfo.COLOR_MODE_HDR
+        onDispose { activity.window.colorMode = ActivityInfo.COLOR_MODE_DEFAULT }
     }
 }

@@ -1,5 +1,6 @@
 package dev.irohaco.core.contracts
 
+import dev.irohaco.core.domain.MediaFormat
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.core.domain.MediaDetailsResult
 import kotlinx.coroutines.flow.Flow
@@ -122,6 +123,11 @@ interface MediaFiles {
 
     /** [fileName] is the whole new name, extension included. */
     suspend fun rename(contentUri: String, fileName: String): FileOperationResult
+}
+
+/** Tells which special format a photo is (PRD GAL-009); unreadable files are plain ones. */
+fun interface MediaFormatProbe {
+    suspend fun probe(contentUri: String, kind: MediaKind): MediaFormat
 }
 
 /** Reads EXIF, XMP and container metadata of one file when it is asked for (PRD MET-001). */

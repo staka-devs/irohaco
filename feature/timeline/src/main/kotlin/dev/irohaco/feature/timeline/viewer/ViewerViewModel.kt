@@ -16,6 +16,11 @@ import dev.irohaco.core.contracts.AssetMarks
 import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.contracts.Tag
+import dev.irohaco.core.contracts.MediaFormatProbe
+import dev.irohaco.core.domain.MediaFormat
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flatMapLatest
@@ -51,8 +56,16 @@ class ViewerViewModel(
     private val query: TimelineQuery = getPage.query.value,
     private val mark: MarkMedia? = null,
     private val collections: ManageCollections? = null,
+    private val formatProbe: MediaFormatProbe? = null,
 ) : ViewModel() {
-    private val current = MutableStateFlow<String?>(null)
+    private val currentItem = MutableStateFlow<TimelineItem?>(null)
+    private val current = currentItem.map { it?.assetId }.distinctUntilChanged()
+
+    /** RAW, HDR or Motion Photo of the page on screen, for its label (PRD GAL-009). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val format: StateFlow<MediaFormat> = currentItem
+        .flatMapLatest { item -> flow { emit(if (item == null || formatProbe == null) MediaFormat() else formatProbe.probe(item.contentUri, item.kind)) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MediaFormat())
 
     /** Favorite and rating of the page on screen (PRD GAL-007). */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -77,7 +90,7 @@ class ViewerViewModel(
     }
 
     fun showing(item: TimelineItem?) {
-        current.value = item?.assetId
+        currentItem.value = item
     }
 
     fun setFavorite(item: TimelineItem, favorite: Boolean) {
