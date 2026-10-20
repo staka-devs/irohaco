@@ -12,6 +12,7 @@ import dev.irohaco.core.database.RoomIdentityStore
 import dev.irohaco.core.database.RoomMarksStore
 import dev.irohaco.core.database.RoomLibraryReader
 import dev.irohaco.infrastructure.preferences.DataStoreLibrarySettings
+import dev.irohaco.infrastructure.preferences.DataStoreTimelineSettings
 import dev.irohaco.infrastructure.media.AndroidMediaFiles
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +56,8 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     private val settingsStore by lazy { PreferenceDataStoreFactory.create { appContext.preferencesDataStoreFile("settings") } }
 
     val themeColorSettings by lazy { ThemeColorSettings(DataStoreAppearanceSettings(settingsStore)) }
+
+    val timelineSettings by lazy { DataStoreTimelineSettings(settingsStore) }
 
     val browseLibrary by lazy { BrowseLibrary(RoomLibraryReader(database), DataStoreLibrarySettings(settingsStore)) }
 

@@ -158,4 +158,11 @@
     <string name="library_unpin">Unpin</string>
     <string name="library_move_up">Move up</string>
     <string name="library_move_down">Move down</string>
+    <string name="timeline_group_title">Group by</string>
+    <string name="timeline_group_year">Year</string>
+    <string name="timeline_group_month">Month</string>
+    <string name="timeline_group_day">Day</string>
+    <string name="timeline_select_group">Select all of %1$s</string>
+    <string name="timeline_unselect_group">Unselect all of %1$s</string>
+    <string name="timeline_pinch_hint">Pinch with two fingers to change the number of columns</string>
 </resources>

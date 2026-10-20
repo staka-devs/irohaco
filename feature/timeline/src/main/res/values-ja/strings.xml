@@ -158,4 +158,11 @@
     <string name="library_unpin">固定を外す</string>
     <string name="library_move_up">上へ移動</string>
     <string name="library_move_down">下へ移動</string>
+    <string name="timeline_group_title">見出しの単位</string>
+    <string name="timeline_group_year">年</string>
+    <string name="timeline_group_month">月</string>
+    <string name="timeline_group_day">日</string>
+    <string name="timeline_select_group">%1$sをすべて選択</string>
+    <string name="timeline_unselect_group">%1$sの選択を外す</string>
+    <string name="timeline_pinch_hint">2本の指でつまむと、並べる列の数を変えられます</string>
 </resources>
