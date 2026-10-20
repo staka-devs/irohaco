@@ -6,7 +6,9 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -40,6 +42,13 @@ class TimelineTest {
     fun showsAPhotoFromMediaStoreAndOpensItInTheViewer() {
         val thumbnail = hasContentDescription(context.getString(TimelineR.string.timeline_photo_description, ""), substring = true)
         compose.waitUntilAtLeastOneExists(thumbnail, timeoutMillis = 15_000)
+
+        // Long press enters selection mode with the toolbar; back leaves it.
+        compose.onAllNodes(thumbnail).onFirst().performTouchInput { longClick() }
+        val share = hasContentDescription(context.getString(TimelineR.string.timeline_share))
+        compose.waitUntilAtLeastOneExists(share, timeoutMillis = 5_000)
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntilDoesNotExist(share, timeoutMillis = 5_000)
 
         compose.onAllNodes(thumbnail).onFirst().performClick()
         val back = hasContentDescription(context.getString(TimelineR.string.viewer_back))

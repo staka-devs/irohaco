@@ -1,6 +1,26 @@
 package dev.irohaco.feature.timeline
 
 import android.Manifest
+import android.app.Activity
+import android.content.ClipData
+import android.content.Context
+import android.provider.MediaStore
+import androidx.activity.compose.BackHandler
+import androidx.activity.result.IntentSenderRequest
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.material3.HorizontalFloatingToolbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.pluralStringResource
+import kotlinx.coroutines.launch
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -88,12 +108,30 @@ private val MEDIA_PERMISSIONS: Array<String> =
 fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) -> Unit, onOpenSettings: () -> Unit) {
     val access by viewModel.access.collectAsStateWithLifecycle()
     val cells = viewModel.cells.collectAsLazyPagingItems()
+    val selection by viewModel.selection.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.refreshAccess() }
     LifecycleResumeEffect(Unit) {
         viewModel.refreshAccess()
         onPauseOrDispose { }
     }
+    // Trash and restore go through the system's confirmation; the resume-time catalog sync then updates the grid.
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var trashed by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    val trashedMessage = pluralStringResource(R.plurals.timeline_trashed, trashed.size, trashed.size)
+    val undoLabel = stringResource(R.string.timeline_undo)
+    val restore = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { }
+    val trash = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+        viewModel.clearSelection()
+        val uris = trashed
+        scope.launch {
+            val answer = snackbar.showSnackbar(trashedMessage, actionLabel = undoLabel, duration = SnackbarDuration.Long)
+            if (answer == SnackbarResult.ActionPerformed) restore.launch(trashRequest(context, uris, trashed = false))
+        }
+    }
+    BackHandler(enabled = selection.isNotEmpty()) { viewModel.clearSelection() }
     TimelineContent(
         access = access,
         cells = cells,
@@ -103,8 +141,39 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
         },
         onOpenMedia = onOpenMedia,
         onOpenSettings = onOpenSettings,
+        selection = selection,
+        onToggle = viewModel::toggle,
+        onSelectRange = viewModel::setSelection,
+        onClearSelection = viewModel::clearSelection,
+        onShare = { items -> context.startActivity(shareIntent(items)) },
+        onTrash = { items ->
+            trashed = items.map { Uri.parse(it.contentUri) }
+            trash.launch(trashRequest(context, trashed, trashed = true))
+        },
+        snackbar = snackbar,
     )
 }
+
+/** Hands the selected files to another app with read access only. */
+private fun shareIntent(items: List<TimelineItem>): Intent {
+    val uris = ArrayList(items.map { Uri.parse(it.contentUri) })
+    val type = when {
+        items.all { it.kind == MediaKind.IMAGE } -> "image/*"
+        items.all { it.kind == MediaKind.VIDEO } -> "video/*"
+        else -> "*/*"
+    }
+    val send = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+        setType(type)
+        putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+        clipData = ClipData.newRawUri(null, uris.first()).apply { uris.drop(1).forEach { addItem(ClipData.Item(it)) } }
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    return Intent.createChooser(send, null)
+}
+
+/** The system dialog that moves files to, or back from, the trash (GAL-005). */
+private fun trashRequest(context: Context, uris: List<Uri>, trashed: Boolean): IntentSenderRequest =
+    IntentSenderRequest.Builder(MediaStore.createTrashRequest(context.contentResolver, uris, trashed).intentSender).build()
 
 @Composable
 internal fun TimelineContent(
@@ -114,6 +183,13 @@ internal fun TimelineContent(
     onOpenSystemSettings: () -> Unit,
     onOpenMedia: (String) -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    selection: Map<String, TimelineItem> = emptyMap(),
+    onToggle: (TimelineItem) -> Unit = {},
+    onSelectRange: (Map<String, TimelineItem>) -> Unit = {},
+    onClearSelection: () -> Unit = {},
+    onShare: (List<TimelineItem>) -> Unit = {},
+    onTrash: (List<TimelineItem>) -> Unit = {},
+    snackbar: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     BoxWithConstraints {
         // Column ranges per width class (DESIGN §4.1): Compact 3–5, Medium 5–7, Expanded 6–10.
@@ -126,7 +202,19 @@ internal fun TimelineContent(
         val columns = chosen.coerceIn(range)
         val noAccess = access.images == LibraryAccess.NONE && access.videos == LibraryAccess.NONE
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
+                if (selection.isNotEmpty()) {
+                    TopAppBar(
+                        title = { Text(pluralStringResource(R.plurals.timeline_selected, selection.size, selection.size)) },
+                        navigationIcon = {
+                            IconButton(onClick = onClearSelection) {
+                                Icon(painterResource(IrohacoIcons.Close), stringResource(R.string.timeline_clear_selection))
+                            }
+                        },
+                    )
+                    return@Scaffold
+                }
                 TopAppBar(
                     title = { Text(stringResource(R.string.timeline_title)) },
                     actions = {
@@ -158,6 +246,11 @@ internal fun TimelineContent(
                         onFewerColumns = { chosen = (columns - 1).coerceIn(range) },
                         onMoreColumns = { chosen = (columns + 1).coerceIn(range) },
                         onOpenMedia = onOpenMedia,
+                        selection = selection,
+                        onToggle = onToggle,
+                        onSelectRange = onSelectRange,
+                        onShare = onShare,
+                        onTrash = onTrash,
                     )
                 }
             }
@@ -173,8 +266,15 @@ private fun TimelineGrid(
     onFewerColumns: () -> Unit,
     onMoreColumns: () -> Unit,
     onOpenMedia: (String) -> Unit,
+    selection: Map<String, TimelineItem>,
+    onToggle: (TimelineItem) -> Unit,
+    onSelectRange: (Map<String, TimelineItem>) -> Unit,
+    onShare: (List<TimelineItem>) -> Unit,
+    onTrash: (List<TimelineItem>) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
+    val currentSelection by rememberUpdatedState(selection)
+    val selectRange by rememberUpdatedState(onSelectRange)
     val formatter = rememberDateFormatter()
     // The pinch detector is installed once, so it must call the latest callbacks.
     val fewer by rememberUpdatedState(onFewerColumns)
@@ -195,7 +295,10 @@ private fun TimelineGrid(
             contentPadding = PaddingValues(bottom = bottomPadding),
             horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs),
             verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs),
-            modifier = Modifier.fillMaxSize().pinchToChangeColumns({ fewer() }, { more() }),
+            modifier = Modifier
+                .fillMaxSize()
+                .pinchToChangeColumns({ fewer() }, { more() })
+                .dragToSelect(gridState, cells, { currentSelection }) { selectRange(it) },
         ) {
             items(
                 count = cells.itemCount,
@@ -212,11 +315,17 @@ private fun TimelineGrid(
                         } else {
                             stringResource(R.string.timeline_photo_description, date)
                         }
+                        val selecting = selection.isNotEmpty()
+                        val selectLabel = stringResource(R.string.timeline_select)
                         MediaThumbnail(
                             model = cell.item.contentUri,
                             contentDescription = description,
-                            selected = false,
-                            modifier = Modifier.sharedMedia(cell.item.assetId).clickable { onOpenMedia(cell.item.assetId) },
+                            selected = cell.item.assetId in selection,
+                            modifier = Modifier
+                                .sharedMedia(cell.item.assetId)
+                                .clickable { if (selecting) onToggle(cell.item) else onOpenMedia(cell.item.assetId) }
+                                // The long press itself is the grid's gesture; screen readers get it as an action.
+                                .semantics { onLongClick(selectLabel) { onToggle(cell.item); true } },
                         )
                     }
                     null -> MediaThumbnail(model = null, contentDescription = "", selected = false)
@@ -236,6 +345,58 @@ private fun TimelineGrid(
             }
         }
         pinned?.let { DateHeader(it, formatter) }
+        if (selection.isNotEmpty()) {
+            HorizontalFloatingToolbar(
+                expanded = true,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = bottomPadding + IrohacoSpacing.l),
+            ) {
+                IconButton(onClick = { onShare(selection.values.toList()) }) {
+                    Icon(painterResource(IrohacoIcons.Share), stringResource(R.string.timeline_share))
+                }
+                IconButton(onClick = { onTrash(selection.values.toList()) }) {
+                    Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.timeline_delete))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Long press, then drag: selects every cell between the pressed one and the finger (DESIGN §4.1).
+ * A long press without moving selects just that cell. Taps stay with the cells.
+ * shortcut: no auto-scroll at the grid edges yet; add it if selecting long ranges feels cramped on devices.
+ */
+private fun Modifier.dragToSelect(
+    gridState: LazyGridState,
+    cells: LazyPagingItems<TimelineCell>,
+    selection: () -> Map<String, TimelineItem>,
+    onSelect: (Map<String, TimelineItem>) -> Unit,
+): Modifier = pointerInput(cells) {
+    fun indexAt(position: Offset): Int? = gridState.layoutInfo.visibleItemsInfo.firstOrNull { item ->
+        position.x >= item.offset.x && position.x < item.offset.x + item.size.width &&
+            position.y >= item.offset.y && position.y < item.offset.y + item.size.height
+    }?.index
+    val cellAt = { index: Int -> if (index < cells.itemCount) cells.peek(index) else null }
+    // The Initial pass sees the touch before the cells' click handlers, so their consumption cannot cancel the press.
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        val anchor = indexAt(down.position)?.takeIf { cellAt(it) is TimelineCell.Media } ?: return@awaitEachGesture
+        // Lifting or moving past the slop before the timeout leaves the touch to taps and scrolling.
+        val released = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+            while (true) {
+                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                if (!change.pressed || (change.position - down.position).getDistance() > viewConfiguration.touchSlop) break
+            }
+        }
+        if (released != null) return@awaitEachGesture
+        val before = selection()
+        onSelect(rangeSelection(before, cellAt, anchor, anchor))
+        while (true) {
+            val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+            change.consume() // once selecting, the grid neither scrolls nor opens the cell
+            if (!change.pressed) break
+            indexAt(change.position)?.let { onSelect(rangeSelection(before, cellAt, anchor, it)) }
+        }
     }
 }
 
@@ -330,5 +491,17 @@ private fun TimelinePermissionPreview() {
     IrohacoTheme(dynamicColor = false) {
         val cells = flowOf(PagingData.empty<TimelineCell>()).collectAsLazyPagingItems()
         TimelineContent(MediaLibraryAccess(LibraryAccess.NONE, LibraryAccess.NONE), cells, {}, {})
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun TimelineSelectionPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        val cells = flowOf(PagingData.from(previewItems).withDateHeaders(ZoneOffset.UTC)).collectAsLazyPagingItems()
+        TimelineContent(
+            MediaLibraryAccess(LibraryAccess.FULL, LibraryAccess.FULL), cells, {}, {},
+            selection = previewItems.take(2).associateBy { it.assetId },
+        )
     }
 }
