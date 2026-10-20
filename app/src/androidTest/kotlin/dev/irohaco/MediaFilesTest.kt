@@ -55,6 +55,7 @@ class MediaFilesTest {
         // Moving the copy next to the original would collide with its name.
         assertEquals(FileOperationResult.NAME_TAKEN, files.move(copy.toString(), "Pictures/IrohacoTestMoved/"))
         context.contentResolver.delete(copy, null, null)
+        created -= copy
         assertEquals(FileOperationResult.NOT_FOUND, files.rename(copy.toString(), "gone.png"))
     }
 }
