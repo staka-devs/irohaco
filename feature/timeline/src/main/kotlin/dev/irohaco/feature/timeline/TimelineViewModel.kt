@@ -8,6 +8,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetTimelinePage
+import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.domain.MediaLibraryAccess
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +37,22 @@ class TimelineViewModel(
 
     init {
         viewModelScope.launch { getPage.changes().collect { source?.invalidate() } }
+    }
+
+    /** Selected items in the order they were picked; empty means the grid is not in selection mode. */
+    private val _selection = MutableStateFlow<Map<String, TimelineItem>>(emptyMap())
+    val selection: StateFlow<Map<String, TimelineItem>> = _selection.asStateFlow()
+
+    fun toggle(item: TimelineItem) {
+        _selection.value = _selection.value.toggled(item)
+    }
+
+    fun setSelection(selection: Map<String, TimelineItem>) {
+        _selection.value = selection
+    }
+
+    fun clearSelection() {
+        _selection.value = emptyMap()
     }
 
     /** Called when the screen resumes, since the user may have changed the grant in system settings. */
