@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="destination_photos">Photos</string>
+    <string name="destination_albums">Albums</string>
+    <string name="destination_search">Search</string>
+    <string name="destination_library">Library</string>
+</resources>

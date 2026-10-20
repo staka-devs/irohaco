@@ -19,4 +19,13 @@ object IrohacoIcons {
     @DrawableRes val Lock = R.drawable.ic_lock
     @DrawableRes val DataAlert = R.drawable.ic_data_alert
     @DrawableRes val SmartToy = R.drawable.ic_smart_toy
+
+    // Navigation: the filled variant marks the selected destination (DESIGN §1, FILL=1). Search has no filled glyph.
+    @DrawableRes val Photo = R.drawable.ic_photo
+    @DrawableRes val PhotoFilled = R.drawable.ic_photo_filled
+    @DrawableRes val PhotoAlbum = R.drawable.ic_photo_album
+    @DrawableRes val PhotoAlbumFilled = R.drawable.ic_photo_album_filled
+    @DrawableRes val Search = R.drawable.ic_search
+    @DrawableRes val Folder = R.drawable.ic_folder
+    @DrawableRes val FolderFilled = R.drawable.ic_folder_filled
 }

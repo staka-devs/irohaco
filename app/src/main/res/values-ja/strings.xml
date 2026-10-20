@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="destination_photos">写真</string>
+    <string name="destination_albums">アルバム</string>
+    <string name="destination_search">検索</string>
+    <string name="destination_library">ライブラリ</string>
+</resources>
