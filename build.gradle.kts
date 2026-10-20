@@ -32,3 +32,10 @@ subprojects {
         resolutionStrategy.eachDependency { checkPure(requested.group, requested.name) }
     }
 }
+
+// Robolectric sets up SDK 36+ apps through JDK internals that newer JDKs hide.
+subprojects {
+    tasks.withType<Test>().configureEach {
+        jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED", "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
+    }
+}

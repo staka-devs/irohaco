@@ -103,7 +103,7 @@ Irohaco/
 |---|---|
 | minSdk | 33（PRD §14の候補。基準端末と依存ランタイムを確かめて変えるときは、こことPRD §14を直す） |
 | compileSdk / targetSdk | 37 |
-| ビルド | Gradle 9.8.1、Android Gradle Plugin 9.4.1、Kotlin 2.4.21、JDK 17 |
+| ビルド | Gradle 9.8.1、Android Gradle Plugin 9.4.1、Kotlin 2.4.21、JDK 21（純粋なKotlinのモジュールはJava 17のバイトコードを出力する） |
 | 依存のバージョン | `gradle/libs.versions.toml`で管理する |
 | 開発環境 | `.devcontainer/`のDockerイメージで、JDKとAndroid SDKをそろえてビルドする |
 
