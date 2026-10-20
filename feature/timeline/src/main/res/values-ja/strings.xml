@@ -93,7 +93,6 @@
     <string name="library_empty">写真と動画はまだありません</string>
     <string name="library_internal">内蔵ストレージ</string>
     <string name="library_sd_card">SDカード（%1$s）</string>
-    <string name="library_root">最上位</string>
     <string name="library_excluded">%1$s・写真のタブに表示しない</string>
     <string name="library_exclude">写真のタブに表示しない</string>
     <string name="library_include">写真のタブに表示する</string>
@@ -146,4 +145,15 @@
     <string name="details_headline">見出し</string>
     <string name="details_creator">作成者</string>
     <string name="details_copyright">著作権</string>
+    <string name="library_pick_folder">フォルダを選んでください</string>
+    <string name="library_layout_grid">カードで表示</string>
+    <string name="library_layout_tree">ツリーで表示</string>
+    <string name="library_expand">%1$sを開く</string>
+    <string name="library_collapse">%1$sを閉じる</string>
+    <string name="library_pinned">固定したフォルダ</string>
+    <string name="library_pinned_menu">%1$sの操作</string>
+    <string name="library_pin">ライブラリの上部に固定</string>
+    <string name="library_unpin">固定を外す</string>
+    <string name="library_move_up">上へ移動</string>
+    <string name="library_move_down">下へ移動</string>
 </resources>

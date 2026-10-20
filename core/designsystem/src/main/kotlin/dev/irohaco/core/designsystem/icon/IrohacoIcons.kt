@@ -51,6 +51,12 @@ object IrohacoIcons {
     @DrawableRes val MoreVert = R.drawable.ic_more_vert
     @DrawableRes val Refresh = R.drawable.ic_refresh
     @DrawableRes val FindReplace = R.drawable.ic_find_replace
+    @DrawableRes val ExpandMore = R.drawable.ic_expand_more
+    @DrawableRes val ChevronRight = R.drawable.ic_chevron_right
+    @DrawableRes val GridView = R.drawable.ic_grid_view
+    @DrawableRes val ViewList = R.drawable.ic_view_list
+    @DrawableRes val PushPin = R.drawable.ic_push_pin
+    @DrawableRes val PushPinFilled = R.drawable.ic_push_pin_filled
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val Settings = R.drawable.ic_settings
     @DrawableRes val Check = R.drawable.ic_check

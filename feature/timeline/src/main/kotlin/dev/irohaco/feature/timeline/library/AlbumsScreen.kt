@@ -128,17 +128,18 @@ internal fun AlbumsContent(
             modifier = Modifier.fillMaxSize(),
         ) {
             item(key = "favorites") {
-                AlbumCard(stringResource(R.string.albums_favorites), favorites?.itemCount ?: 0, favorites?.coverUri) { onOpen(MediaList.Favorites) }
+                CoverCard(stringResource(R.string.albums_favorites), favorites?.itemCount ?: 0, favorites?.coverUri) { onOpen(MediaList.Favorites) }
             }
             items(albums, key = { it.albumId }) { album ->
-                AlbumCard(album.title, album.itemCount, album.coverUri) { onOpen(MediaList.Album(album.albumId)) }
+                CoverCard(album.title, album.itemCount, album.coverUri) { onOpen(MediaList.Album(album.albumId)) }
             }
         }
     }
 }
 
+/** A card with a cover, a title and a count: an album, or a folder in the library's grid view. */
 @Composable
-private fun AlbumCard(title: String, count: Int, coverUri: String?, onClick: () -> Unit) {
+internal fun CoverCard(title: String, count: Int, coverUri: String?, onClick: () -> Unit) {
     Column(Modifier.clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
         MediaThumbnail(model = coverUri, contentDescription = "", selected = false, modifier = Modifier.fillMaxWidth().aspectRatio(1f))
         Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)

@@ -59,6 +59,8 @@ data class LibraryFolder(
     /** The SD card is out; the folder and its count stay as they were when it was last seen. */
     val offline: Boolean,
     val itemCount: Int,
+    /** The newest item of the folder, for the card in the library's grid view. */
+    val coverUri: String? = null,
 )
 
 interface LibraryReader {

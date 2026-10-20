@@ -55,10 +55,10 @@ class RoomLibraryReaderTest {
         val reader = RoomLibraryReader(db)
         assertEquals(
             listOf(
-                LibraryFolder(FolderRef("sd", "DCIM/"), "1234-5678", offline = false, itemCount = 1),
-                LibraryFolder(FolderRef("internal", ""), "external_primary", offline = false, itemCount = 1),
-                LibraryFolder(FolderRef("internal", "DCIM/Camera/"), "external_primary", offline = false, itemCount = 2),
-                LibraryFolder(FolderRef("internal", "Pictures/Trip/"), "external_primary", offline = false, itemCount = 1),
+                LibraryFolder(FolderRef("sd", "DCIM/"), "1234-5678", offline = false, itemCount = 1, coverUri = "content://media/sd/1"),
+                LibraryFolder(FolderRef("internal", ""), "external_primary", offline = false, itemCount = 1, coverUri = "content://media/internal/4"),
+                LibraryFolder(FolderRef("internal", "DCIM/Camera/"), "external_primary", offline = false, itemCount = 2, coverUri = "content://media/internal/2"), // the newest of the two
+                LibraryFolder(FolderRef("internal", "Pictures/Trip/"), "external_primary", offline = false, itemCount = 1, coverUri = "content://media/internal/3"),
             ),
             reader.folders(),
         )
@@ -66,7 +66,7 @@ class RoomLibraryReaderTest {
         RoomCatalogStore(db).apply(
             CatalogChanges(observedAtMs = 2, offlineVolumeIds = setOf("sd"), availability = mapOf("s-e" to AssetAvailability.OFFLINE)),
         )
-        assertEquals(LibraryFolder(FolderRef("sd", "DCIM/"), "1234-5678", offline = true, itemCount = 1), reader.folders().first())
+        assertEquals(LibraryFolder(FolderRef("sd", "DCIM/"), "1234-5678", offline = true, itemCount = 1, coverUri = "content://media/sd/1"), reader.folders().first())
         assertEquals(4, timeline.count(TimelineQuery())) // offline media leaves the timeline but not the library
     }
 
@@ -86,6 +86,6 @@ class RoomLibraryReaderTest {
         assetId = name,
         sourceId = "s-$name",
         volumeId = volume,
-        entry = MediaStoreEntry(id, MediaKind.IMAGE, "content://media/$volume/$id", "$name.jpg", path, "image/jpeg", 1, 1, 1),
+        entry = MediaStoreEntry(id, MediaKind.IMAGE, "content://media/$volume/$id", "$name.jpg", path, "image/jpeg", 1, id, id), // newer ids are newer photos
     )
 }

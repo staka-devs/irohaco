@@ -4,9 +4,11 @@ import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.IdentityCandidate
 import dev.irohaco.core.contracts.IdentityStore
 import dev.irohaco.core.contracts.LibraryFolder
+import dev.irohaco.core.contracts.LibraryLayout
 import dev.irohaco.core.contracts.LibraryReader
 import dev.irohaco.core.contracts.LibrarySettings
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /** The library tab: folders per volume and the folders hidden from the timeline (PRD GAL-002). */
@@ -17,6 +19,25 @@ class BrowseLibrary(private val reader: LibraryReader, private val settings: Lib
     fun excludedFolders(): Flow<Set<FolderRef>> = settings.excludedFolders
 
     suspend fun setExcluded(folder: FolderRef, excluded: Boolean) = settings.setExcluded(folder, excluded)
+
+    fun pinnedFolders(): Flow<List<FolderRef>> = settings.pinnedFolders
+
+    suspend fun setPinned(folder: FolderRef, pinned: Boolean) {
+        val current = settings.pinnedFolders.first()
+        settings.setPinnedFolders(if (pinned) current - folder + folder else current - folder)
+    }
+
+    /** Moves a pinned folder up (negative [by]) or down, stopping at either end. */
+    suspend fun movePinned(folder: FolderRef, by: Int) {
+        val current = settings.pinnedFolders.first().toMutableList()
+        val from = current.indexOf(folder).takeIf { it >= 0 } ?: return
+        current.add((from + by).coerceIn(0, current.lastIndex), current.removeAt(from))
+        settings.setPinnedFolders(current)
+    }
+
+    fun layout(): Flow<LibraryLayout> = settings.libraryLayout
+
+    suspend fun setLayout(layout: LibraryLayout) = settings.setLibraryLayout(layout)
 }
 
 /**
