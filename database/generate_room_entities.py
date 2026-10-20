@@ -12,6 +12,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 DDL = ROOT / 'database' / 'schema.sql'
 OUT = ROOT / 'core/database/src/main/kotlin/dev/irohaco/core/database/IrohacoDatabase.kt'
 KOTLIN_TYPES = {'TEXT': 'String', 'INTEGER': 'Long', 'REAL': 'Double', 'BLOB': 'ByteArray'}
+# Hand-written DAOs in core:database; add one here to expose it on IrohacoDatabase.
+DAOS = ['CatalogDao']
 FK_ACTIONS = {'NO ACTION': 'NO_ACTION', 'RESTRICT': 'RESTRICT', 'CASCADE': 'CASCADE', 'SET NULL': 'SET_NULL', 'SET DEFAULT': 'SET_DEFAULT'}
 
 
@@ -97,7 +99,9 @@ def main():
         'import androidx.room.Index\n'
         'import androidx.room.RoomDatabase\n\n'
         '@Database(\n    entities = [\n' + entities + ',\n    ],\n    version = 1,\n    exportSchema = true,\n)\n'
-        'abstract class IrohacoDatabase : RoomDatabase()\n\n' + body,
+        'abstract class IrohacoDatabase : RoomDatabase() {\n'
+        + ''.join(f'    abstract fun {d[0].lower() + d[1:]}(): {d}\n' for d in DAOS)
+        + '}\n\n' + body,
         encoding='utf-8',
         newline='\n',
     )

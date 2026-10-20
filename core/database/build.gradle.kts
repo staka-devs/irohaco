@@ -42,11 +42,13 @@ androidComponents {
 }
 
 dependencies {
-    implementation(libs.androidx.room.runtime)
+    implementation(project(":core:contracts"))
+    api(libs.androidx.room.runtime) // IrohacoDatabase is a RoomDatabase in this module's public API
     ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(kotlin("test"))
+    testImplementation(libs.kotlinx.coroutines.test)
 }

@@ -68,7 +68,9 @@ import androidx.room.RoomDatabase
     version = 1,
     exportSchema = true,
 )
-abstract class IrohacoDatabase : RoomDatabase()
+abstract class IrohacoDatabase : RoomDatabase() {
+    abstract fun catalogDao(): CatalogDao
+}
 
 @Entity(
     tableName = "album_items",
@@ -497,6 +499,7 @@ data class MediaSourcesEntity(
     @ColumnInfo(name = "mime_type") val mimeType: String,
     @ColumnInfo(name = "file_size_bytes") val fileSizeBytes: Long,
     @ColumnInfo(name = "observed_modified_at") val observedModifiedAt: Long?,
+    @ColumnInfo(name = "observed_taken_at") val observedTakenAt: Long?,
     @ColumnInfo(name = "access_state") val accessState: String,
 )
 
