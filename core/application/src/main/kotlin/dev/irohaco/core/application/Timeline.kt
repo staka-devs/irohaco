@@ -5,18 +5,26 @@ import dev.irohaco.core.contracts.MediaDetailsReader
 import dev.irohaco.core.contracts.MediaFiles
 import dev.irohaco.core.contracts.MediaLibraryAccessPort
 import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineReader
 import dev.irohaco.core.domain.MediaLibraryAccess
 import dev.irohaco.core.domain.isValidName
 import dev.irohaco.core.domain.renamedFile
+import kotlinx.coroutines.flow.MutableStateFlow
 
-/** Reads the timeline a page at a time (PRD GAL-001). */
+/**
+ * Reads the timeline a page at a time (PRD GAL-001) in the order and filter the user picked
+ * (GAL-006). The timeline and the viewer share this choice for the session, so swiping in the
+ * viewer follows the grid.
+ */
 class GetTimelinePage(private val reader: TimelineReader) {
-    suspend fun count() = reader.count()
+    val query = MutableStateFlow(TimelineQuery())
 
-    suspend operator fun invoke(offset: Int, limit: Int) = reader.page(offset, limit)
+    suspend fun count(query: TimelineQuery = this.query.value) = reader.count(query)
 
-    suspend fun indexOf(assetId: String) = reader.indexOf(assetId)
+    suspend operator fun invoke(offset: Int, limit: Int, query: TimelineQuery = this.query.value) = reader.page(query, offset, limit)
+
+    suspend fun indexOf(assetId: String, query: TimelineQuery = this.query.value) = reader.indexOf(query, assetId)
 
     fun changes() = reader.changes()
 }

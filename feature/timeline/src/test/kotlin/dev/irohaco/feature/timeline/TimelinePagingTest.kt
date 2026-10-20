@@ -7,6 +7,7 @@ import androidx.paging.testing.TestPager
 import androidx.paging.testing.asSnapshot
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineReader
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.flow.emptyFlow
@@ -22,9 +23,9 @@ class TimelinePagingTest {
     private val day = 86_400_000L
     private val items = (0 until 10).map { TimelineItem("a$it", MediaKind.IMAGE, "content://$it", sortTimeMs = (9 - it / 3) * day) }
     private val reader = object : TimelineReader {
-        override suspend fun count() = items.size
-        override suspend fun page(offset: Int, limit: Int) = items.drop(offset).take(limit)
-        override suspend fun indexOf(assetId: String) = items.indexOfFirst { it.assetId == assetId }.takeIf { it >= 0 }
+        override suspend fun count(query: TimelineQuery) = items.size
+        override suspend fun page(query: TimelineQuery, offset: Int, limit: Int) = items.drop(offset).take(limit)
+        override suspend fun indexOf(query: TimelineQuery, assetId: String) = items.indexOfFirst { it.assetId == assetId }.takeIf { it >= 0 }
         override fun changes() = emptyFlow<Unit>()
     }
     private val config = PagingConfig(pageSize = 4, initialLoadSize = 4, enablePlaceholders = true)

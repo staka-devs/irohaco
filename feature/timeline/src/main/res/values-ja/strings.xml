@@ -78,4 +78,15 @@
         <item quantity="one">%d件をコピーしました</item>
         <item quantity="other">%d件をコピーしました</item>
     </plurals>
+    <string name="timeline_sort">並べ替えと絞り込み</string>
+    <string name="timeline_sort_title">並べ替えと絞り込み</string>
+    <string name="timeline_sort_newest">撮影日時（新しい順）</string>
+    <string name="timeline_sort_oldest">撮影日時（古い順）</string>
+    <string name="timeline_sort_name_asc">ファイル名（A→Z）</string>
+    <string name="timeline_sort_name_desc">ファイル名（Z→A）</string>
+    <string name="timeline_sort_largest">サイズ（大きい順）</string>
+    <string name="timeline_sort_smallest">サイズ（小さい順）</string>
+    <string name="timeline_kind_all">すべて</string>
+    <string name="timeline_kind_photos">写真</string>
+    <string name="timeline_kind_videos">動画</string>
 </resources>
