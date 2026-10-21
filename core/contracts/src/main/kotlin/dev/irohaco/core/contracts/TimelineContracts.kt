@@ -12,6 +12,8 @@ data class TimelineItem(
     val contentUri: String,
     /** Capture time, or the modification time when MediaStore has no capture time. */
     val sortTimeMs: Long,
+    /** From MediaStore; the grid marks GIFs with it (GAL-016). */
+    val mimeType: String? = null,
 )
 
 enum class TimelineSortKey { TAKEN, NAME, SIZE, RATING }

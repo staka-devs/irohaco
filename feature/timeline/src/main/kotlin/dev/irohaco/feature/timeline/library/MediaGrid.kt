@@ -28,8 +28,9 @@ import dev.irohaco.core.designsystem.component.FastScrollbar
 import dev.irohaco.core.designsystem.component.MediaThumbnail
 import dev.irohaco.core.designsystem.motion.sharedMedia
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
-import dev.irohaco.core.domain.MediaKind
-import dev.irohaco.feature.timeline.R
+import dev.irohaco.feature.timeline.GIF_LABEL
+import dev.irohaco.feature.timeline.descriptionRes
+import dev.irohaco.feature.timeline.isGif
 import dev.irohaco.feature.timeline.format
 import dev.irohaco.feature.timeline.rememberDateFormatter
 import java.time.Instant
@@ -63,14 +64,11 @@ internal fun MediaGrid(
                     MediaThumbnail(model = null, contentDescription = "", selected = false)
                 } else {
                     val date = formatter.format(Instant.ofEpochMilli(item.sortTimeMs).atZone(zone))
-                    val description = stringResource(
-                        if (item.kind == MediaKind.VIDEO) R.string.timeline_video_description else R.string.timeline_photo_description,
-                        date,
-                    )
                     MediaThumbnail(
                         model = item.contentUri,
-                        contentDescription = description,
+                        contentDescription = stringResource(item.descriptionRes(), date),
                         selected = false,
+                        label = if (item.isGif) GIF_LABEL else null,
                         modifier = Modifier.sharedMedia(item.assetId).clickable { onOpenMedia(item.assetId) },
                     )
                 }

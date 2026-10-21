@@ -15,6 +15,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -48,6 +50,7 @@ private const val SelectedScale = 0.9f
  *
  * @param model anything Coil can load (a content Uri, a file); null shows only the placeholder.
  * @param contentDescription what TalkBack reads: kind, capture date and, for a video, its length.
+ * @param label a short mark in the bottom corner, such as "GIF"; [contentDescription] already says it.
  */
 @Composable
 fun MediaThumbnail(
@@ -55,6 +58,7 @@ fun MediaThumbnail(
     contentDescription: String,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    label: String? = null,
 ) {
     val progress by animateFloatAsState(
         targetValue = if (selected) 1f else 0f,
@@ -84,6 +88,18 @@ fun MediaThumbnail(
                     .clip(shape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         )
+        if (label != null) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(IrohacoSpacing.xs)
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = IrohacoSpacing.xs),
+            )
+        }
         if (selected) {
             Surface(
                 shape = CircleShape,
@@ -117,6 +133,7 @@ private fun MediaThumbnailPreview() {
             Row(Modifier.padding(IrohacoSpacing.l), horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
                 MediaThumbnail(model = null, contentDescription = "Photo", selected = false, modifier = Modifier.size(120.dp))
                 MediaThumbnail(model = null, contentDescription = "Photo", selected = true, modifier = Modifier.size(120.dp))
+                MediaThumbnail(model = null, contentDescription = "Animated image", selected = false, modifier = Modifier.size(120.dp), label = "GIF")
             }
         }
     }

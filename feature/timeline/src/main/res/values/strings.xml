@@ -193,4 +193,6 @@
         <item quantity="other">Deletes in %d days</item>
     </plurals>
     <string name="library_trash">Trash</string>
+    <string name="timeline_animated_description">Animated image, %1$s</string>
+    <string name="viewer_play_animation">Play animation</string>
 </resources>

@@ -190,4 +190,6 @@
         <item quantity="other">あと%d日で削除されます</item>
     </plurals>
     <string name="library_trash">ゴミ箱</string>
+    <string name="timeline_animated_description">アニメーション画像、%1$s</string>
+    <string name="viewer_play_animation">アニメーションを再生</string>
 </resources>

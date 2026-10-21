@@ -17,11 +17,11 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
     override suspend fun page(query: TimelineQuery, offset: Int, limit: Int): List<TimelineItem> =
         db.timelineDao().page(
             SimpleSQLiteQuery(
-                """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs
+                """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType
                    ${from(query)} ${where(query)} ORDER BY ${orderBy(query)} LIMIT ? OFFSET ?""",
                 arrayOf(*fromArgs(query), *args(query), limit, offset),
             ),
-        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs) }
+        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType) }
 
     override suspend fun indexOf(query: TimelineQuery, assetId: String): Int? =
         db.timelineDao().indexOf(
@@ -35,11 +35,11 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
     override suspend fun between(query: TimelineQuery, fromMs: Long, untilMs: Long): List<TimelineItem> =
         db.timelineDao().page(
             SimpleSQLiteQuery(
-                """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs
+                """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType
                    ${from(query)} ${where(query)} AND $TIME >= ? AND $TIME < ? ORDER BY ${orderBy(query)}""",
                 arrayOf(*fromArgs(query), *args(query), fromMs, untilMs),
             ),
-        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs) }
+        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType) }
 
     override suspend fun labelAt(query: TimelineQuery, index: Int): TimelineLabel? {
         val row = db.timelineDao().labelRow(

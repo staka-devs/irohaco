@@ -20,7 +20,7 @@ interface TimelineDao {
     suspend fun labelRow(query: SupportSQLiteQuery): LabelRow?
 }
 
-data class TimelineRow(val assetId: String, val mediaKind: String, val contentUri: String, val sortTimeMs: Long)
+data class TimelineRow(val assetId: String, val mediaKind: String, val contentUri: String, val sortTimeMs: Long, val mimeType: String?)
 
 /** Every column the fast scrollbar's bubble might need, whichever sort is active ([RoomTimelineReader] picks one). */
 data class LabelRow(val takenMs: Long, val displayName: String, val sizeBytes: Long, val rating: Int)
