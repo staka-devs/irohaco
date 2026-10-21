@@ -58,7 +58,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -97,7 +96,6 @@ import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.designsystem.component.FastScrollbar
-import dev.irohaco.core.designsystem.component.GridThumbnail
 import dev.irohaco.core.designsystem.component.MediaThumbnail
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.motion.sharedMedia
@@ -497,6 +495,7 @@ private fun TimelineGrid(
     labelAt: suspend (Int) -> TimelineLabel? = { null },
 ) {
     val gridState = rememberLazyGridState()
+    val flinging by rememberFlinging(gridState)
     LaunchedEffect(scrollToTop) { scrollToTop.collect { gridState.scrollToItem(0) } }
     val currentSelection by rememberUpdatedState(selection)
     val selectRange by rememberUpdatedState(onSelectRange)
@@ -554,7 +553,7 @@ private fun TimelineGrid(
                         val selecting = selection.isNotEmpty()
                         val selectLabel = stringResource(R.string.timeline_select)
                         MediaThumbnail(
-                            model = GridThumbnail(cell.item.contentUri),
+                            model = gridModel(cell.item.contentUri, flinging),
                             contentDescription = description,
                             selected = cell.item.assetId in selection,
                             label = cell.item.badge,
@@ -582,7 +581,7 @@ private fun TimelineGrid(
                 }
             }
         }
-        PrefetchThumbnails(gridState) { index ->
+        PrefetchThumbnails(gridState, flinging) { index ->
             if (index < cells.itemCount) (cells.peek(index) as? TimelineCell.Media)?.item?.contentUri else null
         }
         // The next group's header pushes the pinned one up as it nears the top, so the two never stack (M1-31).
@@ -603,9 +602,7 @@ private fun TimelineGrid(
         val context = LocalContext.current
         val zone = ZoneId.systemDefault()
         var dragIndex by remember { mutableStateOf<Int?>(null) }
-        val scrubLabel by produceState<String?>(null, dragIndex) {
-            value = dragIndex?.let { labelAt(it)?.format(scrubFormatter, zone, context) }
-        }
+        val scrubLabel by rememberScrubLabel(dragIndex) { labelAt(it)?.format(scrubFormatter, zone, context) }
         FastScrollbar(
             gridState = gridState,
             itemCount = cells.itemCount,

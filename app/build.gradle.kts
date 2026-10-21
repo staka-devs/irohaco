@@ -26,6 +26,16 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
         buildConfigField("boolean", "GOOGLE_MAPS", (mapsKey.isNotEmpty()).toString())
     }
+    buildTypes {
+        // For judging speed on a device: Compose runs several times slower in a debuggable build (M1-34).
+        // Same id and key as debug, so it installs over it and keeps the data.
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+            isDebuggable = false
+        }
+    }
     buildFeatures {
         compose = true
         buildConfig = true

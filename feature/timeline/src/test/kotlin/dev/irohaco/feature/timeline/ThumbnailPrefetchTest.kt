@@ -17,6 +17,13 @@ class ThumbnailPrefetchTest {
     }
 
     @Test
+    fun `a fling moves more than a screenful in one sample`() {
+        assertEquals(false, isFast(moved = 20, visible = 30)) // ordinary scrolling keeps loading
+        assertEquals(true, isFast(moved = 31, visible = 30))
+        assertEquals(true, isFast(moved = -31, visible = 30)) // upwards too
+    }
+
+    @Test
     fun `loads nothing after a jump of several screens`() {
         assertEquals(IntRange.EMPTY, prefetchRange(first = 5_000, previous = 20, firstVisible = 5_000, lastVisible = 5_009))
     }

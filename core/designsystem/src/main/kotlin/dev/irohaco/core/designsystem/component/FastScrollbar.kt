@@ -24,7 +24,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -39,14 +38,16 @@ import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
- * A right-edge scroll thumb for very long grids (PRD GAL-014, NFR-002): visible while scrolling and
- * for a moment after, draggable to any position in the whole grid including items not loaded yet,
- * with a bubble naming the destination while dragging. TalkBack never reaches it — it keeps using
- * the grid's own scrolling, which does the same thing one item at a time.
+ * A right-edge scroll thumb for very long grids (PRD GAL-014, NFR-002), as other galleries have one:
+ * a wide handle that shows up while scrolling and fades a moment after it stops. Only the handle
+ * takes drags, so the rest of the edge still scrolls the grid (M1-35); dragging it reaches any
+ * position, including items not loaded yet, with a bubble naming the destination. TalkBack never
+ * reaches it — it keeps using the grid's own scrolling, which does the same thing one item at a time.
  */
 @Composable
 fun FastScrollbar(
@@ -57,12 +58,17 @@ fun FastScrollbar(
     modifier: Modifier = Modifier,
 ) {
     if (itemCount == 0) return
-    val scope = rememberCoroutineScope()
     var dragging by remember { mutableStateOf(false) }
     var visible by remember { mutableStateOf(false) }
     var trackHeightPx by remember { mutableFloatStateOf(0f) }
     var thumbOffsetPx by remember { mutableFloatStateOf(0f) }
     val thumbHeightPx = with(LocalDensity.current) { THUMB_HEIGHT.toPx() }
+    // One scroll at a time towards the latest position: launching one per move piled them up and the
+    // grid fell behind the finger (M1-35).
+    var target by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(gridState) {
+        snapshotFlow { target }.filterNotNull().collect { gridState.scrollToItem(it) }
+    }
 
     // Follows normal scrolling too, so the thumb always shows roughly where the grid is.
     LaunchedEffect(gridState, itemCount, trackHeightPx) {
@@ -85,29 +91,32 @@ fun FastScrollbar(
                 .fillMaxHeight()
                 .width(TOUCH_WIDTH)
                 .onSizeChanged { trackHeightPx = it.height.toFloat() }
-                .pointerInput(itemCount, trackHeightPx) {
-                    fun jumpTo(y: Float) {
-                        thumbOffsetPx = y.coerceIn(0f, (trackHeightPx - thumbHeightPx).coerceAtLeast(0f))
-                        val index = indexFor(thumbOffsetPx, trackHeightPx, thumbHeightPx, itemCount)
-                        onDragIndex(index)
-                        scope.launch { gridState.scrollToItem(index) }
-                    }
-                    detectDragGestures(
-                        onDragStart = { offset -> dragging = true; jumpTo(offset.y - thumbHeightPx / 2) },
-                        onDragEnd = { dragging = false },
-                        onDragCancel = { dragging = false },
-                    ) { change, _ -> jumpTo(change.position.y - thumbHeightPx / 2) }
-                }
                 // TalkBack users scroll the grid itself instead; this thumb would only confuse that.
                 .clearAndSetSemantics {},
         ) {
-            ScrollbarThumb(thumbOffsetPx, if (dragging) label else null)
+            ScrollbarThumb(
+                thumbOffsetPx,
+                if (dragging) label else null,
+                Modifier.pointerInput(itemCount, trackHeightPx) {
+                    detectDragGestures(
+                        onDragStart = { dragging = true },
+                        onDragEnd = { dragging = false },
+                        onDragCancel = { dragging = false },
+                    ) { change, drag ->
+                        change.consume()
+                        thumbOffsetPx = (thumbOffsetPx + drag.y).coerceIn(0f, (trackHeightPx - thumbHeightPx).coerceAtLeast(0f))
+                        val index = indexFor(thumbOffsetPx, trackHeightPx, thumbHeightPx, itemCount)
+                        onDragIndex(index)
+                        target = index
+                    }
+                },
+            )
         }
     }
 }
 
 @Composable
-private fun BoxScope.ScrollbarThumb(thumbOffsetPx: Float, label: String?) {
+private fun BoxScope.ScrollbarThumb(thumbOffsetPx: Float, label: String?, dragModifier: Modifier = Modifier) {
     label?.let {
         Surface(
             shape = MaterialTheme.shapes.medium,
@@ -128,15 +137,24 @@ private fun BoxScope.ScrollbarThumb(thumbOffsetPx: Float, label: String?) {
             )
         }
     }
+    // The touch area is the whole width and the handle's height; the handle sits at its end.
     Box(
         Modifier
             .align(Alignment.TopEnd)
             .offset { IntOffset(0, thumbOffsetPx.roundToInt()) }
-            .padding(end = IrohacoSpacing.s)
-            .width(THUMB_WIDTH)
+            .width(TOUCH_WIDTH)
             .height(THUMB_HEIGHT)
-            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50)),
-    )
+            .then(dragModifier),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Box(
+            Modifier
+                .padding(end = IrohacoSpacing.xs)
+                .width(THUMB_WIDTH)
+                .fillMaxHeight()
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50)),
+        )
+    }
 }
 
 internal fun offsetFor(index: Int, itemCount: Int, trackHeightPx: Float, thumbHeightPx: Float): Float {
@@ -150,10 +168,10 @@ internal fun indexFor(offsetPx: Float, trackHeightPx: Float, thumbHeightPx: Floa
     return (fraction * (itemCount - 1)).roundToInt().coerceIn(0, itemCount - 1)
 }
 
-/** Touch target per DESIGN.md (48dp minimum); the visible thumb is a thin bar inside it. */
+/** Touch target per DESIGN.md (48dp minimum); the handle is wide enough to see and grab at a glance. */
 private val TOUCH_WIDTH = 48.dp
-private val THUMB_WIDTH = 4.dp
-private val THUMB_HEIGHT = 48.dp
+private val THUMB_WIDTH = 16.dp
+private val THUMB_HEIGHT = 56.dp
 private const val HIDE_DELAY_MS = 1_200L
 
 @IrohacoPreviews

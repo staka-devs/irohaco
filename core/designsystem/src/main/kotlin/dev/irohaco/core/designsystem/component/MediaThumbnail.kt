@@ -30,9 +30,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -49,7 +49,10 @@ private const val SelectedScale = 0.9f
  * A grid cell's image (GAL-001, M1-25): the app loads the small copy MediaStore keeps for the file
  * instead of decoding the original, and falls back to the original only when there is none.
  */
-data class GridThumbnail(val contentUri: String)
+data class GridThumbnail(val contentUri: String) {
+    /** The image loader's memory-cache key: one entry per file, whatever the cell size. */
+    val memoryKey: String get() = "grid:$contentUri"
+}
 
 /**
  * A square grid cell for a photo or a video (DESIGN.md §2.3). Selecting it morphs the corners from
@@ -79,7 +82,9 @@ fun MediaThumbnail(
     Box(
         modifier
             .aspectRatio(1f)
-            .semantics {
+            // One node per cell: the badge and the check are already in the description, and with
+            // accessibility services on, every node costs time on each scrolled frame (M1-34).
+            .clearAndSetSemantics {
                 this.contentDescription = contentDescription
                 this.selected = selected
             },
