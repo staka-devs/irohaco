@@ -50,6 +50,7 @@ class RoomTimelineReaderTest {
         assertEquals(4, reader.count(newest))
         val first = reader.page(newest, offset = 0, limit = 2)
         assertEquals(listOf("c", "a"), first.map { it.assetId }) // same time: asset id breaks the tie
+        assertEquals("image/jpeg", first.first().mimeType) // the grid marks GIFs by it (GAL-016)
         val rest = reader.page(newest, offset = 2, limit = 10)
         assertEquals(listOf("b" to 200L, "d" to 100L), rest.map { it.assetId to it.sortTimeMs })
         assertEquals(listOf(0, 1, 2, 3), listOf("c", "a", "b", "d").map { reader.indexOf(newest, it) })

@@ -89,6 +89,8 @@ import dev.irohaco.core.domain.Detail
 import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaFormat
 import coil3.request.ImageRequest
+import coil3.gif.AnimatedImageDecoder
+import android.provider.Settings
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.designsystem.component.VideoPlayer
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
@@ -246,6 +248,8 @@ internal fun MediaViewerContent(
                         zoom = if (page == pager.currentPage && item?.kind != MediaKind.VIDEO) zoom else null,
                         onTap = { chrome = !chrome },
                         onPlay = { item?.let(onPlay) },
+                        // The probe looks at the page on screen only; its neighbours wait as stills.
+                        animated = page == pager.currentPage && format.animated,
                     )
                 }
             }
@@ -332,7 +336,7 @@ private fun ColumnScope.ViewerActionsMenu(
 }
 
 @Composable
-private fun MediaPage(item: TimelineItem?, zoom: ZoomState?, onTap: () -> Unit, onPlay: () -> Unit) {
+private fun MediaPage(item: TimelineItem?, zoom: ZoomState?, onTap: () -> Unit, onPlay: () -> Unit, animated: Boolean = false) {
     var size by remember { mutableStateOf(Size.Zero) }
     val gestures = if (zoom == null) {
         Modifier.pointerInput(Unit) { detectTapGestures(onTap = { onTap() }) }
@@ -353,6 +357,9 @@ private fun MediaPage(item: TimelineItem?, zoom: ZoomState?, onTap: () -> Unit, 
             if (item.kind == MediaKind.VIDEO) R.string.viewer_video_description else R.string.viewer_photo_description,
         )
         var failed by remember(item.contentUri) { mutableStateOf(false) }
+        // GAL-016: plays on its own unless the device asks for less motion; then it waits for the button.
+        val reduceMotion = remember { reducedMotion(context) }
+        var playing by remember(item.contentUri, animated) { mutableStateOf(animated && !reduceMotion) }
         if (failed && item.kind == MediaKind.IMAGE) {
             // Better a reason than a blank page; the details sheet still opens from the bar.
             Text(
@@ -366,7 +373,12 @@ private fun MediaPage(item: TimelineItem?, zoom: ZoomState?, onTap: () -> Unit, 
         AsyncImage(
             onError = { failed = true },
             // Large enough to stay sharp when zoomed, bounded so huge photos do not exhaust memory.
-            model = remember(item.contentUri) { ImageRequest.Builder(context).data(item.contentUri).size(MAX_DECODE_PX).build() },
+            model = remember(item.contentUri, playing) {
+                ImageRequest.Builder(context).data(item.contentUri).size(MAX_DECODE_PX)
+                    // Frames are decoded one at a time by the platform, so a long animation does not pile up in memory.
+                    .apply { if (playing) decoderFactory(AnimatedImageDecoder.Factory()) }
+                    .build()
+            },
             contentDescription = description,
             contentScale = ContentScale.Fit,
             modifier = Modifier
@@ -379,6 +391,16 @@ private fun MediaPage(item: TimelineItem?, zoom: ZoomState?, onTap: () -> Unit, 
                     translationY = zoom?.offset?.y ?: 0f
                 },
         )
+        if (animated && !playing) {
+            IconButton(onClick = { playing = true }, modifier = Modifier.size(96.dp)) {
+                Icon(
+                    painterResource(IrohacoIcons.PlayCircleFilled),
+                    contentDescription = stringResource(R.string.viewer_play_animation),
+                    tint = IrohacoViewerColors.content,
+                    modifier = Modifier.size(72.dp),
+                )
+            }
+        }
         if (item.kind == MediaKind.VIDEO) {
             IconButton(onClick = onPlay, modifier = Modifier.size(96.dp)) {
                 Icon(
@@ -408,6 +430,10 @@ private suspend fun PointerInputScope.detectZoom(zoom: ZoomState) {
 }
 
 private fun Size.center() = Offset(width / 2f, height / 2f)
+
+/** The device's "Remove animations" switch sets the animator scale to 0. */
+private fun reducedMotion(context: Context): Boolean =
+    Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
 
 /** The date and time shown in the viewer's bar (PRD GAL-013). */
 @Composable
