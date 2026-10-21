@@ -4,33 +4,16 @@ import android.Manifest
 import android.app.Activity
 import android.content.ClipData
 import android.content.Context
-import android.content.res.Resources
-import androidx.compose.ui.platform.LocalResources
-import android.provider.MediaStore
-import androidx.activity.compose.BackHandler
-import androidx.activity.result.IntentSenderRequest
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.semantics.onLongClick
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.material3.HorizontalFloatingToolbar
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import dev.irohaco.core.contracts.FileOperationResult
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.res.pluralStringResource
-import kotlinx.coroutines.launch
 import android.content.Intent
+import android.content.res.Resources
 import android.net.Uri
 import android.os.Build
+import android.provider.MediaStore
 import android.provider.Settings
 import android.text.format.DateFormat
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -48,37 +31,52 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -90,8 +88,11 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
+import dev.irohaco.core.contracts.DateGrouping
+import dev.irohaco.core.contracts.FileOperationResult
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineLabel
+import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.designsystem.component.FastScrollbar
 import dev.irohaco.core.designsystem.component.GridThumbnail
 import dev.irohaco.core.designsystem.component.MediaThumbnail
@@ -106,8 +107,7 @@ import dev.irohaco.core.domain.MediaLibraryAccess
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
-import dev.irohaco.core.contracts.TimelineQuery
-import dev.irohaco.core.contracts.DateGrouping
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -122,7 +122,7 @@ private val MEDIA_PERMISSIONS: Array<String> =
 
 /** The Photos tab (PRD GAL-001, DESIGN §4.1). */
 @Composable
-fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) -> Unit, onOpenSettings: () -> Unit) {
+fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) -> Unit, onOpenSettings: () -> Unit, onOpenMap: () -> Unit = {}) {
     val access by viewModel.access.collectAsStateWithLifecycle()
     val cells = viewModel.cells.collectAsLazyPagingItems()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
@@ -235,6 +235,7 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
         },
         onOpenMedia = onOpenMedia,
         onOpenSettings = onOpenSettings,
+        onOpenMap = onOpenMap,
         selection = selection,
         onToggle = viewModel::toggle,
         onSelectRange = viewModel::setSelection,
@@ -338,6 +339,7 @@ internal fun TimelineContent(
     onOpenSystemSettings: () -> Unit,
     onOpenMedia: (String) -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onOpenMap: () -> Unit = {},
     selection: Map<String, TimelineItem> = emptyMap(),
     onToggle: (TimelineItem) -> Unit = {},
     onSelectRange: (Map<String, TimelineItem>) -> Unit = {},
@@ -363,11 +365,11 @@ internal fun TimelineContent(
     var sorting by rememberSaveable { mutableStateOf(false) }
     if (sorting) SortSheet(query, onQueryChange, onDismiss = { sorting = false }, grouping = grouping, onGrouping = onGrouping)
     BoxWithConstraints {
-        // Column ranges per width class (DESIGN §4.1): Compact 3–5, Medium 5–7, Expanded 6–10.
+        // Column ranges per width class (DESIGN §4.1): Compact 3–10, Medium 5–12, Expanded 6–16.
         val range = when {
-            maxWidth < 600.dp -> 3..5
-            maxWidth < 840.dp -> 5..7
-            else -> 6..10
+            maxWidth < 600.dp -> 3..10
+            maxWidth < 840.dp -> 5..12
+            else -> 6..16
         }
         var chosen by rememberSaveable { mutableIntStateOf(range.first + 1) }
         val columns = chosen.coerceIn(range)
@@ -401,11 +403,29 @@ internal fun TimelineContent(
                             IconButton(onClick = { sorting = true }) {
                                 Icon(painterResource(IrohacoIcons.Sort), stringResource(R.string.timeline_sort))
                             }
-                            IconButton(onClick = { chosen = (columns - 1).coerceIn(range) }, enabled = columns > range.first) {
-                                Icon(painterResource(IrohacoIcons.ZoomIn), stringResource(R.string.timeline_columns_fewer))
+                            // Pinch changes the columns; the menu keeps a way without gestures, as for TalkBack (M1-30).
+                            var menu by remember { mutableStateOf(false) }
+                            IconButton(onClick = { menu = true }) {
+                                Icon(painterResource(IrohacoIcons.MoreVert), stringResource(R.string.timeline_more))
                             }
-                            IconButton(onClick = { chosen = (columns + 1).coerceIn(range) }, enabled = columns < range.last) {
-                                Icon(painterResource(IrohacoIcons.ZoomOut), stringResource(R.string.timeline_columns_more))
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.viewer_show_on_map)) },
+                                    leadingIcon = { Icon(painterResource(IrohacoIcons.Map), null) },
+                                    onClick = { menu = false; onOpenMap() },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.timeline_columns_fewer)) },
+                                    leadingIcon = { Icon(painterResource(IrohacoIcons.ZoomIn), null) },
+                                    enabled = columns > range.first,
+                                    onClick = { menu = false; chosen = (columns - 1).coerceIn(range) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.timeline_columns_more)) },
+                                    leadingIcon = { Icon(painterResource(IrohacoIcons.ZoomOut), null) },
+                                    enabled = columns < range.last,
+                                    onClick = { menu = false; chosen = (columns + 1).coerceIn(range) },
+                                )
                             }
                         }
                     },
