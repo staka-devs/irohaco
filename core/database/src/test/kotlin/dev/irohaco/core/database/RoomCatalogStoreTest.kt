@@ -39,6 +39,8 @@ class RoomCatalogStoreTest {
         assertEquals(1, count("SELECT count(*) FROM identity_resolutions WHERE resolution_kind = 'NEW_ASSET' AND selected_asset_id = 'a1'"))
         assertEquals(2, count("SELECT count(*) FROM media_discoveries WHERE discovery_state = 'RESOLVED'"))
         assertEquals(1, count("SELECT count(*) FROM media_sources WHERE observed_taken_at = 42"))
+        // The video's length is kept, so the grid's badge does not open the file (M1-26).
+        assertEquals(1, count("SELECT count(*) FROM media_sources WHERE media_store_id = 2 AND observed_duration_ms = 46000"))
         assertEquals(0, count("SELECT count(*) FROM media_revisions"))
         assertEquals(0, count("SELECT count(*) FROM pragma_foreign_key_check"))
     }
@@ -100,6 +102,7 @@ class RoomCatalogStoreTest {
         sizeBytes = 10,
         modifiedAtMs = 1,
         takenAtMs = if (id == 1L) 42 else null,
+        durationMs = if (kind == MediaKind.VIDEO) 46_000 else null,
     )
 
     private fun count(sql: String): Int = db.openHelper.readableDatabase.query(sql).use { it.moveToFirst(); it.getInt(0) }

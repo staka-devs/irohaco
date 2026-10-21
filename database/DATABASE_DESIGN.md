@@ -142,7 +142,7 @@ erDiagram
 | 関係 | 候補キーと識別子 | 主な関数従属性 | 3NFにするための分け方 |
 |---|---|---|---|
 | `media_assets` | `asset_id` | `asset_id → media_kind, first_seen_at, tombstoned_at` | 物理ファイルの情報は持たない |
-| `media_sources` | `source_id`、非NULLの`(volume_id,media_store_id)` | `source_id → asset_id, uri, name, mime, observed_taken_at, access_state,...` | ボリューム名は`storage_volumes`に持つ。`observed_taken_at`はMediaStoreの`DATE_TAKEN`で、ソースを観測した値である |
+| `media_sources` | `source_id`、非NULLの`(volume_id,media_store_id)` | `source_id → asset_id, uri, name, mime, observed_taken_at, access_state,...` | ボリューム名は`storage_volumes`に持つ。`observed_taken_at`はMediaStoreの`DATE_TAKEN`、`observed_duration_ms`は動画の`DURATION`で、どちらもソースを観測した値である |
 | `media_revisions` | `revision_id` | `revision_id → asset_id, file_digest, visual_digest, dimensions,...` | 現在のrevisionを指すポインタは別の関係にする |
 | `video_segments` | `segment_id` | `segment_id → revision_id, extraction_profile_id, start_ms, end_ms` | `asset_id`を持たない |
 | `sampled_frames` | `frame_id` | `frame_id → segment_id, timestamp_ms, frame_digest` | `asset_id`と`revision_id`を持たない |

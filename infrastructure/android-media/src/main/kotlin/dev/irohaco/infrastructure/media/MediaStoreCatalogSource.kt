@@ -58,6 +58,7 @@ class MediaStoreCatalogSource(private val context: Context) : MediaCatalogSource
         val size = getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
         val modified = getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
         val taken = getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_TAKEN)
+        val duration = getColumnIndexOrThrow(MediaStore.MediaColumns.DURATION)
         val result = ArrayList<MediaStoreEntry>(count)
         while (moveToNext()) {
             val mediaStoreId = getLong(id)
@@ -71,6 +72,7 @@ class MediaStoreCatalogSource(private val context: Context) : MediaCatalogSource
                 sizeBytes = getLong(size),
                 modifiedAtMs = if (isNull(modified)) null else getLong(modified) * 1000, // DATE_MODIFIED is in seconds
                 takenAtMs = if (isNull(taken)) null else getLong(taken),
+                durationMs = if (isNull(duration)) null else getLong(duration).takeIf { it > 0 },
             )
         }
         return result
@@ -91,6 +93,7 @@ class MediaStoreCatalogSource(private val context: Context) : MediaCatalogSource
             MediaStore.MediaColumns.SIZE,
             MediaStore.MediaColumns.DATE_MODIFIED,
             MediaStore.MediaColumns.DATE_TAKEN,
+            MediaStore.MediaColumns.DURATION,
         )
     }
 }

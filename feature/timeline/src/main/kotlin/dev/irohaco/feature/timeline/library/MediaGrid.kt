@@ -18,7 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
@@ -29,10 +28,10 @@ import dev.irohaco.core.designsystem.component.GridThumbnail
 import dev.irohaco.core.designsystem.component.MediaThumbnail
 import dev.irohaco.core.designsystem.motion.sharedMedia
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
-import dev.irohaco.feature.timeline.GIF_LABEL
+import dev.irohaco.feature.timeline.badge
+import dev.irohaco.feature.timeline.badgeIcon
 import dev.irohaco.feature.timeline.PrefetchThumbnails
-import dev.irohaco.feature.timeline.descriptionRes
-import dev.irohaco.feature.timeline.isGif
+import dev.irohaco.feature.timeline.description
 import dev.irohaco.feature.timeline.format
 import dev.irohaco.feature.timeline.rememberDateFormatter
 import java.time.Instant
@@ -68,9 +67,10 @@ internal fun MediaGrid(
                     val date = formatter.format(Instant.ofEpochMilli(item.sortTimeMs).atZone(zone))
                     MediaThumbnail(
                         model = GridThumbnail(item.contentUri),
-                        contentDescription = stringResource(item.descriptionRes(), date),
+                        contentDescription = item.description(date),
                         selected = false,
-                        label = if (item.isGif) GIF_LABEL else null,
+                        label = item.badge,
+                        labelIcon = item.badgeIcon,
                         modifier = Modifier.sharedMedia(item.assetId).clickable { onOpenMedia(item.assetId) },
                     )
                 }
