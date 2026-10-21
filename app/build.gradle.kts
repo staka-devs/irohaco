@@ -2,6 +2,8 @@
 
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -18,9 +20,15 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // ADR-0011: Google Maps needs the builder's own key from local.properties; without one it cannot be chosen.
+        val mapsKey = rootProject.file("local.properties").takeIf { it.exists() }
+            ?.let { file -> Properties().apply { file.inputStream().use { load(it) } }.getProperty("MAPS_API_KEY") }.orEmpty()
+        manifestPlaceholders["MAPS_API_KEY"] = mapsKey
+        buildConfigField("boolean", "GOOGLE_MAPS", (mapsKey.isNotEmpty()).toString())
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     testOptions {
         unitTests {

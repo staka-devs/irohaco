@@ -3,6 +3,8 @@ package dev.irohaco.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.irohaco.core.application.ThemeColorSettings
+import dev.irohaco.core.contracts.MapProvider
+import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.ShareLocationPolicy
 import dev.irohaco.core.contracts.SharingSettings
 import dev.irohaco.core.domain.ThemeColor
@@ -13,7 +15,11 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class SettingsViewModel(private val settings: ThemeColorSettings, private val sharing: SharingSettings? = null) : ViewModel() {
+class SettingsViewModel(
+    private val settings: ThemeColorSettings,
+    private val sharing: SharingSettings? = null,
+    private val map: MapSettings? = null,
+) : ViewModel() {
     val themeColor: StateFlow<ThemeColor> =
         settings.observe().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeColor.Device)
 
@@ -31,6 +37,22 @@ class SettingsViewModel(private val settings: ThemeColorSettings, private val sh
 
     fun selectContrast(contrast: ThemeContrast) {
         viewModelScope.launch { settings.setContrast(contrast) }
+    }
+
+    /** The map's provider and which providers the user allowed (ADR-0011). */
+    val mapProvider: StateFlow<MapProvider> =
+        (map?.provider ?: flowOf(MapProvider.OPEN_FREE_MAP)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapProvider.OPEN_FREE_MAP)
+
+    val mapConsented: StateFlow<Set<MapProvider>> =
+        (map?.consented ?: flowOf(emptySet())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    fun selectMapProvider(provider: MapProvider) {
+        viewModelScope.launch { map?.setProvider(provider) }
+    }
+
+    /** Takes back every provider's consent; the map asks again before it next loads. */
+    fun revokeMapConsent() {
+        viewModelScope.launch { MapProvider.entries.forEach { map?.setConsent(it, false) } }
     }
 
     fun selectShareLocationPolicy(policy: ShareLocationPolicy) {

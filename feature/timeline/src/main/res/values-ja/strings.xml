@@ -192,4 +192,14 @@
     <string name="library_trash">ゴミ箱</string>
     <string name="timeline_animated_description">アニメーション画像、%1$s</string>
     <string name="viewer_play_animation">アニメーションを再生</string>
+    <string name="library_map">地図</string>
+    <string name="map_title">地図</string>
+    <string name="map_provider_openfreemap">OpenFreeMap</string>
+    <string name="map_provider_google">Google マップ</string>
+    <string name="map_consent_title">オンラインの地図を使いますか？</string>
+    <string name="map_consent_body">地図は%1$sから取得するため、表示している範囲が%1$sに伝わります。地名を出すときは、撮影場所が端末の地名変換のサービスに送られることもあります。</string>
+    <string name="map_consent_allow">許可する</string>
+    <string name="map_consent_decline">今はしない</string>
+    <string name="map_declined">地図は表示しません。1枚の撮影場所を見るときは、写真を開いてメニューの「地図上で表示」を選ぶと、端末の地図アプリで開きます。</string>
+    <string name="map_area_title">地図の写真</string>
 </resources>

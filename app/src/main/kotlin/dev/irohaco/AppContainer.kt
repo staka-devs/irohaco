@@ -16,7 +16,10 @@ import dev.irohaco.infrastructure.preferences.DataStoreSharingSettings
 import dev.irohaco.infrastructure.preferences.DataStoreTimelineSettings
 import dev.irohaco.infrastructure.media.AndroidMediaFiles
 import dev.irohaco.infrastructure.media.AndroidShareFiles
+import dev.irohaco.infrastructure.media.AndroidPlaceNames
 import dev.irohaco.infrastructure.media.AndroidTrashReader
+import dev.irohaco.infrastructure.preferences.DataStoreMapSettings
+import dev.irohaco.core.database.RoomLocationStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -26,7 +29,9 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import dev.irohaco.core.application.BrowseMap
 import dev.irohaco.core.application.BrowseTrash
+import dev.irohaco.core.application.IndexLocations
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
@@ -89,6 +94,24 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val prepareShare by lazy { PrepareShare(AndroidMediaDetailsReader(appContext), AndroidShareFiles(appContext)) }
 
     val browseTrash by lazy { BrowseTrash(AndroidTrashReader(appContext)) }
+
+    val mapSettings by lazy { DataStoreMapSettings(settingsStore) }
+
+    private val locationStore by lazy { RoomLocationStore(database) }
+
+    val browseMap by lazy { BrowseMap(locationStore, mapSettings, AndroidPlaceNames(appContext)) }
+
+    /** Reads the GPS of files not read yet; cancelling it (the app leaving the screen) pauses it (GAL-017). */
+    suspend fun indexLocations() {
+        try {
+            withContext(Dispatchers.IO) { IndexLocations(locationStore, AndroidMediaDetailsReader(appContext))() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // The next resume carries on from where this stopped.
+            Log.w("Irohaco", "Location indexing failed", e)
+        }
+    }
 
     val getTimelinePage by lazy { GetTimelinePage(RoomTimelineReader(database)) }
 

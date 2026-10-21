@@ -42,9 +42,12 @@ import dev.irohaco.feature.timeline.library.MediaList
 import dev.irohaco.feature.timeline.library.FolderViewModel
 import dev.irohaco.feature.timeline.library.LibraryScreen
 import dev.irohaco.feature.timeline.library.LibraryViewModel
+import dev.irohaco.feature.timeline.library.MapScreen
+import dev.irohaco.feature.timeline.library.MapViewModel
 import dev.irohaco.feature.timeline.library.TrashScreen
 import dev.irohaco.feature.timeline.library.TrashViewModel
 import dev.irohaco.core.contracts.FolderRef
+import dev.irohaco.core.domain.GeoBounds
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.listSaver
 import dev.irohaco.feature.timeline.viewer.MediaViewerScreen
@@ -66,6 +69,7 @@ class MainActivity : ComponentActivity() {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 container.syncCatalog()
                 container.prepareShare.cleanUp() // stale share-cache copies past their retention window (MET-003)
+                container.indexLocations() // GPS of new files, a few at a time; pausing the app pauses it (GAL-017)
             }
         }
         setContent {
@@ -99,6 +103,7 @@ class MainActivity : ComponentActivity() {
                                         onOpenCandidates = { open(Route.IDENTITY) },
                                         onOpenSettings = { open(Route.SETTINGS) },
                                         onOpenTrash = { open(Route.TRASH) },
+                                        onOpenMap = { open(Route.MAP) },
                                     )
                                 }
                             } else {
@@ -120,6 +125,7 @@ class MainActivity : ComponentActivity() {
         onOpenSettings: () -> Unit,
         onOpenCandidates: () -> Unit,
         onOpenTrash: () -> Unit,
+        onOpenMap: () -> Unit,
     ) {
         IrohacoApp { destination ->
             when (destination) {
@@ -158,6 +164,7 @@ class MainActivity : ComponentActivity() {
                     onOpenSettings = onOpenSettings,
                     onOpenCandidates = onOpenCandidates,
                     onOpenTrash = onOpenTrash,
+                    onOpenMap = onOpenMap,
                 )
                 else -> DestinationPlaceholder(destination)
             }
@@ -167,9 +174,19 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun FullScreen(route: String, open: (String) -> Unit, onBack: () -> Unit) {
         when {
-            route == Route.SETTINGS -> SettingsScreen(viewModel { SettingsViewModel(container.themeColorSettings, container.sharingSettings) }, onBack)
+            route == Route.SETTINGS -> SettingsScreen(
+                viewModel { SettingsViewModel(container.themeColorSettings, container.sharingSettings, container.mapSettings) },
+                onBack,
+                googleMapsAvailable = BuildConfig.GOOGLE_MAPS,
+            )
             route == Route.IDENTITY -> IdentityScreen(viewModel { IdentityViewModel(container.reconcileIdentity) }, onBack)
             route == Route.TRASH -> TrashScreen(viewModel { TrashViewModel(container.browseTrash, container::syncCatalog) }, onBack)
+            route == Route.MAP -> MapScreen(
+                viewModel { MapViewModel(container.browseMap) },
+                googleMapsAvailable = BuildConfig.GOOGLE_MAPS,
+                onOpenArea = { open(Route.list(MediaList.Area(it))) },
+                onBack = onBack,
+            )
             Route.isList(route) -> {
                 val list = Route.parseList(route)
                 CollectionScreen(
@@ -188,6 +205,7 @@ class MainActivity : ComponentActivity() {
                         ViewerViewModel(
                             page, viewer.assetId, viewer.startMs, container::newVideoPlayer, container.getMediaDetails, query,
                             container.markMedia, container.manageCollections, container.mediaFormatProbe,
+                            container.browseMap,
                         )
                     },
                     onBack,
@@ -218,6 +236,7 @@ object Route {
     const val SETTINGS = "settings"
     const val IDENTITY = "identity"
     const val TRASH = "trash"
+    const val MAP = "map"
     private const val VIEWER = "viewer:"
     private const val LIST = "list:"
     private const val SEP = '\u0000'
@@ -249,9 +268,14 @@ object Route {
         is MediaList.Album -> "a$SEP${list.albumId}"
         is MediaList.Tag -> "t$SEP${list.tagId}"
         MediaList.Favorites -> "v"
+        is MediaList.Area -> listOf("g", list.bounds.south, list.bounds.west, list.bounds.north, list.bounds.east).joinToString("$SEP")
     }
 
     private fun decode(value: String): MediaList {
+        if (value.startsWith("g$SEP")) {
+            val (south, west, north, east) = value.split(SEP).drop(1).map { it.toDouble() }
+            return MediaList.Area(GeoBounds(south, west, north, east))
+        }
         val parts = value.split(SEP, limit = 3)
         return when (parts[0]) {
             "f" -> MediaList.Folder(FolderRef(parts[1], parts.getOrElse(2) { "" }))
