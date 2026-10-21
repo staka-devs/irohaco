@@ -37,7 +37,7 @@ class RoomLocationStoreTest {
             observedAtMs = 1,
             newVolumes = listOf(CatalogVolume("v1", "external_primary", null, null)),
             newAssets = names.mapIndexed { i, name ->
-                NewCatalogAsset("d-$name", name, "s-$name", "v1", MediaStoreEntry(i + 1L, MediaKind.IMAGE, "content://media/$i", "$name.jpg", null, "image/jpeg", 1, 1, 1))
+                NewCatalogAsset("d-$name", name, "s-$name", "v1", MediaStoreEntry(i + 1L, MediaKind.IMAGE, "content://media/$i", "$name.jpg", null, "image/jpeg", 1, 1, takenAtMs = i.toLong()))
             },
         ),
     )
@@ -53,7 +53,15 @@ class RoomLocationStoreTest {
         store.recordExif("tokyo", GeoPoint(0.0, 0.0)) // read again by a resumed run: the first record stays
 
         assertEquals(listOf("later"), store.unindexed(10).map { it.assetId })
-        assertEquals(listOf(LocatedAsset("tokyo", tokyo)), store.located())
+        assertEquals(listOf(LocatedAsset("tokyo", tokyo, "content://media/0")), store.located())
+    }
+
+    @Test
+    fun `lists the located ones newest first, so a map marker shows the newest photo`() = runTest {
+        catalog("older", "newer")
+        store.recordExif("older", GeoPoint(35.68, 139.76))
+        store.recordExif("newer", GeoPoint(35.69, 139.77))
+        assertEquals(listOf("newer", "older"), store.located().map { it.assetId })
     }
 
     @Test

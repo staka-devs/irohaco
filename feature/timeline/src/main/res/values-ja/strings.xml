@@ -203,4 +203,7 @@
     <string name="map_consent_decline">今はしない</string>
     <string name="map_declined">地図は表示しません。1枚の撮影場所を見るときは、写真を開いてメニューの「地図上で表示」を選ぶと、端末の地図アプリで開きます。</string>
     <string name="map_area_title">地図の写真</string>
+    <plurals name="map_marker_description">
+        <item quantity="other">ここで撮った写真と動画 %d件</item>
+    </plurals>
 </resources>

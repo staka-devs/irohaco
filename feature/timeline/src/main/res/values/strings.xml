@@ -206,4 +206,8 @@
     <string name="map_consent_decline">Not now</string>
     <string name="map_declined">The map stays off. To see one photo\'s place, open it and choose Show on map from its menu; it opens in your map app.</string>
     <string name="map_area_title">Photos on the map</string>
+    <plurals name="map_marker_description">
+        <item quantity="one">%d photo or video here</item>
+        <item quantity="other">%d photos and videos here</item>
+    </plurals>
 </resources>

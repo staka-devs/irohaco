@@ -23,6 +23,8 @@ class GeoTest {
         assertEquals(1, clusterPoints(listOf(tokyo, osaka), zoom = 2.0).size)
         assertEquals(2, clusterPoints(listOf(tokyo, osaka), zoom = 8.0).size)
         assertEquals(2, clusterPoints(listOf(tokyo, tokyoNear), zoom = 20.0).size)
+        // Each marker shows the photo of its group's first point (the newest, as the store lists them).
+        assertEquals(listOf(0, 1), clusterPoints(listOf(osaka, tokyo, tokyoNear), zoom = 10.0).map { it.first }.sorted())
     }
 
     @Test

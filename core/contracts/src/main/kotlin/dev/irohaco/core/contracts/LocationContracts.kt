@@ -4,7 +4,7 @@ import dev.irohaco.core.domain.GeoPoint
 import kotlinx.coroutines.flow.Flow
 
 /** An available photo or video whose file says where it was taken (PRD GAL-017). */
-data class LocatedAsset(val assetId: String, val point: GeoPoint)
+data class LocatedAsset(val assetId: String, val point: GeoPoint, val contentUri: String = "")
 
 /** The EXIF and video GPS read into `location_evidence` as source EXIF (GAL-017). */
 interface LocationStore {

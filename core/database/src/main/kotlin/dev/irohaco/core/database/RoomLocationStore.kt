@@ -44,10 +44,12 @@ interface LocationDao {
     }
 
     @Query(
-        """SELECT DISTINCT le.asset_id AS assetId, le.latitude AS latitude, le.longitude AS longitude
+        """SELECT le.asset_id AS assetId, le.latitude AS latitude, le.longitude AS longitude, MIN(s.content_uri) AS contentUri
            FROM location_evidence le JOIN media_assets a ON a.asset_id = le.asset_id JOIN media_sources s ON s.asset_id = a.asset_id
            WHERE le.evidence_source = 'EXIF' AND le.evidence_status = 'CONFIRMED'
-             AND s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL""",
+             AND s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL
+           GROUP BY le.asset_id
+           ORDER BY COALESCE(MAX(s.observed_taken_at), MAX(s.observed_modified_at), a.first_seen_at) DESC""",
     )
     suspend fun located(): List<LocatedRow>
 
@@ -58,7 +60,7 @@ interface LocationDao {
     suspend fun setPlaceName(assetId: String, name: String)
 }
 
-data class LocatedRow(val assetId: String, val latitude: Double, val longitude: Double)
+data class LocatedRow(val assetId: String, val latitude: Double, val longitude: Double, val contentUri: String)
 
 /** EXIF and video GPS in `location_evidence`, source EXIF (PRD GAL-017). A file without GPS is kept as UNKNOWN. */
 class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -> String = { UUID.randomUUID().toString() }) : LocationStore {
@@ -69,7 +71,9 @@ class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -
 
     override suspend fun recordExif(assetId: String, point: GeoPoint?) = dao.recordExif(newId(), assetId, point)
 
-    override suspend fun located(): List<LocatedAsset> = dao.located().map { LocatedAsset(it.assetId, GeoPoint(it.latitude, it.longitude)) }
+    /** Newest first, so a map marker can show its group's newest photo. */
+    override suspend fun located(): List<LocatedAsset> =
+        dao.located().map { LocatedAsset(it.assetId, GeoPoint(it.latitude, it.longitude), it.contentUri) }
 
     override suspend fun placeName(assetId: String): String? = dao.placeName(assetId)
 
