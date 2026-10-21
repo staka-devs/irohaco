@@ -19,4 +19,12 @@
     <string name="settings_share_location_ask">Ask every time</string>
     <string name="settings_share_location_strip">Always remove it</string>
     <string name="settings_share_location_keep">Always include it</string>
+    <string name="settings_map">Map</string>
+    <string name="settings_map_openfreemap">OpenFreeMap</string>
+    <string name="settings_map_openfreemap_summary">Open data from OpenStreetMap; no account needed</string>
+    <string name="settings_map_google">Google Maps</string>
+    <string name="settings_map_google_summary">Sends the area you look at to Google</string>
+    <string name="settings_map_google_unavailable">Needs a Maps API key built into the app</string>
+    <string name="settings_map_revoke">Stop using the online map</string>
+    <string name="settings_map_revoke_summary">The map asks again before it next loads</string>
 </resources>

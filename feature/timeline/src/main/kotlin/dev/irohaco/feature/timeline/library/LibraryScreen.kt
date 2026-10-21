@@ -129,6 +129,7 @@ fun LibraryScreen(
     onOpenSettings: () -> Unit,
     onOpenCandidates: () -> Unit = {},
     onOpenTrash: () -> Unit = {},
+    onOpenMap: () -> Unit = {},
 ) {
     val candidates by viewModel.candidateCount.collectAsStateWithLifecycle()
     val folders by viewModel.folders.collectAsStateWithLifecycle()
@@ -153,6 +154,7 @@ fun LibraryScreen(
                     candidates = candidates,
                     onOpenCandidates = onOpenCandidates,
                     onOpenTrash = onOpenTrash,
+                    onOpenMap = onOpenMap,
                     pinned = pinned,
                     onMovePinned = viewModel::movePinned,
                     onUnpin = viewModel::unpin,
@@ -194,6 +196,7 @@ internal fun LibraryContent(
     candidates: Int = 0,
     onOpenCandidates: () -> Unit = {},
     onOpenTrash: () -> Unit = {},
+    onOpenMap: () -> Unit = {},
     pinned: List<FolderRef> = emptyList(),
     onMovePinned: (FolderRef, Int) -> Unit = { _, _ -> },
     onUnpin: (FolderRef) -> Unit = {},
@@ -247,7 +250,7 @@ internal fun LibraryContent(
         val contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())
         when (layout) {
             LibraryLayout.TREE -> LazyColumn(Modifier.fillMaxSize(), contentPadding = contentPadding) {
-                header(candidates, onOpenCandidates, onOpenTrash)
+                header(candidates, onOpenCandidates, onOpenTrash, onOpenMap)
                 pinnedSection(pinnedLines, onOpenFolder, onMovePinned, onUnpin)
                 for ((volumeId, entry) in volumes) {
                     val (volume, lines) = entry
@@ -294,6 +297,7 @@ internal fun LibraryContent(
             ) {
                 fullLine("candidates-and-pinned") {
                     Column {
+                        MapItem(onOpenMap)
                         TrashItem(onOpenTrash)
                         if (candidates > 0) CandidatesItem(candidates, onOpenCandidates)
                         pinnedLines.forEachIndexed { index, (ref, volume, line) ->
@@ -354,7 +358,8 @@ private fun LazyGridScope.fullLine(key: String, content: @Composable () -> Unit)
     }
 }
 
-private fun LazyListScope.header(candidates: Int, onOpenCandidates: () -> Unit, onOpenTrash: () -> Unit) {
+private fun LazyListScope.header(candidates: Int, onOpenCandidates: () -> Unit, onOpenTrash: () -> Unit, onOpenMap: () -> Unit) {
+    item(key = "map") { MapItem(onOpenMap) }
     item(key = "trash") { TrashItem(onOpenTrash) }
     if (candidates > 0) item(key = "candidates") { CandidatesItem(candidates, onOpenCandidates) }
 }
@@ -393,6 +398,15 @@ private fun CandidatesItem(candidates: Int, onOpen: () -> Unit) {
         headlineContent = { Text(pluralStringResource(R.plurals.identity_found, candidates, candidates)) },
         supportingContent = { Text(stringResource(R.string.identity_check)) },
         leadingContent = { Icon(painterResource(IrohacoIcons.FindReplace), contentDescription = null) },
+        modifier = Modifier.clickable(onClick = onOpen),
+    )
+}
+
+@Composable
+private fun MapItem(onOpen: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.library_map)) },
+        leadingContent = { Icon(painterResource(IrohacoIcons.Map), contentDescription = null) },
         modifier = Modifier.clickable(onClick = onOpen),
     )
 }

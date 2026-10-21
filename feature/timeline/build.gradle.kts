@@ -17,6 +17,11 @@ android {
     buildFeatures {
         compose = true
     }
+    // Maps Compose inlines code built for Java 17 (ADR-0011).
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -47,6 +52,8 @@ dependencies {
     implementation(libs.androidx.paging.compose)
     implementation(libs.coil.compose)
     implementation(libs.coil.gif) // the viewer plays GIF and animated WebP (GAL-016)
+    implementation(libs.maplibre.android) // ADR-0011: the default map
+    implementation(libs.maps.compose) // ADR-0011: Google Maps, when a key is built in
     implementation(libs.androidx.media3.common)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)

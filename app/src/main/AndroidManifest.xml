@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- ADR-0011: only the map tiles and place names go out, and only after the user allows it on first use. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".IrohacoApplication"
@@ -9,6 +11,10 @@
         android:label="Irohaco"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.NoActionBar">
+        <!-- ADR-0011: empty unless MAPS_API_KEY is in local.properties; Google Maps is offered only then. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
         <activity
             android:name=".MainActivity"
             android:exported="true">

@@ -121,6 +121,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
     val marks by viewModel.marks.collectAsStateWithLifecycle()
     val format by viewModel.format.collectAsStateWithLifecycle()
     val location by viewModel.location.collectAsStateWithLifecycle()
+    val placeName by viewModel.placeName.collectAsStateWithLifecycle()
     HdrWindow(format.hdr)
     val tags by viewModel.tags.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
@@ -184,6 +185,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
                 onToggleFavorite = { viewModel.setFavorite(it, !marks.favorite) },
                 format = format,
                 hasLocation = location is Detail.Value<GeoPoint>,
+                placeName = placeName,
                 onShare = { item -> context.startActivity(shareIntent(listOf(item))) },
                 onShowOnMap = { (location as? Detail.Value<GeoPoint>)?.value?.let { context.startActivity(mapIntent(it)) } },
                 onTrash = { item ->
@@ -211,6 +213,7 @@ internal fun MediaViewerContent(
     onToggleFavorite: (TimelineItem) -> Unit = {},
     format: MediaFormat = MediaFormat(),
     hasLocation: Boolean = false,
+    placeName: String? = null,
     onShare: (TimelineItem) -> Unit = {},
     onShowOnMap: (TimelineItem) -> Unit = {},
     onTrash: (TimelineItem) -> Unit = {},
@@ -261,13 +264,17 @@ internal fun MediaViewerContent(
                     Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back), tint = IrohacoViewerColors.content)
                 }
                 val dateTimeFormatter = rememberDateTimeFormatter()
-                Text(
-                    text = current?.let { dateTimeFormatter.format(Instant.ofEpochMilli(it.sortTimeMs).atZone(ZoneId.systemDefault())) } ?: "",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = IrohacoViewerColors.content,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f).padding(horizontal = IrohacoSpacing.s),
-                )
+                Column(Modifier.weight(1f).padding(horizontal = IrohacoSpacing.s)) {
+                    Text(
+                        text = current?.let { dateTimeFormatter.format(Instant.ofEpochMilli(it.sortTimeMs).atZone(ZoneId.systemDefault())) } ?: "",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = IrohacoViewerColors.content,
+                        maxLines = 1,
+                    )
+                    if (placeName != null) {
+                        Text(placeName, style = MaterialTheme.typography.bodySmall, color = IrohacoViewerColors.content, maxLines = 1)
+                    }
+                }
                 current?.let { item ->
                     IconButton(onClick = { onToggleFavorite(item) }) {
                         Icon(
@@ -484,7 +491,7 @@ private fun MediaViewerPreview() {
         val items = flowOf(
             PagingData.from(listOf(TimelineItem("v1", MediaKind.VIDEO, "content://preview/v1", 0))),
         ).collectAsLazyPagingItems()
-        MediaViewerContent(items, startIndex = 0, onBack = {}, hasLocation = true)
+        MediaViewerContent(items, startIndex = 0, onBack = {}, hasLocation = true, placeName = "千代田区, 東京都")
     }
 }
 

@@ -54,21 +54,30 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.designsystem.tokens.MaterialPalette
 import dev.irohaco.core.designsystem.tokens.PaletteHue
 import dev.irohaco.core.designsystem.tokens.legibleContentOn
+import dev.irohaco.core.contracts.MapProvider
 import dev.irohaco.core.contracts.ShareLocationPolicy
+import androidx.compose.foundation.clickable
 import dev.irohaco.core.domain.ThemeColor
 import dev.irohaco.core.domain.ThemeContrast
 
 /** Settings (DESIGN §2.1, §3). Opened from the Photos tab's top app bar. */
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
+fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, googleMapsAvailable: Boolean = false) {
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val contrast by viewModel.contrast.collectAsStateWithLifecycle()
     val shareLocationPolicy by viewModel.shareLocationPolicy.collectAsStateWithLifecycle()
+    val mapProvider by viewModel.mapProvider.collectAsStateWithLifecycle()
+    val mapConsented by viewModel.mapConsented.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
     SettingsContent(
         themeColor, contrast, viewModel::select, viewModel::selectContrast, onBack,
         shareLocationPolicy = shareLocationPolicy,
         onSelectShareLocationPolicy = viewModel::selectShareLocationPolicy,
+        mapProvider = mapProvider,
+        googleMapsAvailable = googleMapsAvailable,
+        onSelectMapProvider = viewModel::selectMapProvider,
+        mapConsented = mapConsented.isNotEmpty(),
+        onRevokeMapConsent = viewModel::revokeMapConsent,
     )
 }
 
@@ -91,6 +100,11 @@ internal fun SettingsContent(
     onBack: () -> Unit,
     shareLocationPolicy: ShareLocationPolicy = ShareLocationPolicy.ASK,
     onSelectShareLocationPolicy: (ShareLocationPolicy) -> Unit = {},
+    mapProvider: MapProvider = MapProvider.OPEN_FREE_MAP,
+    googleMapsAvailable: Boolean = false,
+    onSelectMapProvider: (MapProvider) -> Unit = {},
+    mapConsented: Boolean = false,
+    onRevokeMapConsent: () -> Unit = {},
 ) {
     val seed = themeColor as? ThemeColor.Seed
     var mode by rememberSaveable {
@@ -152,6 +166,26 @@ internal fun SettingsContent(
                     ShareLocationPolicy.KEEP to R.string.settings_share_location_keep,
                 ).forEach { (value, label) -> RadioRow(label, shareLocationPolicy == value) { onSelectShareLocationPolicy(value) } }
             }
+
+            SectionTitle(R.string.settings_map)
+            Column(Modifier.selectableGroup()) {
+                RadioRow(R.string.settings_map_openfreemap, mapProvider == MapProvider.OPEN_FREE_MAP, R.string.settings_map_openfreemap_summary) {
+                    onSelectMapProvider(MapProvider.OPEN_FREE_MAP)
+                }
+                RadioRow(
+                    R.string.settings_map_google,
+                    mapProvider == MapProvider.GOOGLE,
+                    if (googleMapsAvailable) R.string.settings_map_google_summary else R.string.settings_map_google_unavailable,
+                    enabled = googleMapsAvailable,
+                ) { onSelectMapProvider(MapProvider.GOOGLE) }
+            }
+            if (mapConsented) {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_map_revoke)) },
+                    supportingContent = { Text(stringResource(R.string.settings_map_revoke_summary)) },
+                    modifier = Modifier.clickable(onClick = onRevokeMapConsent),
+                )
+            }
         }
     }
 }
@@ -167,12 +201,12 @@ private fun SectionTitle(text: Int) {
 }
 
 @Composable
-private fun RadioRow(label: Int, selected: Boolean, summary: Int? = null, onClick: () -> Unit) {
+private fun RadioRow(label: Int, selected: Boolean, summary: Int? = null, enabled: Boolean = true, onClick: () -> Unit) {
     ListItem(
         headlineContent = { Text(stringResource(label)) },
         supportingContent = summary?.let { { Text(stringResource(it)) } },
-        leadingContent = { RadioButton(selected = selected, onClick = null) },
-        modifier = Modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+        leadingContent = { RadioButton(selected = selected, onClick = null, enabled = enabled) },
+        modifier = Modifier.selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
     )
 }
 

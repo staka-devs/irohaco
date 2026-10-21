@@ -71,7 +71,15 @@ fun CollectionScreen(viewModel: CollectionViewModel, onOpenMedia: (String) -> Un
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title ?: if (viewModel.list == MediaList.Favorites) stringResource(R.string.albums_favorites) else "") },
+                title = {
+                    Text(
+                        title ?: when (viewModel.list) {
+                            MediaList.Favorites -> stringResource(R.string.albums_favorites)
+                            is MediaList.Area -> stringResource(R.string.map_area_title)
+                            else -> ""
+                        },
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back)) }
                 },

@@ -1,5 +1,6 @@
 package dev.irohaco.core.contracts
 
+import dev.irohaco.core.domain.GeoBounds
 import dev.irohaco.core.domain.MediaFormat
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.core.domain.MediaDetailsResult
@@ -43,6 +44,8 @@ data class TimelineQuery(
     val tagId: String? = null,
     /** An album shows its items in the order they were added, whatever [sortKey] says. */
     val albumId: String? = null,
+    /** Only items whose file puts them inside this area, as a map's group does (GAL-017). */
+    val area: GeoBounds? = null,
 )
 
 /**

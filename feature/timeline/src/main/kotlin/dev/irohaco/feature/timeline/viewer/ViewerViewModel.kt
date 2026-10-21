@@ -9,6 +9,7 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import dev.irohaco.core.application.GetMediaDetails
+import dev.irohaco.core.application.BrowseMap
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -59,6 +61,7 @@ class ViewerViewModel(
     private val mark: MarkMedia? = null,
     private val collections: ManageCollections? = null,
     private val formatProbe: MediaFormatProbe? = null,
+    private val map: BrowseMap? = null,
 ) : ViewModel() {
     private val currentItem = MutableStateFlow<TimelineItem?>(null)
     private val current = currentItem.map { it?.assetId }.distinctUntilChanged()
@@ -87,6 +90,14 @@ class ViewerViewModel(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Detail.Missing)
+
+    /** The place name of the page on screen, once the user allowed lookups (GAL-017, ADR-0011). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val placeName: StateFlow<String?> = combine(currentItem, location) { item, location -> item to location }
+        .flatMapLatest { (item, location) ->
+            flow { emit(if (item == null || map == null || location !is Detail.Value) null else map.placeName(item.assetId, location.value)) }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Favorite and rating of the page on screen (PRD GAL-007). */
     @OptIn(ExperimentalCoroutinesApi::class)

@@ -86,14 +86,21 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
             if (query.tagId != null) append(" AND EXISTS (SELECT 1 FROM media_tags mt WHERE mt.asset_id = a.asset_id AND mt.tag_id = ?)")
             if (query.folder != null) append(" AND s.volume_id = ? AND $PATH = ?")
             repeat(query.excludedFolders.size) { append(" AND NOT (s.volume_id = ? AND $PATH = ?)") }
+            if (query.area != null) {
+                append(
+                    " AND EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = a.asset_id AND le.evidence_source = 'EXIF'" +
+                        " AND le.evidence_status = 'CONFIRMED' AND le.latitude BETWEEN ? AND ? AND le.longitude BETWEEN ? AND ?)",
+                )
+            }
         }
 
         /** In the order of the placeholders in [where]. */
         fun args(query: TimelineQuery): Array<Any> = buildList {
             query.kind?.let { add(it.name) }
-            query.folder?.let { add(it.volumeId); add(it.relativePath) }
             query.tagId?.let { add(it) }
+            query.folder?.let { add(it.volumeId); add(it.relativePath) }
             query.excludedFolders.forEach { add(it.volumeId); add(it.relativePath) }
+            query.area?.let { add(it.south); add(it.north); add(it.west); add(it.east) }
         }.toTypedArray()
 
         /** The asset id breaks ties in the same direction, so pages never overlap or skip. */
