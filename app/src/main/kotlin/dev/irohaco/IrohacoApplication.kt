@@ -5,6 +5,7 @@ import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.video.VideoFrameDecoder
+import dev.irohaco.ui.GridThumbnailFetcher
 
 class IrohacoApplication : Application(), SingletonImageLoader.Factory {
     val container by lazy { AppContainer(this) }
