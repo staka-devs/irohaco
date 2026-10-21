@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "515ece9d0c9b30aeb9a5eec89a638107",
+    "identityHash": "5ac5d3efc1ec8fa8f2ea4f834acfe2aa",
     "entities": [
       {
         "tableName": "album_items",
@@ -1586,7 +1586,7 @@
       },
       {
         "tableName": "media_sources",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`source_id` TEXT NOT NULL, `asset_id` TEXT NOT NULL, `volume_id` TEXT NOT NULL, `media_store_id` INTEGER, `content_uri` TEXT NOT NULL, `display_name` TEXT NOT NULL, `relative_path` TEXT, `mime_type` TEXT NOT NULL, `file_size_bytes` INTEGER NOT NULL, `observed_modified_at` INTEGER, `observed_taken_at` INTEGER, `access_state` TEXT NOT NULL, PRIMARY KEY(`source_id`), FOREIGN KEY(`volume_id`) REFERENCES `storage_volumes`(`volume_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`source_id` TEXT NOT NULL, `asset_id` TEXT NOT NULL, `volume_id` TEXT NOT NULL, `media_store_id` INTEGER, `content_uri` TEXT NOT NULL, `display_name` TEXT NOT NULL, `relative_path` TEXT, `mime_type` TEXT NOT NULL, `file_size_bytes` INTEGER NOT NULL, `observed_modified_at` INTEGER, `observed_taken_at` INTEGER, `observed_duration_ms` INTEGER, `access_state` TEXT NOT NULL, PRIMARY KEY(`source_id`), FOREIGN KEY(`volume_id`) REFERENCES `storage_volumes`(`volume_id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`asset_id`) REFERENCES `media_assets`(`asset_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "sourceId",
@@ -1648,6 +1648,11 @@
           {
             "fieldPath": "observedTakenAt",
             "columnName": "observed_taken_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "observedDurationMs",
+            "columnName": "observed_duration_ms",
             "affinity": "INTEGER"
           },
           {
@@ -3356,7 +3361,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '515ece9d0c9b30aeb9a5eec89a638107')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5ac5d3efc1ec8fa8f2ea4f834acfe2aa')"
     ]
   }
 }
