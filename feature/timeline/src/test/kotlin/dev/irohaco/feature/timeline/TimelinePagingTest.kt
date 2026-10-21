@@ -11,6 +11,7 @@ import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineReader
+import dev.irohaco.core.contracts.TimelineSortKey
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
@@ -83,6 +84,33 @@ class TimelinePagingTest {
             listOf("h2026-01-01", "a", "b", "c", "h2025-01-01", "d"),
             years.map { if (it is TimelineCell.Header) "h${it.date}" else (it as TimelineCell.Media).item.assetId },
         )
+    }
+
+    @Test
+    fun `sorted by name, a header comes before each first letter instead of a date`() = runTest {
+        fun named(name: String) = TimelineItem(name, MediaKind.IMAGE, "content://$name", sortTimeMs = 0, displayName = name)
+        val cells = flowOf(PagingData.from(listOf(named("1.jpg"), named("apple.jpg"), named("Avocado.jpg"), named("beach.jpg")))
+            .withSortHeaders(ZoneOffset.UTC, TimelineSortKey.NAME)).asSnapshot()
+        assertEquals(
+            listOf("g#", "1.jpg", "gA", "apple.jpg", "Avocado.jpg", "gB", "beach.jpg"),
+            cells.map {
+                when (it) {
+                    is TimelineCell.Group -> "g${(it.group as SortGroup.Initial).letter}"
+                    is TimelineCell.Media -> it.item.assetId
+                    is TimelineCell.Header -> "date"
+                }
+            },
+        )
+    }
+
+    @Test
+    fun `size and rating groups`() {
+        fun sized(bytes: Long) = TimelineItem("s", MediaKind.IMAGE, "content://s", 0, sizeBytes = bytes)
+        assertEquals(SortGroup.Size(0), sized(250_000_000).sortGroup(TimelineSortKey.SIZE))
+        assertEquals(SortGroup.Size(2), sized(3_000_000).sortGroup(TimelineSortKey.SIZE))
+        assertEquals(SortGroup.Size(4), sized(5_000).sortGroup(TimelineSortKey.SIZE))
+        assertEquals(SortGroup.Stars(0), TimelineItem("r", MediaKind.IMAGE, "content://r", 0).sortGroup(TimelineSortKey.RATING))
+        assertNull(sized(1).sortGroup(TimelineSortKey.TAKEN))
     }
 
     @Test

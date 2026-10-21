@@ -210,4 +210,8 @@
         <item quantity="one">%d photo or video here</item>
         <item quantity="other">%d photos and videos here</item>
     </plurals>
+    <string name="timeline_size_at_least">%1$s or more</string>
+    <string name="timeline_size_between">%1$s–%2$s</string>
+    <string name="timeline_size_under">Under %1$s</string>
+    <string name="timeline_unrated">No rating</string>
 </resources>

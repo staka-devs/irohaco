@@ -19,6 +19,10 @@ data class TimelineItem(
     val mimeType: String? = null,
     /** A video's length from MediaStore, for the grid's badge (M1-26); null when unknown. */
     val durationMs: Long? = null,
+    /** What the grid groups by when sorted by name, size or rating (M1-36). */
+    val displayName: String? = null,
+    val sizeBytes: Long? = null,
+    val rating: Int = 0,
 )
 
 enum class TimelineSortKey { TAKEN, NAME, SIZE, RATING }

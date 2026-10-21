@@ -206,4 +206,8 @@
     <plurals name="map_marker_description">
         <item quantity="other">ここで撮った写真と動画 %d件</item>
     </plurals>
+    <string name="timeline_size_at_least">%1$s以上</string>
+    <string name="timeline_size_between">%1$s〜%2$s</string>
+    <string name="timeline_size_under">%1$s未満</string>
+    <string name="timeline_unrated">評価なし</string>
 </resources>
