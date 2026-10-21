@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -69,6 +70,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -79,6 +81,7 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -582,7 +585,21 @@ private fun TimelineGrid(
         PrefetchThumbnails(gridState) { index ->
             if (index < cells.itemCount) (cells.peek(index) as? TimelineCell.Media)?.item?.contentUri else null
         }
-        pinned?.let { DateHeader(it, headerFormatter, it in selectedGroups) { onToggleGroup(it) } }
+        // The next group's header pushes the pinned one up as it nears the top, so the two never stack (M1-31).
+        var pinnedHeight by remember { mutableIntStateOf(0) }
+        pinned?.let {
+            Box(
+                Modifier
+                    .onSizeChanged { size -> pinnedHeight = size.height }
+                    .offset {
+                        val first = gridState.firstVisibleItemIndex
+                        val next = gridState.layoutInfo.visibleItemsInfo.firstOrNull { item ->
+                            item.index > first && item.index < cells.itemCount && cells.peek(item.index) is TimelineCell.Header
+                        }
+                        IntOffset(0, pinnedHeaderOffset(next?.offset?.y, pinnedHeight))
+                    },
+            ) { DateHeader(it, headerFormatter, it in selectedGroups) { onToggleGroup(it) } }
+        }
         val context = LocalContext.current
         val zone = ZoneId.systemDefault()
         var dragIndex by remember { mutableStateOf<Int?>(null) }
@@ -776,6 +793,10 @@ private fun Modifier.pinchToChangeColumns(onFewer: () -> Unit, onMore: () -> Uni
 )
 
 private const val PINCH_STEP = 1.3f
+
+/** How far the pinned header moves up: as much as the next header overlaps it, never down. */
+internal fun pinnedHeaderOffset(nextHeaderTop: Int?, pinnedHeight: Int): Int =
+    if (nextHeaderTop == null) 0 else (nextHeaderTop - pinnedHeight).coerceAtMost(0)
 
 /** The fast scrollbar's date: digits in the order of the device's language, such as 2026/08/05. */
 internal const val SCRUB_DATE = "yMMdd"
