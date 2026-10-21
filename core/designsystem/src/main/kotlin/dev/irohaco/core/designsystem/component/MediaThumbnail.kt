@@ -146,6 +146,8 @@ private fun MediaThumbnailPreview() {
                 Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
                     MediaThumbnail(model = null, contentDescription = "Photo", selected = false, modifier = Modifier.size(120.dp))
                     MediaThumbnail(model = null, contentDescription = "Photo", selected = true, modifier = Modifier.size(120.dp))
+                    // A video whose length MediaStore does not know.
+                    MediaThumbnail(model = null, contentDescription = "Video", selected = false, modifier = Modifier.size(120.dp), labelIcon = IrohacoIcons.PlayArrowFilled)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
                     MediaThumbnail(model = null, contentDescription = "Animated image", selected = false, modifier = Modifier.size(120.dp), label = "GIF")
@@ -157,8 +159,6 @@ private fun MediaThumbnailPreview() {
                         label = "1:01:19",
                         labelIcon = IrohacoIcons.PlayArrowFilled,
                     )
-                    // A video whose length MediaStore does not know.
-                    MediaThumbnail(model = null, contentDescription = "Video", selected = false, modifier = Modifier.size(120.dp), labelIcon = IrohacoIcons.PlayArrowFilled)
                 }
             }
         }
