@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import dev.irohaco.core.designsystem.component.GridThumbnail
+import kotlin.math.abs
 
 /**
  * Loads one screenful of thumbnails past the edge the grid is scrolling towards, so cells are
@@ -35,8 +36,12 @@ internal fun PrefetchThumbnails(state: LazyGridState, uriAt: (Int) -> String?) {
     }
 }
 
-/** The indices just past the visible ones in the scroll direction, as many as are visible. */
+/**
+ * The indices just past the visible ones in the scroll direction, as many as are visible; none after a
+ * jump of several screens (a fast scrollbar drag), whose direction says nothing about what comes next.
+ */
 internal fun prefetchRange(first: Int, previous: Int, firstVisible: Int, lastVisible: Int): IntRange {
     val count = lastVisible - firstVisible + 1
+    if (abs(first - previous) > count * 2) return IntRange.EMPTY
     return if (first >= previous) lastVisible + 1..lastVisible + count else (firstVisible - count).coerceAtLeast(0)..<firstVisible
 }

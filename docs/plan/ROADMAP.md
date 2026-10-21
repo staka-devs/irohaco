@@ -65,6 +65,10 @@
 | M1-25 | スクロール中のサムネイルの表示の遅れの解消（MediaStoreの縮小画像、先読み、キャッシュ） | feature / viewer | GAL-001, NFR-002 | M0-10 |
 | M1-26 | 動画のサムネイルに再生時間と再生の印を出す | feature / viewer | GAL-001 | M0-10 |
 | M1-27 | スクロール中に上部のバーを隠す | feature / viewer | GAL-001, DESIGN §3 | M0-10 |
+| M1-28 | 高速スクロールの吹き出しを1行の日付にし、ドラッグ中の読み込みを軽くする | feature / viewer | GAL-014, NFR-002 | M1-18 |
+| M1-29 | 地図のまとまりに写真のサムネイルを出す | feature / viewer | GAL-017, ADR-0011 | M1-22 |
+| M1-30 | タイムラインのバーを整理し、メニューから地図を開く | feature / viewer | GAL-001, GAL-017, DESIGN §4.1 | M1-22 |
+| M1-31 | 固定した日付の見出しが次の見出しと重ならないようにする | feature / viewer | GAL-001, DESIGN §4.1 | M1-16 |
 
 ### M2: AI索引・検索・セマンティックメモ・複数索引
 

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -112,9 +113,19 @@ private fun BoxScope.ScrollbarThumb(thumbOffsetPx: Float, label: String?) {
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.align(Alignment.TopEnd).offset { IntOffset(-(TOUCH_WIDTH + IrohacoSpacing.xs).roundToPx(), thumbOffsetPx.roundToInt()) },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                // The track is only the touch width; the bubble sizes to its text and grows leftwards out of it.
+                .wrapContentWidth(Alignment.End, unbounded = true)
+                .offset { IntOffset(-(TOUCH_WIDTH + IrohacoSpacing.xs).roundToPx(), thumbOffsetPx.roundToInt()) },
         ) {
-            Text(it, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = IrohacoSpacing.m, vertical = IrohacoSpacing.s))
+            Text(
+                it,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.padding(horizontal = IrohacoSpacing.m, vertical = IrohacoSpacing.s),
+            )
         }
     }
     Box(
@@ -149,8 +160,8 @@ private const val HIDE_DELAY_MS = 1_200L
 @Composable
 private fun FastScrollbarPreview() {
     IrohacoTheme(dynamicColor = false) {
-        Box(Modifier.width(120.dp).height(320.dp).background(MaterialTheme.colorScheme.surfaceContainerLow)) {
-            ScrollbarThumb(thumbOffsetPx = with(LocalDensity.current) { 120.dp.toPx() }, label = "2026年7月")
+        Box(Modifier.width(240.dp).height(320.dp).background(MaterialTheme.colorScheme.surfaceContainerLow)) {
+            ScrollbarThumb(thumbOffsetPx = with(LocalDensity.current) { 120.dp.toPx() }, label = "2026/07/15")
         }
     }
 }
