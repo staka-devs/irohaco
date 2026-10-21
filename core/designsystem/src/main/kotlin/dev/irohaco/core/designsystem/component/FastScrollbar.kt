@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -63,6 +64,8 @@ fun FastScrollbar(
     var trackHeightPx by remember { mutableFloatStateOf(0f) }
     var thumbOffsetPx by remember { mutableFloatStateOf(0f) }
     val thumbHeightPx = with(LocalDensity.current) { THUMB_HEIGHT.toPx() }
+    val currentCount by rememberUpdatedState(itemCount)
+    val currentOnDragIndex by rememberUpdatedState(onDragIndex)
     // One scroll at a time towards the latest position: launching one per move piled them up and the
     // grid fell behind the finger (M1-35).
     var target by remember { mutableStateOf<Int?>(null) }
@@ -97,7 +100,9 @@ fun FastScrollbar(
             ScrollbarThumb(
                 thumbOffsetPx,
                 if (dragging) label else null,
-                Modifier.pointerInput(itemCount, trackHeightPx) {
+                // Keyed on nothing: the count grows as pages load their date headers, and a new key would
+                // restart the gesture and drop the finger mid-drag (M1-35).
+                Modifier.pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { dragging = true },
                         onDragEnd = { dragging = false },
@@ -105,8 +110,8 @@ fun FastScrollbar(
                     ) { change, drag ->
                         change.consume()
                         thumbOffsetPx = (thumbOffsetPx + drag.y).coerceIn(0f, (trackHeightPx - thumbHeightPx).coerceAtLeast(0f))
-                        val index = indexFor(thumbOffsetPx, trackHeightPx, thumbHeightPx, itemCount)
-                        onDragIndex(index)
+                        val index = indexFor(thumbOffsetPx, trackHeightPx, thumbHeightPx, currentCount)
+                        currentOnDragIndex(index)
                         target = index
                     }
                 },
