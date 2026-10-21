@@ -141,6 +141,21 @@ interface MediaFiles {
     suspend fun rename(contentUri: String, fileName: String): FileOperationResult
 }
 
+/** One item in MediaStore's own trash, whoever deleted it (PRD GAL-015). */
+data class TrashedItem(
+    val mediaStoreId: Long,
+    val contentUri: String,
+    val kind: MediaKind,
+    val displayName: String,
+    /** When MediaStore will remove it for good; null on the rare file that reports none. */
+    val expiresAtMs: Long?,
+)
+
+/** Reads MediaStore's trash directly, so another app's deletions show up here too (GAL-015). */
+fun interface TrashReader {
+    suspend fun list(): List<TrashedItem>
+}
+
 /** Tells which special format a photo is (PRD GAL-009); unreadable files are plain ones. */
 fun interface MediaFormatProbe {
     suspend fun probe(contentUri: String, kind: MediaKind): MediaFormat

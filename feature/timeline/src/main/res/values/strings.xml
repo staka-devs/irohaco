@@ -176,4 +176,21 @@
     </plurals>
     <string name="share_location_unremovable_include">Share them anyway</string>
     <string name="share_location_unremovable_exclude">Leave them out</string>
+    <string name="trash_title">Trash</string>
+    <string name="trash_empty">Trash is empty</string>
+    <string name="trash_select_all">Select all</string>
+    <string name="trash_restore">Restore</string>
+    <string name="trash_delete_forever">Delete forever</string>
+    <string name="trash_delete_confirm_title">Delete forever?</string>
+    <string name="trash_delete_confirm_body">This cannot be undone.</string>
+    <string name="trash_days_unknown">Deletion date unknown</string>
+    <plurals name="trash_selected">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="trash_days_remaining">
+        <item quantity="one">Deletes in %d day</item>
+        <item quantity="other">Deletes in %d days</item>
+    </plurals>
+    <string name="library_trash">Trash</string>
 </resources>

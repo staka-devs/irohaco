@@ -16,6 +16,7 @@ import dev.irohaco.infrastructure.preferences.DataStoreSharingSettings
 import dev.irohaco.infrastructure.preferences.DataStoreTimelineSettings
 import dev.irohaco.infrastructure.media.AndroidMediaFiles
 import dev.irohaco.infrastructure.media.AndroidShareFiles
+import dev.irohaco.infrastructure.media.AndroidTrashReader
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,6 +26,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import dev.irohaco.core.application.BrowseTrash
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
@@ -85,6 +87,8 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val getMediaDetails by lazy { GetMediaDetails(AndroidMediaDetailsReader(appContext)) }
 
     val prepareShare by lazy { PrepareShare(AndroidMediaDetailsReader(appContext), AndroidShareFiles(appContext)) }
+
+    val browseTrash by lazy { BrowseTrash(AndroidTrashReader(appContext)) }
 
     val getTimelinePage by lazy { GetTimelinePage(RoomTimelineReader(database)) }
 

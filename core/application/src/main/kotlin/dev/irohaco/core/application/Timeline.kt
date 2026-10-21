@@ -11,6 +11,7 @@ import dev.irohaco.core.contracts.ShareFiles
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineReader
+import dev.irohaco.core.contracts.TrashReader
 import dev.irohaco.core.domain.Detail
 import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.MediaLibraryAccess
@@ -121,4 +122,9 @@ class PrepareShare(private val detailsReader: MediaDetailsReader, private val sh
     }
 
     suspend fun cleanUp() = shareFiles.cleanUp()
+}
+
+/** The trash (PRD GAL-015): MediaStore's own, so restoring or deleting for good go through the OS. */
+class BrowseTrash(private val reader: TrashReader) {
+    suspend fun list() = reader.list()
 }
