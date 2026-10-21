@@ -750,7 +750,15 @@ private fun Modifier.pinchToChangeColumns(onFewer: () -> Unit, onMore: () -> Uni
 private const val PINCH_STEP = 1.3f
 
 private val previewItems = (0 until 9).map { i ->
-    TimelineItem("a$i", if (i % 4 == 0) MediaKind.VIDEO else MediaKind.IMAGE, "content://preview/$i", LocalDate.of(2026, 10, if (i < 4) 20 else 18).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+    val video = i % 4 == 0
+    TimelineItem(
+        "a$i",
+        if (video) MediaKind.VIDEO else MediaKind.IMAGE,
+        "content://preview/$i",
+        LocalDate.of(2026, 10, if (i < 4) 20 else 18).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        // 0:46, 1:01:19, and one whose length is unknown.
+        durationMs = listOf(46_000L, 3_679_000L, null).getOrNull(i / 4)?.takeIf { video },
+    )
 }
 
 @IrohacoPreviews
