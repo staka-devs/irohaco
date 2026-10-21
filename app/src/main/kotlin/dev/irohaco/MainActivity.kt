@@ -146,6 +146,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onOpenMedia = { onOpenMedia(it, null) },
                     onOpenSettings = onOpenSettings,
+                    onOpenMap = onOpenMap,
                 )
                 TopLevelDestination.ALBUMS -> AlbumsScreen(
                     viewModel { AlbumsViewModel(container.getTimelinePage, container.manageCollections) },
