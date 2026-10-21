@@ -49,7 +49,10 @@ private const val SelectedScale = 0.9f
  * A grid cell's image (GAL-001, M1-25): the app loads the small copy MediaStore keeps for the file
  * instead of decoding the original, and falls back to the original only when there is none.
  */
-data class GridThumbnail(val contentUri: String)
+data class GridThumbnail(val contentUri: String) {
+    /** The image loader's memory-cache key: one entry per file, whatever the cell size. */
+    val memoryKey: String get() = "grid:$contentUri"
+}
 
 /**
  * A square grid cell for a photo or a video (DESIGN.md §2.3). Selecting it morphs the corners from
