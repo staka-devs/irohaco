@@ -18,11 +18,12 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
         db.timelineDao().page(
             SimpleSQLiteQuery(
                 """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
-                          s.observed_duration_ms AS durationMs
+                          s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes,
+                          COALESCE(r.rating, 0) AS rating
                    ${from(query)} ${where(query)} ORDER BY ${orderBy(query)} LIMIT ? OFFSET ?""",
                 arrayOf(*fromArgs(query), *args(query), limit, offset),
             ),
-        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs) }
+        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, it.rating ?: 0) }
 
     override suspend fun indexOf(query: TimelineQuery, assetId: String): Int? =
         db.timelineDao().indexOf(
@@ -37,11 +38,12 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
         db.timelineDao().page(
             SimpleSQLiteQuery(
                 """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
-                          s.observed_duration_ms AS durationMs
+                          s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes,
+                          COALESCE(r.rating, 0) AS rating
                    ${from(query)} ${where(query)} AND $TIME >= ? AND $TIME < ? ORDER BY ${orderBy(query)}""",
                 arrayOf(*fromArgs(query), *args(query), fromMs, untilMs),
             ),
-        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs) }
+        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, it.rating ?: 0) }
 
     override suspend fun labels(query: TimelineQuery): List<TimelineLabel> =
         db.timelineDao().labelRows(

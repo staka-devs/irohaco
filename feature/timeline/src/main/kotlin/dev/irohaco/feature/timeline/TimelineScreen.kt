@@ -11,10 +11,12 @@ import android.os.Build
 import android.provider.MediaStore
 import android.provider.Settings
 import android.text.format.DateFormat
+import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -28,14 +30,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -545,12 +548,19 @@ private fun TimelineGrid(
         ) {
             items(
                 count = cells.itemCount,
-                key = cells.itemKey { if (it is TimelineCell.Header) "date-${it.date}" else (it as TimelineCell.Media).item.assetId },
+                key = cells.itemKey {
+                    when (it) {
+                        is TimelineCell.Header -> "date-${it.date}"
+                        is TimelineCell.Group -> "group-${it.group}"
+                        is TimelineCell.Media -> it.item.assetId
+                    }
+                },
                 contentType = cells.itemContentType { it::class },
-                span = { index -> GridItemSpan(if (cells.peek(index) is TimelineCell.Header) maxLineSpan else 1) },
+                span = { index -> GridItemSpan(if (cells.peek(index)?.isHeader == true) maxLineSpan else 1) },
             ) { index ->
                 when (val cell = cells[index]) {
                     is TimelineCell.Header -> DateHeader(cell.date, headerFormatter, cell.date in selectedGroups) { onToggleGroup(cell.date) }
+                    is TimelineCell.Group -> GroupHeader(cell.group)
                     is TimelineCell.Media -> {
                         val date = formatter.format(cell.date)
                         val description = cell.item.description(date)
@@ -578,9 +588,11 @@ private fun TimelineGrid(
             derivedStateOf {
                 // The list is empty until the first page arrives.
                 val index = gridState.firstVisibleItemIndex
+                // A date, or the group of a name, size or rating sort (M1-36).
                 when (val cell = if (index < cells.itemCount) cells.peek(index) else null) {
                     is TimelineCell.Header -> cell.date
-                    is TimelineCell.Media -> cell.date.groupStart(grouping)
+                    is TimelineCell.Group -> cell.group
+                    is TimelineCell.Media -> cell.group ?: cell.date.groupStart(grouping)
                     null -> null
                 }
             }
@@ -594,11 +606,16 @@ private fun TimelineGrid(
                     .offset {
                         val first = gridState.firstVisibleItemIndex
                         val next = gridState.layoutInfo.visibleItemsInfo.firstOrNull { item ->
-                            item.index > first && item.index < cells.itemCount && cells.peek(item.index) is TimelineCell.Header
+                            item.index > first && item.index < cells.itemCount && cells.peek(item.index)?.isHeader == true
                         }
                         IntOffset(0, pinnedHeaderOffset(next?.offset?.y, pinnedHeight))
                     },
-            ) { DateHeader(it, headerFormatter, it in selectedGroups) { onToggleGroup(it) } }
+            ) {
+                when (it) {
+                    is LocalDate -> DateHeader(it, headerFormatter, it in selectedGroups) { onToggleGroup(it) }
+                    is SortGroup -> GroupHeader(it)
+                }
+            }
         }
         val context = LocalContext.current
         val zone = ZoneId.systemDefault()
@@ -728,6 +745,36 @@ private fun DateHeader(date: LocalDate, formatter: DateTimeFormatter, selected: 
                 stringResource(if (selected) R.string.timeline_unselect_group else R.string.timeline_select_group, label),
                 tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/** The header of a name, size or rating group; whole-group selection stays with date groups (M1-36). */
+@Composable
+private fun GroupHeader(group: SortGroup) {
+    Text(
+        group.title(),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .heightIn(min = 48.dp)
+            .wrapContentHeight(Alignment.CenterVertically)
+            .padding(horizontal = IrohacoSpacing.l),
+    )
+}
+
+@Composable
+internal fun SortGroup.title(): String {
+    val context = LocalContext.current
+    fun size(bytes: Long) = Formatter.formatShortFileSize(context, bytes)
+    return when (this) {
+        is SortGroup.Initial -> letter.toString()
+        is SortGroup.Stars -> if (count <= 0) stringResource(R.string.timeline_unrated) else "★".repeat(count)
+        is SortGroup.Size -> when (band) {
+            0 -> stringResource(R.string.timeline_size_at_least, size(SIZE_BANDS[0]))
+            SIZE_BANDS.lastIndex -> stringResource(R.string.timeline_size_under, size(SIZE_BANDS[band - 1]))
+            else -> stringResource(R.string.timeline_size_between, size(SIZE_BANDS[band]), size(SIZE_BANDS[band - 1]))
         }
     }
 }

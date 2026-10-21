@@ -9,15 +9,43 @@ import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.contracts.DateGrouping
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
+import dev.irohaco.core.contracts.TimelineSortKey
+import kotlin.math.max
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import kotlin.math.max
 
 sealed interface TimelineCell {
     data class Header(val date: LocalDate) : TimelineCell
 
-    data class Media(val item: TimelineItem, val date: LocalDate) : TimelineCell
+    /** The header of a group when the grid is sorted by name, size or rating (M1-36). */
+    data class Group(val group: SortGroup) : TimelineCell
+
+    data class Media(val item: TimelineItem, val date: LocalDate, val group: SortGroup? = null) : TimelineCell
+}
+
+internal val TimelineCell.isHeader: Boolean get() = this is TimelineCell.Header || this is TimelineCell.Group
+
+/** What a non-date sort groups by: a name's first letter, a size band or a star count (M1-36). */
+sealed interface SortGroup {
+    /** '#' for names that start with a digit or a symbol. */
+    data class Initial(val letter: Char) : SortGroup
+
+    /** An index into [SIZE_BANDS]: 0 is the largest band. */
+    data class Size(val band: Int) : SortGroup
+
+    /** 0 is no rating. */
+    data class Stars(val count: Int) : SortGroup
+}
+
+/** Lower edges of the size bands, largest first; the last band is everything smaller. */
+internal val SIZE_BANDS = longArrayOf(100_000_000, 10_000_000, 1_000_000, 100_000, 0)
+
+internal fun TimelineItem.sortGroup(key: TimelineSortKey): SortGroup? = when (key) {
+    TimelineSortKey.TAKEN -> null
+    TimelineSortKey.NAME -> SortGroup.Initial(displayName?.firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() } ?: '#')
+    TimelineSortKey.SIZE -> SortGroup.Size(SIZE_BANDS.indexOfFirst { (sizeBytes ?: 0) >= it })
+    TimelineSortKey.RATING -> SortGroup.Stars(rating)
 }
 
 /**
@@ -75,8 +103,13 @@ internal fun groupEnd(start: LocalDate, grouping: DateGrouping): LocalDate = whe
     DateGrouping.DAY -> start.plusDays(1)
 }
 
-/** Dates mean nothing as headers when the grid is sorted by name or size; the cells keep them for their labels. */
-internal fun PagingData<TimelineItem>.withoutHeaders(zone: ZoneId): PagingData<TimelineCell> = mediaCells(zone).map { it }
+/** Sorted by name, size or rating: a header before each group of that key, not of dates (M1-36). */
+internal fun PagingData<TimelineItem>.withSortHeaders(zone: ZoneId, key: TimelineSortKey): PagingData<TimelineCell> =
+    mediaCells(zone, key)
+        .insertSeparators { before: TimelineCell.Media?, after: TimelineCell.Media? ->
+            val group = after?.group
+            if (group != null && group != before?.group) TimelineCell.Group(group) else null
+        }
 
-private fun PagingData<TimelineItem>.mediaCells(zone: ZoneId): PagingData<TimelineCell.Media> =
-    map { TimelineCell.Media(it, Instant.ofEpochMilli(it.sortTimeMs).atZone(zone).toLocalDate()) }
+private fun PagingData<TimelineItem>.mediaCells(zone: ZoneId, key: TimelineSortKey = TimelineSortKey.TAKEN): PagingData<TimelineCell.Media> =
+    map { TimelineCell.Media(it, Instant.ofEpochMilli(it.sortTimeMs).atZone(zone).toLocalDate(), it.sortGroup(key)) }

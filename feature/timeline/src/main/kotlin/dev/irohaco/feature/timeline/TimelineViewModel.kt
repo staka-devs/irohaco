@@ -81,7 +81,7 @@ class TimelineViewModel(
             TimelinePagingSource(getPage).also { source = it }
         }.flow
             .map {
-                if (getPage.query.value.sortKey == TimelineSortKey.TAKEN) it.withDateHeaders(zone, _grouping.value) else it.withoutHeaders(zone)
+                if (getPage.query.value.sortKey == TimelineSortKey.TAKEN) it.withDateHeaders(zone, _grouping.value) else it.withSortHeaders(zone, getPage.query.value.sortKey)
             }
             .cachedIn(viewModelScope)
 
