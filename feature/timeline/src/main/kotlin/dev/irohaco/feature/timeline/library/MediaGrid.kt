@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -36,6 +35,7 @@ import dev.irohaco.feature.timeline.format
 import dev.irohaco.feature.timeline.gridModel
 import dev.irohaco.feature.timeline.rememberDateFormatter
 import dev.irohaco.feature.timeline.rememberFlinging
+import dev.irohaco.feature.timeline.rememberScrubLabel
 import java.time.Instant
 import java.time.ZoneId
 
@@ -87,7 +87,7 @@ internal fun MediaGrid(
         }
         val context = LocalContext.current
         var dragIndex by remember { mutableStateOf<Int?>(null) }
-        val label by produceState<String?>(null, dragIndex) { value = dragIndex?.let { labelAt(it)?.format(scrubFormatter, zone, context) } }
+        val label by rememberScrubLabel(dragIndex) { labelAt(it)?.format(scrubFormatter, zone, context) }
         FastScrollbar(
             gridState = gridState,
             itemCount = items.itemCount,

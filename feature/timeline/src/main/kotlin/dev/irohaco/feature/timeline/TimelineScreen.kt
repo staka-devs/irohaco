@@ -58,7 +58,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -603,9 +602,7 @@ private fun TimelineGrid(
         val context = LocalContext.current
         val zone = ZoneId.systemDefault()
         var dragIndex by remember { mutableStateOf<Int?>(null) }
-        val scrubLabel by produceState<String?>(null, dragIndex) {
-            value = dragIndex?.let { labelAt(it)?.format(scrubFormatter, zone, context) }
-        }
+        val scrubLabel by rememberScrubLabel(dragIndex) { labelAt(it)?.format(scrubFormatter, zone, context) }
         FastScrollbar(
             gridState = gridState,
             itemCount = cells.itemCount,

@@ -17,10 +17,10 @@ class ThumbnailPrefetchTest {
     }
 
     @Test
-    fun `a fling moves more than a third of the visible cells in one sample`() {
-        assertEquals(false, isFast(moved = 3, visible = 30))
-        assertEquals(true, isFast(moved = 11, visible = 30))
-        assertEquals(true, isFast(moved = -11, visible = 30)) // upwards too
+    fun `a fling moves more than a screenful in one sample`() {
+        assertEquals(false, isFast(moved = 20, visible = 30)) // ordinary scrolling keeps loading
+        assertEquals(true, isFast(moved = 31, visible = 30))
+        assertEquals(true, isFast(moved = -31, visible = 30)) // upwards too
     }
 
     @Test

@@ -58,7 +58,7 @@ internal fun prefetchRange(first: Int, previous: Int, firstVisible: Int, lastVis
 }
 
 /**
- * True while the grid moves faster than about a third of a screen per tenth of a second, as in a
+ * True while the grid moves more than a screenful per tenth of a second, as in a hard
  * fling (M1-34). Cells then show only what is already in memory, and the rest load once it slows.
  */
 @Composable
@@ -80,8 +80,8 @@ internal fun rememberFlinging(state: LazyGridState): State<Boolean> {
     return fast
 }
 
-/** Moving more than a third of the visible cells in one sample counts as a fling. */
-internal fun isFast(moved: Int, visible: Int): Boolean = abs(moved) * 3 > visible.coerceAtLeast(1)
+/** Moving more than the visible cells in one sample counts as a fling; slower scrolling still loads as it goes. */
+internal fun isFast(moved: Int, visible: Int): Boolean = abs(moved) > visible.coerceAtLeast(1)
 
 private const val FLING_SAMPLE_MS = 100L
 
