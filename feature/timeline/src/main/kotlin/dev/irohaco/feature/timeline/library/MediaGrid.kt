@@ -24,17 +24,18 @@ import androidx.paging.compose.itemKey
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.designsystem.component.FastScrollbar
-import dev.irohaco.core.designsystem.component.GridThumbnail
 import dev.irohaco.core.designsystem.component.MediaThumbnail
 import dev.irohaco.core.designsystem.motion.sharedMedia
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
-import dev.irohaco.feature.timeline.badge
-import dev.irohaco.feature.timeline.badgeIcon
 import dev.irohaco.feature.timeline.PrefetchThumbnails
 import dev.irohaco.feature.timeline.SCRUB_DATE
+import dev.irohaco.feature.timeline.badge
+import dev.irohaco.feature.timeline.badgeIcon
 import dev.irohaco.feature.timeline.description
 import dev.irohaco.feature.timeline.format
+import dev.irohaco.feature.timeline.gridModel
 import dev.irohaco.feature.timeline.rememberDateFormatter
+import dev.irohaco.feature.timeline.rememberFlinging
 import java.time.Instant
 import java.time.ZoneId
 
@@ -51,6 +52,7 @@ internal fun MediaGrid(
     val scrubFormatter = rememberDateFormatter(SCRUB_DATE)
     val zone = ZoneId.systemDefault()
     val gridState = rememberLazyGridState()
+    val flinging by rememberFlinging(gridState)
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Adaptive(96.dp),
@@ -68,7 +70,7 @@ internal fun MediaGrid(
                 } else {
                     val date = formatter.format(Instant.ofEpochMilli(item.sortTimeMs).atZone(zone))
                     MediaThumbnail(
-                        model = GridThumbnail(item.contentUri),
+                        model = gridModel(item.contentUri, flinging),
                         contentDescription = item.description(date),
                         selected = false,
                         label = item.badge,
@@ -78,7 +80,7 @@ internal fun MediaGrid(
                 }
             }
         }
-        PrefetchThumbnails(gridState) { index ->
+        PrefetchThumbnails(gridState, flinging) { index ->
             // Grid indices count the header items first.
             val itemIndex = index - (gridState.layoutInfo.totalItemsCount - items.itemCount)
             if (itemIndex in 0..<items.itemCount) items.peek(itemIndex)?.contentUri else null

@@ -30,7 +30,7 @@ class GridThumbnailFetcher(
     private val context: Context,
 ) : Fetcher {
     override suspend fun fetch(): FetchResult? {
-        val bitmap = withContext(Dispatchers.IO) {
+        val bitmap = withContext(LOADS) {
             try {
                 context.contentResolver.loadThumbnail(Uri.parse(data.contentUri), Size(THUMBNAIL_PX, THUMBNAIL_PX), null)
             } catch (e: CancellationException) {
@@ -55,10 +55,13 @@ class GridThumbnailFetcher(
 
     /** One memory-cache entry per file, whatever the column count; the size stays fixed. */
     class Key : Keyer<GridThumbnail> {
-        override fun key(data: GridThumbnail, options: Options): String = "grid:${data.contentUri}"
+        override fun key(data: GridThumbnail, options: Options): String = data.memoryKey
     }
 
     private companion object {
+        // A few decodes at a time, so scrolling keeps the CPU it needs to draw (M1-34).
+        val LOADS = Dispatchers.IO.limitedParallelism(3)
+
         // Sharp at three columns on a wide phone; one size keeps the OS's thumbnail cache reusable.
         const val THUMBNAIL_PX = 384
     }
