@@ -27,4 +27,14 @@
     <string name="settings_map_google_unavailable">アプリにMapsのAPIキーを組み込んだときだけ選べます</string>
     <string name="settings_map_revoke">オンラインの地図の許可を取り消す</string>
     <string name="settings_map_revoke_summary">次に地図を開くとき、もう一度確認します</string>
+    <string name="settings_display">表示</string>
+    <string name="settings_library">ライブラリ</string>
+    <string name="settings_privacy">プライバシー</string>
+    <string name="settings_pick_category">カテゴリを選んでください</string>
+    <string name="settings_library_hidden_title">写真のタブに出さないフォルダ</string>
+    <string name="settings_library_none_hidden">出さないフォルダはありません</string>
+    <string name="settings_library_show">表示する</string>
+    <plurals name="settings_library_hidden">
+        <item quantity="other">写真のタブに出さないフォルダ：%d件</item>
+    </plurals>
 </resources>

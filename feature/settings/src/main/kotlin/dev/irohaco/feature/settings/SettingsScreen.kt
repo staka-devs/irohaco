@@ -1,6 +1,21 @@
 package dev.irohaco.feature.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.layout.AnimatedPane
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
+import androidx.compose.material3.adaptive.layout.PaneAdaptedValue
+import androidx.compose.material3.adaptive.layout.ThreePaneScaffoldDestinationItem
+import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
+import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.res.pluralStringResource
+import dev.irohaco.core.contracts.FolderRef
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -45,6 +60,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
@@ -60,7 +76,7 @@ import androidx.compose.foundation.clickable
 import dev.irohaco.core.domain.ThemeColor
 import dev.irohaco.core.domain.ThemeContrast
 
-/** Settings (DESIGN §2.1, §3). Opened from the Photos tab's top app bar. */
+/** Settings, in categories (DESIGN §2.1, §3, APP-001). Opened from the top app bars. */
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, googleMapsAvailable: Boolean = false) {
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
@@ -68,17 +84,170 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, googleMapsA
     val shareLocationPolicy by viewModel.shareLocationPolicy.collectAsStateWithLifecycle()
     val mapProvider by viewModel.mapProvider.collectAsStateWithLifecycle()
     val mapConsented by viewModel.mapConsented.collectAsStateWithLifecycle()
-    BackHandler(onBack = onBack)
+    val excludedFolders by viewModel.excludedFolders.collectAsStateWithLifecycle()
     SettingsContent(
-        themeColor, contrast, viewModel::select, viewModel::selectContrast, onBack,
+        onBack = onBack,
+        themeColor = themeColor,
+        contrast = contrast,
+        excludedFolders = excludedFolders,
         shareLocationPolicy = shareLocationPolicy,
-        onSelectShareLocationPolicy = viewModel::selectShareLocationPolicy,
-        mapProvider = mapProvider,
-        googleMapsAvailable = googleMapsAvailable,
-        onSelectMapProvider = viewModel::selectMapProvider,
-        mapConsented = mapConsented.isNotEmpty(),
-        onRevokeMapConsent = viewModel::revokeMapConsent,
+        display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast) },
+        library = { LibrarySettings(excludedFolders, viewModel::showFolder) },
+        privacy = {
+            PrivacySettings(
+                shareLocationPolicy = shareLocationPolicy,
+                onSelectShareLocationPolicy = viewModel::selectShareLocationPolicy,
+                mapProvider = mapProvider,
+                googleMapsAvailable = googleMapsAvailable,
+                onSelectMapProvider = viewModel::selectMapProvider,
+                mapConsented = mapConsented.isNotEmpty(),
+                onRevokeMapConsent = viewModel::revokeMapConsent,
+            )
+        },
     )
+}
+
+/** The categories; each opens its own page, with the same name as its title. */
+enum class SettingsCategory(@StringRes val title: Int, @DrawableRes val icon: Int) {
+    DISPLAY(R.string.settings_display, IrohacoIcons.Visibility),
+    LIBRARY(R.string.settings_library, IrohacoIcons.Folder),
+    PRIVACY(R.string.settings_privacy, IrohacoIcons.Lock),
+}
+
+/**
+ * The category list, and the chosen category beside it on Expanded widths or over it on narrower
+ * ones (ListDetailPaneScaffold). Each category shows its main setting's value in one line.
+ */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@Composable
+internal fun SettingsContent(
+    onBack: () -> Unit,
+    themeColor: ThemeColor,
+    contrast: ThemeContrast,
+    excludedFolders: List<FolderRef>,
+    shareLocationPolicy: ShareLocationPolicy,
+    display: @Composable () -> Unit,
+    library: @Composable () -> Unit,
+    privacy: @Composable () -> Unit,
+    initial: SettingsCategory? = null,
+) {
+    val navigator = rememberListDetailPaneScaffoldNavigator(initialDestinationHistory = initialHistory(initial))
+    val scope = rememberCoroutineScope()
+    val listHidden = navigator.scaffoldValue[ListDetailPaneScaffoldRole.List] == PaneAdaptedValue.Hidden
+    BackHandler(enabled = !navigator.canNavigateBack(), onBack = onBack)
+    NavigableListDetailPaneScaffold(
+        navigator = navigator,
+        listPane = {
+            AnimatedPane {
+                Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = { Text(stringResource(R.string.settings_title)) },
+                            navigationIcon = {
+                                IconButton(onClick = onBack) { Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.settings_back)) }
+                            },
+                        )
+                    },
+                ) { padding ->
+                    Column(Modifier.padding(padding)) {
+                        SettingsCategory.entries.forEach { category ->
+                            val summary = when (category) {
+                                SettingsCategory.DISPLAY -> stringResource(themeColorLabel(themeColor)) + " · " + stringResource(contrastLabel(contrast))
+                                SettingsCategory.LIBRARY -> if (excludedFolders.isEmpty()) {
+                                    stringResource(R.string.settings_library_none_hidden)
+                                } else {
+                                    pluralStringResource(R.plurals.settings_library_hidden, excludedFolders.size, excludedFolders.size)
+                                }
+                                SettingsCategory.PRIVACY -> stringResource(R.string.settings_share_location) + ": " + stringResource(sharePolicyLabel(shareLocationPolicy))
+                            }
+                            ListItem(
+                                headlineContent = { Text(stringResource(category.title)) },
+                                supportingContent = { Text(summary, maxLines = 1) },
+                                leadingContent = { Icon(painterResource(category.icon), contentDescription = null) },
+                                modifier = Modifier.clickable { scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, category) } },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        detailPane = {
+            AnimatedPane {
+                val category = navigator.currentDestination?.contentKey
+                Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = { Text(category?.let { stringResource(it.title) }.orEmpty()) },
+                            navigationIcon = {
+                                if (listHidden) {
+                                    IconButton(onClick = { scope.launch { navigator.navigateBack() } }) {
+                                        Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.settings_back))
+                                    }
+                                }
+                            },
+                        )
+                    },
+                ) { padding ->
+                    Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
+                        when (category) {
+                            SettingsCategory.DISPLAY -> display()
+                            SettingsCategory.LIBRARY -> library()
+                            SettingsCategory.PRIVACY -> privacy()
+                            null -> Text(
+                                stringResource(R.string.settings_pick_category),
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(IrohacoSpacing.xl),
+                            )
+                        }
+                    }
+                }
+            }
+        },
+    )
+}
+
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+private fun initialHistory(initial: SettingsCategory?) =
+    listOfNotNull(ThreePaneScaffoldDestinationItem<SettingsCategory>(ListDetailPaneScaffoldRole.List), initial?.let { ThreePaneScaffoldDestinationItem(ListDetailPaneScaffoldRole.Detail, it) })
+
+private fun themeColorLabel(color: ThemeColor): Int = when {
+    color !is ThemeColor.Seed -> R.string.settings_theme_color_device
+    paletteHueOf(color) != null -> R.string.settings_theme_color_palette
+    else -> R.string.settings_theme_color_custom
+}
+
+private fun contrastLabel(contrast: ThemeContrast): Int = when (contrast) {
+    ThemeContrast.DEVICE -> R.string.settings_contrast_device
+    ThemeContrast.STANDARD -> R.string.settings_contrast_standard
+    ThemeContrast.MEDIUM -> R.string.settings_contrast_medium
+    ThemeContrast.HIGH -> R.string.settings_contrast_high
+}
+
+private fun sharePolicyLabel(policy: ShareLocationPolicy): Int = when (policy) {
+    ShareLocationPolicy.ASK -> R.string.settings_share_location_ask
+    ShareLocationPolicy.STRIP -> R.string.settings_share_location_strip
+    ShareLocationPolicy.KEEP -> R.string.settings_share_location_keep
+}
+
+/** Folders hidden from the Photos tab (GAL-002); each comes back with one tap. */
+@Composable
+internal fun LibrarySettings(excludedFolders: List<FolderRef>, onShow: (FolderRef) -> Unit) {
+    SectionTitle(R.string.settings_library_hidden_title)
+    if (excludedFolders.isEmpty()) {
+        Text(
+            stringResource(R.string.settings_library_none_hidden),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
+        )
+    }
+    excludedFolders.forEach { folder ->
+        ListItem(
+            headlineContent = { Text(folder.relativePath.trimEnd('/').substringAfterLast('/').ifEmpty { folder.volumeId }) },
+            supportingContent = { Text(folder.relativePath.ifEmpty { "/" }) },
+            leadingContent = { Icon(painterResource(IrohacoIcons.VisibilityOff), contentDescription = null) },
+            trailingContent = { TextButton(onClick = { onShow(folder) }) { Text(stringResource(R.string.settings_library_show)) } },
+        )
+    }
 }
 
 private enum class ColorMode { DEVICE, PALETTE, CUSTOM }
@@ -91,20 +260,13 @@ private fun Color.toSeed() = ThemeColor.Seed(toArgb() and 0xFFFFFF)
 private fun paletteHueOf(seed: ThemeColor.Seed): Int? =
     MaterialPalette.indexOfFirst { hue -> hue.shades.any { it.color.toSeed() == seed } }.takeIf { it >= 0 }
 
+/** Theme colour and contrast (DESIGN §2.1). */
 @Composable
-internal fun SettingsContent(
+internal fun DisplaySettings(
     themeColor: ThemeColor,
     contrast: ThemeContrast,
     onSelect: (ThemeColor) -> Unit,
     onSelectContrast: (ThemeContrast) -> Unit,
-    onBack: () -> Unit,
-    shareLocationPolicy: ShareLocationPolicy = ShareLocationPolicy.ASK,
-    onSelectShareLocationPolicy: (ShareLocationPolicy) -> Unit = {},
-    mapProvider: MapProvider = MapProvider.OPEN_FREE_MAP,
-    googleMapsAvailable: Boolean = false,
-    onSelectMapProvider: (MapProvider) -> Unit = {},
-    mapConsented: Boolean = false,
-    onRevokeMapConsent: () -> Unit = {},
 ) {
     val seed = themeColor as? ThemeColor.Seed
     var mode by rememberSaveable {
@@ -117,76 +279,73 @@ internal fun SettingsContent(
         )
     }
     var hue by rememberSaveable { mutableIntStateOf(seed?.let(::paletteHueOf) ?: BLUE) }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.settings_back))
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
-            SectionTitle(R.string.settings_theme_color)
-            Column(Modifier.selectableGroup()) {
-                RadioRow(R.string.settings_theme_color_device, mode == ColorMode.DEVICE, R.string.settings_theme_color_device_summary) {
-                    mode = ColorMode.DEVICE
-                    onSelect(ThemeColor.Device)
-                }
-                RadioRow(R.string.settings_theme_color_palette, mode == ColorMode.PALETTE) {
-                    mode = ColorMode.PALETTE
-                    onSelect(MaterialPalette[hue].main.toSeed())
-                }
-                RadioRow(R.string.settings_theme_color_custom, mode == ColorMode.CUSTOM) { mode = ColorMode.CUSTOM }
-            }
-            when (mode) {
-                ColorMode.PALETTE -> PalettePicker(selectedHue = hue, selected = seed, onHue = { hue = it }, onSelect = onSelect)
-                ColorMode.CUSTOM -> CustomColor(current = seed, onSelect = onSelect)
-                ColorMode.DEVICE -> Unit
-            }
-
-            SectionTitle(R.string.settings_contrast)
-            Column(Modifier.selectableGroup()) {
-                listOf(
-                    ThemeContrast.DEVICE to R.string.settings_contrast_device,
-                    ThemeContrast.STANDARD to R.string.settings_contrast_standard,
-                    ThemeContrast.MEDIUM to R.string.settings_contrast_medium,
-                    ThemeContrast.HIGH to R.string.settings_contrast_high,
-                ).forEach { (value, label) -> RadioRow(label, contrast == value) { onSelectContrast(value) } }
-            }
-
-            SectionTitle(R.string.settings_share_location)
-            Column(Modifier.selectableGroup()) {
-                listOf(
-                    ShareLocationPolicy.ASK to R.string.settings_share_location_ask,
-                    ShareLocationPolicy.STRIP to R.string.settings_share_location_strip,
-                    ShareLocationPolicy.KEEP to R.string.settings_share_location_keep,
-                ).forEach { (value, label) -> RadioRow(label, shareLocationPolicy == value) { onSelectShareLocationPolicy(value) } }
-            }
-
-            SectionTitle(R.string.settings_map)
-            Column(Modifier.selectableGroup()) {
-                RadioRow(R.string.settings_map_openfreemap, mapProvider == MapProvider.OPEN_FREE_MAP, R.string.settings_map_openfreemap_summary) {
-                    onSelectMapProvider(MapProvider.OPEN_FREE_MAP)
-                }
-                RadioRow(
-                    R.string.settings_map_google,
-                    mapProvider == MapProvider.GOOGLE,
-                    if (googleMapsAvailable) R.string.settings_map_google_summary else R.string.settings_map_google_unavailable,
-                    enabled = googleMapsAvailable,
-                ) { onSelectMapProvider(MapProvider.GOOGLE) }
-            }
-            if (mapConsented) {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_map_revoke)) },
-                    supportingContent = { Text(stringResource(R.string.settings_map_revoke_summary)) },
-                    modifier = Modifier.clickable(onClick = onRevokeMapConsent),
-                )
-            }
+    SectionTitle(R.string.settings_theme_color)
+    Column(Modifier.selectableGroup()) {
+        RadioRow(R.string.settings_theme_color_device, mode == ColorMode.DEVICE, R.string.settings_theme_color_device_summary) {
+            mode = ColorMode.DEVICE
+            onSelect(ThemeColor.Device)
         }
+        RadioRow(R.string.settings_theme_color_palette, mode == ColorMode.PALETTE) {
+            mode = ColorMode.PALETTE
+            onSelect(MaterialPalette[hue].main.toSeed())
+        }
+        RadioRow(R.string.settings_theme_color_custom, mode == ColorMode.CUSTOM) { mode = ColorMode.CUSTOM }
+    }
+    when (mode) {
+        ColorMode.PALETTE -> PalettePicker(selectedHue = hue, selected = seed, onHue = { hue = it }, onSelect = onSelect)
+        ColorMode.CUSTOM -> CustomColor(current = seed, onSelect = onSelect)
+        ColorMode.DEVICE -> Unit
+    }
+
+    SectionTitle(R.string.settings_contrast)
+    Column(Modifier.selectableGroup()) {
+        listOf(
+            ThemeContrast.DEVICE to R.string.settings_contrast_device,
+            ThemeContrast.STANDARD to R.string.settings_contrast_standard,
+            ThemeContrast.MEDIUM to R.string.settings_contrast_medium,
+            ThemeContrast.HIGH to R.string.settings_contrast_high,
+        ).forEach { (value, label) -> RadioRow(label, contrast == value) { onSelectContrast(value) } }
+    }
+}
+
+/** What leaves the device: a shared photo's GPS (MET-003) and the online map (ADR-0011). */
+@Composable
+internal fun PrivacySettings(
+    shareLocationPolicy: ShareLocationPolicy,
+    onSelectShareLocationPolicy: (ShareLocationPolicy) -> Unit,
+    mapProvider: MapProvider,
+    googleMapsAvailable: Boolean,
+    onSelectMapProvider: (MapProvider) -> Unit,
+    mapConsented: Boolean,
+    onRevokeMapConsent: () -> Unit,
+) {
+    SectionTitle(R.string.settings_share_location)
+    Column(Modifier.selectableGroup()) {
+        listOf(
+            ShareLocationPolicy.ASK to R.string.settings_share_location_ask,
+            ShareLocationPolicy.STRIP to R.string.settings_share_location_strip,
+            ShareLocationPolicy.KEEP to R.string.settings_share_location_keep,
+        ).forEach { (value, label) -> RadioRow(label, shareLocationPolicy == value) { onSelectShareLocationPolicy(value) } }
+    }
+
+    SectionTitle(R.string.settings_map)
+    Column(Modifier.selectableGroup()) {
+        RadioRow(R.string.settings_map_openfreemap, mapProvider == MapProvider.OPEN_FREE_MAP, R.string.settings_map_openfreemap_summary) {
+            onSelectMapProvider(MapProvider.OPEN_FREE_MAP)
+        }
+        RadioRow(
+            R.string.settings_map_google,
+            mapProvider == MapProvider.GOOGLE,
+            if (googleMapsAvailable) R.string.settings_map_google_summary else R.string.settings_map_google_unavailable,
+            enabled = googleMapsAvailable,
+        ) { onSelectMapProvider(MapProvider.GOOGLE) }
+    }
+    if (mapConsented) {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_map_revoke)) },
+            supportingContent = { Text(stringResource(R.string.settings_map_revoke_summary)) },
+            modifier = Modifier.clickable(onClick = onRevokeMapConsent),
+        )
     }
 }
 
@@ -294,7 +453,7 @@ private const val BLUE = 5
 @Composable
 private fun SettingsPalettePreview() {
     IrohacoTheme(dynamicColor = false) {
-        SettingsContent(ThemeColor.Seed(0x2196F3), ThemeContrast.DEVICE, {}, {}, {})
+        Surface { Column { DisplaySettings(ThemeColor.Seed(0x2196F3), ThemeContrast.DEVICE, {}, {}) } }
     }
 }
 
@@ -302,6 +461,51 @@ private fun SettingsPalettePreview() {
 @Composable
 private fun SettingsCustomPreview() {
     IrohacoTheme(seedColor = Color(0xFF6A1B9A), contrast = 1.0) {
-        SettingsContent(ThemeColor.Seed(0x6A1B9B), ThemeContrast.HIGH, {}, {}, {})
+        Surface { Column { DisplaySettings(ThemeColor.Seed(0x6A1B9B), ThemeContrast.HIGH, {}, {}) } }
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun SettingsCategoriesPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        SettingsContent(
+            onBack = {}, themeColor = ThemeColor.Device, contrast = ThemeContrast.DEVICE,
+            excludedFolders = listOf(FolderRef("external_primary", "Pictures/Screenshots/")),
+            shareLocationPolicy = ShareLocationPolicy.ASK, display = {}, library = {}, privacy = {},
+        )
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun SettingsLibraryPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        Surface { Column { LibrarySettings(listOf(FolderRef("external_primary", "Pictures/Screenshots/"), FolderRef("external_primary", "Download/")), {}) } }
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun SettingsPrivacyPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        Surface {
+            Column {
+                PrivacySettings(ShareLocationPolicy.STRIP, {}, MapProvider.OPEN_FREE_MAP, googleMapsAvailable = false, {}, mapConsented = true, {})
+            }
+        }
+    }
+}
+
+@Preview(name = "Expanded", device = "spec:width=1280dp,height=800dp,dpi=240")
+@Composable
+private fun SettingsExpandedPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        SettingsContent(
+            onBack = {}, themeColor = ThemeColor.Device, contrast = ThemeContrast.STANDARD, excludedFolders = emptyList(),
+            shareLocationPolicy = ShareLocationPolicy.ASK,
+            display = { DisplaySettings(ThemeColor.Device, ThemeContrast.STANDARD, {}, {}) }, library = {}, privacy = {},
+            initial = SettingsCategory.DISPLAY,
+        )
     }
 }

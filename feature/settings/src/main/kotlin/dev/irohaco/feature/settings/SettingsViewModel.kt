@@ -2,7 +2,10 @@ package dev.irohaco.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.ThemeColorSettings
+import dev.irohaco.core.contracts.FolderRef
+import kotlinx.coroutines.flow.map
 import dev.irohaco.core.contracts.MapProvider
 import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.ShareLocationPolicy
@@ -19,7 +22,17 @@ class SettingsViewModel(
     private val settings: ThemeColorSettings,
     private val sharing: SharingSettings? = null,
     private val map: MapSettings? = null,
+    private val library: BrowseLibrary? = null,
 ) : ViewModel() {
+    /** Folders hidden from the Photos tab, by path, for the Library page (GAL-002). */
+    val excludedFolders: StateFlow<List<FolderRef>> = (library?.excludedFolders() ?: flowOf(emptySet()))
+        .map { folders -> folders.sortedWith(compareBy({ it.volumeId }, { it.relativePath })) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun showFolder(folder: FolderRef) {
+        viewModelScope.launch { library?.setExcluded(folder, false) }
+    }
+
     val themeColor: StateFlow<ThemeColor> =
         settings.observe().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeColor.Device)
 
