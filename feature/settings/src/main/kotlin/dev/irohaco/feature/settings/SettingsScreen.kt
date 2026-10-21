@@ -1,6 +1,22 @@
 package dev.irohaco.feature.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.core.graphics.ColorUtils
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
+import dev.irohaco.core.designsystem.component.ThemeSwatch
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.material3.Surface
@@ -17,17 +33,13 @@ import androidx.compose.ui.res.pluralStringResource
 import dev.irohaco.core.contracts.FolderRef
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -69,7 +81,6 @@ import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.designsystem.tokens.MaterialPalette
 import dev.irohaco.core.designsystem.tokens.PaletteHue
-import dev.irohaco.core.designsystem.tokens.legibleContentOn
 import dev.irohaco.core.contracts.MapProvider
 import dev.irohaco.core.contracts.ShareLocationPolicy
 import androidx.compose.foundation.clickable
@@ -152,7 +163,7 @@ internal fun SettingsContent(
                     Column(Modifier.padding(padding)) {
                         SettingsCategory.entries.forEach { category ->
                             val summary = when (category) {
-                                SettingsCategory.DISPLAY -> stringResource(themeColorLabel(themeColor)) + " · " + stringResource(contrastLabel(contrast))
+                                SettingsCategory.DISPLAY -> themeColorSummary(themeColor) + " · " + stringResource(contrastLabel(contrast))
                                 SettingsCategory.LIBRARY -> if (excludedFolders.isEmpty()) {
                                     stringResource(R.string.settings_library_none_hidden)
                                 } else {
@@ -210,10 +221,11 @@ internal fun SettingsContent(
 private fun initialHistory(initial: SettingsCategory?) =
     listOfNotNull(ThreePaneScaffoldDestinationItem<SettingsCategory>(ListDetailPaneScaffoldRole.List), initial?.let { ThreePaneScaffoldDestinationItem(ListDetailPaneScaffoldRole.Detail, it) })
 
-private fun themeColorLabel(color: ThemeColor): Int = when {
-    color !is ThemeColor.Seed -> R.string.settings_theme_color_device
-    paletteHueOf(color) != null -> R.string.settings_theme_color_palette
-    else -> R.string.settings_theme_color_custom
+/** The colour in use, by name when it is one of the hand-picked ones. */
+@Composable
+private fun themeColorSummary(color: ThemeColor): String = when {
+    color !is ThemeColor.Seed -> stringResource(R.string.settings_theme_color_device)
+    else -> curatedHueOf(color)?.let { stringResource(it.name) } ?: color.toHex()
 }
 
 private fun contrastLabel(contrast: ThemeContrast): Int = when (contrast) {
@@ -250,17 +262,21 @@ internal fun LibrarySettings(excludedFolders: List<FolderRef>, onShow: (FolderRe
     }
 }
 
-private enum class ColorMode { DEVICE, PALETTE, CUSTOM }
-
 private fun ThemeColor.Seed.toColor() = Color(0xFF000000 or rgb.toLong())
 
 private fun Color.toSeed() = ThemeColor.Seed(toArgb() and 0xFFFFFF)
 
-/** The hue holding [seed], or null when it is not a palette colour. */
-private fun paletteHueOf(seed: ThemeColor.Seed): Int? =
-    MaterialPalette.indexOfFirst { hue -> hue.shades.any { it.color.toSeed() == seed } }.takeIf { it >= 0 }
+/** Ten hand-picked hues' 500 shades, apart enough to tell apart (APP-002). */
+private val CURATED: List<PaletteHue>
+    get() = listOf(0, 1, 2, 4, 5, 8, 9, 13, 14, 16).map { MaterialPalette[it] }
 
-/** Theme colour and contrast (DESIGN §2.1). */
+private fun curatedHueOf(seed: ThemeColor.Seed): PaletteHue? = CURATED.firstOrNull { it.main.toSeed() == seed }
+
+/**
+ * Theme colour and contrast (DESIGN §2.1, APP-002). The device's colour stays the default; the
+ * hand-picked colours show the app in light and dark at a glance, and "Other colours" opens a picker.
+ * Every choice applies at once.
+ */
 @Composable
 internal fun DisplaySettings(
     themeColor: ThemeColor,
@@ -269,33 +285,31 @@ internal fun DisplaySettings(
     onSelectContrast: (ThemeContrast) -> Unit,
 ) {
     val seed = themeColor as? ThemeColor.Seed
-    var mode by rememberSaveable {
-        mutableStateOf(
-            when {
-                seed == null -> ColorMode.DEVICE
-                paletteHueOf(seed) != null -> ColorMode.PALETTE
-                else -> ColorMode.CUSTOM
-            },
-        )
-    }
-    var hue by rememberSaveable { mutableIntStateOf(seed?.let(::paletteHueOf) ?: BLUE) }
+    var choosingOther by rememberSaveable { mutableStateOf(false) }
+    if (choosingOther) OtherColorDialog(current = seed, onSelect = onSelect, onDismiss = { choosingOther = false })
     SectionTitle(R.string.settings_theme_color)
     Column(Modifier.selectableGroup()) {
-        RadioRow(R.string.settings_theme_color_device, mode == ColorMode.DEVICE, R.string.settings_theme_color_device_summary) {
-            mode = ColorMode.DEVICE
-            onSelect(ThemeColor.Device)
-        }
-        RadioRow(R.string.settings_theme_color_palette, mode == ColorMode.PALETTE) {
-            mode = ColorMode.PALETTE
-            onSelect(MaterialPalette[hue].main.toSeed())
-        }
-        RadioRow(R.string.settings_theme_color_custom, mode == ColorMode.CUSTOM) { mode = ColorMode.CUSTOM }
+        RadioRow(R.string.settings_theme_color_device, seed == null, R.string.settings_theme_color_device_summary) { onSelect(ThemeColor.Device) }
     }
-    when (mode) {
-        ColorMode.PALETTE -> PalettePicker(selectedHue = hue, selected = seed, onHue = { hue = it }, onSelect = onSelect)
-        ColorMode.CUSTOM -> CustomColor(current = seed, onSelect = onSelect)
-        ColorMode.DEVICE -> Unit
+    FlowRow(
+        modifier = Modifier.padding(horizontal = IrohacoSpacing.l).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
+        verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
+    ) {
+        CURATED.forEach { hue ->
+            val value = hue.main.toSeed()
+            ThemeSwatch(seed = hue.main, name = stringResource(hue.name), selected = seed == value, onClick = { onSelect(value) })
+        }
     }
+    val other = seed?.takeIf { curatedHueOf(it) == null }
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.settings_theme_color_other)) },
+        supportingContent = { Text(other?.toHex() ?: stringResource(R.string.settings_theme_color_other_summary)) },
+        leadingContent = {
+            Box(Modifier.size(24.dp).clip(CircleShape).background(other?.toColor() ?: MaterialTheme.colorScheme.surfaceVariant))
+        },
+        modifier = Modifier.clickable { choosingOther = true },
+    )
 
     SectionTitle(R.string.settings_contrast)
     Column(Modifier.selectableGroup()) {
@@ -306,6 +320,72 @@ internal fun DisplaySettings(
             ThemeContrast.HIGH to R.string.settings_contrast_high,
         ).forEach { (value, label) -> RadioRow(label, contrast == value) { onSelectContrast(value) } }
     }
+}
+
+/** Hue across and lightness down on one surface, and the hex code; each change applies at once. */
+@Composable
+private fun OtherColorDialog(current: ThemeColor.Seed?, onSelect: (ThemeColor) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_theme_color_other)) },
+        text = { OtherColorBody(current, onSelect) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_done)) } },
+    )
+}
+
+@Composable
+private fun OtherColorBody(current: ThemeColor.Seed?, onSelect: (ThemeColor) -> Unit) {
+    var picked by remember { mutableStateOf(current?.toColor()) }
+    var hexKey by remember { mutableIntStateOf(0) } // a pick from the surface rewrites the hex field
+    Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m)) {
+        HueLightnessPicker(picked) { color ->
+            picked = color
+            hexKey++
+            onSelect(color.toSeed())
+        }
+        key(hexKey) {
+            CustomColor(current = picked?.toSeed()) { chosen ->
+                picked = (chosen as? ThemeColor.Seed)?.toColor()
+                onSelect(chosen)
+            }
+        }
+    }
+}
+
+private val PICKER_HUES = (0..6).map { Color.hsl(it * 60f % 360f, 0.8f, 0.5f) }
+
+@Composable
+private fun HueLightnessPicker(color: Color?, onPick: (Color) -> Unit) {
+    var size by remember { mutableStateOf(IntSize.Zero) }
+    val label = stringResource(R.string.settings_theme_color_picker)
+    fun pick(at: Offset) {
+        if (size.width == 0 || size.height == 0) return
+        val hue = (at.x / size.width).coerceIn(0f, 1f) * 359f
+        // The ends are cut off, as near-white and near-black seeds make the same grey theme.
+        val lightness = (1f - (at.y / size.height)).coerceIn(0.15f, 0.85f)
+        onPick(Color.hsl(hue, 0.8f, lightness))
+    }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(160.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .onSizeChanged { size = it }
+            .drawBehind {
+                drawRect(Brush.horizontalGradient(PICKER_HUES))
+                drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.8f), Color.Transparent, Color.Black.copy(alpha = 0.8f))))
+                color?.let { drawCircle(Color.White, radius = 10.dp.toPx(), center = it.pickerOffset(this.size), style = Stroke(3.dp.toPx())) }
+            }
+            .pointerInput(Unit) { detectTapGestures { pick(it) } }
+            .pointerInput(Unit) { detectDragGestures { change, _ -> pick(change.position) } }
+            .semantics { contentDescription = label },
+    )
+}
+
+/** Where a colour sits on the picker: its hue across, its lightness down. */
+private fun Color.pickerOffset(size: Size): Offset {
+    val hsl = FloatArray(3).also { ColorUtils.colorToHSL(toArgb(), it) }
+    return Offset(hsl[0] / 359f * size.width, (1f - hsl[2]) * size.height)
 }
 
 /** What leaves the device: a shared photo's GPS (MET-003) and the online map (ADR-0011). */
@@ -369,37 +449,6 @@ private fun RadioRow(label: Int, selected: Boolean, summary: Int? = null, enable
     )
 }
 
-/** The hues as a row of 500 shades, and the fourteen shades of the chosen hue below it. */
-@Composable
-private fun PalettePicker(selectedHue: Int, selected: ThemeColor.Seed?, onHue: (Int) -> Unit, onSelect: (ThemeColor) -> Unit) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = IrohacoSpacing.l),
-        horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
-        modifier = Modifier.selectableGroup(),
-    ) {
-        itemsIndexed(MaterialPalette) { index, hue ->
-            Swatch(hue.main, stringResource(hue.name), label = null, selected = index == selectedHue) { onHue(index) }
-        }
-    }
-    val hue: PaletteHue = MaterialPalette[selectedHue]
-    val hueName = stringResource(hue.name)
-    FlowRow(
-        modifier = Modifier.padding(IrohacoSpacing.l).selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
-        verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
-    ) {
-        hue.shades.forEach { shade ->
-            val value = shade.color.toSeed()
-            Swatch(
-                color = shade.color,
-                name = stringResource(R.string.settings_palette_shade, hueName, shade.label),
-                label = shade.label,
-                selected = value == selected,
-            ) { onSelect(value) }
-        }
-    }
-}
-
 @Composable
 private fun CustomColor(current: ThemeColor.Seed?, onSelect: (ThemeColor) -> Unit) {
     var text by rememberSaveable { mutableStateOf(current?.toHex() ?: "#") }
@@ -426,34 +475,11 @@ private fun CustomColor(current: ThemeColor.Seed?, onSelect: (ThemeColor) -> Uni
     }
 }
 
-/** A 48dp colour circle (DESIGN §7 touch target) read out by name; the selected one is ringed and checked. */
-@Composable
-private fun Swatch(color: Color, name: String, label: String?, selected: Boolean, onClick: () -> Unit) {
-    val content = legibleContentOn(color)
-    Box(
-        Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(color)
-            .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .semantics { contentDescription = name },
-        contentAlignment = Alignment.Center,
-    ) {
-        when {
-            selected -> Icon(painterResource(IrohacoIcons.Check), contentDescription = null, tint = content)
-            label != null -> Text(label, style = MaterialTheme.typography.labelSmall, color = content)
-        }
-    }
-}
-
-private const val BLUE = 5
-
 @IrohacoPreviews
 @Composable
 private fun SettingsPalettePreview() {
     IrohacoTheme(dynamicColor = false) {
-        Surface { Column { DisplaySettings(ThemeColor.Seed(0x2196F3), ThemeContrast.DEVICE, {}, {}) } }
+        Surface { Column(Modifier.verticalScroll(rememberScrollState())) { DisplaySettings(ThemeColor.Seed(0x2196F3), ThemeContrast.DEVICE, {}, {}) } }
     }
 }
 
@@ -461,7 +487,7 @@ private fun SettingsPalettePreview() {
 @Composable
 private fun SettingsCustomPreview() {
     IrohacoTheme(seedColor = Color(0xFF6A1B9A), contrast = 1.0) {
-        Surface { Column { DisplaySettings(ThemeColor.Seed(0x6A1B9B), ThemeContrast.HIGH, {}, {}) } }
+        Surface { Column(Modifier.verticalScroll(rememberScrollState())) { DisplaySettings(ThemeColor.Seed(0x6A1B9B), ThemeContrast.HIGH, {}, {}) } }
     }
 }
 
@@ -508,4 +534,11 @@ private fun SettingsExpandedPreview() {
             initial = SettingsCategory.DISPLAY,
         )
     }
+}
+
+@IrohacoPreviews
+@Composable
+private fun OtherColorPreview() {
+    // The dialog's body: in a dialog window the hex field takes focus, and its blinking cursor never lets the test settle.
+    IrohacoTheme(dynamicColor = false) { Surface { Box(Modifier.padding(IrohacoSpacing.l)) { OtherColorBody(current = ThemeColor.Seed(0x6A1B9B), onSelect = {}) } } }
 }

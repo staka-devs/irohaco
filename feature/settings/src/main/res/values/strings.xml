@@ -38,4 +38,8 @@
         <item quantity="one">%d folder hidden from Photos</item>
         <item quantity="other">%d folders hidden from Photos</item>
     </plurals>
+    <string name="settings_theme_color_other">Other colours</string>
+    <string name="settings_theme_color_other_summary">Pick any colour or type its code</string>
+    <string name="settings_theme_color_picker">Colour picker: hue across, lightness down</string>
+    <string name="settings_done">Done</string>
 </resources>

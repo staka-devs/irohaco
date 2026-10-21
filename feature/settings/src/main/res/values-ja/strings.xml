@@ -37,4 +37,8 @@
     <plurals name="settings_library_hidden">
         <item quantity="other">写真のタブに出さないフォルダ：%d件</item>
     </plurals>
+    <string name="settings_theme_color_other">ほかの色</string>
+    <string name="settings_theme_color_other_summary">好きな色を選ぶか、色のコードを入力します</string>
+    <string name="settings_theme_color_picker">色の選択。横が色合い、縦が明るさ</string>
+    <string name="settings_done">完了</string>
 </resources>
