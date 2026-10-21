@@ -61,6 +61,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -72,6 +73,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -370,7 +372,11 @@ internal fun TimelineContent(
         var chosen by rememberSaveable { mutableIntStateOf(range.first + 1) }
         val columns = chosen.coerceIn(range)
         val noAccess = access.images == LibraryAccess.NONE && access.videos == LibraryAccess.NONE
+        // The bar slides away while scrolling down and comes back on any scroll up (DESIGN §3, M1-27).
+        // The selection bar does not take part, so the count and the clear button stay in view.
+        val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
         Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
                 if (selection.isNotEmpty()) {
@@ -386,6 +392,7 @@ internal fun TimelineContent(
                 }
                 TopAppBar(
                     title = { Text(stringResource(R.string.timeline_title)) },
+                    scrollBehavior = scrollBehavior,
                     actions = {
                         IconButton(onClick = onOpenSettings) {
                             Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.timeline_settings))

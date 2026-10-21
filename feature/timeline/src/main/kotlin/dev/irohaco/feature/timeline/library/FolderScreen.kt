@@ -18,10 +18,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -151,7 +153,10 @@ internal fun FolderContent(
 ) {
     val rootLabel = volumeName?.let { volumeLabel(it) }.orEmpty()
     val crumbs = breadcrumbs(folder.relativePath)
+    // The bar slides away while scrolling down and comes back on any scroll up (DESIGN §3, M1-27).
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 title = { Text(crumbs.lastOrNull()?.first ?: rootLabel) },
@@ -175,6 +180,7 @@ internal fun FolderContent(
                         )
                     }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { padding ->
