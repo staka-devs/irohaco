@@ -25,10 +25,12 @@ import androidx.paging.compose.itemKey
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.designsystem.component.FastScrollbar
+import dev.irohaco.core.designsystem.component.GridThumbnail
 import dev.irohaco.core.designsystem.component.MediaThumbnail
 import dev.irohaco.core.designsystem.motion.sharedMedia
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.feature.timeline.GIF_LABEL
+import dev.irohaco.feature.timeline.PrefetchThumbnails
 import dev.irohaco.feature.timeline.descriptionRes
 import dev.irohaco.feature.timeline.isGif
 import dev.irohaco.feature.timeline.format
@@ -65,7 +67,7 @@ internal fun MediaGrid(
                 } else {
                     val date = formatter.format(Instant.ofEpochMilli(item.sortTimeMs).atZone(zone))
                     MediaThumbnail(
-                        model = item.contentUri,
+                        model = GridThumbnail(item.contentUri),
                         contentDescription = stringResource(item.descriptionRes(), date),
                         selected = false,
                         label = if (item.isGif) GIF_LABEL else null,
@@ -73,6 +75,11 @@ internal fun MediaGrid(
                     )
                 }
             }
+        }
+        PrefetchThumbnails(gridState) { index ->
+            // Grid indices count the header items first.
+            val itemIndex = index - (gridState.layoutInfo.totalItemsCount - items.itemCount)
+            if (itemIndex in 0..<items.itemCount) items.peek(itemIndex)?.contentUri else null
         }
         val context = LocalContext.current
         var dragIndex by remember { mutableStateOf<Int?>(null) }

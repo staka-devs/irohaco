@@ -91,6 +91,7 @@ import androidx.paging.compose.itemKey
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.designsystem.component.FastScrollbar
+import dev.irohaco.core.designsystem.component.GridThumbnail
 import dev.irohaco.core.designsystem.component.MediaThumbnail
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.motion.sharedMedia
@@ -515,7 +516,7 @@ private fun TimelineGrid(
                         val selecting = selection.isNotEmpty()
                         val selectLabel = stringResource(R.string.timeline_select)
                         MediaThumbnail(
-                            model = cell.item.contentUri,
+                            model = GridThumbnail(cell.item.contentUri),
                             contentDescription = description,
                             selected = cell.item.assetId in selection,
                             label = if (cell.item.isGif) GIF_LABEL else null,
@@ -541,6 +542,9 @@ private fun TimelineGrid(
                     null -> null
                 }
             }
+        }
+        PrefetchThumbnails(gridState) { index ->
+            if (index < cells.itemCount) (cells.peek(index) as? TimelineCell.Media)?.item?.contentUri else null
         }
         pinned?.let { DateHeader(it, headerFormatter, it in selectedGroups) { onToggleGroup(it) } }
         val context = LocalContext.current
