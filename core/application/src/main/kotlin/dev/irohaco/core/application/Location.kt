@@ -7,32 +7,33 @@ import dev.irohaco.core.contracts.MediaDetailsReader
 import dev.irohaco.core.contracts.PlaceNames
 import dev.irohaco.core.domain.Detail
 import dev.irohaco.core.domain.GeoPoint
-import dev.irohaco.core.domain.MediaDetailsResult
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.yield
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
- * Reads the GPS of each photo and video a few at a time, apart from the catalog sync (PRD GAL-017).
+ * Reads the GPS of each photo and video in batches, apart from the catalog sync (PRD GAL-017).
  * Cancelling the call pauses it; calling again resumes where it stopped, as the store remembers what
  * was read. Without the location permission it stops and reads nothing: the OS would hide the GPS.
  */
 class IndexLocations(private val store: LocationStore, private val reader: MediaDetailsReader) {
-    suspend operator fun invoke(batch: Int = 20) {
+    suspend operator fun invoke(batch: Int = 100, parallel: Int = 4) {
+        // A read mostly waits on storage, so a few files at once go faster (M1-33).
+        val gate = Semaphore(parallel)
         while (true) {
             val items = store.unindexed(batch)
             if (items.isEmpty()) return
-            for (item in items) {
-                val location = (reader.read(item.contentUri, item.kind) as? MediaDetailsResult.Read)?.details?.location
-                when (location) {
-                    Detail.NoPermission -> return
-                    is Detail.Value -> store.recordExif(item.assetId, location.value)
-                    // No GPS, an unreadable one or a vanished file: remembered, so it is not read on every resume.
-                    else -> store.recordExif(item.assetId, null)
-                }
-                yield()
+            val read = coroutineScope {
+                items.map { item -> async { gate.withPermit { item.assetId to reader.location(item.contentUri, item.kind) } } }.awaitAll()
             }
+            if (read.any { (_, location) -> location == Detail.NoPermission }) return
+            // No GPS, an unreadable one or a vanished file is kept as null, so it is not read on every resume.
+            store.recordExif(read.associate { (assetId, location) -> assetId to (location as? Detail.Value)?.value })
         }
     }
 }

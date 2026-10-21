@@ -1,9 +1,11 @@
 package dev.irohaco.core.contracts
 
+import dev.irohaco.core.domain.Detail
 import dev.irohaco.core.domain.GeoBounds
+import dev.irohaco.core.domain.GeoPoint
+import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.MediaFormat
 import dev.irohaco.core.domain.MediaKind
-import dev.irohaco.core.domain.MediaDetailsResult
 import kotlinx.coroutines.flow.Flow
 
 /** One cell of the timeline (PRD GAL-001): an available photo or video, newest first. */
@@ -171,6 +173,10 @@ fun interface MediaFormatProbe {
 /** Reads EXIF, XMP and container metadata of one file when it is asked for (PRD MET-001). */
 fun interface MediaDetailsReader {
     suspend fun read(contentUri: String, kind: MediaKind): MediaDetailsResult
+
+    /** Only the GPS, for reading many files; a reader that can skip the other fields overrides it (M1-33). */
+    suspend fun location(contentUri: String, kind: MediaKind): Detail<GeoPoint> =
+        (read(contentUri, kind) as? MediaDetailsResult.Read)?.details?.location ?: Detail.Missing
 }
 
 /** An item about to be shared, and whether its GPS could be removed from the shared copy (PRD MET-003). */
