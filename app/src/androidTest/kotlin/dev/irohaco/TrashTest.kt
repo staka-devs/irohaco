@@ -5,9 +5,9 @@ import android.provider.MediaStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.irohaco.infrastructure.media.AndroidTrashReader
+import kotlin.math.abs
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,7 +41,9 @@ class TrashTest {
 
         val trashed = reader.list().firstOrNull { it.contentUri == image.toString() }
         assertTrue("expected the trashed file in the list", trashed != null)
-        assertEquals(expiresAt * 1000, trashed!!.expiresAtMs)
+        // Newer releases set the expiry themselves when trashing, a second or so off from ours.
+        val expiresAtMs = trashed!!.expiresAtMs ?: error("expected an expiry")
+        assertTrue("expiry $expiresAtMs too far from ${expiresAt * 1000}", abs(expiresAtMs - expiresAt * 1000) < 60_000)
 
         resolver.update(image, ContentValues().apply { put(MediaStore.MediaColumns.IS_TRASHED, 0) }, null, null)
         assertTrue(reader.list().none { it.contentUri == image.toString() })
