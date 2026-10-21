@@ -6,4 +6,18 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <!-- PRD MET-001: GPS in EXIF is withheld unless the user grants this. -->
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+
+    <application>
+        <!-- PRD MET-003: content:// URIs for the share cache's GPS-stripped copies; never the originals. -->
+        <!-- A fixed authority, not tied to the app's applicationId, so this provider also works unchanged in this module's own tests. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="dev.irohaco.infrastructure.media.shareprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/share_file_paths" />
+        </provider>
+    </application>
 </manifest>

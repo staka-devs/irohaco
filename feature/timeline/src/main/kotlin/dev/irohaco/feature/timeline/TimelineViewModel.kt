@@ -20,8 +20,12 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import dev.irohaco.core.application.OrganizeMedia
+import dev.irohaco.core.application.PrepareShare
 import dev.irohaco.core.contracts.FileOperationResult
 import dev.irohaco.core.contracts.FolderRef
+import dev.irohaco.core.contracts.ShareCandidate
+import dev.irohaco.core.contracts.ShareLocationPolicy
+import dev.irohaco.core.contracts.SharingSettings
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineSortKey
@@ -49,6 +53,8 @@ class TimelineViewModel(
     private val mark: MarkMedia? = null,
     private val collections: ManageCollections? = null,
     private val settings: TimelineSettings? = null,
+    private val share: PrepareShare? = null,
+    private val sharingSettings: SharingSettings? = null,
     private val zone: ZoneId = ZoneId.systemDefault(),
 ) : ViewModel() {
     private var source: TimelinePagingSource? = null
@@ -154,6 +160,15 @@ class TimelineViewModel(
 
     /** What the fast scrollbar's bubble names at this position (PRD GAL-014). */
     suspend fun labelAt(index: Int) = getPage.labelAt(index)
+
+    /** The user's default for a shared photo's GPS (PRD MET-003). */
+    val shareLocationPolicy: StateFlow<ShareLocationPolicy> = (sharingSettings?.shareLocationPolicy ?: flowOf(ShareLocationPolicy.ASK))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ShareLocationPolicy.ASK)
+
+    suspend fun checkShare(items: List<TimelineItem>): List<ShareCandidate> = share?.check(items) ?: items.map { ShareCandidate(it, hasLocation = false) }
+
+    suspend fun prepareShare(candidates: List<ShareCandidate>, stripLocation: Boolean): List<TimelineItem> =
+        share?.prepare(candidates, stripLocation) ?: candidates.map { it.item }
 
     enum class Operation { MOVE, COPY, RENAME }
 

@@ -6,9 +6,13 @@ import dev.irohaco.core.contracts.CollectionsStore
 import dev.irohaco.core.contracts.MarksStore
 import dev.irohaco.core.contracts.MediaFiles
 import dev.irohaco.core.contracts.MediaLibraryAccessPort
+import dev.irohaco.core.contracts.ShareCandidate
+import dev.irohaco.core.contracts.ShareFiles
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineReader
+import dev.irohaco.core.domain.Detail
+import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.MediaLibraryAccess
 import dev.irohaco.core.domain.isValidName
 import dev.irohaco.core.domain.renamedFile
@@ -98,4 +102,23 @@ class ManageCollections(private val store: CollectionsStore) {
 /** The details sheet's data, read from the file each time it opens (PRD MET-001). */
 class GetMediaDetails(private val reader: MediaDetailsReader) {
     suspend operator fun invoke(item: TimelineItem) = reader.read(item.contentUri, item.kind)
+}
+
+/** Shares with or without GPS, as the user's settings or in-the-moment choice says (PRD GAL-005, MET-003). */
+class PrepareShare(private val detailsReader: MediaDetailsReader, private val shareFiles: ShareFiles) {
+    suspend fun check(items: List<TimelineItem>): List<ShareCandidate> = items.map { item ->
+        val hasLocation = (detailsReader.read(item.contentUri, item.kind) as? MediaDetailsResult.Read)?.details?.location is Detail.Value
+        ShareCandidate(item, hasLocation)
+    }
+
+    /**
+     * A photo with GPS gets a cache copy, with or without it as asked; everything else (nothing to
+     * redact, or a video, whose GPS this does not touch) shares its own file untouched.
+     */
+    suspend fun prepare(candidates: List<ShareCandidate>, stripLocation: Boolean): List<TimelineItem> = candidates.map { candidate ->
+        if (!candidate.hasLocation || !candidate.locationRemovable) return@map candidate.item
+        shareFiles.prepareCopy(candidate.item.contentUri, keepLocation = !stripLocation)?.let { candidate.item.copy(contentUri = it) } ?: candidate.item
+    }
+
+    suspend fun cleanUp() = shareFiles.cleanUp()
 }

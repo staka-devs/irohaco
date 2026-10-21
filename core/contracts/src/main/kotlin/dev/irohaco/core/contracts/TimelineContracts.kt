@@ -150,3 +150,27 @@ fun interface MediaFormatProbe {
 fun interface MediaDetailsReader {
     suspend fun read(contentUri: String, kind: MediaKind): MediaDetailsResult
 }
+
+/** An item about to be shared, and whether its GPS could be removed from the shared copy (PRD MET-003). */
+data class ShareCandidate(val item: TimelineItem, val hasLocation: Boolean) {
+    /** Only photos can have their GPS stripped; videos keep whatever location they have (M3-04). */
+    val locationRemovable: Boolean get() = item.kind == MediaKind.IMAGE
+
+    val cannotRemoveLocation: Boolean get() = hasLocation && !locationRemovable
+}
+
+/**
+ * Makes a copy of a photo with its GPS removed, for sharing without the original (PRD GAL-005, MET-003).
+ * The original file is never changed; the copy lives in the app's own cache, cleaned up on its own.
+ */
+interface ShareFiles {
+    /**
+     * A content:// URI of the copy, usable in ACTION_SEND; null if the copy could not be made.
+     * Even when [keepLocation] is true, the receiving app's own read of the original would normally
+     * have its GPS redacted by the OS, so a copy is made either way, with or without it.
+     */
+    suspend fun prepareCopy(contentUri: String, keepLocation: Boolean): String?
+
+    /** Deletes copies past the app's retention window; the caller runs this once per app start. */
+    suspend fun cleanUp()
+}

@@ -12,8 +12,10 @@ import dev.irohaco.core.database.RoomIdentityStore
 import dev.irohaco.core.database.RoomMarksStore
 import dev.irohaco.core.database.RoomLibraryReader
 import dev.irohaco.infrastructure.preferences.DataStoreLibrarySettings
+import dev.irohaco.infrastructure.preferences.DataStoreSharingSettings
 import dev.irohaco.infrastructure.preferences.DataStoreTimelineSettings
 import dev.irohaco.infrastructure.media.AndroidMediaFiles
+import dev.irohaco.infrastructure.media.AndroidShareFiles
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -26,6 +28,7 @@ import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
+import dev.irohaco.core.application.PrepareShare
 import dev.irohaco.core.application.SyncMediaCatalog
 import dev.irohaco.core.application.ThemeColorSettings
 import dev.irohaco.core.database.IrohacoDatabase
@@ -59,6 +62,8 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     val timelineSettings by lazy { DataStoreTimelineSettings(settingsStore) }
 
+    val sharingSettings by lazy { DataStoreSharingSettings(settingsStore) }
+
     val browseLibrary by lazy { BrowseLibrary(RoomLibraryReader(database), DataStoreLibrarySettings(settingsStore)) }
 
     /**
@@ -78,6 +83,8 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val mediaFormatProbe by lazy { AndroidMediaFormatProbe(appContext) }
 
     val getMediaDetails by lazy { GetMediaDetails(AndroidMediaDetailsReader(appContext)) }
+
+    val prepareShare by lazy { PrepareShare(AndroidMediaDetailsReader(appContext), AndroidShareFiles(appContext)) }
 
     val getTimelinePage by lazy { GetTimelinePage(RoomTimelineReader(database)) }
 

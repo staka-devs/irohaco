@@ -54,6 +54,7 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.designsystem.tokens.MaterialPalette
 import dev.irohaco.core.designsystem.tokens.PaletteHue
 import dev.irohaco.core.designsystem.tokens.legibleContentOn
+import dev.irohaco.core.contracts.ShareLocationPolicy
 import dev.irohaco.core.domain.ThemeColor
 import dev.irohaco.core.domain.ThemeContrast
 
@@ -62,8 +63,13 @@ import dev.irohaco.core.domain.ThemeContrast
 fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val contrast by viewModel.contrast.collectAsStateWithLifecycle()
+    val shareLocationPolicy by viewModel.shareLocationPolicy.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
-    SettingsContent(themeColor, contrast, viewModel::select, viewModel::selectContrast, onBack)
+    SettingsContent(
+        themeColor, contrast, viewModel::select, viewModel::selectContrast, onBack,
+        shareLocationPolicy = shareLocationPolicy,
+        onSelectShareLocationPolicy = viewModel::selectShareLocationPolicy,
+    )
 }
 
 private enum class ColorMode { DEVICE, PALETTE, CUSTOM }
@@ -83,6 +89,8 @@ internal fun SettingsContent(
     onSelect: (ThemeColor) -> Unit,
     onSelectContrast: (ThemeContrast) -> Unit,
     onBack: () -> Unit,
+    shareLocationPolicy: ShareLocationPolicy = ShareLocationPolicy.ASK,
+    onSelectShareLocationPolicy: (ShareLocationPolicy) -> Unit = {},
 ) {
     val seed = themeColor as? ThemeColor.Seed
     var mode by rememberSaveable {
@@ -134,6 +142,15 @@ internal fun SettingsContent(
                     ThemeContrast.MEDIUM to R.string.settings_contrast_medium,
                     ThemeContrast.HIGH to R.string.settings_contrast_high,
                 ).forEach { (value, label) -> RadioRow(label, contrast == value) { onSelectContrast(value) } }
+            }
+
+            SectionTitle(R.string.settings_share_location)
+            Column(Modifier.selectableGroup()) {
+                listOf(
+                    ShareLocationPolicy.ASK to R.string.settings_share_location_ask,
+                    ShareLocationPolicy.STRIP to R.string.settings_share_location_strip,
+                    ShareLocationPolicy.KEEP to R.string.settings_share_location_keep,
+                ).forEach { (value, label) -> RadioRow(label, shareLocationPolicy == value) { onSelectShareLocationPolicy(value) } }
             }
         }
     }
