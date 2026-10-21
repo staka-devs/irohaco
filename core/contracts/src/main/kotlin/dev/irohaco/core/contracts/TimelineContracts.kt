@@ -67,8 +67,8 @@ interface TimelineReader {
     /** Every item whose sort time is in [fromMs, untilMs), in the query's order: a whole date group. */
     suspend fun between(query: TimelineQuery, fromMs: Long, untilMs: Long): List<TimelineItem>
 
-    /** What to name the item at this position, for the fast scrollbar; null past the end. */
-    suspend fun labelAt(query: TimelineQuery, index: Int): TimelineLabel?
+    /** What to name each item, in the query's order, for the fast scrollbar's bubble. */
+    suspend fun labels(query: TimelineQuery): List<TimelineLabel>
 
     /** Emits whenever the catalog behind the timeline may have changed. */
     fun changes(): Flow<Unit>

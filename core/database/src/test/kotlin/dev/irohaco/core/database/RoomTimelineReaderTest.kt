@@ -98,11 +98,10 @@ class RoomTimelineReaderTest {
                 newAssets = listOf(asset("a", id = 1, taken = 1_000, modified = 1, fileName = "beach.jpg", size = 300)),
             ),
         )
-        assertEquals(TimelineLabel.Taken(1_000), reader.labelAt(TimelineQuery(TimelineSortKey.TAKEN), 0))
-        assertEquals(TimelineLabel.Name('B'), reader.labelAt(TimelineQuery(TimelineSortKey.NAME), 0))
-        assertEquals(TimelineLabel.Size(300), reader.labelAt(TimelineQuery(TimelineSortKey.SIZE), 0))
-        assertEquals(TimelineLabel.Rating(0), reader.labelAt(TimelineQuery(TimelineSortKey.RATING), 0))
-        assertEquals(null, reader.labelAt(newest, 5))
+        assertEquals(listOf(TimelineLabel.Taken(1_000)), reader.labels(TimelineQuery(TimelineSortKey.TAKEN)))
+        assertEquals(listOf(TimelineLabel.Name('B')), reader.labels(TimelineQuery(TimelineSortKey.NAME)))
+        assertEquals(listOf(TimelineLabel.Size(300)), reader.labels(TimelineQuery(TimelineSortKey.SIZE)))
+        assertEquals(listOf(TimelineLabel.Rating(0)), reader.labels(TimelineQuery(TimelineSortKey.RATING)))
     }
 
     private val newest = TimelineQuery()

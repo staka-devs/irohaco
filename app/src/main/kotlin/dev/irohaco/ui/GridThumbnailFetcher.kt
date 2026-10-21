@@ -60,7 +60,7 @@ class GridThumbnailFetcher(
 
     private companion object {
         // A few decodes at a time, so scrolling keeps the CPU it needs to draw (M1-34).
-        val LOADS = Dispatchers.IO.limitedParallelism(3)
+        val LOADS = Dispatchers.IO.limitedParallelism(4)
 
         // Sharp at three columns on a wide phone; one size keeps the OS's thumbnail cache reusable.
         const val THUMBNAIL_PX = 384

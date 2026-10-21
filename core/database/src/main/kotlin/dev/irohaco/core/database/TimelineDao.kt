@@ -17,7 +17,7 @@ interface TimelineDao {
     suspend fun indexOf(query: SupportSQLiteQuery): Int?
 
     @RawQuery
-    suspend fun labelRow(query: SupportSQLiteQuery): LabelRow?
+    suspend fun labelRows(query: SupportSQLiteQuery): List<LabelRow>
 }
 
 data class TimelineRow(val assetId: String, val mediaKind: String, val contentUri: String, val sortTimeMs: Long, val mimeType: String?, val durationMs: Long? = null)
