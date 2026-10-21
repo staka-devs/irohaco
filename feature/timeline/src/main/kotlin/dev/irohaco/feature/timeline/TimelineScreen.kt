@@ -485,6 +485,14 @@ private fun TimelineGrid(
             DateGrouping.DAY -> "yMMMdE"
         },
     )
+    // Digits only, so the bubble stays one short line while dragging (M1-28).
+    val scrubFormatter = rememberDateFormatter(
+        when (grouping) {
+            DateGrouping.YEAR -> "y"
+            DateGrouping.MONTH -> "yMM"
+            DateGrouping.DAY -> SCRUB_DATE
+        },
+    )
     // The pinch detector is installed once, so it must call the latest callbacks.
     val fewer by rememberUpdatedState(onFewerColumns)
     val more by rememberUpdatedState(onMoreColumns)
@@ -559,7 +567,7 @@ private fun TimelineGrid(
         val zone = ZoneId.systemDefault()
         var dragIndex by remember { mutableStateOf<Int?>(null) }
         val scrubLabel by produceState<String?>(null, dragIndex) {
-            value = dragIndex?.let { labelAt(it)?.format(headerFormatter, zone, context) }
+            value = dragIndex?.let { labelAt(it)?.format(scrubFormatter, zone, context) }
         }
         FastScrollbar(
             gridState = gridState,
@@ -748,6 +756,9 @@ private fun Modifier.pinchToChangeColumns(onFewer: () -> Unit, onMore: () -> Uni
 )
 
 private const val PINCH_STEP = 1.3f
+
+/** The fast scrollbar's date: digits in the order of the device's language, such as 2026/08/05. */
+internal const val SCRUB_DATE = "yMMdd"
 
 private val previewItems = (0 until 9).map { i ->
     val video = i % 4 == 0

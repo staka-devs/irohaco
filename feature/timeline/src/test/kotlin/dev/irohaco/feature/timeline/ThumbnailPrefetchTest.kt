@@ -15,4 +15,9 @@ class ThumbnailPrefetchTest {
         assertEquals(10..<20, prefetchRange(first = 20, previous = 30, firstVisible = 20, lastVisible = 29))
         assertEquals(0..<5, prefetchRange(first = 5, previous = 8, firstVisible = 5, lastVisible = 14))
     }
+
+    @Test
+    fun `loads nothing after a jump of several screens`() {
+        assertEquals(IntRange.EMPTY, prefetchRange(first = 5_000, previous = 20, firstVisible = 5_000, lastVisible = 5_009))
+    }
 }
