@@ -10,6 +10,7 @@
     <string name="timeline_empty">No photos or videos yet</string>
     <string name="timeline_photo_description">Photo, %1$s</string>
     <string name="timeline_video_description">Video, %1$s</string>
+    <string name="timeline_video_length_description">Video, %1$s, %2$s</string>
     <string name="timeline_columns_fewer">Fewer columns</string>
     <string name="timeline_columns_more">More columns</string>
     <string name="viewer_back">Back</string>

@@ -1,9 +1,11 @@
 package dev.irohaco.core.designsystem.component
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,7 +58,8 @@ data class GridThumbnail(val contentUri: String)
  *
  * @param model anything Coil can load (a content Uri, a file); null shows only the placeholder.
  * @param contentDescription what TalkBack reads: kind, capture date and, for a video, its length.
- * @param label a short mark in the bottom corner, such as "GIF"; [contentDescription] already says it.
+ * @param label a short mark in the top end corner, such as "GIF" or a video's length; [contentDescription] already says it.
+ * @param labelIcon an icon before [label], such as the play mark of a video; shown alone when [label] is null.
  */
 @Composable
 fun MediaThumbnail(
@@ -65,6 +68,7 @@ fun MediaThumbnail(
     selected: Boolean,
     modifier: Modifier = Modifier,
     label: String? = null,
+    @DrawableRes labelIcon: Int? = null,
 ) {
     val progress by animateFloatAsState(
         targetValue = if (selected) 1f else 0f,
@@ -94,17 +98,19 @@ fun MediaThumbnail(
                     .clip(shape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         )
-        if (label != null) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
+        if (label != null || labelIcon != null) {
+            // White on a translucent black pill stays readable over both dark and bright photos.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
+                    .align(Alignment.TopEnd)
                     .padding(IrohacoSpacing.xs)
                     .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                     .padding(horizontal = IrohacoSpacing.xs),
-            )
+            ) {
+                if (labelIcon != null) Icon(painterResource(labelIcon), contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                if (label != null) Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White)
+            }
         }
         if (selected) {
             Surface(
@@ -136,10 +142,24 @@ private class LerpCornerShape(
 private fun MediaThumbnailPreview() {
     IrohacoTheme(dynamicColor = false) {
         Surface {
-            Row(Modifier.padding(IrohacoSpacing.l), horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
-                MediaThumbnail(model = null, contentDescription = "Photo", selected = false, modifier = Modifier.size(120.dp))
-                MediaThumbnail(model = null, contentDescription = "Photo", selected = true, modifier = Modifier.size(120.dp))
-                MediaThumbnail(model = null, contentDescription = "Animated image", selected = false, modifier = Modifier.size(120.dp), label = "GIF")
+            Column(Modifier.padding(IrohacoSpacing.l), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
+                    MediaThumbnail(model = null, contentDescription = "Photo", selected = false, modifier = Modifier.size(120.dp))
+                    MediaThumbnail(model = null, contentDescription = "Photo", selected = true, modifier = Modifier.size(120.dp))
+                    // A video whose length MediaStore does not know.
+                    MediaThumbnail(model = null, contentDescription = "Video", selected = false, modifier = Modifier.size(120.dp), labelIcon = IrohacoIcons.PlayArrowFilled)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
+                    MediaThumbnail(model = null, contentDescription = "Animated image", selected = false, modifier = Modifier.size(120.dp), label = "GIF")
+                    MediaThumbnail(
+                        model = null,
+                        contentDescription = "Video",
+                        selected = false,
+                        modifier = Modifier.size(120.dp),
+                        label = "1:01:19",
+                        labelIcon = IrohacoIcons.PlayArrowFilled,
+                    )
+                }
             }
         }
     }

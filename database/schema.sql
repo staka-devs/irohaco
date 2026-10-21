@@ -31,6 +31,7 @@ CREATE TABLE media_sources (
   file_size_bytes INTEGER NOT NULL CHECK(file_size_bytes >= 0),
   observed_modified_at INTEGER,
   observed_taken_at INTEGER,
+  observed_duration_ms INTEGER CHECK(observed_duration_ms IS NULL OR observed_duration_ms >= 0),
   access_state TEXT NOT NULL CHECK(access_state IN ('AVAILABLE','OFFLINE','INACCESSIBLE','MISSING_CANDIDATE')),
   UNIQUE(volume_id,media_store_id)
 );

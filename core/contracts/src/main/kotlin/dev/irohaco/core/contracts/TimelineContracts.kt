@@ -15,6 +15,8 @@ data class TimelineItem(
     val sortTimeMs: Long,
     /** From MediaStore; the grid marks GIFs with it (GAL-016). */
     val mimeType: String? = null,
+    /** A video's length from MediaStore, for the grid's badge (M1-26); null when unknown. */
+    val durationMs: Long? = null,
 )
 
 enum class TimelineSortKey { TAKEN, NAME, SIZE, RATING }

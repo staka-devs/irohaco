@@ -41,7 +41,8 @@ interface CatalogDao {
     @Query(
         """UPDATE media_sources SET content_uri = :contentUri, display_name = :displayName,
                   relative_path = :relativePath, mime_type = :mimeType, file_size_bytes = :sizeBytes,
-                  observed_modified_at = :modifiedAt, observed_taken_at = :takenAt, access_state = 'AVAILABLE'
+                  observed_modified_at = :modifiedAt, observed_taken_at = :takenAt,
+                  observed_duration_ms = :durationMs, access_state = 'AVAILABLE'
            WHERE source_id = :sourceId""",
     )
     suspend fun refresh(
@@ -53,6 +54,7 @@ interface CatalogDao {
         sizeBytes: Long,
         modifiedAt: Long?,
         takenAt: Long?,
+        durationMs: Long?,
     )
 
     @Query("UPDATE media_sources SET access_state = :state WHERE source_id = :sourceId")

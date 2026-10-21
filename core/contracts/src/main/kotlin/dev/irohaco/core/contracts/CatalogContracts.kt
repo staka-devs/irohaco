@@ -16,6 +16,8 @@ data class MediaStoreEntry(
     val sizeBytes: Long,
     val modifiedAtMs: Long?,
     val takenAtMs: Long?,
+    /** A video's length; null for photos and when MediaStore does not know it. */
+    val durationMs: Long? = null,
 )
 
 /** Reads MediaStore. Every call reflects only what the app may read at that moment. */

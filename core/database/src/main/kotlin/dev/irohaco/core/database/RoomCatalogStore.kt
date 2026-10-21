@@ -43,13 +43,13 @@ class RoomCatalogStore(private val db: IrohacoDatabase) : CatalogStore {
                     val e = it.entry
                     MediaSourcesEntity(
                         it.sourceId, it.assetId, it.volumeId, e.mediaStoreId, e.contentUri, e.displayName, e.relativePath,
-                        e.mimeType, e.sizeBytes, e.modifiedAtMs, e.takenAtMs, AssetAvailability.AVAILABLE.name,
+                        e.mimeType, e.sizeBytes, e.modifiedAtMs, e.takenAtMs, e.durationMs, AssetAvailability.AVAILABLE.name,
                     )
                 },
             )
 
             changes.refreshedSources.forEach { (sourceId, e) ->
-                dao.refresh(sourceId, e.contentUri, e.displayName, e.relativePath, e.mimeType, e.sizeBytes, e.modifiedAtMs, e.takenAtMs)
+                dao.refresh(sourceId, e.contentUri, e.displayName, e.relativePath, e.mimeType, e.sizeBytes, e.modifiedAtMs, e.takenAtMs, e.durationMs)
             }
             changes.availability.forEach { (sourceId, state) -> dao.setAvailability(sourceId, state.name) }
             dao.upsertSyncStates(changes.syncedVolumes.map { CatalogSyncStateEntity(it.volumeId, it.mediaStoreVersion, it.generation, at) })

@@ -512,14 +512,15 @@ private fun TimelineGrid(
                     is TimelineCell.Header -> DateHeader(cell.date, headerFormatter, cell.date in selectedGroups) { onToggleGroup(cell.date) }
                     is TimelineCell.Media -> {
                         val date = formatter.format(cell.date)
-                        val description = stringResource(cell.item.descriptionRes(), date)
+                        val description = cell.item.description(date)
                         val selecting = selection.isNotEmpty()
                         val selectLabel = stringResource(R.string.timeline_select)
                         MediaThumbnail(
                             model = GridThumbnail(cell.item.contentUri),
                             contentDescription = description,
                             selected = cell.item.assetId in selection,
-                            label = if (cell.item.isGif) GIF_LABEL else null,
+                            label = cell.item.badge,
+                            labelIcon = cell.item.badgeIcon,
                             modifier = Modifier
                                 .sharedMedia(cell.item.assetId)
                                 .clickable { if (selecting) onToggle(cell.item) else onOpenMedia(cell.item.assetId) }
@@ -742,7 +743,15 @@ private fun Modifier.pinchToChangeColumns(onFewer: () -> Unit, onMore: () -> Uni
 private const val PINCH_STEP = 1.3f
 
 private val previewItems = (0 until 9).map { i ->
-    TimelineItem("a$i", if (i % 4 == 0) MediaKind.VIDEO else MediaKind.IMAGE, "content://preview/$i", LocalDate.of(2026, 10, if (i < 4) 20 else 18).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+    val video = i % 4 == 0
+    TimelineItem(
+        "a$i",
+        if (video) MediaKind.VIDEO else MediaKind.IMAGE,
+        "content://preview/$i",
+        LocalDate.of(2026, 10, if (i < 4) 20 else 18).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        // 0:46, 1:01:19, and one whose length is unknown.
+        durationMs = listOf(46_000L, 3_679_000L, null).getOrNull(i / 4)?.takeIf { video },
+    )
 }
 
 @IrohacoPreviews

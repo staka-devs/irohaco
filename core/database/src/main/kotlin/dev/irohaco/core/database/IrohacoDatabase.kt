@@ -506,6 +506,7 @@ data class MediaSourcesEntity(
     @ColumnInfo(name = "file_size_bytes") val fileSizeBytes: Long,
     @ColumnInfo(name = "observed_modified_at") val observedModifiedAt: Long?,
     @ColumnInfo(name = "observed_taken_at") val observedTakenAt: Long?,
+    @ColumnInfo(name = "observed_duration_ms") val observedDurationMs: Long?,
     @ColumnInfo(name = "access_state") val accessState: String,
 )
 
