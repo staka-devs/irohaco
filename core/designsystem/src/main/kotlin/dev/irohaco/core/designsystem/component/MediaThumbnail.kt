@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -141,18 +142,24 @@ private class LerpCornerShape(
 private fun MediaThumbnailPreview() {
     IrohacoTheme(dynamicColor = false) {
         Surface {
-            Row(Modifier.padding(IrohacoSpacing.l), horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
-                MediaThumbnail(model = null, contentDescription = "Photo", selected = false, modifier = Modifier.size(120.dp))
-                MediaThumbnail(model = null, contentDescription = "Photo", selected = true, modifier = Modifier.size(120.dp))
-                MediaThumbnail(model = null, contentDescription = "Animated image", selected = false, modifier = Modifier.size(120.dp), label = "GIF")
-                MediaThumbnail(
-                    model = null,
-                    contentDescription = "Video",
-                    selected = false,
-                    modifier = Modifier.size(120.dp),
-                    label = "1:01:19",
-                    labelIcon = IrohacoIcons.PlayArrowFilled,
-                )
+            Column(Modifier.padding(IrohacoSpacing.l), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
+                    MediaThumbnail(model = null, contentDescription = "Photo", selected = false, modifier = Modifier.size(120.dp))
+                    MediaThumbnail(model = null, contentDescription = "Photo", selected = true, modifier = Modifier.size(120.dp))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
+                    MediaThumbnail(model = null, contentDescription = "Animated image", selected = false, modifier = Modifier.size(120.dp), label = "GIF")
+                    MediaThumbnail(
+                        model = null,
+                        contentDescription = "Video",
+                        selected = false,
+                        modifier = Modifier.size(120.dp),
+                        label = "1:01:19",
+                        labelIcon = IrohacoIcons.PlayArrowFilled,
+                    )
+                    // A video whose length MediaStore does not know.
+                    MediaThumbnail(model = null, contentDescription = "Video", selected = false, modifier = Modifier.size(120.dp), labelIcon = IrohacoIcons.PlayArrowFilled)
+                }
             }
         }
     }
