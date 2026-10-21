@@ -31,6 +31,7 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.feature.timeline.badge
 import dev.irohaco.feature.timeline.badgeIcon
 import dev.irohaco.feature.timeline.PrefetchThumbnails
+import dev.irohaco.feature.timeline.SCRUB_DATE
 import dev.irohaco.feature.timeline.description
 import dev.irohaco.feature.timeline.format
 import dev.irohaco.feature.timeline.rememberDateFormatter
@@ -47,6 +48,7 @@ internal fun MediaGrid(
     header: LazyGridScope.() -> Unit = {},
 ) {
     val formatter = rememberDateFormatter()
+    val scrubFormatter = rememberDateFormatter(SCRUB_DATE)
     val zone = ZoneId.systemDefault()
     val gridState = rememberLazyGridState()
     Box(Modifier.fillMaxSize()) {
@@ -83,7 +85,7 @@ internal fun MediaGrid(
         }
         val context = LocalContext.current
         var dragIndex by remember { mutableStateOf<Int?>(null) }
-        val label by produceState<String?>(null, dragIndex) { value = dragIndex?.let { labelAt(it)?.format(formatter, zone, context) } }
+        val label by produceState<String?>(null, dragIndex) { value = dragIndex?.let { labelAt(it)?.format(scrubFormatter, zone, context) } }
         FastScrollbar(
             gridState = gridState,
             itemCount = items.itemCount,
