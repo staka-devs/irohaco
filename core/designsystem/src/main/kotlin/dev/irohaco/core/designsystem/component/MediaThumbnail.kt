@@ -30,9 +30,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -82,7 +82,9 @@ fun MediaThumbnail(
     Box(
         modifier
             .aspectRatio(1f)
-            .semantics {
+            // One node per cell: the badge and the check are already in the description, and with
+            // accessibility services on, every node costs time on each scrolled frame (M1-34).
+            .clearAndSetSemantics {
                 this.contentDescription = contentDescription
                 this.selected = selected
             },
