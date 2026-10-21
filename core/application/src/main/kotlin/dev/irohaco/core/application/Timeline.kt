@@ -1,14 +1,15 @@
 package dev.irohaco.core.application
 
-import dev.irohaco.core.contracts.FileOperationResult
-import dev.irohaco.core.contracts.MediaDetailsReader
 import dev.irohaco.core.contracts.CollectionsStore
+import dev.irohaco.core.contracts.FileOperationResult
 import dev.irohaco.core.contracts.MarksStore
+import dev.irohaco.core.contracts.MediaDetailsReader
 import dev.irohaco.core.contracts.MediaFiles
 import dev.irohaco.core.contracts.MediaLibraryAccessPort
 import dev.irohaco.core.contracts.ShareCandidate
 import dev.irohaco.core.contracts.ShareFiles
 import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineReader
 import dev.irohaco.core.contracts.TrashReader
@@ -18,13 +19,15 @@ import dev.irohaco.core.domain.MediaLibraryAccess
 import dev.irohaco.core.domain.isValidName
 import dev.irohaco.core.domain.renamedFile
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Reads the timeline a page at a time (PRD GAL-001) in the order and filter the user picked
  * (GAL-006). The timeline and the viewer share this choice for the session, so swiping in the
  * viewer follows the grid.
  */
-class GetTimelinePage(private val reader: TimelineReader) {
+class GetTimelinePage(private val reader: TimelineReader, private val clock: () -> Long = System::currentTimeMillis) {
     val query = MutableStateFlow(TimelineQuery())
 
     suspend fun count(query: TimelineQuery = this.query.value) = reader.count(query)
@@ -35,7 +38,23 @@ class GetTimelinePage(private val reader: TimelineReader) {
 
     suspend fun between(fromMs: Long, untilMs: Long, query: TimelineQuery = this.query.value) = reader.between(query, fromMs, untilMs)
 
-    suspend fun labelAt(index: Int, query: TimelineQuery = this.query.value) = reader.labelAt(query, index)
+    /**
+     * The fast scrollbar's bubble at a position. The whole order's labels load in one query and stay
+     * for a short while, so a moving finger never waits on the database (M1-35).
+     * shortcut: a file added while they are kept shifts the bubble by one; key them to changes() if it shows.
+     */
+    suspend fun labelAt(index: Int, query: TimelineQuery = this.query.value): TimelineLabel? {
+        val labels = labelsLock.withLock {
+            val kept = kept?.takeIf { it.query == query && clock() - it.atMs < LABELS_KEPT_MS }
+            kept?.labels ?: reader.labels(query).also { this.kept = KeptLabels(query, it, clock()) }
+        }
+        return labels.getOrNull(index)
+    }
+
+    private class KeptLabels(val query: TimelineQuery, val labels: List<TimelineLabel>, val atMs: Long)
+
+    private val labelsLock = Mutex()
+    private var kept: KeptLabels? = null
 
     fun changes() = reader.changes()
 }
@@ -128,3 +147,5 @@ class PrepareShare(private val detailsReader: MediaDetailsReader, private val sh
 class BrowseTrash(private val reader: TrashReader) {
     suspend fun list() = reader.list()
 }
+
+private const val LABELS_KEPT_MS = 30_000L

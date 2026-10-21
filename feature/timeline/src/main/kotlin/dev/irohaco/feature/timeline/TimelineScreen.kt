@@ -35,6 +35,8 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -96,6 +98,7 @@ import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.designsystem.component.FastScrollbar
+import dev.irohaco.core.designsystem.component.GridThumbnail
 import dev.irohaco.core.designsystem.component.MediaThumbnail
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.motion.sharedMedia
@@ -469,6 +472,7 @@ internal fun TimelineContent(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class) // LazyLayoutCacheWindow
 @Composable
 private fun TimelineGrid(
     cells: LazyPagingItems<TimelineCell>,
@@ -494,8 +498,8 @@ private fun TimelineGrid(
     onToggleGroup: (LocalDate) -> Unit,
     labelAt: suspend (Int) -> TimelineLabel? = { null },
 ) {
-    val gridState = rememberLazyGridState()
-    val flinging by rememberFlinging(gridState)
+    // Cells two screens ahead are composed, so their thumbnails are loading before they show (M1-34).
+    val gridState = rememberLazyGridState(cacheWindow = LazyLayoutCacheWindow(aheadFraction = 2f, behindFraction = 1f))
     LaunchedEffect(scrollToTop) { scrollToTop.collect { gridState.scrollToItem(0) } }
     val currentSelection by rememberUpdatedState(selection)
     val selectRange by rememberUpdatedState(onSelectRange)
@@ -553,7 +557,7 @@ private fun TimelineGrid(
                         val selecting = selection.isNotEmpty()
                         val selectLabel = stringResource(R.string.timeline_select)
                         MediaThumbnail(
-                            model = gridModel(cell.item.contentUri, flinging),
+                            model = GridThumbnail(cell.item.contentUri),
                             contentDescription = description,
                             selected = cell.item.assetId in selection,
                             label = cell.item.badge,
@@ -580,9 +584,6 @@ private fun TimelineGrid(
                     null -> null
                 }
             }
-        }
-        PrefetchThumbnails(gridState, flinging) { index ->
-            if (index < cells.itemCount) (cells.peek(index) as? TimelineCell.Media)?.item?.contentUri else null
         }
         // The next group's header pushes the pinned one up as it nears the top, so the two never stack (M1-31).
         var pinnedHeight by remember { mutableIntStateOf(0) }

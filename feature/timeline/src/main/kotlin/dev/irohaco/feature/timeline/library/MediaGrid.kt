@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,23 +25,22 @@ import androidx.paging.compose.itemKey
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.designsystem.component.FastScrollbar
+import dev.irohaco.core.designsystem.component.GridThumbnail
 import dev.irohaco.core.designsystem.component.MediaThumbnail
 import dev.irohaco.core.designsystem.motion.sharedMedia
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
-import dev.irohaco.feature.timeline.PrefetchThumbnails
 import dev.irohaco.feature.timeline.SCRUB_DATE
 import dev.irohaco.feature.timeline.badge
 import dev.irohaco.feature.timeline.badgeIcon
 import dev.irohaco.feature.timeline.description
 import dev.irohaco.feature.timeline.format
-import dev.irohaco.feature.timeline.gridModel
 import dev.irohaco.feature.timeline.rememberDateFormatter
-import dev.irohaco.feature.timeline.rememberFlinging
 import dev.irohaco.feature.timeline.rememberScrubLabel
 import java.time.Instant
 import java.time.ZoneId
 
 /** The grid of a folder, album, tag or the favorites; tapping opens the viewer over the same list. */
+@OptIn(ExperimentalFoundationApi::class) // LazyLayoutCacheWindow
 @Composable
 internal fun MediaGrid(
     items: LazyPagingItems<TimelineItem>,
@@ -51,8 +52,8 @@ internal fun MediaGrid(
     val formatter = rememberDateFormatter()
     val scrubFormatter = rememberDateFormatter(SCRUB_DATE)
     val zone = ZoneId.systemDefault()
-    val gridState = rememberLazyGridState()
-    val flinging by rememberFlinging(gridState)
+    // Cells two screens ahead are composed, so their thumbnails are loading before they show (M1-34).
+    val gridState = rememberLazyGridState(cacheWindow = LazyLayoutCacheWindow(aheadFraction = 2f, behindFraction = 1f))
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Adaptive(96.dp),
@@ -70,7 +71,7 @@ internal fun MediaGrid(
                 } else {
                     val date = formatter.format(Instant.ofEpochMilli(item.sortTimeMs).atZone(zone))
                     MediaThumbnail(
-                        model = gridModel(item.contentUri, flinging),
+                        model = GridThumbnail(item.contentUri),
                         contentDescription = item.description(date),
                         selected = false,
                         label = item.badge,
@@ -79,11 +80,6 @@ internal fun MediaGrid(
                     )
                 }
             }
-        }
-        PrefetchThumbnails(gridState, flinging) { index ->
-            // Grid indices count the header items first.
-            val itemIndex = index - (gridState.layoutInfo.totalItemsCount - items.itemCount)
-            if (itemIndex in 0..<items.itemCount) items.peek(itemIndex)?.contentUri else null
         }
         val context = LocalContext.current
         var dragIndex by remember { mutableStateOf<Int?>(null) }

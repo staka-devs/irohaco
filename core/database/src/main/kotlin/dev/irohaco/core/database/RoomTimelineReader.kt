@@ -43,21 +43,22 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
             ),
         ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs) }
 
-    override suspend fun labelAt(query: TimelineQuery, index: Int): TimelineLabel? {
-        val row = db.timelineDao().labelRow(
+    override suspend fun labels(query: TimelineQuery): List<TimelineLabel> =
+        db.timelineDao().labelRows(
             SimpleSQLiteQuery(
                 """SELECT $TIME AS takenMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, COALESCE(r.rating, 0) AS rating
-                   ${from(query)} ${where(query)} ORDER BY ${orderBy(query)} LIMIT 1 OFFSET ?""",
-                arrayOf(*fromArgs(query), *args(query), index),
+                   ${from(query)} ${where(query)} ORDER BY ${orderBy(query)}""",
+                arrayOf(*fromArgs(query), *args(query)),
             ),
-        ) ?: return null
-        return when (query.sortKey) {
+        ).map { row -> label(query, row) }
+
+    private fun label(query: TimelineQuery, row: LabelRow): TimelineLabel =
+        when (query.sortKey) {
             TimelineSortKey.TAKEN -> TimelineLabel.Taken(row.takenMs)
             TimelineSortKey.NAME -> TimelineLabel.Name(row.displayName.firstOrNull()?.uppercaseChar() ?: '#')
             TimelineSortKey.SIZE -> TimelineLabel.Size(row.sizeBytes)
             TimelineSortKey.RATING -> TimelineLabel.Rating(row.rating)
         }
-    }
 
     /**
      * Emits once on subscription as well: a sync that finishes after the first page loads but before
