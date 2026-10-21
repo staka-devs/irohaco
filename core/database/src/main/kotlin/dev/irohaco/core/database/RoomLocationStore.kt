@@ -53,6 +53,11 @@ interface LocationDao {
     )
     suspend fun located(): List<LocatedRow>
 
+    @Transaction
+    suspend fun recordExifAll(points: Map<String, GeoPoint?>, newId: () -> String) {
+        points.forEach { (assetId, point) -> recordExif(newId(), assetId, point) }
+    }
+
     @Query("SELECT place_text FROM location_evidence WHERE asset_id = :assetId AND evidence_source = 'EXIF' AND place_text IS NOT NULL LIMIT 1")
     suspend fun placeName(assetId: String): String?
 
@@ -70,6 +75,8 @@ class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -
         dao.unindexed(limit).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType) }
 
     override suspend fun recordExif(assetId: String, point: GeoPoint?) = dao.recordExif(newId(), assetId, point)
+
+    override suspend fun recordExif(points: Map<String, GeoPoint?>) = dao.recordExifAll(points, newId)
 
     /** Newest first, so a map marker can show its group's newest photo. */
     override suspend fun located(): List<LocatedAsset> =
