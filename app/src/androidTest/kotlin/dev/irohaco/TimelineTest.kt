@@ -63,7 +63,10 @@ class TimelineTest {
         compose.waitUntilAtLeastOneExists(back, timeoutMillis = 5_000)
 
         // The details sheet reads the real file: its name comes from MediaStore.
-        compose.onNode(hasContentDescription(context.getString(TimelineR.string.details_open))).performClick()
+        // The viewer's bar can still be inside the opening transition; wait until the button is its own node.
+        val details = hasContentDescription(context.getString(TimelineR.string.details_open))
+        compose.waitUntilAtLeastOneExists(details, timeoutMillis = 5_000)
+        compose.onNode(details).performClick()
         compose.waitUntilAtLeastOneExists(hasText("irohaco-l2-", substring = true), timeoutMillis = 5_000)
         Espresso.pressBack() // system back goes to the sheet's window and closes only the sheet
         compose.waitUntilDoesNotExist(hasText("irohaco-l2-", substring = true), timeoutMillis = 5_000)
