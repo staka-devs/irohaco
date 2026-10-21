@@ -61,4 +61,6 @@ object IrohacoIcons {
     @DrawableRes val Settings = R.drawable.ic_settings
     @DrawableRes val Check = R.drawable.ic_check
     @DrawableRes val Map = R.drawable.ic_map
+    @DrawableRes val Restore = R.drawable.ic_restore
+    @DrawableRes val DeleteForever = R.drawable.ic_delete_forever
 }

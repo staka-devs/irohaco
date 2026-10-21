@@ -15,4 +15,8 @@
     <string name="settings_contrast_standard">Standard</string>
     <string name="settings_contrast_medium">Medium</string>
     <string name="settings_contrast_high">High</string>
+    <string name="settings_share_location">Location when sharing</string>
+    <string name="settings_share_location_ask">Ask every time</string>
+    <string name="settings_share_location_strip">Always remove it</string>
+    <string name="settings_share_location_keep">Always include it</string>
 </resources>

@@ -42,6 +42,8 @@ import dev.irohaco.feature.timeline.library.MediaList
 import dev.irohaco.feature.timeline.library.FolderViewModel
 import dev.irohaco.feature.timeline.library.LibraryScreen
 import dev.irohaco.feature.timeline.library.LibraryViewModel
+import dev.irohaco.feature.timeline.library.TrashScreen
+import dev.irohaco.feature.timeline.library.TrashViewModel
 import dev.irohaco.core.contracts.FolderRef
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.listSaver
@@ -61,7 +63,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Resume covers launch, returning from the permission dialog and returning from system settings.
         lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.RESUMED) { container.syncCatalog() }
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                container.syncCatalog()
+                container.prepareShare.cleanUp() // stale share-cache copies past their retention window (MET-003)
+            }
         }
         setContent {
             val themeColor by container.themeColorSettings.observe().collectAsStateWithLifecycle(ThemeColor.Device)
@@ -93,6 +98,7 @@ class MainActivity : ComponentActivity() {
                                         onOpenList = { open(Route.list(it)) },
                                         onOpenCandidates = { open(Route.IDENTITY) },
                                         onOpenSettings = { open(Route.SETTINGS) },
+                                        onOpenTrash = { open(Route.TRASH) },
                                     )
                                 }
                             } else {
@@ -113,6 +119,7 @@ class MainActivity : ComponentActivity() {
         onOpenList: (MediaList) -> Unit,
         onOpenSettings: () -> Unit,
         onOpenCandidates: () -> Unit,
+        onOpenTrash: () -> Unit,
     ) {
         IrohacoApp { destination ->
             when (destination) {
@@ -127,6 +134,8 @@ class MainActivity : ComponentActivity() {
                             container.markMedia,
                             container.manageCollections,
                             container.timelineSettings,
+                            container.prepareShare,
+                            container.sharingSettings,
                         )
                     },
                     onOpenMedia = { onOpenMedia(it, null) },
@@ -148,6 +157,7 @@ class MainActivity : ComponentActivity() {
                     onOpenTag = { onOpenList(MediaList.Tag(it)) },
                     onOpenSettings = onOpenSettings,
                     onOpenCandidates = onOpenCandidates,
+                    onOpenTrash = onOpenTrash,
                 )
                 else -> DestinationPlaceholder(destination)
             }
@@ -157,8 +167,9 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun FullScreen(route: String, open: (String) -> Unit, onBack: () -> Unit) {
         when {
-            route == Route.SETTINGS -> SettingsScreen(viewModel { SettingsViewModel(container.themeColorSettings) }, onBack)
+            route == Route.SETTINGS -> SettingsScreen(viewModel { SettingsViewModel(container.themeColorSettings, container.sharingSettings) }, onBack)
             route == Route.IDENTITY -> IdentityScreen(viewModel { IdentityViewModel(container.reconcileIdentity) }, onBack)
+            route == Route.TRASH -> TrashScreen(viewModel { TrashViewModel(container.browseTrash, container::syncCatalog) }, onBack)
             Route.isList(route) -> {
                 val list = Route.parseList(route)
                 CollectionScreen(
@@ -206,6 +217,7 @@ object Route {
     const val SHELL = "shell"
     const val SETTINGS = "settings"
     const val IDENTITY = "identity"
+    const val TRASH = "trash"
     private const val VIEWER = "viewer:"
     private const val LIST = "list:"
     private const val SEP = '\u0000'

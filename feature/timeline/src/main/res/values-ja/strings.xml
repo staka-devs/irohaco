@@ -165,4 +165,29 @@
     <string name="timeline_select_group">%1$sをすべて選択</string>
     <string name="timeline_unselect_group">%1$sの選択を外す</string>
     <string name="timeline_pinch_hint">2本の指でつまむと、並べる列の数を変えられます</string>
+    <string name="share_location_title">位置情報も共有しますか？</string>
+    <string name="share_location_body">共有する写真には、撮影した場所の情報があります。</string>
+    <string name="share_location_strip">位置情報を外す</string>
+    <string name="share_location_keep">含めて共有</string>
+    <string name="share_location_unremovable_title">位置情報を外せない項目があります</string>
+    <plurals name="share_location_unremovable_body">
+        <item quantity="other">%d件は位置情報が残ります（多くは動画です）。</item>
+    </plurals>
+    <string name="share_location_unremovable_include">そのまま共有</string>
+    <string name="share_location_unremovable_exclude">この項目を除く</string>
+    <string name="trash_title">ゴミ箱</string>
+    <string name="trash_empty">ゴミ箱は空です</string>
+    <string name="trash_select_all">すべて選択</string>
+    <string name="trash_restore">元に戻す</string>
+    <string name="trash_delete_forever">完全に削除</string>
+    <string name="trash_delete_confirm_title">完全に削除しますか？</string>
+    <string name="trash_delete_confirm_body">元に戻せません。</string>
+    <string name="trash_days_unknown">削除される日が分かりません</string>
+    <plurals name="trash_selected">
+        <item quantity="other">%d件を選択</item>
+    </plurals>
+    <plurals name="trash_days_remaining">
+        <item quantity="other">あと%d日で削除されます</item>
+    </plurals>
+    <string name="library_trash">ゴミ箱</string>
 </resources>
