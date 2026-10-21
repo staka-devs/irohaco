@@ -7,6 +7,7 @@ import android.database.Cursor
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
+import androidx.exifinterface.media.ExifInterface
 import dev.irohaco.core.contracts.MediaDetailsReader
 import dev.irohaco.core.domain.Detail
 import dev.irohaco.core.domain.GeoPoint
@@ -45,6 +46,33 @@ class AndroidMediaDetailsReader(private val context: Context) : MediaDetailsRead
             MediaDetailsResult.FileUnavailable
         } catch (e: FileNotFoundException) {
             MediaDetailsResult.FileUnavailable
+        }
+    }
+
+    /** Opens each file once and reads only the GPS: the EXIF header of a photo, the container of a video (M1-33). */
+    override suspend fun location(contentUri: String, kind: MediaKind): Detail<GeoPoint> = withContext(Dispatchers.IO) {
+        if (context.checkSelfPermission(Manifest.permission.ACCESS_MEDIA_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return@withContext Detail.NoPermission
+        }
+        val source = MediaStore.setRequireOriginal(Uri.parse(contentUri))
+        try {
+            when (kind) {
+                MediaKind.IMAGE -> context.contentResolver.openInputStream(source)?.use { ExifInterface(it).latLong }
+                    ?.let { Detail.Value(GeoPoint(it[0], it[1])) } ?: Detail.Missing
+                MediaKind.VIDEO -> {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(context, source)
+                        parseIso6709(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION), locationAllowed = true)
+                    } finally {
+                        retriever.release()
+                    }
+                }
+            }
+        } catch (e: IOException) {
+            Detail.Unreadable
+        } catch (e: RuntimeException) { // a vanished file, a revoked grant or a container the retriever cannot open
+            Detail.Unreadable
         }
     }
 

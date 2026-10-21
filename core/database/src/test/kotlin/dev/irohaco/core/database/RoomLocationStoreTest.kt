@@ -65,6 +65,14 @@ class RoomLocationStoreTest {
     }
 
     @Test
+    fun `records a batch at once`() = runTest {
+        catalog("a", "b", "c")
+        store.recordExif(mapOf("a" to GeoPoint(35.68, 139.76), "b" to null))
+        assertEquals(listOf("c"), store.unindexed(10).map { it.assetId })
+        assertEquals(listOf("a"), store.located().map { it.assetId })
+    }
+
+    @Test
     fun `keeps a place name once looked up`() = runTest {
         catalog("tokyo")
         store.recordExif("tokyo", GeoPoint(35.68, 139.76))
