@@ -14,6 +14,11 @@ interface LocationStore {
     /** What the file says: a point, or null when it has none, so it is not read again. */
     suspend fun recordExif(assetId: String, point: GeoPoint?)
 
+    /** Several files in one write, so the map sees one change per batch instead of one per file (M1-33). */
+    suspend fun recordExif(points: Map<String, GeoPoint?>) {
+        points.forEach { (assetId, point) -> recordExif(assetId, point) }
+    }
+
     /** Every available item with a GPS point from its file. */
     suspend fun located(): List<LocatedAsset>
 
