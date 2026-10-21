@@ -13,8 +13,11 @@ data class GeoBounds(val south: Double, val west: Double, val north: Double, val
         point.latitude in south..north && point.longitude in west..east
 }
 
-/** Nearby points shown as one marker with a count; tapping it opens the photos in [bounds]. */
-data class GeoCluster(val center: GeoPoint, val count: Int, val bounds: GeoBounds)
+/**
+ * Nearby points shown as one marker with a count; tapping it opens the photos in [bounds].
+ * [first] is the index in the input of the group's first point, whose photo the marker shows (M1-29).
+ */
+data class GeoCluster(val center: GeoPoint, val count: Int, val bounds: GeoBounds, val first: Int = 0)
 
 /**
  * Groups points that fall in the same square of the map at [zoom] (Web Mercator, as both map
@@ -24,12 +27,13 @@ data class GeoCluster(val center: GeoPoint, val count: Int, val bounds: GeoBound
  */
 fun clusterPoints(points: List<GeoPoint>, zoom: Double, cellsPerTile: Int = 4): List<GeoCluster> {
     val scale = 2.0.pow(zoom) * cellsPerTile
-    return points.groupBy { p ->
+    return points.withIndex().groupBy { (_, p) ->
         val x = floor((p.longitude + 180.0) / 360.0 * scale).toLong()
         val latRad = p.latitude.coerceIn(-85.0511, 85.0511) * PI / 180.0
         val y = floor((1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / PI) / 2.0 * scale).toLong()
         x to y
-    }.values.map { group ->
+    }.values.map { indexed ->
+        val group = indexed.map { it.value }
         GeoCluster(
             center = GeoPoint(group.sumOf { it.latitude } / group.size, group.sumOf { it.longitude } / group.size),
             count = group.size,
@@ -39,6 +43,7 @@ fun clusterPoints(points: List<GeoPoint>, zoom: Double, cellsPerTile: Int = 4): 
                 north = group.maxOf { it.latitude },
                 east = group.maxOf { it.longitude },
             ),
+            first = indexed.first().index,
         )
     }
 }

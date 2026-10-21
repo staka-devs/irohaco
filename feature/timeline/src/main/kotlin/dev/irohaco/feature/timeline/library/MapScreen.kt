@@ -1,10 +1,17 @@
 package dev.irohaco.feature.timeline.library
 
-import android.graphics.Color as AndroidColor
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -18,19 +25,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -38,6 +53,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import coil3.compose.AsyncImage
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng as GoogleLatLng
 import com.google.maps.android.compose.GoogleMap
@@ -45,21 +61,16 @@ import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberUpdatedMarkerState
 import dev.irohaco.core.application.BrowseMap
+import dev.irohaco.core.contracts.LocatedAsset
 import dev.irohaco.core.contracts.MapProvider
+import dev.irohaco.core.designsystem.component.GridThumbnail
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.domain.GeoBounds
-import dev.irohaco.core.domain.GeoCluster
-import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.clusterPoints
 import dev.irohaco.feature.timeline.R
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -67,18 +78,16 @@ import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
-import org.maplibre.android.style.expressions.Expression
-import org.maplibre.android.style.layers.CircleLayer
-import org.maplibre.android.style.layers.PropertyFactory
-import org.maplibre.android.style.layers.SymbolLayer
-import org.maplibre.android.style.sources.GeoJsonSource
-import org.maplibre.geojson.Feature
-import org.maplibre.geojson.FeatureCollection
-import org.maplibre.geojson.Point
+import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 class MapViewModel(private val browse: BrowseMap) : ViewModel() {
-    /** Null while the points load. */
-    val points: StateFlow<List<GeoPoint>?> = browse.changes().map { browse.located().map { it.point } }
+    /** Null while the points load; newest first. */
+    val located: StateFlow<List<LocatedAsset>?> = browse.changes().map { browse.located() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Null until the setting loads; nothing is fetched before then. */
@@ -97,11 +106,19 @@ class MapViewModel(private val browse: BrowseMap) : ViewModel() {
  */
 @Composable
 fun MapScreen(viewModel: MapViewModel, googleMapsAvailable: Boolean, onOpenArea: (GeoBounds) -> Unit, onBack: () -> Unit) {
-    val points by viewModel.points.collectAsStateWithLifecycle()
+    val points by viewModel.located.collectAsStateWithLifecycle()
     val allowed by viewModel.allowed.collectAsStateWithLifecycle()
     val provider by viewModel.provider.collectAsStateWithLifecycle()
     val active = if (provider == MapProvider.GOOGLE && googleMapsAvailable) MapProvider.GOOGLE else MapProvider.OPEN_FREE_MAP
     var declined by remember { mutableStateOf(false) }
+    // Once the map is agreed to, ask the OS for the GPS permission too: without it no location is read
+    // at all (M1-32). Returning from the system dialog resumes the app, which re-runs IndexLocations.
+    val context = LocalContext.current
+    val allowGps = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(allowed) {
+        val granted = context.checkSelfPermission(Manifest.permission.ACCESS_MEDIA_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (allowed == true && !granted) allowGps.launch(Manifest.permission.ACCESS_MEDIA_LOCATION)
+    }
     MapContent(
         allowed = allowed,
         declined = declined,
@@ -163,18 +180,22 @@ internal fun MapContent(
 
 /** OpenFreeMap's style (ADR-0011), kept in one place in case the service changes. */
 private const val OPEN_FREE_MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty"
-private const val CLUSTERS = "irohaco-clusters"
+private val MARKER_SIZE = 56.dp
 
+/**
+ * The map library draws only the map; each group is a photo marker laid over it in Compose (M1-29)
+ * and placed through the map's projection, so it follows every pan and zoom.
+ */
 @Composable
-private fun MapLibreClusterMap(points: List<GeoPoint>, onOpenArea: (GeoBounds) -> Unit) {
+private fun MapLibreClusterMap(located: List<LocatedAsset>, onOpenArea: (GeoBounds) -> Unit) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val mapView = remember { MapLibre.getInstance(context); MapView(context).apply { onCreate(null) } }
-    val color = MaterialTheme.colorScheme.primary.toArgb()
-    val onColor = MaterialTheme.colorScheme.onPrimary.toArgb()
     val openArea by rememberUpdatedState(onOpenArea)
+    var map by remember { mutableStateOf<MapLibreMap?>(null) }
+    var view by remember { mutableStateOf<LatLngBounds?>(null) } // the area in view when the camera last stopped
     var zoom by remember { mutableDoubleStateOf(2.0) }
-    var map by remember { mutableStateOf<Pair<MapLibreMap, Style>?>(null) }
+    var moved by remember { mutableIntStateOf(0) } // bumped on every camera move, so the markers re-project
     DisposableEffect(lifecycle, mapView) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -193,80 +214,60 @@ private fun MapLibreClusterMap(points: List<GeoPoint>, onOpenArea: (GeoBounds) -
     }
     LaunchedEffect(mapView) {
         mapView.getMapAsync { m ->
-            m.setStyle(Style.Builder().fromUri(OPEN_FREE_MAP_STYLE)) { style ->
-                style.addSource(GeoJsonSource(CLUSTERS))
-                style.addLayer(
-                    CircleLayer(CLUSTERS, CLUSTERS).withProperties(
-                        PropertyFactory.circleColor(color),
-                        PropertyFactory.circleStrokeColor(AndroidColor.WHITE),
-                        PropertyFactory.circleStrokeWidth(2f),
-                        PropertyFactory.circleRadius(Expression.interpolate(Expression.linear(), Expression.get("count"), Expression.stop(1, 12), Expression.stop(1000, 28))),
-                    ),
-                )
-                style.addLayer(
-                    SymbolLayer("$CLUSTERS-count", CLUSTERS).withProperties(
-                        PropertyFactory.textField(Expression.toString(Expression.get("count"))),
-                        PropertyFactory.textColor(onColor),
-                        PropertyFactory.textSize(12f),
-                        PropertyFactory.textAllowOverlap(true),
-                        PropertyFactory.textIgnorePlacement(true),
-                    ),
-                )
-                m.addOnCameraIdleListener { zoom = m.cameraPosition.zoom }
-                m.addOnMapClickListener { latLng ->
-                    val feature = m.queryRenderedFeatures(m.projection.toScreenLocation(latLng), CLUSTERS).firstOrNull() ?: return@addOnMapClickListener false
-                    openArea(
-                        GeoBounds(
-                            south = feature.getNumberProperty("south").toDouble(),
-                            west = feature.getNumberProperty("west").toDouble(),
-                            north = feature.getNumberProperty("north").toDouble(),
-                            east = feature.getNumberProperty("east").toDouble(),
-                        ),
-                    )
-                    true
+            m.setStyle(Style.Builder().fromUri(OPEN_FREE_MAP_STYLE)) {
+                m.addOnCameraMoveListener { moved++ }
+                m.addOnCameraIdleListener {
+                    zoom = m.cameraPosition.zoom
+                    view = m.projection.visibleRegion.latLngBounds
+                    moved++
                 }
-                map = m to style
+                map = m
             }
         }
     }
     // Starts with every point in view; later the user moves the map.
-    LaunchedEffect(map, points.isNotEmpty()) {
-        val (m, _) = map ?: return@LaunchedEffect
-        if (points.size >= 2) {
-            val bounds = LatLngBounds.Builder().includes(points.map { LatLng(it.latitude, it.longitude) }).build()
+    LaunchedEffect(map, located.isNotEmpty()) {
+        val m = map ?: return@LaunchedEffect
+        if (located.size >= 2) {
+            val bounds = LatLngBounds.Builder().includes(located.map { LatLng(it.point.latitude, it.point.longitude) }).build()
             m.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds, 96))
-        } else if (points.size == 1) {
-            m.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(points[0].latitude, points[0].longitude), 12.0))
-        }
-        zoom = m.cameraPosition.zoom
-    }
-    LaunchedEffect(map, points) {
-        snapshotFlow { zoom }.collect { z ->
-            val (_, style) = map ?: return@collect
-            val features = clusterPoints(points, z).map { it.toFeature() }
-            style.getSourceAs<GeoJsonSource>(CLUSTERS)?.setGeoJson(FeatureCollection.fromFeatures(features))
+        } else if (located.size == 1) {
+            m.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(located[0].point.latitude, located[0].point.longitude), 12.0))
         }
     }
-    AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
-}
-
-private fun GeoCluster.toFeature(): Feature = Feature.fromGeometry(Point.fromLngLat(center.longitude, center.latitude)).apply {
-    addNumberProperty("count", count)
-    addNumberProperty("south", bounds.south)
-    addNumberProperty("west", bounds.west)
-    addNumberProperty("north", bounds.north)
-    addNumberProperty("east", bounds.east)
+    val clusters = remember(located, zoom) { clusterPoints(located.map { it.point }, zoom) }
+    Box(Modifier.fillMaxSize()) {
+        AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
+        val m = map ?: return@Box
+        // Only the groups in view get a marker; a library of tens of thousands has far more groups than fit.
+        val shown = view?.let { area -> clusters.filter { area.contains(LatLng(it.center.latitude, it.center.longitude)) } }.orEmpty()
+        shown.forEach { cluster ->
+            key(cluster.first) {
+                PhotoMarker(
+                    contentUri = located[cluster.first].contentUri,
+                    count = cluster.count,
+                    onClick = { openArea(cluster.bounds) },
+                    modifier = Modifier.offset {
+                        moved // read here so a camera move only re-places the markers
+                        val p = m.projection.toScreenLocation(LatLng(cluster.center.latitude, cluster.center.longitude))
+                        IntOffset((p.x - MARKER_SIZE.toPx() / 2).roundToInt(), (p.y - MARKER_SIZE.toPx()).roundToInt())
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable
-private fun GoogleClusterMap(points: List<GeoPoint>, onOpenArea: (GeoBounds) -> Unit) {
+private fun GoogleClusterMap(located: List<LocatedAsset>, onOpenArea: (GeoBounds) -> Unit) {
     val camera = rememberCameraPositionState {
-        position = points.firstOrNull()?.let { CameraPosition.fromLatLngZoom(GoogleLatLng(it.latitude, it.longitude), 5f) }
+        position = located.firstOrNull()?.let { CameraPosition.fromLatLngZoom(GoogleLatLng(it.point.latitude, it.point.longitude), 5f) }
             ?: CameraPosition.fromLatLngZoom(GoogleLatLng(35.68, 139.76), 2f)
     }
-    val clusters = remember(points, camera.position.zoom.toInt()) { clusterPoints(points, camera.position.zoom.toDouble()) }
+    val clusters = remember(located, camera.position.zoom.toInt()) { clusterPoints(located.map { it.point }, camera.position.zoom.toDouble()) }
     GoogleMap(modifier = Modifier.fillMaxSize(), cameraPositionState = camera) {
         clusters.forEach { cluster ->
+            // shortcut: a count only, as a marker is drawn once as a bitmap before its photo loads; add photos if Google is used much.
             MarkerComposable(
                 cluster.count,
                 state = rememberUpdatedMarkerState(GoogleLatLng(cluster.center.latitude, cluster.center.longitude)),
@@ -276,10 +277,36 @@ private fun GoogleClusterMap(points: List<GeoPoint>, onOpenArea: (GeoBounds) -> 
     }
 }
 
+/** A group on the map: its newest photo, with the number of photos and videos on its corner. */
 @Composable
-private fun CountBadge(count: Int) {
+private fun PhotoMarker(contentUri: String, count: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val description = pluralStringResource(R.plurals.map_marker_description, count, count)
     Box(
-        Modifier.background(MaterialTheme.colorScheme.primary, CircleShape).padding(IrohacoSpacing.s),
+        modifier
+            .size(MARKER_SIZE)
+            .semantics(mergeDescendants = true) { contentDescription = description }
+            .clickable(onClick = onClick),
+    ) {
+        AsyncImage(
+            model = GridThumbnail(contentUri),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .border(2.dp, Color.White, MaterialTheme.shapes.small),
+        )
+        CountBadge(count, Modifier.align(Alignment.TopStart).offset(x = -IrohacoSpacing.xs, y = -IrohacoSpacing.xs))
+    }
+}
+
+@Composable
+private fun CountBadge(count: Int, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .background(MaterialTheme.colorScheme.primary, CircleShape)
+            .padding(horizontal = IrohacoSpacing.s, vertical = IrohacoSpacing.xxs),
         contentAlignment = Alignment.Center,
     ) {
         Text(count.toString(), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelLarge)
