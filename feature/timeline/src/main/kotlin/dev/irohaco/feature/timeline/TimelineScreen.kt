@@ -543,7 +543,9 @@ private fun TimelineGrid(
                 }
             }
         }
-        PrefetchThumbnails(gridState) { index -> (cells.peek(index) as? TimelineCell.Media)?.item?.contentUri }
+        PrefetchThumbnails(gridState) { index ->
+            if (index < cells.itemCount) (cells.peek(index) as? TimelineCell.Media)?.item?.contentUri else null
+        }
         pinned?.let { DateHeader(it, headerFormatter, it in selectedGroups) { onToggleGroup(it) } }
         val context = LocalContext.current
         val zone = ZoneId.systemDefault()
