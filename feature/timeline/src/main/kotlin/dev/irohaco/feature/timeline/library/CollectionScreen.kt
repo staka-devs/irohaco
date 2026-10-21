@@ -9,9 +9,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -68,7 +70,10 @@ fun CollectionScreen(viewModel: CollectionViewModel, onOpenMedia: (String) -> Un
     val items = viewModel.items.collectAsLazyPagingItems()
     val title by viewModel.title.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
+    // The bar slides away while scrolling down and comes back on any scroll up (DESIGN §3, M1-27).
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 title = {
@@ -83,6 +88,7 @@ fun CollectionScreen(viewModel: CollectionViewModel, onOpenMedia: (String) -> Un
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back)) }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { padding ->
