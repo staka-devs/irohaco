@@ -24,7 +24,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -39,6 +38,7 @@ import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -58,12 +58,17 @@ fun FastScrollbar(
     modifier: Modifier = Modifier,
 ) {
     if (itemCount == 0) return
-    val scope = rememberCoroutineScope()
     var dragging by remember { mutableStateOf(false) }
     var visible by remember { mutableStateOf(false) }
     var trackHeightPx by remember { mutableFloatStateOf(0f) }
     var thumbOffsetPx by remember { mutableFloatStateOf(0f) }
     val thumbHeightPx = with(LocalDensity.current) { THUMB_HEIGHT.toPx() }
+    // One scroll at a time towards the latest position: launching one per move piled them up and the
+    // grid fell behind the finger (M1-35).
+    var target by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(gridState) {
+        snapshotFlow { target }.filterNotNull().collect { gridState.scrollToItem(it) }
+    }
 
     // Follows normal scrolling too, so the thumb always shows roughly where the grid is.
     LaunchedEffect(gridState, itemCount, trackHeightPx) {
@@ -102,7 +107,7 @@ fun FastScrollbar(
                         thumbOffsetPx = (thumbOffsetPx + drag.y).coerceIn(0f, (trackHeightPx - thumbHeightPx).coerceAtLeast(0f))
                         val index = indexFor(thumbOffsetPx, trackHeightPx, thumbHeightPx, itemCount)
                         onDragIndex(index)
-                        scope.launch { gridState.scrollToItem(index) }
+                        target = index
                     }
                 },
             )
