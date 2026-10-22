@@ -149,6 +149,11 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
         ManageModels(AndroidModelStorage(appContext), AndroidModelDownloader(appContext), RoomModelProfiles(database))
     }
 
+    /** Starts a model download that keeps being followed after the screen that asked for it closes. */
+    fun downloadModel(id: String) {
+        scope.launch(Dispatchers.IO) { manageModels.download(id) }
+    }
+
     /** Picks up downloads the system kept running while the app was closed. */
     fun resumeModelDownloads() {
         scope.launch(Dispatchers.IO) { manageModels.refresh() }

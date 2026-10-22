@@ -42,4 +42,23 @@
     <string name="settings_theme_color_other_summary">Pick any colour or type its code</string>
     <string name="settings_theme_color_picker">Colour picker: hue across, lightness down</string>
     <string name="settings_done">Done</string>
+    <string name="settings_ai">AI</string>
+    <string name="settings_ai_not_installed">Not installed</string>
+    <string name="settings_ai_downloading">Downloading %1$d%%</string>
+    <string name="settings_ai_verifying">Checking the file</string>
+    <string name="settings_ai_installed">Ready to use</string>
+    <string name="settings_ai_failed_download">The download failed</string>
+    <string name="settings_ai_failed_digest">The file did not match and was removed</string>
+    <string name="settings_ai_failed_unknown">Not a model Irohaco knows; the file was removed</string>
+    <string name="settings_ai_failed_storage">The file could not be saved</string>
+    <string name="settings_ai_download">Download</string>
+    <string name="settings_ai_download_note">Models run on this device only. A download is large and can use mobile data; it carries on in the background.</string>
+    <string name="settings_ai_delete">Delete</string>
+    <string name="settings_ai_delete_title">Delete %1$s?</string>
+    <string name="settings_ai_delete_body">Searches that use it stop working until it is downloaded again. Built indexes are kept.</string>
+    <string name="settings_ai_cancel">Cancel</string>
+    <string name="settings_ai_import">Import a model file</string>
+    <string name="settings_ai_import_summary">A .litertlm file of one of the models above</string>
+    <string name="settings_ai_import_done">Imported and ready to use</string>
+    <string name="settings_ai_import_choose">Choose</string>
 </resources>
