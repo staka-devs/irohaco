@@ -3,6 +3,7 @@ package dev.irohaco
 import android.Manifest
 import android.content.ContentValues
 import android.graphics.Bitmap
+import android.media.ExifInterface
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -18,6 +19,11 @@ import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import java.util.UUID
 
 /**
@@ -37,8 +43,11 @@ class MediaStorePersistenceTest {
     private val dbName = "spike-f-${UUID.randomUUID()}.db"
     private val container = AppContainer(context, dbName)
     private val created = mutableListOf<Uri>()
-    private val name = "irohaco-spike-f-${UUID.randomUUID()}.png"
+    private val name = "irohaco-spike-f-${UUID.randomUUID()}.jpg"
     private val takenMs = 1_790_000_000_000L
+    // Like a camera photo: the capture time is in the file's EXIF, which MediaStore reads on every
+    // version; a time only written to the DATE_TAKEN column is dropped on API 33.
+    private val exifTime = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date(takenMs))
 
     @After
     fun tearDown() {
@@ -52,13 +61,21 @@ class MediaStorePersistenceTest {
             MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
             ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
                 put(MediaStore.MediaColumns.RELATIVE_PATH, folder)
                 put(MediaStore.MediaColumns.DATE_TAKEN, takenMs)
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             },
         )!!
-        resolver.openOutputStream(uri)!!.use { Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        val file = File.createTempFile("spike-f", ".jpg", context.cacheDir)
+        file.outputStream().use { Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+        ExifInterface(file.path).apply {
+            setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, exifTime)
+            setAttribute(ExifInterface.TAG_OFFSET_TIME_ORIGINAL, "+00:00")
+            saveAttributes()
+        }
+        resolver.openOutputStream(uri)!!.use { out -> file.inputStream().use { it.copyTo(out) } }
+        file.delete()
         resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
         created += uri
         return uri
