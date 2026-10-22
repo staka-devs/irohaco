@@ -27,6 +27,7 @@ import dev.irohaco.core.application.OrganizeMedia
 import dev.irohaco.core.application.PlanMediaIndex
 import dev.irohaco.core.application.PrepareShare
 import dev.irohaco.core.application.ReconcileIdentity
+import dev.irohaco.core.application.SearchText
 import dev.irohaco.core.application.SyncMediaCatalog
 import dev.irohaco.core.application.ThemeColorSettings
 import dev.irohaco.core.contracts.AiPriority
@@ -41,11 +42,13 @@ import dev.irohaco.core.database.RoomLibraryReader
 import dev.irohaco.core.database.RoomLocationStore
 import dev.irohaco.core.database.RoomMarksStore
 import dev.irohaco.core.database.RoomModelProfiles
+import dev.irohaco.core.database.RoomTextIndexStore
 import dev.irohaco.core.database.RoomTimelineReader
 import dev.irohaco.infrastructure.ai.AndroidResourcePolicy
 import dev.irohaco.infrastructure.ai.AndroidModelDownloader
 import dev.irohaco.infrastructure.ai.AndroidModelStorage
 import dev.irohaco.infrastructure.ai.LiteRtEmbeddingRuntime
+import dev.irohaco.infrastructure.ai.MlKitTextRecognizer
 import dev.irohaco.infrastructure.media.AndroidIndexImageReader
 import dev.irohaco.infrastructure.media.AndroidMediaDetailsReader
 import dev.irohaco.infrastructure.media.AndroidMediaFiles
@@ -181,11 +184,16 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     private val mediaIndexStore by lazy { RoomMediaIndexStore(database) }
 
+    private val textIndexStore by lazy { RoomTextIndexStore(database) }
+
+    /** Finds files by the text OCR read in them (M2-07); the search screen (M2-09) shows the matches. */
+    val searchText by lazy { SearchText(textIndexStore) }
+
     /** Indexing jobs (M2-03); [IndexingService] runs them, one at a time. */
     val indexJobs by lazy {
         IndexJobs(
             store = RoomIndexJobStore(database),
-            processor = EmbedMediaItem(mediaIndexStore, AndroidIndexImageReader(appContext)) { bytes ->
+            processor = EmbedMediaItem(mediaIndexStore, AndroidIndexImageReader(appContext), MlKitTextRecognizer(), textIndexStore) { bytes ->
                 aiResourceManager.withEmbedding(AiPriority.BACKGROUND_INDEX) { it.embedImage(bytes) }
             },
             policy = AndroidResourcePolicy(appContext),

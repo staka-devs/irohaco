@@ -81,7 +81,9 @@ class IrohacoDatabaseFactoryTest {
     private fun SupportSQLiteDatabase.count(type: String, excludeInternal: Boolean): Int =
         single(
             "SELECT count(*) FROM sqlite_master WHERE type = '$type'" +
-                if (excludeInternal) " AND name NOT LIKE 'sqlite_%' AND name NOT IN ('room_master_table', 'android_metadata')" else "",
+                if (excludeInternal) " AND name NOT LIKE 'sqlite_%' AND name NOT IN ('room_master_table', 'android_metadata')" +
+                    // The derived full-text index (M2-07) is not part of schema.sql.
+                    " AND name NOT LIKE 'ocr_fts%'" else "",
         ).toInt()
 
     private fun SupportSQLiteDatabase.single(query: String): String =
