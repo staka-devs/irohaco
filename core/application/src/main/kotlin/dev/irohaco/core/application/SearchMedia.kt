@@ -4,6 +4,7 @@ import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.MediaItems
 import dev.irohaco.core.contracts.ModelLoadException
 import dev.irohaco.core.contracts.ModelNotInstalledException
+import dev.irohaco.core.contracts.PlaceMatch
 import dev.irohaco.core.contracts.SpaceState
 import dev.irohaco.core.contracts.TextMatch
 import dev.irohaco.core.contracts.TimelineItem
@@ -12,7 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /** Why a result matched (SRCH-004); shown under it. */
-enum class Evidence { MEANING, TEXT, MEMO }
+enum class Evidence { MEANING, TEXT, MEMO, PLACE, PLACE_INFERRED }
 
 /**
  * One photo, or one scene of a video at [timestampMs] (SRCH-002), with what matched. [ranks] holds
@@ -44,6 +45,8 @@ class SearchMedia(
     private val meaning: SearchByMeaning,
     private val text: SearchText,
     private val items: MediaItems,
+    /** Files at a place the query names (SRCH-003); null leaves place names out. */
+    private val places: SearchPlaces? = null,
 ) {
     /** The spaces to pick from; one still being built carries how much it covers (AC-005). */
     fun spaces(): Flow<List<SpaceChoice>> = meaning.spaces().map { spaces ->
@@ -62,10 +65,13 @@ class SearchMedia(
         /** Search memos, by their text and their meaning (ANN-002). */
         byMemo: Boolean = true,
         filters: SearchFilters = SearchFilters(),
+        /** Places guessed from photos taken near in time count too (`include_inferred`); else only GPS (`confirmed_only`). */
+        includeInferredPlaces: Boolean = true,
     ): SearchResults {
         val meant = if (byMeaning) meaningOrEmpty { if (compare) meaning.compare(query) else listOfNotNull(meaning(query, spaceId)) } else emptyList()
         val texts = if (byText || byMemo) text(query).filter { if (it.fromMemo) byMemo else byText } else emptyList()
-        return fuse(meant.map { it.copy(hits = it.hits.filter { hit -> byMemo || !hit.fromMemo }) }, texts, kind, filters, meaningAsked = byMeaning)
+        val atPlaces = places?.invoke(query, includeInferredPlaces).orEmpty()
+        return fuse(meant.map { it.copy(hits = it.hits.filter { hit -> byMemo || !hit.fromMemo }) }, texts, kind, filters, meaningAsked = byMeaning, atPlaces)
     }
 
     /** Photos and video scenes like [assetId] (SRCH-001), under the same conditions as a search. */
@@ -74,13 +80,23 @@ class SearchMedia(
         return fuse(meant, emptyList(), kind, filters, meaningAsked = true)
     }
 
-    private suspend fun fuse(meant: List<MeaningResult>, texts: List<TextMatch>, kind: MediaKind?, filters: SearchFilters, meaningAsked: Boolean): SearchResults {
+    private suspend fun fuse(
+        meant: List<MeaningResult>,
+        texts: List<TextMatch>,
+        kind: MediaKind?,
+        filters: SearchFilters,
+        meaningAsked: Boolean,
+        atPlaces: List<PlaceMatch> = emptyList(),
+    ): SearchResults {
         val fused = LinkedHashMap<Pair<String, Long?>, Fused>()
         meant.forEach { result ->
             result.hits.forEachIndexed { rank, hit ->
                 val evidence = if (hit.fromMemo) Evidence.MEMO else Evidence.MEANING
                 fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, evidence, null, result.space.spaceId)
             }
+        }
+        atPlaces.forEachIndexed { rank, hit ->
+            fused.getOrPut(hit.assetId to null) { Fused() }.add(rank, if (hit.inferred) Evidence.PLACE_INFERRED else Evidence.PLACE, hit.placeName, null)
         }
         texts.forEachIndexed { rank, hit ->
             fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, if (hit.fromMemo) Evidence.MEMO else Evidence.TEXT, hit.text, null)
