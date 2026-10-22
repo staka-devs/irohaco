@@ -117,4 +117,5 @@ dependencies {
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.litertlm.android) // Spike A only (AI_SEARCH_SPIKE)
 }
