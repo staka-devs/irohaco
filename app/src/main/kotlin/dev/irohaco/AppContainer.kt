@@ -19,6 +19,7 @@ import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.IndexLocations
 import dev.irohaco.core.application.ManageCollections
+import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.application.OrganizeMedia
 import dev.irohaco.core.application.PrepareShare
@@ -33,7 +34,10 @@ import dev.irohaco.core.database.RoomIdentityStore
 import dev.irohaco.core.database.RoomLibraryReader
 import dev.irohaco.core.database.RoomLocationStore
 import dev.irohaco.core.database.RoomMarksStore
+import dev.irohaco.core.database.RoomModelProfiles
 import dev.irohaco.core.database.RoomTimelineReader
+import dev.irohaco.infrastructure.ai.AndroidModelDownloader
+import dev.irohaco.infrastructure.ai.AndroidModelStorage
 import dev.irohaco.infrastructure.ai.LiteRtEmbeddingRuntime
 import dev.irohaco.infrastructure.media.AndroidMediaDetailsReader
 import dev.irohaco.infrastructure.media.AndroidMediaFiles
@@ -140,10 +144,19 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     /** Background work that outlives a screen, such as freeing the model when it sits unused. */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    /** Downloads, imports and checks model files (M2-02). */
+    val manageModels by lazy {
+        ManageModels(AndroidModelStorage(appContext), AndroidModelDownloader(appContext), RoomModelProfiles(database))
+    }
+
+    /** Picks up downloads the system kept running while the app was closed. */
+    fun resumeModelDownloads() {
+        scope.launch(Dispatchers.IO) { manageModels.refresh() }
+    }
+
     private val aiLazy = lazy {
         AiResourceManager(
-            // shortcut: one fixed file until M2-02 installs and switches models.
-            locator = { File(appContext.getExternalFilesDir(null), "models/embedding.litertlm").takeIf { it.exists() }?.path },
+            locator = manageModels.embeddingLocator,
             runtime = LiteRtEmbeddingRuntime(appContext.cacheDir.path),
             io = Dispatchers.IO,
             scope = scope,

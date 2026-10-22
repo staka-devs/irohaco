@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        container.resumeModelDownloads()
         // Resume covers launch, returning from the permission dialog and returning from system settings.
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
