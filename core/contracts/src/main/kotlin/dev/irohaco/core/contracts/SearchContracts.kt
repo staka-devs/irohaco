@@ -36,3 +36,8 @@ interface VectorSearchStore {
     /** The share of available photos and videos with a vector of their current revision in [spaceId]. */
     suspend fun coverage(spaceId: String): Float
 }
+
+/** Looks files up by id for search results; files that are gone or not available are left out. */
+fun interface MediaItems {
+    suspend fun items(assetIds: List<String>): List<TimelineItem>
+}

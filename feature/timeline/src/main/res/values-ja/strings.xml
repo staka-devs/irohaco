@@ -210,4 +210,17 @@
     <string name="timeline_size_between">%1$s〜%2$s</string>
     <string name="timeline_size_under">%1$s未満</string>
     <string name="timeline_unrated">評価なし</string>
+    <string name="search_placeholder">写っているものや、写真の中の文字で探す</string>
+    <string name="search_by_meaning">意味</string>
+    <string name="search_by_text">文字</string>
+    <string name="search_photos">写真</string>
+    <string name="search_videos">動画</string>
+    <string name="search_no_index">写真の中の文字だけで探しました。設定で検索用の索引を作成すると、意味でも探せます。</string>
+    <string name="search_open_settings">設定を開く</string>
+    <string name="search_coverage">索引は写真と動画の%1$d%%を対象にしています。残りはこの結果に入っていません。</string>
+    <string name="search_nothing">見つかりませんでした</string>
+    <string name="search_hint">「海に沈む夕日」のように場面を書くか、写真に書かれた言葉を入力してください。</string>
+    <string name="search_at">%1$sの場面</string>
+    <string name="search_video_scene">動画の場面</string>
+    <string name="search_photo">写真</string>
 </resources>

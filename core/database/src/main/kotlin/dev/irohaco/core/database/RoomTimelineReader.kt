@@ -1,6 +1,7 @@
 package dev.irohaco.core.database
 
 import androidx.sqlite.db.SimpleSQLiteQuery
+import dev.irohaco.core.contracts.MediaItems
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
@@ -10,7 +11,19 @@ import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
+class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, MediaItems {
+    // A file in two places has two sources; the result keeps one row per asset.
+    override suspend fun items(assetIds: List<String>): List<TimelineItem> = assetIds.distinct().chunked(MAX_ARGS).flatMap { ids ->
+        db.timelineDao().page(
+            SimpleSQLiteQuery(
+                """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
+                          s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, 0 AS rating
+                   $FROM WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL AND a.asset_id IN (${ids.joinToString { "?" }})""",
+                ids.toTypedArray(),
+            ),
+        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes) }
+    }.distinctBy { it.assetId }
+
     override suspend fun count(query: TimelineQuery): Int =
         db.timelineDao().count(SimpleSQLiteQuery("SELECT count(*) ${from(query)} ${where(query)}", arrayOf(*fromArgs(query), *args(query))))
 
@@ -73,6 +86,7 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader {
         // shortcut: no index on the sort expressions yet; add them if M0-13 measures slow pages at 10k items.
         const val FROM = "FROM media_sources s JOIN media_assets a ON a.asset_id = s.asset_id " +
             "LEFT JOIN media_ratings r ON r.asset_id = a.asset_id"
+        const val MAX_ARGS = 500
         const val TIME = "COALESCE(s.observed_taken_at, s.observed_modified_at, a.first_seen_at)"
 
         // The volume root has a null relative path in MediaStore; FolderRef calls it "".

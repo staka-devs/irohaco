@@ -28,6 +28,7 @@ import dev.irohaco.core.application.PlanMediaIndex
 import dev.irohaco.core.application.PrepareShare
 import dev.irohaco.core.application.ReconcileIdentity
 import dev.irohaco.core.application.SearchByMeaning
+import dev.irohaco.core.application.SearchMedia
 import dev.irohaco.core.application.SearchText
 import dev.irohaco.core.application.SyncMediaCatalog
 import dev.irohaco.core.application.ThemeColorSettings
@@ -190,6 +191,9 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     /** Finds files by the text OCR read in them (M2-07); the search screen (M2-09) shows the matches. */
     val searchText by lazy { SearchText(textIndexStore) }
+
+    /** The search screen: by meaning and by text, fused by rank (M2-09). */
+    val searchMedia by lazy { SearchMedia(searchByMeaning, searchText, RoomTimelineReader(database)) }
 
     /** Searches by meaning in one embedding space at a time (M2-08); the query runs before any indexing. */
     val searchByMeaning by lazy {
