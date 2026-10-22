@@ -27,6 +27,7 @@ import dev.irohaco.core.application.OrganizeMedia
 import dev.irohaco.core.application.PlanMediaIndex
 import dev.irohaco.core.application.PrepareShare
 import dev.irohaco.core.application.ReconcileIdentity
+import dev.irohaco.core.application.SearchByMeaning
 import dev.irohaco.core.application.SearchText
 import dev.irohaco.core.application.SyncMediaCatalog
 import dev.irohaco.core.application.ThemeColorSettings
@@ -44,6 +45,7 @@ import dev.irohaco.core.database.RoomMarksStore
 import dev.irohaco.core.database.RoomModelProfiles
 import dev.irohaco.core.database.RoomTextIndexStore
 import dev.irohaco.core.database.RoomTimelineReader
+import dev.irohaco.core.database.RoomVectorSearchStore
 import dev.irohaco.infrastructure.ai.AndroidResourcePolicy
 import dev.irohaco.infrastructure.ai.AndroidModelDownloader
 import dev.irohaco.infrastructure.ai.AndroidModelStorage
@@ -188,6 +190,11 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     /** Finds files by the text OCR read in them (M2-07); the search screen (M2-09) shows the matches. */
     val searchText by lazy { SearchText(textIndexStore) }
+
+    /** Searches by meaning in one embedding space at a time (M2-08); the query runs before any indexing. */
+    val searchByMeaning by lazy {
+        SearchByMeaning(RoomVectorSearchStore(database), embedText = { text -> aiResourceManager.withEmbedding(AiPriority.USER_SEARCH) { it.embedText(text) } })
+    }
 
     /** Indexing jobs (M2-03); [IndexingService] runs them, one at a time. */
     val indexJobs by lazy {

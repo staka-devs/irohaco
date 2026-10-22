@@ -60,6 +60,12 @@ interface IndexJobStore {
     /** Pauses jobs a process that ended left RUNNING, PAUSING or VERIFYING. */
     suspend fun pauseInterrupted()
 
+    /**
+     * Moves the job's space from BUILDING through VERIFYING to READY, and makes it the default search
+     * space when there is none yet (ADR-0003). A space in any other state is left as it is.
+     */
+    suspend fun markSpaceReady(jobId: String)
+
     fun progress(jobId: String): Flow<IndexJobProgress?>
 
     /** The job requested last, or null before the first one. */
@@ -115,6 +121,9 @@ interface MediaIndexStore {
     suspend fun ensureSpace(newSpaceId: String, spec: EmbeddingSpaceSpec, signature: String): String
 
     suspend fun hasVectors(spaceId: String): Boolean
+
+    /** Marks READY spaces of [modelProfileId] whose signature is not [current] STALE: the model file changed (ADR-0003). */
+    suspend fun markStale(modelProfileId: String, current: String)
 
     /**
      * Makes targets for every available image and for frames of every available video, in [folders]
