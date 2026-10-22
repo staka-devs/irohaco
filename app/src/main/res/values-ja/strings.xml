@@ -4,4 +4,7 @@
     <string name="destination_albums">アルバム</string>
     <string name="destination_search">検索</string>
     <string name="destination_library">ライブラリ</string>
+    <string name="indexing_channel">索引の作成</string>
+    <string name="indexing_title">検索用の索引を作成しています</string>
+    <string name="indexing_progress">%1$d / %2$d件</string>
 </resources>
