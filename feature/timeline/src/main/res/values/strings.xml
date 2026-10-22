@@ -214,4 +214,17 @@
     <string name="timeline_size_between">%1$s–%2$s</string>
     <string name="timeline_size_under">Under %1$s</string>
     <string name="timeline_unrated">No rating</string>
+    <string name="search_placeholder">Search by what is in the photo, or its text</string>
+    <string name="search_by_meaning">Meaning</string>
+    <string name="search_by_text">Text</string>
+    <string name="search_photos">Photos</string>
+    <string name="search_videos">Videos</string>
+    <string name="search_no_index">Only the text in photos was searched. Build the search index in Settings to search by meaning too.</string>
+    <string name="search_open_settings">Open settings</string>
+    <string name="search_coverage">The index covers %1$d%% of your photos and videos; the rest are not in these results.</string>
+    <string name="search_nothing">Nothing found</string>
+    <string name="search_hint">Describe a scene, such as “sunset over the sea”, or type a word written in the photo.</string>
+    <string name="search_at">at %1$s</string>
+    <string name="search_video_scene">Video scene</string>
+    <string name="search_photo">Photo</string>
 </resources>

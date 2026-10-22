@@ -26,6 +26,8 @@ class SearchByMeaning(
     /** Switches new searches to [spaceId]; only a READY space can be the default. */
     suspend fun setDefault(spaceId: String): Boolean = store.setDefault(spaceId)
 
+    suspend fun coverage(spaceId: String): Float = store.coverage(spaceId)
+
     /** Null when there is nothing to search: no space yet, or one the local model cannot query. */
     suspend operator fun invoke(query: String, spaceId: String? = null): MeaningResult? {
         if (query.isBlank()) return null

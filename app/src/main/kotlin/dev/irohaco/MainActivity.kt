@@ -46,13 +46,14 @@ import dev.irohaco.feature.timeline.library.MapScreen
 import dev.irohaco.feature.timeline.library.MapViewModel
 import dev.irohaco.feature.timeline.library.TrashScreen
 import dev.irohaco.feature.timeline.library.TrashViewModel
+import dev.irohaco.feature.timeline.search.SearchScreen
+import dev.irohaco.feature.timeline.search.SearchViewModel
 import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.domain.GeoBounds
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.listSaver
 import dev.irohaco.feature.timeline.viewer.MediaViewerScreen
 import dev.irohaco.feature.timeline.viewer.ViewerViewModel
-import dev.irohaco.ui.DestinationPlaceholder
 import dev.irohaco.ui.IrohacoApp
 import dev.irohaco.ui.ScreenViewModelStores
 import dev.irohaco.ui.TopLevelDestination
@@ -105,6 +106,7 @@ class MainActivity : ComponentActivity() {
                                         onOpenSettings = { open(Route.SETTINGS) },
                                         onOpenTrash = { open(Route.TRASH) },
                                         onOpenMap = { open(Route.MAP) },
+                                        onPlayAt = { assetId, ms -> open(Route.playVideoAt(assetId, ms)) },
                                     )
                                 }
                             } else {
@@ -127,6 +129,7 @@ class MainActivity : ComponentActivity() {
         onOpenCandidates: () -> Unit,
         onOpenTrash: () -> Unit,
         onOpenMap: () -> Unit,
+        onPlayAt: (assetId: String, startMs: Long) -> Unit,
     ) {
         IrohacoApp { destination ->
             when (destination) {
@@ -168,7 +171,12 @@ class MainActivity : ComponentActivity() {
                     onOpenTrash = onOpenTrash,
                     onOpenMap = onOpenMap,
                 )
-                else -> DestinationPlaceholder(destination)
+                TopLevelDestination.SEARCH -> SearchScreen(
+                    viewModel { SearchViewModel(container.searchMedia) },
+                    onOpenMedia = { onOpenMedia(it, null) },
+                    onPlayAt = onPlayAt,
+                    onOpenSettings = onOpenSettings,
+                )
             }
         }
     }
