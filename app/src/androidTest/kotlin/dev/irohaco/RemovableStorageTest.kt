@@ -5,7 +5,9 @@ import android.content.ContentValues
 import android.graphics.Bitmap
 import android.media.ExifInterface
 import android.net.Uri
+import android.os.Environment
 import android.os.ParcelFileDescriptor
+import android.os.storage.StorageManager
 import android.provider.MediaStore
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -72,9 +74,13 @@ class RemovableStorageTest {
     // Turning the virtual disk on or off resets every volume, the built-in storage too, on some versions.
     private fun waitForBuiltInStorage() {
         waitFor(60) {
-            sh("sm list-volumes").lines().any { it.startsWith("emulated") && " mounted" in it } &&
-                mediaStoreSees(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            val primary = context.getSystemService(StorageManager::class.java).primaryStorageVolume
+            // MediaStore lists the volume a moment before files can be written to it again.
+            primary.state == Environment.MEDIA_MOUNTED && primary.directory?.canWrite() != false &&
+                mediaStoreSees(MediaStore.VOLUME_EXTERNAL_PRIMARY) &&
+                runCatching { resolver.query(MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), null, null, null)?.close() }.isSuccess
         }
+        Thread.sleep(2_000) // the media scanner reattaches the volume's path just after it reports mounted
     }
 
     @Before
