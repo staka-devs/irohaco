@@ -6,6 +6,8 @@ import dev.irohaco.core.contracts.IndexItem
 import dev.irohaco.core.contracts.IndexItemProcessor
 import dev.irohaco.core.contracts.IndexItemSkipped
 import dev.irohaco.core.contracts.IndexJobKind
+import dev.irohaco.core.contracts.IndexJobState
+import dev.irohaco.core.contracts.IndexSettings
 import dev.irohaco.core.contracts.IndexSource
 import dev.irohaco.core.contracts.MediaIndexStore
 import dev.irohaco.core.contracts.TextIndexStore
@@ -14,6 +16,7 @@ import dev.irohaco.core.contracts.TextRecognizer
 import dev.irohaco.core.contracts.VideoQuality
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.security.MessageDigest
 
 /** The space photos go into with the local model (ARCHITECTURE §4.1); queries carry the model card's prefix. */
@@ -55,8 +58,50 @@ class PlanMediaIndex(
         return jobs.start(spaceId, kind, store.plan(spaceId, folders, quality, now()), requestedByUser = true)
     }
 
+    /**
+     * Plans an index of what changed since the last one (IDX-005): new and edited files and memos of
+     * every folder. It never makes the first index, which only the user starts, and plans nothing when
+     * nothing changed; null then.
+     */
+    suspend fun changes(): String? {
+        val spaceId = store.findSpace(ImageSpaces.signature(spec))?.takeIf { store.hasVectors(it) } ?: return null
+        val items = store.plan(spaceId, null, VideoQuality.BALANCED, now()).ifEmpty { return null }
+        return jobs.start(spaceId, IndexJobKind.INCREMENTAL, items, requestedByUser = false)
+    }
+
+    /** How many files and memos the current index lacks or has at an older revision; all of them before the first index. */
+    suspend fun pendingCount(): Int = store.pendingCount(store.findSpace(ImageSpaces.signature(spec)).orEmpty())
+
     /** Videos not covered to their end, for the low coverage notice. */
     fun lowCoverageVideos(): Flow<Int> = store.lowCoverageVideos()
+}
+
+/**
+ * Indexes changes by itself after the catalog syncs, when the user turned it on (IDX-005). It first
+ * retires spaces of an older model file, and leaves a job that is already open alone.
+ */
+class IndexChanges(
+    private val plan: PlanMediaIndex,
+    private val jobs: IndexJobs,
+    private val meaning: SearchByMeaning,
+    private val settings: IndexSettings,
+    /** Runs the job in the foreground service; returns false when the system does not allow it now. */
+    private val run: (String) -> Boolean,
+) {
+    suspend operator fun invoke() {
+        meaning.retireOldSpaces()
+        if (!settings.autoIndex.first()) return
+        jobs.recover()
+        val latest = jobs.latest().first()?.let { jobs.progress(it).first() }
+        if (latest != null && latest.state in OPEN) return
+        val jobId = plan.changes() ?: return
+        // Not allowed to start from where the app is now: the job waits paused for the user to resume it.
+        if (!run(jobId)) jobs.pause(jobId)
+    }
+
+    private companion object {
+        val OPEN = setOf(IndexJobState.PLANNED, IndexJobState.RUNNING, IndexJobState.PAUSING, IndexJobState.PAUSED, IndexJobState.VERIFYING)
+    }
 }
 
 /**

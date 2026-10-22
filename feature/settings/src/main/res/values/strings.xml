@@ -92,4 +92,12 @@
         <item quantity="one">%1$d long video is indexed only partway; later scenes cannot be found.</item>
         <item quantity="other">%1$d long videos are indexed only partway; later scenes cannot be found.</item>
     </plurals>
+    <string name="settings_index_rebuild">The model has changed, so the old index can no longer be used. Build the index again.</string>
+    <string name="settings_index_up_to_date">Everything is indexed.</string>
+    <plurals name="settings_index_pending">
+        <item quantity="one">%1$d item is new or has changed since the last index.</item>
+        <item quantity="other">%1$d items are new or have changed since the last index.</item>
+    </plurals>
+    <string name="settings_index_auto">Index changes automatically</string>
+    <string name="settings_index_auto_summary">When photos and videos are added or edited, index them when you open the app. Only after the first index.</string>
 </resources>

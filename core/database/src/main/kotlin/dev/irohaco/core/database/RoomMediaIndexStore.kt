@@ -39,6 +39,9 @@ interface MediaIndexDao {
     )
 
     @Query("SELECT space_id FROM embedding_spaces WHERE space_signature = :signature")
+    suspend fun findSpace(signature: String): String?
+
+    @Query("SELECT space_id FROM embedding_spaces WHERE space_signature = :signature")
     suspend fun spaceId(signature: String): String
 
     @Transaction
@@ -155,6 +158,26 @@ interface MediaIndexDao {
     )
     suspend fun memoSource(targetId: String): MemoSourceRow?
 
+    // Two EXISTS rather than one join on COALESCE, so each side uses its own index.
+    @Query(
+        """SELECT
+             (SELECT COUNT(*) FROM media_assets a
+              WHERE a.tombstoned_at IS NULL AND $REVISION IS NOT NULL
+                AND (a.media_kind = 'IMAGE' OR EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND s.observed_duration_ms > 0))
+                AND NOT EXISTS (SELECT 1 FROM embedding_targets t JOIN embedding_vectors v ON v.target_id = t.target_id
+                                WHERE t.asset_id = a.asset_id AND v.space_id = :spaceId AND v.source_revision_digest = $REVISION)
+                AND NOT EXISTS (SELECT 1 FROM media_revisions r JOIN video_segments g ON g.revision_id = r.revision_id
+                                  JOIN sampled_frames f ON f.segment_id = g.segment_id JOIN embedding_targets t ON t.frame_id = f.frame_id
+                                  JOIN embedding_vectors v ON v.target_id = t.target_id
+                                WHERE r.asset_id = a.asset_id AND v.space_id = :spaceId AND v.source_revision_digest = $REVISION))
+           + (SELECT COUNT(*) FROM semantic_annotations n JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
+                JOIN media_assets a ON a.asset_id = sub.asset_id
+              WHERE n.searchable = 1 AND a.tombstoned_at IS NULL AND $REVISION IS NOT NULL
+                AND NOT EXISTS (SELECT 1 FROM embedding_targets t JOIN embedding_vectors v ON v.target_id = t.target_id
+                                WHERE t.annotation_id = n.annotation_id AND v.space_id = :spaceId AND v.source_revision_digest = $MEMO_REVISION))""",
+    )
+    suspend fun pendingCount(spaceId: String): Int
+
     @Query(
         """INSERT OR IGNORE INTO embedding_vectors(vector_id, space_id, target_id, source_revision_digest, vector_blob, created_at)
            VALUES (:vectorId, :spaceId, :targetId, :digest, :blob, :createdAt)""",
@@ -245,6 +268,10 @@ class RoomMediaIndexStore(private val db: IrohacoDatabase) : MediaIndexStore {
     override fun lowCoverageVideos() = dao.lowCoverageVideos()
 
     override suspend fun memoItem(annotationId: String) = dao.memoItem(annotationId)
+
+    override suspend fun pendingCount(spaceId: String) = dao.pendingCount(spaceId)
+
+    override suspend fun findSpace(signature: String) = dao.findSpace(signature)
 
     override suspend fun putVector(spaceId: String, item: IndexItem, vectorId: String, vector: FloatArray, createdAt: Long) =
         dao.putVector(spaceId, vectorId, item.targetId, item.sourceRevisionDigest, vector.toBlob(), createdAt)

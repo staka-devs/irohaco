@@ -37,7 +37,8 @@ class SyncMediaCatalog(
     // Two overlapping syncs would both see a new file as new and register it twice.
     private val running = Mutex()
 
-    suspend operator fun invoke() = running.withLock {
+    /** Returns whether a file is new or changed, which an index of changes would pick up (IDX-005). */
+    suspend operator fun invoke(): Boolean = running.withLock {
         val access = access.current()
         val mounted = source.volumes()
         val known = store.volumes()
@@ -70,6 +71,7 @@ class SyncMediaCatalog(
                 syncedVolumes = result.synced,
             ),
         )
+        result.newAssets.isNotEmpty() || result.refreshed.isNotEmpty()
     }
 
     private suspend fun syncVolume(
