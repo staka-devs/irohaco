@@ -88,6 +88,7 @@ dependencies {
     implementation(project(":feature:timeline"))
     implementation(project(":feature:settings"))
     implementation(project(":infrastructure:preferences"))
+    implementation(project(":infrastructure:local-ai"))
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.coil.compose)
