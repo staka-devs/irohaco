@@ -2,53 +2,59 @@ package dev.irohaco
 
 import android.content.Context
 import android.util.Log
-import dev.irohaco.core.application.BrowseLibrary
-import dev.irohaco.core.application.ManageCollections
-import dev.irohaco.core.application.MarkMedia
-import dev.irohaco.core.database.RoomCollectionsStore
-import dev.irohaco.core.application.OrganizeMedia
-import dev.irohaco.core.application.ReconcileIdentity
-import dev.irohaco.core.database.RoomIdentityStore
-import dev.irohaco.core.database.RoomMarksStore
-import dev.irohaco.core.database.RoomLibraryReader
-import dev.irohaco.infrastructure.preferences.DataStoreLibrarySettings
-import dev.irohaco.infrastructure.preferences.DataStoreSharingSettings
-import dev.irohaco.infrastructure.preferences.DataStoreTimelineSettings
-import dev.irohaco.infrastructure.media.AndroidMediaFiles
-import dev.irohaco.infrastructure.media.AndroidShareFiles
-import dev.irohaco.infrastructure.media.AndroidPlaceNames
-import dev.irohaco.infrastructure.media.AndroidTrashReader
-import dev.irohaco.infrastructure.preferences.DataStoreMapSettings
-import dev.irohaco.core.database.RoomLocationStore
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import androidx.media3.common.Player
 import androidx.annotation.OptIn
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.preferencesDataStoreFile
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import dev.irohaco.core.application.AiResourceManager
+import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.BrowseMap
 import dev.irohaco.core.application.BrowseTrash
-import dev.irohaco.core.application.IndexLocations
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
+import dev.irohaco.core.application.IndexLocations
+import dev.irohaco.core.application.ManageCollections
+import dev.irohaco.core.application.MarkMedia
+import dev.irohaco.core.application.OrganizeMedia
 import dev.irohaco.core.application.PrepareShare
+import dev.irohaco.core.application.ReconcileIdentity
 import dev.irohaco.core.application.SyncMediaCatalog
 import dev.irohaco.core.application.ThemeColorSettings
 import dev.irohaco.core.database.IrohacoDatabase
 import dev.irohaco.core.database.IrohacoDatabaseFactory
 import dev.irohaco.core.database.RoomCatalogStore
+import dev.irohaco.core.database.RoomCollectionsStore
+import dev.irohaco.core.database.RoomIdentityStore
+import dev.irohaco.core.database.RoomLibraryReader
+import dev.irohaco.core.database.RoomLocationStore
+import dev.irohaco.core.database.RoomMarksStore
 import dev.irohaco.core.database.RoomTimelineReader
+import dev.irohaco.infrastructure.ai.LiteRtEmbeddingRuntime
 import dev.irohaco.infrastructure.media.AndroidMediaDetailsReader
+import dev.irohaco.infrastructure.media.AndroidMediaFiles
 import dev.irohaco.infrastructure.media.AndroidMediaFormatProbe
 import dev.irohaco.infrastructure.media.AndroidMediaLibraryAccess
+import dev.irohaco.infrastructure.media.AndroidPlaceNames
+import dev.irohaco.infrastructure.media.AndroidShareFiles
+import dev.irohaco.infrastructure.media.AndroidTrashReader
 import dev.irohaco.infrastructure.media.MediaStoreCatalogSource
 import dev.irohaco.infrastructure.preferences.DataStoreAppearanceSettings
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import androidx.datastore.preferences.preferencesDataStoreFile
+import dev.irohaco.infrastructure.preferences.DataStoreLibrarySettings
+import dev.irohaco.infrastructure.preferences.DataStoreMapSettings
+import dev.irohaco.infrastructure.preferences.DataStoreSharingSettings
+import dev.irohaco.infrastructure.preferences.DataStoreTimelineSettings
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.UUID
 
 /** Wires adapters to use cases (CONTRIBUTING §3.1: the app module is where dependencies are assembled). */
@@ -129,6 +135,27 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
             newId = { UUID.randomUUID().toString() },
             now = System::currentTimeMillis,
         )
+    }
+
+    /** Background work that outlives a screen, such as freeing the model when it sits unused. */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    private val aiLazy = lazy {
+        AiResourceManager(
+            // shortcut: one fixed file until M2-02 installs and switches models.
+            locator = { File(appContext.getExternalFilesDir(null), "models/embedding.litertlm").takeIf { it.exists() }?.path },
+            runtime = LiteRtEmbeddingRuntime(appContext.cacheDir.path),
+            io = Dispatchers.IO,
+            scope = scope,
+        )
+    }
+
+    /** The local model's one owner; it loads the model only when inference is first asked for (MOD-004). */
+    val aiResourceManager by aiLazy
+
+    /** Frees the model when the system runs short of memory; nothing to do if it never loaded. */
+    fun trimMemory() {
+        if (aiLazy.isInitialized()) scope.launch { aiResourceManager.release() }
     }
 
     val reconcileIdentity by lazy { ReconcileIdentity(RoomIdentityStore(database), ::syncCatalog, System::currentTimeMillis) }
