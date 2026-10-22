@@ -20,10 +20,10 @@
     <string name="settings_pick_category">Choose a category</string>
     <string name="settings_map_allow">Allow the online map</string>
     <string name="settings_map_allow_summary">Sends locations out to fetch map tiles and place names</string>
-    <string name="settings_display_summary">Theme colour, contrast</string>
-    <string name="settings_library_summary">Folders hidden from Photos</string>
-    <string name="settings_privacy_summary">Location when sharing, online map</string>
-    <string name="settings_ai_summary">AI models, search index</string>
+    <string name="settings_display_summary">App colours and readability</string>
+    <string name="settings_library_summary">What appears in Photos</string>
+    <string name="settings_privacy_summary">What leaves your device</string>
+    <string name="settings_ai_summary">Search with on-device AI</string>
     <string name="settings_library_hidden_hint">Open a folder in Library and tap the eye icon to change</string>
     <string name="settings_library_hidden_title">Folders hidden from Photos</string>
     <string name="settings_library_none_hidden">No hidden folders</string>
