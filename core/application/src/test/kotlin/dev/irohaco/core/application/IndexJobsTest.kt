@@ -45,6 +45,9 @@ class IndexJobsTest {
         override suspend fun fail(jobId: String, item: IndexItem) {
             jobs.getValue(jobId).items[item] = "FAILED"
         }
+        override suspend fun skip(jobId: String, item: IndexItem) {
+            jobs.getValue(jobId).items[item] = "SKIPPED"
+        }
         override suspend fun requeueRunning(jobId: String?, maxAttempts: Int) {
             jobs.filterKeys { jobId == null || it == jobId }.values.forEach { job ->
                 job.items.replaceAll { item, s -> if (s != "RUNNING") s else if (job.attempts.getValue(item) >= maxAttempts) "FAILED" else "PENDING" }

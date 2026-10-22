@@ -45,6 +45,8 @@ interface IndexJobStore {
 
     suspend fun fail(jobId: String, item: IndexItem)
 
+    suspend fun skip(jobId: String, item: IndexItem)
+
     /** Puts RUNNING items of [jobId], or of every job when null, back to PENDING; those tried [maxAttempts] times fail. */
     suspend fun requeueRunning(jobId: String?, maxAttempts: Int)
 
@@ -61,7 +63,44 @@ interface IndexJobStore {
 
 /** Turns one item into its vector, outside any database transaction (INDEX_STATE_MACHINE.md §4). */
 fun interface IndexItemProcessor {
+    /** Throws [IndexItemSkipped] when the item no longer applies, such as a file that is gone or changed. */
     suspend fun embed(item: IndexItem): FloatArray
+}
+
+/** The item is not a failure: its file is gone, offline, or has a newer revision that a later job indexes. */
+class IndexItemSkipped(message: String) : Exception(message)
+
+/** What defines one embedding space (ARCHITECTURE §4.2); spaces with another signature never mix. */
+data class EmbeddingSpaceSpec(
+    val modelProfileId: String,
+    val modelDigest: String,
+    val dimension: Int,
+    val normalization: String,
+    val queryPrefix: String?,
+    val corpusPrefix: String?,
+    val preprocessingSignature: String,
+)
+
+/** An image as it stands now: where to read it, and the revision its vector belongs to. */
+data class IndexImageSource(val contentUri: String, val revisionDigest: String)
+
+/** Embedding spaces and image targets (M2-05). */
+interface ImageIndexStore {
+    /** The space with [signature], created BUILDING under [newSpaceId] if there is none yet. */
+    suspend fun ensureSpace(newSpaceId: String, spec: EmbeddingSpaceSpec, signature: String): String
+
+    suspend fun hasVectors(spaceId: String): Boolean
+
+    /** Makes a target for every available image, in [folders] (relative paths) or everywhere when null, and returns those without a vector of their current revision in [spaceId]. */
+    suspend fun planImages(spaceId: String, folders: Set<String>?): List<IndexItem>
+
+    /** The image behind [targetId], or null when it is gone or not available. */
+    suspend fun imageSource(targetId: String): IndexImageSource?
+}
+
+/** Reads an image reduced for the model; the display path stays separate (ARCHITECTURE §11). */
+fun interface IndexImageReader {
+    suspend fun read(contentUri: String): ByteArray
 }
 
 /** Says whether indexing must stop for now: heat, battery (AC-012, ARCHITECTURE §10.1). */

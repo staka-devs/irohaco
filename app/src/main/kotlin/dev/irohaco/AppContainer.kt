@@ -14,6 +14,7 @@ import dev.irohaco.core.application.AiResourceManager
 import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.BrowseMap
 import dev.irohaco.core.application.BrowseTrash
+import dev.irohaco.core.application.EmbedImageItem
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
@@ -23,15 +24,18 @@ import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.application.OrganizeMedia
+import dev.irohaco.core.application.PlanImageIndex
 import dev.irohaco.core.application.PrepareShare
 import dev.irohaco.core.application.ReconcileIdentity
 import dev.irohaco.core.application.SyncMediaCatalog
 import dev.irohaco.core.application.ThemeColorSettings
+import dev.irohaco.core.contracts.AiPriority
 import dev.irohaco.core.database.IrohacoDatabase
 import dev.irohaco.core.database.IrohacoDatabaseFactory
 import dev.irohaco.core.database.RoomCatalogStore
 import dev.irohaco.core.database.RoomCollectionsStore
 import dev.irohaco.core.database.RoomIdentityStore
+import dev.irohaco.core.database.RoomImageIndexStore
 import dev.irohaco.core.database.RoomIndexJobStore
 import dev.irohaco.core.database.RoomLibraryReader
 import dev.irohaco.core.database.RoomLocationStore
@@ -42,6 +46,7 @@ import dev.irohaco.infrastructure.ai.AndroidResourcePolicy
 import dev.irohaco.infrastructure.ai.AndroidModelDownloader
 import dev.irohaco.infrastructure.ai.AndroidModelStorage
 import dev.irohaco.infrastructure.ai.LiteRtEmbeddingRuntime
+import dev.irohaco.infrastructure.media.AndroidIndexImageReader
 import dev.irohaco.infrastructure.media.AndroidMediaDetailsReader
 import dev.irohaco.infrastructure.media.AndroidMediaFiles
 import dev.irohaco.infrastructure.media.AndroidMediaFormatProbe
@@ -174,17 +179,23 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     /** The local model's one owner; it loads the model only when inference is first asked for (MOD-004). */
     val aiResourceManager by aiLazy
 
+    private val imageIndexStore by lazy { RoomImageIndexStore(database) }
+
     /** Indexing jobs (M2-03); [IndexingService] runs them, one at a time. */
     val indexJobs by lazy {
         IndexJobs(
             store = RoomIndexJobStore(database),
-            // shortcut: nothing turns a target into a vector yet, so every item fails; M2-05 adds the image processor.
-            processor = { throw UnsupportedOperationException("Image embedding arrives with M2-05") },
+            processor = EmbedImageItem(imageIndexStore, AndroidIndexImageReader(appContext)) { bytes ->
+                aiResourceManager.withEmbedding(AiPriority.BACKGROUND_INDEX) { it.embedImage(bytes) }
+            },
             policy = AndroidResourcePolicy(appContext),
             newId = { UUID.randomUUID().toString() },
             now = System::currentTimeMillis,
         )
     }
+
+    /** Plans an image index the user asked for (M2-05); the indexing screen (M2-04) starts the job. */
+    val planImageIndex by lazy { PlanImageIndex(imageIndexStore, indexJobs, { UUID.randomUUID().toString() }) }
 
     /** Frees the model when the system runs short of memory; nothing to do if it never loaded. */
     fun trimMemory() {
