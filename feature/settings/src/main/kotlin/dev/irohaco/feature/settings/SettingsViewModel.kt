@@ -3,9 +3,12 @@ package dev.irohaco.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.irohaco.core.application.BrowseLibrary
+import dev.irohaco.core.application.IndexJobs
 import dev.irohaco.core.application.ManageModels
+import dev.irohaco.core.application.PlanImageIndex
 import dev.irohaco.core.application.ThemeColorSettings
 import dev.irohaco.core.contracts.FolderRef
+import dev.irohaco.core.contracts.LibraryFolder
 import dev.irohaco.core.contracts.MapProvider
 import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.ModelArtifact
@@ -14,9 +17,13 @@ import dev.irohaco.core.contracts.ShareLocationPolicy
 import dev.irohaco.core.contracts.SharingSettings
 import dev.irohaco.core.domain.ThemeColor
 import dev.irohaco.core.domain.ThemeContrast
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -30,7 +37,52 @@ class SettingsViewModel(
     private val models: ManageModels? = null,
     /** Starts a model download that outlives this screen, so the file is checked even if the user leaves. */
     private val startDownload: (String) -> Unit = {},
+    private val indexJobs: IndexJobs? = null,
+    private val planImageIndex: PlanImageIndex? = null,
+    /** Runs a job in the foreground service, so it carries on after the user leaves this screen. */
+    private val runIndexJob: (String) -> Unit = {},
 ) : ViewModel() {
+    /** The job requested last and where it stands (IDX-002, M2-04); null before the first one. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val indexing: StateFlow<IndexingUi?> = (indexJobs?.latest() ?: flowOf(null))
+        .flatMapLatest { id ->
+            if (id == null || indexJobs == null) {
+                flowOf(null)
+            } else {
+                combine(indexJobs.progress(id).filterNotNull(), indexJobs.failedNames(id), indexJobs.pauseReason) { progress, failed, reason ->
+                    IndexingUi(id, progress, failed, reason)
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Folders the user can index, the SD cards that are out left aside (IDX-001). */
+    val indexFolders: StateFlow<List<LibraryFolder>> = (library?.folders() ?: flowOf(emptyList()))
+        .map { folders -> folders.filterNot { it.offline } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Plans an image index of [folders] (relative paths; null for every folder) and runs it. */
+    fun startIndex(folders: Set<String>?) {
+        viewModelScope.launch { planImageIndex?.invoke(folders)?.let(runIndexJob) }
+    }
+
+    fun pauseIndex(jobId: String) {
+        viewModelScope.launch { indexJobs?.pause(jobId) }
+    }
+
+    fun resumeIndex(jobId: String) = runIndexJob(jobId)
+
+    fun cancelIndex(jobId: String) {
+        viewModelScope.launch { indexJobs?.cancel(jobId) }
+    }
+
+    fun retryIndex(jobId: String) {
+        viewModelScope.launch {
+            indexJobs?.retryFailed(jobId)
+            runIndexJob(jobId)
+        }
+    }
+
     /** The models the app knows, and where each stands (M2-02). */
     val modelCatalog: List<ModelArtifact> = models?.catalog.orEmpty()
 

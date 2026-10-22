@@ -1,5 +1,6 @@
 package dev.irohaco.feature.settings
 
+import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -101,6 +102,9 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, googleMapsA
     val excludedFolders by viewModel.excludedFolders.collectAsStateWithLifecycle()
     val modelStates by viewModel.modelStates.collectAsStateWithLifecycle()
     val importResult by viewModel.importResult.collectAsStateWithLifecycle()
+    val indexing by viewModel.indexing.collectAsStateWithLifecycle()
+    val indexFolders by viewModel.indexFolders.collectAsStateWithLifecycle()
+    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { viewModel.importModel(it.toString()) } }
     SettingsContent(
         onBack = onBack,
@@ -117,6 +121,20 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, googleMapsA
                 onDownload = viewModel::downloadModel,
                 onImport = { pickModel.launch(arrayOf("application/octet-stream", "*/*")) },
                 onDelete = viewModel::deleteModel,
+            )
+            IndexingSettings(
+                indexing = indexing,
+                modelReady = viewModel.modelCatalog.any { modelStates[it.id] is ModelInstallState.Installed },
+                folders = indexFolders,
+                onStart = { folders ->
+                    // The job runs either way; without the permission only its progress notification is hidden.
+                    notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    viewModel.startIndex(folders)
+                },
+                onPause = viewModel::pauseIndex,
+                onResume = viewModel::resumeIndex,
+                onCancel = viewModel::cancelIndex,
+                onRetry = viewModel::retryIndex,
             )
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast) },
