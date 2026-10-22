@@ -146,6 +146,18 @@ class RoomVectorSearchStore(private val db: IrohacoDatabase) : VectorSearchStore
 
     override suspend fun coverage(spaceId: String) = dao.coverage(spaceId)
 
+    override suspend fun vectorOf(spaceId: String, assetId: String): FloatArray? = withContext(Dispatchers.IO) {
+        db.openHelper.readableDatabase.query(
+            """SELECT v.vector_blob ${VECTOR_FILES.replace(":spaceId", "?")} AND a.asset_id = ? AND t.annotation_id IS NULL
+               ORDER BY t.frame_id IS NOT NULL, f.timestamp_ms LIMIT 1""",
+            arrayOf(spaceId, assetId),
+        ).use { c ->
+            if (!c.moveToFirst()) return@use null
+            val blob = c.getBlob(0)
+            FloatArray(blob.size / 4).also { ByteBuffer.wrap(blob).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer().get(it) }
+        }
+    }
+
     private fun SpaceRow.toSpace() =
         EmbeddingSpace(spaceId, modelName, SpaceState.valueOf(state), signature, isDefault, modelProfileId, dimension, normalization, queryPrefix, corpusPrefix, preprocessingSignature)
 }

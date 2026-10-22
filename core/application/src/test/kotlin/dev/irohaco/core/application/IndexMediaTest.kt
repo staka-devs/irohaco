@@ -87,6 +87,7 @@ class IndexMediaTest {
             override suspend fun markStale(spaceIds: List<String>) {}
             override suspend fun nearest(spaceId: String, query: FloatArray, limit: Int) = emptyList<VectorHit>()
             override suspend fun coverage(spaceId: String) = 1f
+            override suspend fun vectorOf(spaceId: String, assetId: String): FloatArray? = null
         }
         val embedded = mutableListOf<String>()
         val embedMemo = EmbedMemo(store, SearchByMeaning(vectors, { floatArrayOf(0f) }, modelDigest = "d"), { embedded += it; floatArrayOf(1f) }, { "v" }, { 0 })

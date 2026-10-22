@@ -47,6 +47,18 @@ class SearchByMeaning(
     }
 
     /**
+     * Photos and video scenes near [assetId] in the default space or [spaceId] (SRCH-001); the photo
+     * itself is left out. Null when the space has no vector of it yet.
+     */
+    suspend fun similar(assetId: String, spaceId: String? = null): MeaningResult? {
+        val space = (if (spaceId != null) store.space(spaceId) else store.spaces().first().firstOrNull { it.isDefault }) ?: return null
+        if (!searchable(space)) return null
+        val vector = store.vectorOf(space.spaceId, assetId) ?: return null
+        val hits = store.nearest(space.spaceId, vector, LIMIT + 1).filter { it.assetId != assetId }
+        return MeaningResult(space, hits, store.coverage(space.spaceId))
+    }
+
+    /**
      * Searches every space the local model can query, each on its own (SRCH-005). The caller fuses
      * the rankings; similarities of different spaces are never compared.
      */

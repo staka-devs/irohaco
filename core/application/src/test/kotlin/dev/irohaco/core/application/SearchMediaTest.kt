@@ -22,6 +22,7 @@ class SearchMediaTest {
     private var textHits = listOf(TextMatch("p2", null, "看板"), TextMatch("v1", 40_000, "駅"))
     private var modelMissing = false
     private var embeds = 0
+    private val tagged = mapOf("trip" to setOf("p2", "v1"))
 
     private val vectors = object : VectorSearchStore {
         override fun spaces() = flowOf(listOf(space, other))
@@ -30,20 +31,21 @@ class SearchMediaTest {
         override suspend fun markStale(spaceIds: List<String>) {}
         override suspend fun nearest(spaceId: String, query: FloatArray, limit: Int) = if (spaceId == "b") otherHits else vectorHits
         override suspend fun coverage(spaceId: String) = 0.4f
+        override suspend fun vectorOf(spaceId: String, assetId: String) = if (assetId == "p1") floatArrayOf(1f) else null
     }
     private val texts = object : TextIndexStore {
         override suspend fun recordOcr(targetId: String, revisionDigest: String, text: String, engineRevision: String) {}
         override suspend fun search(query: String, limit: Int) = textHits
     }
     private val catalog = listOf(
-        TimelineItem("p1", MediaKind.IMAGE, "content://p1", 0),
+        TimelineItem("p1", MediaKind.IMAGE, "content://p1", 1_000),
         TimelineItem("p2", MediaKind.IMAGE, "content://p2", 0),
         TimelineItem("v1", MediaKind.VIDEO, "content://v1", 0),
     )
     private val search = SearchMedia(
         SearchByMeaning(vectors, embedText = { embeds++; if (modelMissing) throw ModelNotInstalledException() else floatArrayOf(1f) }, modelDigest = "d"),
         SearchText(texts),
-        { ids -> catalog.filter { it.assetId in ids } },
+        { ids, tag -> catalog.filter { it.assetId in ids && (tag == null || it.assetId in tagged.getValue(tag)) } },
     )
 
     @Test
@@ -73,6 +75,20 @@ class SearchMediaTest {
         assertEquals(setOf(Evidence.MEMO, Evidence.TEXT), results.hits.first { it.item.assetId == "p1" }.evidence)
         assertEquals(setOf(Evidence.MEMO), results.hits.first { it.item.assetId == "p2" }.evidence)
         assertEquals(listOf("p1"), search("祖母", byMemo = false).hits.map { it.item.assetId })
+    }
+
+    @Test
+    fun `a date range and a tag narrow the results`() = runTest {
+        assertEquals(listOf("p1"), search("駅", filters = SearchFilters(fromMs = 1_000, untilMs = 2_000)).hits.map { it.item.assetId })
+        assertEquals(listOf("p2", "v1", "v1"), search("駅", filters = SearchFilters(tagId = "trip")).hits.map { it.item.assetId })
+    }
+
+    @Test
+    fun `similar photos come from the photo's own vector, without the photo itself`() = runTest {
+        val results = search.similar("p1")
+        assertEquals(listOf("v1", "p2"), results.hits.map { it.item.assetId })
+        assertEquals(setOf(Evidence.MEANING), results.hits.flatMap { it.evidence }.toSet())
+        assertEquals(true, search.similar("p2").meaningUnavailable)
     }
 
     @Test

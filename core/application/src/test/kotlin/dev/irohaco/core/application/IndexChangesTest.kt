@@ -73,6 +73,7 @@ class IndexChangesTest {
         override suspend fun markStale(spaceIds: List<String>) {}
         override suspend fun nearest(spaceId: String, query: FloatArray, limit: Int) = emptyList<VectorHit>()
         override suspend fun coverage(spaceId: String) = 1f
+        override suspend fun vectorOf(spaceId: String, assetId: String): FloatArray? = null
     }
 
     private var ids = 0

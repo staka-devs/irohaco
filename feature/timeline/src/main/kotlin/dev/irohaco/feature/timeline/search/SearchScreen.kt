@@ -2,17 +2,23 @@ package dev.irohaco.feature.timeline.search
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -25,8 +31,10 @@ import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -42,12 +50,15 @@ import androidx.lifecycle.viewModelScope
 import coil3.request.ImageRequest
 import coil3.video.videoFrameMillis
 import dev.irohaco.core.application.Evidence
+import dev.irohaco.core.application.ManageCollections
+import dev.irohaco.core.application.SearchFilters
 import dev.irohaco.core.application.SearchHit
 import dev.irohaco.core.application.SearchMedia
 import dev.irohaco.core.application.SearchResults
 import dev.irohaco.core.application.SpaceChoice
 import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.SpaceState
+import dev.irohaco.core.contracts.Tag
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.designsystem.component.BadgeStatus
 import dev.irohaco.core.designsystem.component.GridThumbnail
@@ -66,9 +77,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 /** The search's conditions and what they found; [results] is null before the first search. */
 data class SearchUi(
@@ -81,17 +98,37 @@ data class SearchUi(
     val spaceId: String? = null,
     /** Searches every model and shows each one's rank (SRCH-005). */
     val compare: Boolean = false,
+    /** Capture time in [from, until) and a tag (SRCH-004). */
+    val filters: SearchFilters = SearchFilters(),
+    val tagName: String? = null,
     val searching: Boolean = false,
     val results: SearchResults? = null,
 )
 
-class SearchViewModel(private val search: SearchMedia) : ViewModel() {
+class SearchViewModel(
+    private val search: SearchMedia,
+    collections: ManageCollections? = null,
+    /** Opened from a photo's "find similar": the results are the photos like it, and there is no query. */
+    private val similarTo: String? = null,
+) : ViewModel() {
     val spaces: StateFlow<List<SpaceChoice>> = search.spaces().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The tags to narrow by (SRCH-004). */
+    val tags: StateFlow<List<Tag>> = (collections?.tags() ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _ui = MutableStateFlow(SearchUi())
     val ui: StateFlow<SearchUi> = _ui.asStateFlow()
 
     private var running: Job? = null
+
+    init {
+        if (similarTo != null) change { it }
+    }
+
+    /** Capture times from [fromMs] until [untilMs] (exclusive); nulls clear the range. */
+    fun showDates(fromMs: Long?, untilMs: Long?) = change { it.copy(filters = it.filters.copy(fromMs = fromMs, untilMs = untilMs)) }
+
+    fun showTag(tag: Tag?) = change { it.copy(filters = it.filters.copy(tagId = tag?.tagId), tagName = tag?.name) }
 
     fun search(query: String) = change { it.copy(query = query.trim()) }
 
@@ -121,13 +158,17 @@ class SearchViewModel(private val search: SearchMedia) : ViewModel() {
         _ui.update(edit)
         val ui = _ui.value
         running?.cancel()
-        if (ui.query.isEmpty()) {
+        if (ui.query.isEmpty() && similarTo == null) {
             _ui.update { it.copy(searching = false, results = null) }
             return
         }
         _ui.update { it.copy(searching = true) }
         running = viewModelScope.launch {
-            val results = search(ui.query, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare, ui.byMemo)
+            val results = if (similarTo != null) {
+                search.similar(similarTo, ui.spaceId, ui.kind, ui.filters)
+            } else {
+                search(ui.query, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare, ui.byMemo, ui.filters)
+            }
             _ui.update { it.copy(searching = false, results = results) }
         }
     }
@@ -135,12 +176,24 @@ class SearchViewModel(private val search: SearchMedia) : ViewModel() {
 
 /** Opens a photo, or a video at the matched scene (PlayVideoAt, AC-002). */
 @Composable
-fun SearchScreen(viewModel: SearchViewModel, onOpenMedia: (String) -> Unit, onPlayAt: (String, Long) -> Unit, onOpenSettings: () -> Unit) {
+fun SearchScreen(
+    viewModel: SearchViewModel,
+    onOpenMedia: (String) -> Unit,
+    onPlayAt: (String, Long) -> Unit,
+    onOpenSettings: () -> Unit,
+    /** Set for the "similar photos" page, which has a way back instead of a search bar. */
+    onBack: (() -> Unit)? = null,
+) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val spaces by viewModel.spaces.collectAsStateWithLifecycle()
+    val tags by viewModel.tags.collectAsStateWithLifecycle()
     SearchContent(
         ui = ui,
         spaces = spaces,
+        tags = tags,
+        onDates = viewModel::showDates,
+        onTag = viewModel::showTag,
+        onBack = onBack,
         onSearch = viewModel::search,
         onToggleMeaning = viewModel::toggleMeaning,
         onToggleText = viewModel::toggleText,
@@ -171,6 +224,10 @@ internal fun SearchContent(
     onSpace: (EmbeddingSpace) -> Unit,
     onOpen: (SearchHit) -> Unit,
     onOpenSettings: () -> Unit,
+    tags: List<Tag> = emptyList(),
+    onDates: (Long?, Long?) -> Unit = { _, _ -> },
+    onTag: (Tag?) -> Unit = {},
+    onBack: (() -> Unit)? = null,
 ) {
     var text by rememberSaveable { mutableStateOf(ui.query) }
     val labels = spaceLabels(spaces)
@@ -183,6 +240,10 @@ internal fun SearchContent(
             modifier = Modifier.fillMaxSize(),
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
+                if (onBack != null) {
+                    SimilarHeader(onBack)
+                    return@item
+                }
                 SearchBar(
                     inputField = {
                         SearchBarDefaults.InputField(
@@ -204,7 +265,7 @@ internal fun SearchContent(
                 ) {}
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace)
+                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTag, similar = onBack != null)
             }
             ui.results?.let { results ->
                 item(span = { GridItemSpan(maxLineSpan) }) { Notices(ui, results, labels, onOpenSettings) }
@@ -238,17 +299,29 @@ private fun Conditions(
     onKind: (MediaKind?) -> Unit,
     onToggleCompare: () -> Unit,
     onSpace: (EmbeddingSpace) -> Unit,
+    tags: List<Tag>,
+    onDates: (Long?, Long?) -> Unit,
+    onTag: (Tag?) -> Unit,
+    /** The similar photos page: no query, so only conditions on the files apply. */
+    similar: Boolean,
 ) {
     val searchable = spaces.count { it.space.state in PICKABLE }
+    var pickingDates by rememberSaveable { mutableStateOf(false) }
+    if (pickingDates) DateRangeDialog(ui.filters, onDismiss = { pickingDates = false }) { from, until -> pickingDates = false; onDates(from, until) }
     Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-            FilterChip(ui.byMeaning, onToggleMeaning, label = { Text(stringResource(R.string.search_by_meaning)) })
-            FilterChip(ui.byText, onToggleText, label = { Text(stringResource(R.string.search_by_text)) })
-            FilterChip(ui.byMemo, onToggleMemo, label = { Text(stringResource(R.string.search_by_memo)) })
+            if (!similar) {
+                FilterChip(ui.byMeaning, onToggleMeaning, label = { Text(stringResource(R.string.search_by_meaning)) })
+                FilterChip(ui.byText, onToggleText, label = { Text(stringResource(R.string.search_by_text)) })
+                FilterChip(ui.byMemo, onToggleMemo, label = { Text(stringResource(R.string.search_by_memo)) })
+            }
             FilterChip(ui.kind == MediaKind.IMAGE, { onKind(if (ui.kind == MediaKind.IMAGE) null else MediaKind.IMAGE) }, label = { Text(stringResource(R.string.search_photos)) })
             FilterChip(ui.kind == MediaKind.VIDEO, { onKind(if (ui.kind == MediaKind.VIDEO) null else MediaKind.VIDEO) }, label = { Text(stringResource(R.string.search_videos)) })
+            val dates = ui.filters.fromMs?.let { from -> ui.filters.untilMs?.let { until -> dateRangeLabel(from, until) } }
+            FilterChip(dates != null, { if (dates != null) onDates(null, null) else pickingDates = true }, label = { Text(dates ?: stringResource(R.string.search_dates)) })
+            TagChip(ui, tags, onTag)
             // Comparing searches every model at once, so it needs two of them (SRCH-005).
-            if (searchable > 1) {
+            if (searchable > 1 && !similar) {
                 FilterChip(ui.compare, onToggleCompare, enabled = ui.byMeaning, label = { Text(stringResource(R.string.search_compare)) })
             }
         }
@@ -269,6 +342,65 @@ private fun Conditions(
             }
         }
     }
+}
+
+/** The similar photos page's header: a way back and what the page shows. */
+@Composable
+private fun SimilarHeader(onBack: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = IrohacoSpacing.s)) {
+        IconButton(onClick = onBack) { Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back)) }
+        Text(stringResource(R.string.search_similar_title), style = MaterialTheme.typography.titleLarge)
+    }
+}
+
+/** Narrows by one tag; picking it again, or "any tag", takes the condition off. */
+@Composable
+private fun TagChip(ui: SearchUi, tags: List<Tag>, onTag: (Tag?) -> Unit) {
+    if (tags.isEmpty()) return
+    var open by remember { mutableStateOf(false) }
+    Box {
+        FilterChip(ui.filters.tagId != null, { open = true }, label = { Text(ui.tagName ?: stringResource(R.string.search_tag)) })
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text(stringResource(R.string.search_any_tag)) }, onClick = { open = false; onTag(null) })
+            tags.forEach { tag -> DropdownMenuItem(text = { Text(tag.name) }, onClick = { open = false; onTag(tag) }) }
+        }
+    }
+}
+
+/** Picks the days to search; the range covers whole local days, the last one included. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateRangeDialog(filters: SearchFilters, onDismiss: () -> Unit, onPick: (Long, Long) -> Unit) {
+    val zone = ZoneId.systemDefault()
+    // The picker works in UTC days; the filter in this device's days.
+    fun toPicker(ms: Long?) = ms?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }
+    val state = rememberDateRangePickerState(toPicker(filters.fromMs), toPicker(filters.untilMs?.minus(1)))
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val start = state.selectedStartDateMillis ?: return@TextButton
+                    val end = state.selectedEndDateMillis ?: start
+                    fun day(ms: Long) = Instant.ofEpochMilli(ms).atZone(ZoneOffset.UTC).toLocalDate()
+                    onPick(day(start).atStartOfDay(zone).toInstant().toEpochMilli(), day(end).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())
+                },
+                enabled = state.selectedStartDateMillis != null,
+            ) { Text(stringResource(R.string.search_dates_apply)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.memo_cancel)) } },
+    ) {
+        DateRangePicker(state, modifier = Modifier.heightIn(max = 520.dp))
+    }
+}
+
+@Composable
+private fun dateRangeLabel(fromMs: Long, untilMs: Long): String {
+    val formatter = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM) }
+    val zone = ZoneId.systemDefault()
+    val from = Instant.ofEpochMilli(fromMs).atZone(zone).toLocalDate()
+    val to = Instant.ofEpochMilli(untilMs - 1).atZone(zone).toLocalDate()
+    return if (from == to) formatter.format(from) else "${formatter.format(from)} – ${formatter.format(to)}"
 }
 
 @Composable

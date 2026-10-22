@@ -254,4 +254,10 @@
     <string name="memo_by_ai_model">AI (%1$s)</string>
     <string name="memo_by_user">You</string>
     <string name="memo_revision">Version %1$d · %2$s · %3$s</string>
+    <string name="search_dates">Dates</string>
+    <string name="search_dates_apply">Apply</string>
+    <string name="search_tag">Tag</string>
+    <string name="search_any_tag">Any tag</string>
+    <string name="search_similar_title">Similar photos</string>
+    <string name="viewer_find_similar">Find similar photos</string>
 </resources>

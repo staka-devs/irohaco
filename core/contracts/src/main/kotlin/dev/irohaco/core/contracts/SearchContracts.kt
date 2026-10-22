@@ -50,9 +50,12 @@ interface VectorSearchStore {
 
     /** The share of available photos and videos with a vector of their current revision in [spaceId]. */
     suspend fun coverage(spaceId: String): Float
+
+    /** The vector [assetId] has in [spaceId] at its current revision: the photo's, or a video's first frame; null without one. */
+    suspend fun vectorOf(spaceId: String, assetId: String): FloatArray?
 }
 
-/** Looks files up by id for search results; files that are gone or not available are left out. */
+/** Looks files up by id for search results; files that are gone, not available or, with [tagId], untagged are left out. */
 fun interface MediaItems {
-    suspend fun items(assetIds: List<String>): List<TimelineItem>
+    suspend fun items(assetIds: List<String>, tagId: String?): List<TimelineItem>
 }

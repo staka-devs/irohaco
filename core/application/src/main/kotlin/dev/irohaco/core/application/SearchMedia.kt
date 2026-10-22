@@ -5,6 +5,7 @@ import dev.irohaco.core.contracts.MediaItems
 import dev.irohaco.core.contracts.ModelLoadException
 import dev.irohaco.core.contracts.ModelNotInstalledException
 import dev.irohaco.core.contracts.SpaceState
+import dev.irohaco.core.contracts.TextMatch
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.flow.Flow
@@ -60,12 +61,23 @@ class SearchMedia(
         compare: Boolean = false,
         /** Search memos, by their text and their meaning (ANN-002). */
         byMemo: Boolean = true,
+        filters: SearchFilters = SearchFilters(),
     ): SearchResults {
         val meant = if (byMeaning) meaningOrEmpty { if (compare) meaning.compare(query) else listOfNotNull(meaning(query, spaceId)) } else emptyList()
         val texts = if (byText || byMemo) text(query).filter { if (it.fromMemo) byMemo else byText } else emptyList()
+        return fuse(meant.map { it.copy(hits = it.hits.filter { hit -> byMemo || !hit.fromMemo }) }, texts, kind, filters, meaningAsked = byMeaning)
+    }
+
+    /** Photos and video scenes like [assetId] (SRCH-001), under the same conditions as a search. */
+    suspend fun similar(assetId: String, spaceId: String? = null, kind: MediaKind? = null, filters: SearchFilters = SearchFilters()): SearchResults {
+        val meant = meaningOrEmpty { listOfNotNull(meaning.similar(assetId, spaceId)) }
+        return fuse(meant, emptyList(), kind, filters, meaningAsked = true)
+    }
+
+    private suspend fun fuse(meant: List<MeaningResult>, texts: List<TextMatch>, kind: MediaKind?, filters: SearchFilters, meaningAsked: Boolean): SearchResults {
         val fused = LinkedHashMap<Pair<String, Long?>, Fused>()
         meant.forEach { result ->
-            result.hits.filter { byMemo || !it.fromMemo }.forEachIndexed { rank, hit ->
+            result.hits.forEachIndexed { rank, hit ->
                 val evidence = if (hit.fromMemo) Evidence.MEMO else Evidence.MEANING
                 fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, evidence, null, result.space.spaceId)
             }
@@ -73,15 +85,15 @@ class SearchMedia(
         texts.forEachIndexed { rank, hit ->
             fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, if (hit.fromMemo) Evidence.MEMO else Evidence.TEXT, hit.text, null)
         }
-        val found = items.items(fused.keys.map { it.first }).associateBy { it.assetId }
+        val found = items.items(fused.keys.map { it.first }, filters.tagId).associateBy { it.assetId }
         val hits = fused.entries
             .sortedByDescending { it.value.score }
             .mapNotNull { (key, f) ->
-                val item = found[key.first]?.takeIf { kind == null || it.kind == kind } ?: return@mapNotNull null
+                val item = found[key.first]?.takeIf { (kind == null || it.kind == kind) && filters.admits(it.sortTimeMs) } ?: return@mapNotNull null
                 SearchHit(item, key.second, f.evidence, f.text, f.ranks)
             }
             .take(LIMIT)
-        return SearchResults(hits, meant.map { SpaceChoice(it.space, it.coverage) }, byMeaning && meant.isEmpty())
+        return SearchResults(hits, meant.map { SpaceChoice(it.space, it.coverage) }, meaningAsked && meant.isEmpty())
     }
 
     private suspend fun meaningOrEmpty(search: suspend () -> List<MeaningResult>): List<MeaningResult> = try {
@@ -113,4 +125,12 @@ class SearchMedia(
         const val LIMIT = 200
         val BUILDING = setOf(SpaceState.BUILDING, SpaceState.VERIFYING)
     }
+}
+
+/**
+ * Conditions besides the query (SRCH-004): the capture time in [fromMs, untilMs) and a tag. A file
+ * matches them by its capture time, or its modified time when it has none, as the timeline sorts it.
+ */
+data class SearchFilters(val fromMs: Long? = null, val untilMs: Long? = null, val tagId: String? = null) {
+    fun admits(timeMs: Long) = (fromMs == null || timeMs >= fromMs) && (untilMs == null || timeMs < untilMs)
 }
