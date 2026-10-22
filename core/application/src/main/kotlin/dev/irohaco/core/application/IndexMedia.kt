@@ -49,7 +49,9 @@ class PlanMediaIndex(
 ) {
     /** Returns the planned job's id; folders are relative paths, null meaning every folder. */
     suspend operator fun invoke(folders: Set<String>? = null, quality: VideoQuality = VideoQuality.BALANCED): String {
-        val spaceId = store.ensureSpace(newId(), spec, ImageSpaces.signature(spec))
+        val signature = ImageSpaces.signature(spec)
+        store.markStale(spec.modelProfileId, signature)
+        val spaceId = store.ensureSpace(newId(), spec, signature)
         val kind = if (store.hasVectors(spaceId)) IndexJobKind.INCREMENTAL else IndexJobKind.INITIAL
         return jobs.start(spaceId, kind, store.plan(spaceId, folders, quality, now()), requestedByUser = true)
     }

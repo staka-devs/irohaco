@@ -153,6 +153,8 @@ class IndexJobs(
         store.failUnstored(jobId)
         val end = if (checkNotNull(store.progress(jobId).first()).failed == 0) SUCCEEDED else PARTIAL
         store.transition(jobId, setOf(VERIFYING), end)
+        // Checked vectors make the space searchable; a READY space stays READY through later jobs (IDX-007).
+        store.markSpaceReady(jobId)
         return end
     }
 

@@ -22,6 +22,7 @@ class IndexJobsTest {
 
     private val jobs = mutableMapOf<String, Job>()
     private val vectors = mutableListOf<IndexItem>()
+    private val readySpaces = mutableListOf<String>()
 
     private val store = object : IndexJobStore {
         override suspend fun create(jobId: String, spaceId: String, kind: IndexJobKind, requestedByUser: Boolean, requestedAt: Long, items: List<IndexItem>) {
@@ -57,6 +58,9 @@ class IndexJobsTest {
         override suspend fun retryFailed(jobId: String) {
             jobs.getValue(jobId).items.replaceAll { _, s -> if (s == "FAILED") "PENDING" else s }
         }
+        override suspend fun markSpaceReady(jobId: String) {
+            readySpaces += jobId
+        }
         override suspend fun pauseInterrupted() {
             jobs.values.filter { it.state in setOf(IndexJobState.RUNNING, IndexJobState.PAUSING, IndexJobState.VERIFYING) }.forEach { it.state = IndexJobState.PAUSED }
         }
@@ -85,6 +89,7 @@ class IndexJobsTest {
         val id = indexJobs.start("s", IndexJobKind.INITIAL, items, requestedByUser = true)
         assertEquals(IndexJobState.SUCCEEDED, indexJobs.run(id))
         assertEquals(items, vectors)
+        assertEquals(listOf(id), readySpaces)
     }
 
     @Test

@@ -97,6 +97,31 @@ interface IndexingDao {
     )
     fun progress(jobId: String): Flow<ProgressRow?>
 
+    @Query(
+        """UPDATE embedding_spaces SET lifecycle_state = :to WHERE lifecycle_state = :from
+             AND space_id = (SELECT space_id FROM indexing_jobs WHERE job_id = :jobId)""",
+    )
+    suspend fun moveSpace(jobId: String, from: String, to: String)
+
+    @Query("INSERT OR IGNORE INTO search_profiles(search_profile_id, name, fusion_strategy) VALUES ('$DEFAULT_PROFILE', 'default', 'SINGLE_SPACE')")
+    suspend fun ensureDefaultProfile()
+
+    @Query(
+        """INSERT INTO search_profile_spaces(search_profile_id, space_id, priority)
+           SELECT '$DEFAULT_PROFILE', j.space_id, 0 FROM indexing_jobs j JOIN embedding_spaces s ON s.space_id = j.space_id
+           WHERE j.job_id = :jobId AND s.lifecycle_state = 'READY'
+             AND NOT EXISTS (SELECT 1 FROM search_profile_spaces WHERE search_profile_id = '$DEFAULT_PROFILE')""",
+    )
+    suspend fun defaultIfNone(jobId: String)
+
+    @Transaction
+    suspend fun markSpaceReady(jobId: String) {
+        moveSpace(jobId, "BUILDING", "VERIFYING")
+        moveSpace(jobId, "VERIFYING", "READY")
+        ensureDefaultProfile()
+        defaultIfNone(jobId)
+    }
+
     @Query("SELECT job_id FROM indexing_jobs ORDER BY requested_at DESC, rowid DESC LIMIT 1")
     fun latest(): Flow<String?>
 
@@ -107,6 +132,9 @@ interface IndexingDao {
     )
     fun failedNames(jobId: String, limit: Int): Flow<List<String>>
 }
+
+/** The profile new searches use; switching it changes one row in one transaction (ADR-0003). */
+internal const val DEFAULT_PROFILE = "default"
 
 data class ProgressRow(val state: String, val pending: Int, val committed: Int, val failed: Int, val skipped: Int, val frames: Int)
 
@@ -143,6 +171,8 @@ class RoomIndexJobStore(private val db: IrohacoDatabase) : IndexJobStore {
     override suspend fun retryFailed(jobId: String) = dao.retryFailed(jobId)
 
     override suspend fun pauseInterrupted() = dao.pauseInterrupted()
+
+    override suspend fun markSpaceReady(jobId: String) = dao.markSpaceReady(jobId)
 
     override fun progress(jobId: String): Flow<IndexJobProgress?> = dao.progress(jobId).map { row ->
         row?.let { IndexJobProgress(IndexJobState.valueOf(it.state), it.pending, it.committed, it.failed, it.skipped, it.frames) }
