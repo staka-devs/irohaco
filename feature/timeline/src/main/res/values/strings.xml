@@ -199,7 +199,6 @@
     <string name="library_map">Map</string>
     <string name="map_title">Map</string>
     <string name="map_provider_openfreemap">OpenFreeMap</string>
-    <string name="map_provider_google">Google Maps</string>
     <string name="map_consent_title">Use an online map?</string>
     <string name="map_consent_body">The map loads from %1$s, which then learns the area you look at. To show place names, the places where photos were taken may also be sent to your device\'s place-name service.</string>
     <string name="map_consent_allow">Allow</string>

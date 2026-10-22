@@ -11,7 +11,6 @@ import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.IndexSettings
 import dev.irohaco.core.contracts.LibraryFolder
-import dev.irohaco.core.contracts.MapProvider
 import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.ModelArtifact
 import dev.irohaco.core.contracts.ModelInstallState
@@ -161,20 +160,11 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setContrast(contrast) }
     }
 
-    /** The map's provider and which providers the user allowed (ADR-0011). */
-    val mapProvider: StateFlow<MapProvider> =
-        (map?.provider ?: flowOf(MapProvider.OPEN_FREE_MAP)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapProvider.OPEN_FREE_MAP)
+    /** Whether the online map is allowed (ADR-0011); off, the map asks again before it next loads. */
+    val mapAllowed: StateFlow<Boolean> = (map?.allowed ?: flowOf(false)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    val mapConsented: StateFlow<Set<MapProvider>> =
-        (map?.consented ?: flowOf(emptySet())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
-
-    fun selectMapProvider(provider: MapProvider) {
-        viewModelScope.launch { map?.setProvider(provider) }
-    }
-
-    /** Takes back every provider's consent; the map asks again before it next loads. */
-    fun revokeMapConsent() {
-        viewModelScope.launch { MapProvider.entries.forEach { map?.setConsent(it, false) } }
+    fun setMapAllowed(allowed: Boolean) {
+        viewModelScope.launch { map?.setAllowed(allowed) }
     }
 
     fun selectShareLocationPolicy(policy: ShareLocationPolicy) {

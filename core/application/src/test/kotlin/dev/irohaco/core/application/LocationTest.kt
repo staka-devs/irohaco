@@ -2,7 +2,6 @@ package dev.irohaco.core.application
 
 import dev.irohaco.core.contracts.LocatedAsset
 import dev.irohaco.core.contracts.LocationStore
-import dev.irohaco.core.contracts.MapProvider
 import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.MediaDetailsReader
 import dev.irohaco.core.contracts.PlaceNames
@@ -14,7 +13,6 @@ import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -62,20 +60,18 @@ class LocationTest {
         assertEquals(listOf("a", "b"), store.pending) // read again once the permission is granted
     }
 
-    private class FakeSettings(consent: Set<MapProvider>) : MapSettings {
-        override val provider = MutableStateFlow(MapProvider.OPEN_FREE_MAP)
-        override suspend fun setProvider(provider: MapProvider) { this.provider.value = provider }
-        override val consented = MutableStateFlow(consent)
-        override suspend fun setConsent(provider: MapProvider, granted: Boolean) {
-            consented.value = if (granted) consented.value + provider else consented.value - provider
+    private class FakeSettings(allowed: Boolean) : MapSettings {
+        override val allowed = MutableStateFlow(allowed)
+        override suspend fun setAllowed(allowed: Boolean) {
+            this.allowed.value = allowed
         }
     }
 
     @Test
-    fun `asks for place names only with the active provider's consent, and keeps them`() = runTest {
+    fun `asks for place names only once the online map is allowed, and keeps them`() = runTest {
         var lookups = 0
         val places = PlaceNames { lookups++; "千代田区" }
-        val settings = FakeSettings(emptySet())
+        val settings = FakeSettings(false)
         val map = BrowseMap(FakeStore(emptyList()), settings, places)
 
         assertEquals(null, map.placeName("a", tokyo))
@@ -85,8 +81,5 @@ class LocationTest {
         assertEquals("千代田区", map.placeName("a", tokyo))
         assertEquals("千代田区", map.placeName("a", tokyo))
         assertEquals(1, lookups) // the second time comes from the store
-
-        map.setProvider(MapProvider.GOOGLE)
-        assertEquals(false, map.allowed.first()) // another provider needs its own consent
     }
 }

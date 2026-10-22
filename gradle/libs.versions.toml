@@ -29,7 +29,6 @@ room = "2.8.5"
 ksp = "2.3.12"
 androidxCore = "1.17.0"
 maplibre = "13.6.1"
-mapsCompose = "9.0.1"
 
 [libraries]
 litertlm-android = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlm" }
@@ -56,7 +55,6 @@ coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" 
 coil-video = { module = "io.coil-kt.coil3:coil-video", version.ref = "coil" }
 coil-gif = { module = "io.coil-kt.coil3:coil-gif", version.ref = "coil" }
 maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
-maps-compose = { module = "com.google.maps.android:maps-compose", version.ref = "mapsCompose" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 material-kolor = { module = "com.materialkolor:material-kolor", version.ref = "materialKolor" }
 androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
