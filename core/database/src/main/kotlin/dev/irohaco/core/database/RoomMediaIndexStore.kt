@@ -47,9 +47,6 @@ interface MediaIndexDao {
         return spaceId(signature)
     }
 
-    @Query("UPDATE embedding_spaces SET lifecycle_state = 'STALE' WHERE model_profile_id = :modelProfileId AND space_signature <> :current AND lifecycle_state = 'READY'")
-    suspend fun markStale(modelProfileId: String, current: String)
-
     @Query("SELECT EXISTS(SELECT 1 FROM embedding_vectors WHERE space_id = :spaceId)")
     suspend fun hasVectors(spaceId: String): Boolean
 
@@ -182,8 +179,6 @@ class RoomMediaIndexStore(private val db: IrohacoDatabase) : MediaIndexStore {
     override suspend fun ensureSpace(newSpaceId: String, spec: EmbeddingSpaceSpec, signature: String) = dao.ensureSpace(newSpaceId, spec, signature)
 
     override suspend fun hasVectors(spaceId: String) = dao.hasVectors(spaceId)
-
-    override suspend fun markStale(modelProfileId: String, current: String) = dao.markStale(modelProfileId, current)
 
     override suspend fun plan(spaceId: String, folders: Set<String>?, quality: VideoQuality, now: Long) =
         dao.plan(spaceId, folders == null, folders.orEmpty().toList(), quality, now)

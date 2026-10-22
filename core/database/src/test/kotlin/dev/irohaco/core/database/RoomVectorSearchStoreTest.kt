@@ -95,13 +95,23 @@ class RoomVectorSearchStoreTest {
     }
 
     @Test
-    fun `a new model file makes the old READY space STALE`() = runTest {
+    fun `a stale space keeps its vectors, loses the default and its open jobs`() = runTest {
         setUp()
         val a = media.ensureSpace("A", spec, "sig-a")
         build(a, mapOf("a" to floatArrayOf(1f, 0f)))
-        media.markStale("m", current = "sig-new")
+        jobs.create("open", a, IndexJobKind.INCREMENTAL, true, 1, listOf(IndexItem("asset:b", "10:5")))
+        store.markStale(listOf(a))
         assertEquals(SpaceState.STALE, store.space(a)?.state)
+        assertEquals(false, store.space(a)?.isDefault)
+        assertEquals(IndexJobState.CANCELLED, jobs.state("open"))
         assertEquals(1f / 3, store.coverage(a))
         assertEquals(listOf(IndexItem("asset:b", "10:5"), IndexItem("asset:c", "10:5")), media.plan(a, null, VideoQuality.BALANCED, 0))
+    }
+
+    @Test
+    fun `a space reads back the settings its signature was made from`() = runTest {
+        setUp()
+        val a = media.ensureSpace("A", spec, "sig-a")
+        assertEquals(spec, store.space(a)?.specWith("d"))
     }
 }

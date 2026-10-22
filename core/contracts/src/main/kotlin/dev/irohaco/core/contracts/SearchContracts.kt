@@ -11,9 +11,18 @@ data class EmbeddingSpace(
     val modelName: String,
     val state: SpaceState,
     val signature: String,
-    val queryPrefix: String?,
     val isDefault: Boolean,
-)
+    /** The settings the signature was made from, all but the model file's digest. */
+    val modelProfileId: String,
+    val dimension: Int,
+    val normalization: String,
+    val queryPrefix: String?,
+    val corpusPrefix: String?,
+    val preprocessingSignature: String,
+) {
+    /** The spec this space would have with the model file of [modelDigest]. */
+    fun specWith(modelDigest: String) = EmbeddingSpaceSpec(modelProfileId, modelDigest, dimension, normalization, queryPrefix, corpusPrefix, preprocessingSignature)
+}
 
 /** A file that matched by meaning, with the frame's time when it came from a video. */
 data class VectorHit(val assetId: String, val timestampMs: Long?)
@@ -26,6 +35,12 @@ interface VectorSearchStore {
 
     /** Makes a READY space the default for new searches, in one transaction; false for any other state. */
     suspend fun setDefault(spaceId: String): Boolean
+
+    /**
+     * Marks [spaceIds] STALE in one transaction: their model file is gone (ADR-0003). Their open jobs
+     * are cancelled, so no vector of another model file lands in them, and none stays the default.
+     */
+    suspend fun markStale(spaceIds: List<String>)
 
     /**
      * The [limit] targets of [spaceId] nearest to [query], available files at their current revision

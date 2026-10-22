@@ -1,6 +1,5 @@
 package dev.irohaco.core.application
 
-import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.ModelNotInstalledException
 import dev.irohaco.core.contracts.SpaceState
 import dev.irohaco.core.contracts.TextIndexStore
@@ -13,20 +12,23 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 /** Meaning and text are fused by rank, videos match by scene, and text still works without the model (M2-09). */
 class SearchMediaTest {
-    private val space = EmbeddingSpace("a", "Model", SpaceState.BUILDING, "sig", null, isDefault = true)
+    private val space = testSpace("a", SpaceState.BUILDING, isDefault = true, prefix = null)
+    private val other = testSpace("b", SpaceState.READY, prefix = null, preprocessing = "p2")
+    private val otherHits = listOf(VectorHit("p2", null), VectorHit("p1", null))
     private var vectorHits = listOf(VectorHit("p1", null), VectorHit("v1", 20_000), VectorHit("p2", null))
     private var textHits = listOf(TextMatch("p2", null, "看板"), TextMatch("v1", 40_000, "駅"))
     private var modelMissing = false
+    private var embeds = 0
 
     private val vectors = object : VectorSearchStore {
-        override fun spaces() = flowOf(listOf(space))
-        override suspend fun space(spaceId: String) = space
+        override fun spaces() = flowOf(listOf(space, other))
+        override suspend fun space(spaceId: String) = if (spaceId == "b") other else space
         override suspend fun setDefault(spaceId: String) = false
-        override suspend fun nearest(spaceId: String, query: FloatArray, limit: Int) = vectorHits
+        override suspend fun markStale(spaceIds: List<String>) {}
+        override suspend fun nearest(spaceId: String, query: FloatArray, limit: Int) = if (spaceId == "b") otherHits else vectorHits
         override suspend fun coverage(spaceId: String) = 0.4f
     }
     private val texts = object : TextIndexStore {
@@ -39,7 +41,7 @@ class SearchMediaTest {
         TimelineItem("v1", MediaKind.VIDEO, "content://v1", 0),
     )
     private val search = SearchMedia(
-        SearchByMeaning(vectors, embedText = { if (modelMissing) throw ModelNotInstalledException() else floatArrayOf(1f) }, localSignature = "sig"),
+        SearchByMeaning(vectors, embedText = { embeds++; if (modelMissing) throw ModelNotInstalledException() else floatArrayOf(1f) }, modelDigest = "d"),
         SearchText(texts),
         { ids -> catalog.filter { it.assetId in ids } },
     )
@@ -50,14 +52,24 @@ class SearchMediaTest {
         assertEquals(listOf("p2" to null, "p1" to null, "v1" to 20_000L, "v1" to 40_000L), results.hits.map { it.item.assetId to it.timestampMs })
         assertEquals(setOf(Evidence.MEANING, Evidence.TEXT), results.hits.first().evidence)
         assertEquals("看板", results.hits.first().text)
-        assertEquals(0.4f, results.coverage)
+        assertEquals(listOf(0.4f), results.searched.map { it.coverage })
+    }
+
+    @Test
+    fun `comparing searches every space, fuses them by rank and keeps each model's rank`() = runTest {
+        val results = search("駅前の看板", compare = true)
+        assertEquals(listOf("p2", "p1", "v1", "v1"), results.hits.map { it.item.assetId })
+        assertEquals(mapOf("a" to 3, "b" to 1), results.hits[0].ranks)
+        assertEquals(mapOf("a" to 1, "b" to 2), results.hits[1].ranks)
+        assertEquals(listOf("a", "b"), results.searched.map { it.space.spaceId })
+        assertEquals(1, embeds)
     }
 
     @Test
     fun `chips narrow the sources and the kinds`() = runTest {
         assertEquals(listOf("v1", "v1"), search("駅", kind = MediaKind.VIDEO).hits.map { it.item.assetId })
         assertEquals(setOf(Evidence.TEXT), search("駅", byMeaning = false).hits.flatMap { it.evidence }.toSet())
-        assertNull(search("駅", byMeaning = false).space)
+        assertEquals(emptyList(), search("駅", byMeaning = false).searched)
     }
 
     @Test
