@@ -124,6 +124,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
     val placeName by viewModel.placeName.collectAsStateWithLifecycle()
     HdrWindow(format.hdr)
     val tags by viewModel.tags.collectAsStateWithLifecycle()
+    val memos by viewModel.memos.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
     var tagging by remember { mutableStateOf(false) }
     if (tagging) {
@@ -165,6 +166,16 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
         tags = tags,
         onAddTag = { tagging = true },
         onRemoveTag = { tagId -> detailsOf?.let { viewModel.removeTag(it, tagId) } },
+        memos = {
+            MemoSection(
+                memos = memos,
+                onAdd = { kind, text -> detailsOf?.let { viewModel.addMemo(it, kind, text) } },
+                onEdit = viewModel::editMemo,
+                onSearchable = viewModel::setMemoSearchable,
+                onDelete = viewModel::deleteMemo,
+                history = viewModel::memoHistory,
+            )
+        },
     )
     Box(Modifier.fillMaxSize()) {
         when (val s = start) {

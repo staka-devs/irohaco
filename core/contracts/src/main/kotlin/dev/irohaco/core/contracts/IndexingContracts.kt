@@ -97,13 +97,15 @@ data class EmbeddingSpaceSpec(
 
 /** A target as it stands now: where to read it, and the revision its vector belongs to. */
 sealed interface IndexSource {
-    val contentUri: String
     val revisionDigest: String
 
-    data class Image(override val contentUri: String, override val revisionDigest: String) : IndexSource
+    data class Image(val contentUri: String, override val revisionDigest: String) : IndexSource
 
     /** A video frame at [timestampMs]; the frame shown may be the nearest key frame. */
-    data class Frame(override val contentUri: String, val timestampMs: Long, override val revisionDigest: String) : IndexSource
+    data class Frame(val contentUri: String, val timestampMs: Long, override val revisionDigest: String) : IndexSource
+
+    /** A search memo's current text; its revision is the memo's, not the file's (AC-007). */
+    data class Text(val text: String, override val revisionDigest: String) : IndexSource
 }
 
 /**
@@ -132,6 +134,12 @@ interface MediaIndexStore {
     /** What [targetId] reads from, or null when it is gone or not available. */
     suspend fun source(targetId: String): IndexSource?
 
+    /** The target of a search memo at its current revision, made if needed; null when the memo is not searchable. */
+    suspend fun memoItem(annotationId: String): IndexItem?
+
+    /** Stores a vector outside a job; one already stored for the space, target and revision is kept. */
+    suspend fun putVector(spaceId: String, item: IndexItem, vectorId: String, vector: FloatArray, createdAt: Long)
+
     /** Videos whose frames, in any quality, stop before the video ends (PRD §5.2 low coverage). */
     fun lowCoverageVideos(): Flow<Int>
 }
@@ -153,7 +161,7 @@ interface TextRecognizer {
 }
 
 /** A file whose text matched, with the frame's time when the text came from a video. */
-data class TextMatch(val assetId: String, val timestampMs: Long?, val text: String)
+data class TextMatch(val assetId: String, val timestampMs: Long?, val text: String, val fromMemo: Boolean = false)
 
 /** OCR results in `ocr_observations`, and a full-text index over them that can be rebuilt (M2-07). */
 interface TextIndexStore {

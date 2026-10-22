@@ -15,11 +15,13 @@ import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.BrowseMap
 import dev.irohaco.core.application.BrowseTrash
 import dev.irohaco.core.application.EmbedMediaItem
+import dev.irohaco.core.application.EmbedMemo
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.IndexJobs
 import dev.irohaco.core.application.IndexLocations
+import dev.irohaco.core.application.ManageAnnotations
 import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.MarkMedia
@@ -35,6 +37,7 @@ import dev.irohaco.core.application.ThemeColorSettings
 import dev.irohaco.core.contracts.AiPriority
 import dev.irohaco.core.database.IrohacoDatabase
 import dev.irohaco.core.database.IrohacoDatabaseFactory
+import dev.irohaco.core.database.RoomAnnotationStore
 import dev.irohaco.core.database.RoomCatalogStore
 import dev.irohaco.core.database.RoomCollectionsStore
 import dev.irohaco.core.database.RoomIdentityStore
@@ -200,11 +203,34 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
         SearchByMeaning(RoomVectorSearchStore(database), embedText = { text -> aiResourceManager.withEmbedding(AiPriority.USER_SEARCH) { it.embedText(text) } })
     }
 
+    private val embedMemo by lazy {
+        EmbedMemo(
+            mediaIndexStore,
+            searchByMeaning,
+            embedText = { text -> aiResourceManager.withEmbedding(AiPriority.INTERACTIVE_EDIT) { it.embedText(text) } },
+            newId = { UUID.randomUUID().toString() },
+            now = System::currentTimeMillis,
+        )
+    }
+
+    /** Search memos (M2-11); an edit re-embeds that memo only, after the screen has moved on. */
+    val manageAnnotations by lazy {
+        ManageAnnotations(RoomAnnotationStore(database), { UUID.randomUUID().toString() }, System::currentTimeMillis) { annotationId ->
+            scope.launch(Dispatchers.IO) { embedMemo(annotationId) }
+        }
+    }
+
     /** Indexing jobs (M2-03); [IndexingService] runs them, one at a time. */
     val indexJobs by lazy {
         IndexJobs(
             store = RoomIndexJobStore(database),
-            processor = EmbedMediaItem(mediaIndexStore, AndroidIndexImageReader(appContext), MlKitTextRecognizer(), textIndexStore) { bytes ->
+            processor = EmbedMediaItem(
+                mediaIndexStore,
+                AndroidIndexImageReader(appContext),
+                MlKitTextRecognizer(),
+                textIndexStore,
+                embedText = { text -> aiResourceManager.withEmbedding(AiPriority.BACKGROUND_INDEX) { it.embedText(text) } },
+            ) { bytes ->
                 aiResourceManager.withEmbedding(AiPriority.BACKGROUND_INDEX) { it.embedImage(bytes) }
             },
             policy = AndroidResourcePolicy(appContext),

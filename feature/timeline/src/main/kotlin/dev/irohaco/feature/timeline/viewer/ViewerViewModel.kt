@@ -13,8 +13,12 @@ import dev.irohaco.core.application.BrowseMap
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
+import dev.irohaco.core.contracts.Annotation
+import dev.irohaco.core.contracts.AnnotationKind
+import dev.irohaco.core.contracts.AnnotationRevision
 import dev.irohaco.core.contracts.AssetMarks
 import dev.irohaco.core.application.MarkMedia
+import dev.irohaco.core.application.ManageAnnotations
 import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.contracts.Tag
 import dev.irohaco.core.contracts.MediaFormatProbe
@@ -62,6 +66,7 @@ class ViewerViewModel(
     private val collections: ManageCollections? = null,
     private val formatProbe: MediaFormatProbe? = null,
     private val map: BrowseMap? = null,
+    private val annotations: ManageAnnotations? = null,
 ) : ViewModel() {
     private val currentItem = MutableStateFlow<TimelineItem?>(null)
     private val current = currentItem.map { it?.assetId }.distinctUntilChanged()
@@ -120,6 +125,30 @@ class ViewerViewModel(
     fun removeTag(item: TimelineItem, tagId: String) {
         viewModelScope.launch { collections?.removeTag(item.assetId, tagId) }
     }
+
+    /** Search memos of the page on screen (ANN-001). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val memos: StateFlow<List<Annotation>> = current
+        .flatMapLatest { id -> if (id == null || annotations == null) flowOf(emptyList()) else annotations.annotations(id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun addMemo(item: TimelineItem, kind: AnnotationKind, text: String) {
+        viewModelScope.launch { annotations?.add(item.assetId, kind, text) }
+    }
+
+    fun editMemo(annotationId: String, text: String) {
+        viewModelScope.launch { annotations?.edit(annotationId, text) }
+    }
+
+    fun setMemoSearchable(annotationId: String, searchable: Boolean) {
+        viewModelScope.launch { annotations?.setSearchable(annotationId, searchable) }
+    }
+
+    fun deleteMemo(annotationId: String) {
+        viewModelScope.launch { annotations?.delete(annotationId) }
+    }
+
+    suspend fun memoHistory(annotationId: String): List<AnnotationRevision> = annotations?.history(annotationId).orEmpty()
 
     fun showing(item: TimelineItem?) {
         currentItem.value = item

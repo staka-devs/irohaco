@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /** Why a result matched (SRCH-004); shown under it. */
-enum class Evidence { MEANING, TEXT }
+enum class Evidence { MEANING, TEXT, MEMO }
 
 /**
  * One photo, or one scene of a video at [timestampMs] (SRCH-002), with what matched. [ranks] holds
@@ -58,16 +58,21 @@ class SearchMedia(
         byText: Boolean = true,
         kind: MediaKind? = null,
         compare: Boolean = false,
+        /** Search memos, by their text and their meaning (ANN-002). */
+        byMemo: Boolean = true,
     ): SearchResults {
         val meant = if (byMeaning) meaningOrEmpty { if (compare) meaning.compare(query) else listOfNotNull(meaning(query, spaceId)) } else emptyList()
-        val texts = if (byText) text(query) else emptyList()
+        val texts = if (byText || byMemo) text(query).filter { if (it.fromMemo) byMemo else byText } else emptyList()
         val fused = LinkedHashMap<Pair<String, Long?>, Fused>()
         meant.forEach { result ->
-            result.hits.forEachIndexed { rank, hit ->
-                fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, Evidence.MEANING, null, result.space.spaceId)
+            result.hits.filter { byMemo || !it.fromMemo }.forEachIndexed { rank, hit ->
+                val evidence = if (hit.fromMemo) Evidence.MEMO else Evidence.MEANING
+                fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, evidence, null, result.space.spaceId)
             }
         }
-        texts.forEachIndexed { rank, hit -> fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, Evidence.TEXT, hit.text, null) }
+        texts.forEachIndexed { rank, hit ->
+            fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, if (hit.fromMemo) Evidence.MEMO else Evidence.TEXT, hit.text, null)
+        }
         val found = items.items(fused.keys.map { it.first }).associateBy { it.assetId }
         val hits = fused.entries
             .sortedByDescending { it.value.score }
@@ -97,7 +102,8 @@ class SearchMedia(
             score += 1.0 / (RRF_K + rank + 1)
             evidence += kind
             if (matchedText != null) text = matchedText
-            if (spaceId != null) ranks[spaceId] = rank + 1
+            // A photo and its memo can both match in one space; the better rank stands for both.
+            if (spaceId != null) ranks.merge(spaceId, rank + 1, ::minOf)
         }
     }
 

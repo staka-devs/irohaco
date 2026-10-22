@@ -233,4 +233,25 @@
     <string name="search_unranked">%1$s: not found</string>
     <string name="search_rank_short">%1$s #%2$d</string>
     <string name="search_unranked_short">%1$s –</string>
+    <string name="search_by_memo">Memo</string>
+    <string name="memo_title">Search memos</string>
+    <string name="memo_add">Add a memo</string>
+    <string name="memo_edit">Edit</string>
+    <string name="memo_history">History</string>
+    <string name="memo_delete">Delete</string>
+    <string name="memo_delete_title">Delete this memo?</string>
+    <string name="memo_delete_body">The memo and its history are removed, and search no longer finds the photo by it.</string>
+    <string name="memo_cancel">Cancel</string>
+    <string name="memo_save">Save</string>
+    <string name="memo_close">Close</string>
+    <string name="memo_text">Memo</string>
+    <string name="memo_searchable">Use in search</string>
+    <string name="memo_kind_context">Context</string>
+    <string name="memo_kind_visual">What it shows</string>
+    <string name="memo_kind_keywords">Keywords</string>
+    <string name="memo_kind_ai_caption">AI description</string>
+    <string name="memo_by_ai">Written by AI</string>
+    <string name="memo_by_ai_model">AI (%1$s)</string>
+    <string name="memo_by_user">You</string>
+    <string name="memo_revision">Version %1$d · %2$s · %3$s</string>
 </resources>

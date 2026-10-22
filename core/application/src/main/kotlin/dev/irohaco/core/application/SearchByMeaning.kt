@@ -53,8 +53,11 @@ class SearchByMeaning(
     suspend fun compare(query: String): List<MeaningResult> {
         if (query.isBlank()) return emptyList()
         val queries = mutableMapOf<String?, FloatArray>()
-        return store.spaces().first().filter(::searchable).map { search(it, query, queries) }
+        return searchableSpaces().map { search(it, query, queries) }
     }
+
+    /** Spaces built with the model file that runs now, and not retired. */
+    suspend fun searchableSpaces(): List<EmbeddingSpace> = store.spaces().first().filter(::searchable)
 
     // Built with the model file that runs now: a query vector of another file would land elsewhere (AC-004).
     private fun searchable(space: EmbeddingSpace) = space.state in SEARCHABLE && space.signature == ImageSpaces.signature(space.specWith(modelDigest))

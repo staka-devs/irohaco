@@ -6,9 +6,12 @@ import dev.irohaco.core.contracts.IndexItem
 import dev.irohaco.core.contracts.IndexItemSkipped
 import dev.irohaco.core.contracts.IndexSource
 import dev.irohaco.core.contracts.MediaIndexStore
+import dev.irohaco.core.contracts.SpaceState
 import dev.irohaco.core.contracts.TextIndexStore
 import dev.irohaco.core.contracts.TextMatch
 import dev.irohaco.core.contracts.TextRecognizer
+import dev.irohaco.core.contracts.VectorHit
+import dev.irohaco.core.contracts.VectorSearchStore
 import dev.irohaco.core.contracts.VideoQuality
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -23,8 +26,10 @@ class IndexMediaTest {
     private val sources = mutableMapOf<String, IndexSource>(
         "t1" to IndexSource.Image("content://1", "r1"),
         "f1" to IndexSource.Frame("content://v", 15_000, "r1"),
+        "memo:n1" to IndexSource.Text("看板の前", "rev:1"),
     )
     private val read = mutableListOf<String>()
+    private val put = mutableListOf<String>()
 
     private val store = object : MediaIndexStore {
         override suspend fun ensureSpace(newSpaceId: String, spec: EmbeddingSpaceSpec, signature: String) = "s"
@@ -32,6 +37,10 @@ class IndexMediaTest {
         override suspend fun plan(spaceId: String, folders: Set<String>?, quality: VideoQuality, now: Long) = emptyList<IndexItem>()
         override suspend fun source(targetId: String) = sources[targetId]
         override fun lowCoverageVideos() = flowOf(0)
+        override suspend fun memoItem(annotationId: String) = IndexItem("memo:$annotationId", "rev:1").takeIf { "memo:$annotationId" in sources }
+        override suspend fun putVector(spaceId: String, item: IndexItem, vectorId: String, vector: FloatArray, createdAt: Long) {
+            put += "$spaceId:${item.targetId}@${item.sourceRevisionDigest}"
+        }
     }
 
     private val reader = object : IndexImageReader {
@@ -52,12 +61,37 @@ class IndexMediaTest {
         }
         override suspend fun search(query: String, limit: Int) = emptyList<TextMatch>()
     }
-    private val embedMedia = EmbedMediaItem(store, reader, recognizer, texts) { onEmbed(); floatArrayOf(it[0].toFloat()) }
+    private val embedMedia = EmbedMediaItem(store, reader, recognizer, texts, embedText = { floatArrayOf(it.length.toFloat()) }) { onEmbed(); floatArrayOf(it[0].toFloat()) }
 
     @Test
     fun `an image at its planned revision is read and embedded`() = runTest {
         assertContentEquals(floatArrayOf(1f), embedMedia.embed(IndexItem("t1", "r1")))
         assertEquals(listOf("content://1"), read)
+    }
+
+    @Test
+    fun `a memo is embedded from its text, with no file read and no OCR`() = runTest {
+        assertContentEquals(floatArrayOf(4f), embedMedia.embed(IndexItem("memo:n1", "rev:1")))
+        assertEquals(emptyList(), read)
+        assertEquals(emptyList(), recorded)
+    }
+
+    @Test
+    fun `an edited memo is embedded at once into each space of the running model file`() = runTest {
+        val vectors = object : VectorSearchStore {
+            override fun spaces() = flowOf(listOf(testSpace("a", SpaceState.READY), testSpace("old", SpaceState.READY, digest = "old")))
+            override suspend fun space(spaceId: String) = null
+            override suspend fun setDefault(spaceId: String) = false
+            override suspend fun markStale(spaceIds: List<String>) {}
+            override suspend fun nearest(spaceId: String, query: FloatArray, limit: Int) = emptyList<VectorHit>()
+            override suspend fun coverage(spaceId: String) = 1f
+        }
+        val embedded = mutableListOf<String>()
+        val embedMemo = EmbedMemo(store, SearchByMeaning(vectors, { floatArrayOf(0f) }, modelDigest = "d"), { embedded += it; floatArrayOf(1f) }, { "v" }, { 0 })
+        embedMemo("n1")
+        embedMemo("gone")
+        assertEquals(listOf("看板の前"), embedded)
+        assertEquals(listOf("a:memo:n1@rev:1"), put)
     }
 
     @Test

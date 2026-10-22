@@ -80,6 +80,7 @@ abstract class IrohacoDatabase : RoomDatabase() {
     abstract fun indexingDao(): IndexingDao
     abstract fun mediaIndexDao(): MediaIndexDao
     abstract fun vectorSearchDao(): VectorSearchDao
+    abstract fun annotationDao(): AnnotationDao
 }
 
 @Entity(

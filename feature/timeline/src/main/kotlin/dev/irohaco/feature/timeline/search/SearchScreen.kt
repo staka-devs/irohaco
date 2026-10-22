@@ -75,6 +75,7 @@ data class SearchUi(
     val query: String = "",
     val byMeaning: Boolean = true,
     val byText: Boolean = true,
+    val byMemo: Boolean = true,
     val kind: MediaKind? = null,
     /** A space picked for this search without making it the default, such as one still being built (AC-005). */
     val spaceId: String? = null,
@@ -97,6 +98,8 @@ class SearchViewModel(private val search: SearchMedia) : ViewModel() {
     fun toggleMeaning() = change { it.copy(byMeaning = !it.byMeaning) }
 
     fun toggleText() = change { it.copy(byText = !it.byText) }
+
+    fun toggleMemo() = change { it.copy(byMemo = !it.byMemo) }
 
     fun toggleCompare() = change { it.copy(compare = !it.compare) }
 
@@ -124,7 +127,7 @@ class SearchViewModel(private val search: SearchMedia) : ViewModel() {
         }
         _ui.update { it.copy(searching = true) }
         running = viewModelScope.launch {
-            val results = search(ui.query, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare)
+            val results = search(ui.query, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare, ui.byMemo)
             _ui.update { it.copy(searching = false, results = results) }
         }
     }
@@ -141,6 +144,7 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenMedia: (String) -> Unit, onPl
         onSearch = viewModel::search,
         onToggleMeaning = viewModel::toggleMeaning,
         onToggleText = viewModel::toggleText,
+        onToggleMemo = viewModel::toggleMemo,
         onKind = viewModel::showKind,
         onToggleCompare = viewModel::toggleCompare,
         onSpace = viewModel::pickSpace,
@@ -161,6 +165,7 @@ internal fun SearchContent(
     onSearch: (String) -> Unit,
     onToggleMeaning: () -> Unit,
     onToggleText: () -> Unit,
+    onToggleMemo: () -> Unit,
     onKind: (MediaKind?) -> Unit,
     onToggleCompare: () -> Unit,
     onSpace: (EmbeddingSpace) -> Unit,
@@ -199,7 +204,7 @@ internal fun SearchContent(
                 ) {}
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onKind, onToggleCompare, onSpace)
+                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace)
             }
             ui.results?.let { results ->
                 item(span = { GridItemSpan(maxLineSpan) }) { Notices(ui, results, labels, onOpenSettings) }
@@ -229,6 +234,7 @@ private fun Conditions(
     labels: Map<String, String>,
     onToggleMeaning: () -> Unit,
     onToggleText: () -> Unit,
+    onToggleMemo: () -> Unit,
     onKind: (MediaKind?) -> Unit,
     onToggleCompare: () -> Unit,
     onSpace: (EmbeddingSpace) -> Unit,
@@ -238,6 +244,7 @@ private fun Conditions(
         FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
             FilterChip(ui.byMeaning, onToggleMeaning, label = { Text(stringResource(R.string.search_by_meaning)) })
             FilterChip(ui.byText, onToggleText, label = { Text(stringResource(R.string.search_by_text)) })
+            FilterChip(ui.byMemo, onToggleMemo, label = { Text(stringResource(R.string.search_by_memo)) })
             FilterChip(ui.kind == MediaKind.IMAGE, { onKind(if (ui.kind == MediaKind.IMAGE) null else MediaKind.IMAGE) }, label = { Text(stringResource(R.string.search_photos)) })
             FilterChip(ui.kind == MediaKind.VIDEO, { onKind(if (ui.kind == MediaKind.VIDEO) null else MediaKind.VIDEO) }, label = { Text(stringResource(R.string.search_videos)) })
             // Comparing searches every model at once, so it needs two of them (SRCH-005).
@@ -367,6 +374,7 @@ private fun EmbeddingSpace.badge(coverage: Float?): BadgeStatus? = when (state) 
 private fun Evidence.label() = when (this) {
     Evidence.MEANING -> R.string.search_by_meaning
     Evidence.TEXT -> R.string.search_by_text
+    Evidence.MEMO -> R.string.search_by_memo
 }
 
 private fun TimelineItem.kindLabel() = if (kind == MediaKind.VIDEO) R.string.search_video_scene else R.string.search_photo
@@ -389,7 +397,7 @@ private fun SearchResultsPreview() {
     IrohacoTheme(dynamicColor = false) {
         SearchContent(
             SearchUi(query = "駅", compare = true, results = SearchResults(previewHits, spaces, meaningUnavailable = false)),
-            spaces, {}, {}, {}, {}, {}, {}, {}, {},
+            spaces, {}, {}, {}, {}, {}, {}, {}, {}, {},
         )
     }
 }
@@ -398,6 +406,6 @@ private fun SearchResultsPreview() {
 @Composable
 private fun SearchNoIndexPreview() {
     IrohacoTheme(dynamicColor = false) {
-        SearchContent(SearchUi(query = "駅", results = SearchResults(emptyList(), emptyList(), meaningUnavailable = true)), emptyList(), {}, {}, {}, {}, {}, {}, {}, {})
+        SearchContent(SearchUi(query = "駅", results = SearchResults(emptyList(), emptyList(), meaningUnavailable = true)), emptyList(), {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
