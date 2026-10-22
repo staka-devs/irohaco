@@ -7,29 +7,34 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.AnimatedPane
@@ -40,16 +45,20 @@ import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneSca
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.irohaco.core.contracts.FolderRef
@@ -62,6 +71,7 @@ import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.designsystem.tokens.MaterialPalette
 import dev.irohaco.core.designsystem.tokens.PaletteHue
+import dev.irohaco.core.designsystem.tokens.PaletteShade
 import dev.irohaco.core.domain.ThemeColor
 import dev.irohaco.core.domain.ThemeContrast
 import kotlinx.coroutines.launch
@@ -243,9 +253,20 @@ private fun Color.toSeed() = ThemeColor.Seed(toArgb() and 0xFFFFFF)
 private val BASIC: List<PaletteHue>
     get() = listOf(0, 1, 2, 4, 5, 8, 9, 13, 14, 16).map { MaterialPalette[it] }
 
+/** The hue and shade holding [seed] in the full palette, or null when it is not a palette colour. */
+private fun paletteShadeOf(seed: ThemeColor.Seed): Pair<Int, PaletteShade>? =
+    MaterialPalette.withIndex().firstNotNullOfOrNull { (index, hue) -> hue.shades.firstOrNull { it.color.toSeed() == seed }?.let { index to it } }
+
+/** Material's opacity for disabled content; a disabled Tab keeps its colours. */
+private const val DISABLED_ALPHA = 0.38f
+
+/** Blue, the hue of the default seed. */
+private const val BLUE = 5
+
 /**
- * Theme colour and contrast (DESIGN §2.1, APP-002), picked the way Android picks its own: the device's
- * colours, the default, then the basic colours, as round swatches. Every choice applies at once.
+ * Theme colour and contrast (DESIGN §2.1, APP-002). The device's colours are used by default; turning
+ * them off opens three tabs: the basic colours, the full palette of 19 hues and 14 shades, and any
+ * colour by its code. Every choice applies at once.
  */
 @Composable
 internal fun DisplaySettings(
@@ -255,33 +276,48 @@ internal fun DisplaySettings(
     onSelectContrast: (ThemeContrast) -> Unit,
 ) {
     val seed = themeColor as? ThemeColor.Seed
-    val context = LocalContext.current
-    val dark = isSystemInDarkTheme()
-    val device = remember(dark) { if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context) }
-    val chosen = BASIC.firstOrNull { it.main.toSeed() == seed }
+    val useDevice = seed == null
+    val basic = BASIC.firstOrNull { it.main.toSeed() == seed }
+    val inPalette = seed?.let(::paletteShadeOf)
+    var tab by rememberSaveable {
+        mutableIntStateOf(
+            when {
+                seed == null || basic != null -> 0
+                inPalette != null -> 1
+                else -> 2
+            },
+        )
+    }
     SectionTitle(R.string.settings_theme_color)
-    FlowRow(
-        modifier = Modifier.padding(horizontal = IrohacoSpacing.l).selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
-        verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
-    ) {
-        ThemeSwatch(device, stringResource(R.string.settings_theme_color_device), selected = seed == null, onClick = { onSelect(ThemeColor.Device) })
-        BASIC.forEach { hue ->
-            val value = hue.main.toSeed()
-            ThemeSwatch(seed = hue.main, name = stringResource(hue.name), selected = seed == value, onClick = { onSelect(value) })
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.settings_theme_color_device)) },
+        trailingContent = { Switch(checked = useDevice, onCheckedChange = null) },
+        // Off falls back to Blue 500, the default seed, until another colour is picked.
+        modifier = Modifier.toggleable(useDevice, role = Role.Switch) { on -> onSelect(if (on) ThemeColor.Device else MaterialPalette[BLUE].main.toSeed()) },
+    )
+    SecondaryTabRow(selectedTabIndex = tab, modifier = Modifier.alpha(if (useDevice) DISABLED_ALPHA else 1f)) {
+        listOf(R.string.settings_theme_color_basic, R.string.settings_theme_color_palette, R.string.settings_theme_color_code).forEachIndexed { index, label ->
+            Tab(selected = tab == index, onClick = { tab = index }, enabled = !useDevice, text = { Text(stringResource(label)) })
         }
     }
-    // The swatches carry no text; the one in use is named below them.
-    Text(
-        when {
-            seed == null -> stringResource(R.string.settings_theme_color_device)
-            chosen != null -> stringResource(chosen.name)
-            else -> seed.toHex() // a colour picked in an earlier version, kept until another is chosen
-        },
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
-    )
+    when (tab) {
+        0 -> BasicColors(seed, enabled = !useDevice, onSelect)
+        1 -> PaletteColors(seed, inPalette?.first, enabled = !useDevice, onSelect)
+        else -> ColorCode(seed, enabled = !useDevice, onSelect)
+    }
+    if (!useDevice) {
+        // The swatches carry no text; the one in use is named below them.
+        Text(
+            when {
+                basic != null -> stringResource(basic.name)
+                inPalette != null -> stringResource(R.string.settings_palette_shade, stringResource(MaterialPalette[inPalette.first].name), inPalette.second.label)
+                else -> seed.toHex()
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
+        )
+    }
 
     SectionTitle(R.string.settings_contrast)
     Column(Modifier.selectableGroup()) {
@@ -292,6 +328,74 @@ internal fun DisplaySettings(
             ThemeContrast.HIGH to R.string.settings_contrast_high,
         ).forEach { (value, label) -> RadioRow(label, contrast == value) { onSelectContrast(value) } }
     }
+}
+
+@Composable
+private fun BasicColors(seed: ThemeColor.Seed?, enabled: Boolean, onSelect: (ThemeColor) -> Unit) {
+    FlowRow(
+        modifier = Modifier.padding(IrohacoSpacing.l).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
+        verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
+    ) {
+        BASIC.forEach { hue ->
+            val value = hue.main.toSeed()
+            ThemeSwatch(seed = hue.main, name = stringResource(hue.name), selected = seed == value, onClick = { onSelect(value) }, enabled = enabled)
+        }
+    }
+}
+
+/** The 19 hues as a row of their 500 shades, and the 14 shades of the chosen hue below it. */
+@Composable
+private fun PaletteColors(seed: ThemeColor.Seed?, seedHue: Int?, enabled: Boolean, onSelect: (ThemeColor) -> Unit) {
+    var hueIndex by rememberSaveable { mutableIntStateOf(seedHue ?: BLUE) }
+    LazyRow(
+        contentPadding = PaddingValues(IrohacoSpacing.l),
+        horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
+        modifier = Modifier.selectableGroup(),
+    ) {
+        itemsIndexed(MaterialPalette) { index, hue ->
+            ThemeSwatch(seed = hue.main, name = stringResource(hue.name), selected = index == hueIndex, onClick = { hueIndex = index }, enabled = enabled)
+        }
+    }
+    val hue = MaterialPalette[hueIndex]
+    val hueName = stringResource(hue.name)
+    FlowRow(
+        modifier = Modifier.padding(horizontal = IrohacoSpacing.l).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
+        verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
+    ) {
+        hue.shades.forEach { shade ->
+            val value = shade.color.toSeed()
+            ThemeSwatch(
+                seed = shade.color,
+                name = stringResource(R.string.settings_palette_shade, hueName, shade.label),
+                selected = seed == value,
+                onClick = { onSelect(value) },
+                enabled = enabled,
+            )
+        }
+    }
+}
+
+/** Any colour as #RRGGBB; only a valid code is applied. */
+@Composable
+private fun ColorCode(seed: ThemeColor.Seed?, enabled: Boolean, onSelect: (ThemeColor) -> Unit) {
+    var text by rememberSaveable { mutableStateOf(seed?.toHex() ?: "#") }
+    val invalid = text.length > 1 && ThemeColor.Seed.parseHex(text) == null
+    OutlinedTextField(
+        value = text,
+        onValueChange = { input ->
+            text = input
+            ThemeColor.Seed.parseHex(input)?.let(onSelect)
+        },
+        enabled = enabled,
+        label = { Text(stringResource(R.string.settings_custom_hex_label)) },
+        isError = invalid,
+        supportingText = if (invalid) ({ Text(stringResource(R.string.settings_custom_hex_error)) }) else null,
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+        modifier = Modifier.fillMaxWidth().padding(IrohacoSpacing.l),
+    )
 }
 
 /** What leaves the device: a shared photo's GPS (MET-003) and the online map (ADR-0011). */

@@ -19,12 +19,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
@@ -36,9 +38,9 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 
 /** A theme colour made from [seed], as a round swatch (APP-002). */
 @Composable
-fun ThemeSwatch(seed: Color, name: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ThemeSwatch(seed: Color, name: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val scheme = remember(seed) { dynamicColorScheme(seedColor = seed, isDark = false) }
-    ThemeSwatch(scheme, name, selected, onClick, modifier)
+    ThemeSwatch(scheme, name, selected, onClick, modifier, enabled)
 }
 
 /**
@@ -47,17 +49,19 @@ fun ThemeSwatch(seed: Color, name: String, selected: Boolean, onClick: () -> Uni
  * whether it is the one in use.
  */
 @Composable
-fun ThemeSwatch(scheme: ColorScheme, name: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ThemeSwatch(scheme: ColorScheme, name: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Box(
         modifier
             .size(64.dp)
             .clip(CircleShape)
             .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, CircleShape) else Modifier)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
             .clearAndSetSemantics {
                 contentDescription = name
                 this.selected = selected
                 role = Role.RadioButton
+                if (!enabled) disabled()
             }
             .padding(if (selected) 6.dp else 0.dp),
         contentAlignment = Alignment.Center,
@@ -76,6 +80,9 @@ fun ThemeSwatch(scheme: ColorScheme, name: String, selected: Boolean, onClick: (
         }
     }
 }
+
+/** Material's opacity for disabled content. */
+private const val DISABLED_ALPHA = 0.38f
 
 @IrohacoPreviews
 @Composable

@@ -3,7 +3,13 @@
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>
     <string name="settings_theme_color">Theme colour</string>
-    <string name="settings_theme_color_device">Device colours</string>
+    <string name="settings_theme_color_device">Use device colours</string>
+    <string name="settings_theme_color_basic">Basic</string>
+    <string name="settings_theme_color_palette">Palette</string>
+    <string name="settings_theme_color_code">Colour code</string>
+    <string name="settings_palette_shade">%1$s %2$s</string>
+    <string name="settings_custom_hex_label">Colour code (#RRGGBB)</string>
+    <string name="settings_custom_hex_error">Enter as #RRGGBB</string>
     <string name="settings_contrast">Contrast</string>
     <string name="settings_contrast_device">Device setting</string>
     <string name="settings_contrast_standard">Standard</string>

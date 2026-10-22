@@ -3,7 +3,13 @@
     <string name="settings_title">設定</string>
     <string name="settings_back">戻る</string>
     <string name="settings_theme_color">テーマの色</string>
-    <string name="settings_theme_color_device">端末の色</string>
+    <string name="settings_theme_color_device">端末の色を使用</string>
+    <string name="settings_theme_color_basic">基本</string>
+    <string name="settings_theme_color_palette">パレット</string>
+    <string name="settings_theme_color_code">カラーコード</string>
+    <string name="settings_palette_shade">%1$s %2$s</string>
+    <string name="settings_custom_hex_label">カラーコード（#RRGGBB）</string>
+    <string name="settings_custom_hex_error">#RRGGBBの形式で入力</string>
     <string name="settings_contrast">コントラスト</string>
     <string name="settings_contrast_device">端末の設定</string>
     <string name="settings_contrast_standard">標準</string>
