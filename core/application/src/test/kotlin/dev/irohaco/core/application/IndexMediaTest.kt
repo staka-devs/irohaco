@@ -6,6 +6,9 @@ import dev.irohaco.core.contracts.IndexItem
 import dev.irohaco.core.contracts.IndexItemSkipped
 import dev.irohaco.core.contracts.IndexSource
 import dev.irohaco.core.contracts.MediaIndexStore
+import dev.irohaco.core.contracts.TextIndexStore
+import dev.irohaco.core.contracts.TextMatch
+import dev.irohaco.core.contracts.TextRecognizer
 import dev.irohaco.core.contracts.VideoQuality
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -37,7 +40,19 @@ class IndexMediaTest {
     }
 
     private var onEmbed: () -> Unit = {}
-    private val embedMedia = EmbedMediaItem(store, reader) { onEmbed(); floatArrayOf(it[0].toFloat()) }
+    private var ocr: suspend (ByteArray) -> String = { "看板" }
+    private val recorded = mutableListOf<String>()
+    private val recognizer = object : TextRecognizer {
+        override val engineRevision = "e"
+        override suspend fun recognize(image: ByteArray) = ocr(image)
+    }
+    private val texts = object : TextIndexStore {
+        override suspend fun recordOcr(targetId: String, revisionDigest: String, text: String, engineRevision: String) {
+            recorded += "$targetId@$revisionDigest=$text"
+        }
+        override suspend fun search(query: String, limit: Int) = emptyList<TextMatch>()
+    }
+    private val embedMedia = EmbedMediaItem(store, reader, recognizer, texts) { onEmbed(); floatArrayOf(it[0].toFloat()) }
 
     @Test
     fun `an image at its planned revision is read and embedded`() = runTest {
@@ -49,6 +64,26 @@ class IndexMediaTest {
     fun `a video frame is read at its time`() = runTest {
         assertContentEquals(floatArrayOf(2f), embedMedia.embed(IndexItem("f1", "r1")))
         assertEquals(listOf("content://v@15000"), read)
+    }
+
+    @Test
+    fun `the text read from the image is kept with its revision`() = runTest {
+        embedMedia.embed(IndexItem("t1", "r1"))
+        assertEquals(listOf("t1@r1=看板"), recorded)
+    }
+
+    @Test
+    fun `text that cannot be read leaves the vector in place`() = runTest {
+        ocr = { error("recognizer failed") }
+        assertContentEquals(floatArrayOf(1f), embedMedia.embed(IndexItem("t1", "r1")))
+        assertEquals(emptyList(), recorded)
+    }
+
+    @Test
+    fun `no text is kept for an image changed while it was read`() = runTest {
+        onEmbed = { sources["t1"] = IndexSource.Image("content://1", "r2") }
+        assertFailsWith<IndexItemSkipped> { embedMedia.embed(IndexItem("t1", "r1")) }
+        assertEquals(emptyList(), recorded)
     }
 
     @Test

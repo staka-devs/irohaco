@@ -27,7 +27,7 @@ object IrohacoDatabaseFactory {
 
     @WorkerThread
     internal fun open(context: Context, schemaSql: String, name: String): IrohacoDatabase {
-        val builder = Room.databaseBuilder(context, IrohacoDatabase::class.java, name).addCallback(EnableForeignKeys)
+        val builder = Room.databaseBuilder(context, IrohacoDatabase::class.java, name).addCallback(OnOpen)
         val bootstrap = if (context.getDatabasePath(name).exists()) null else createFromSchema(context, schemaSql, name)
         bootstrap?.let { builder.createFromFile(it) }
         val db = builder.build()
@@ -58,9 +58,11 @@ object IrohacoDatabaseFactory {
         return file
     }
 
-    private object EnableForeignKeys : RoomDatabase.Callback() {
+    // Foreign keys are off per connection unless asked for; ocr_fts is derived, so it is made here (M2-07).
+    private object OnOpen : RoomDatabase.Callback() {
         override fun onOpen(db: SupportSQLiteDatabase) {
             db.execSQL("PRAGMA foreign_keys = ON")
+            db.execSQL(RoomTextIndexStore.CREATE_FTS)
         }
     }
 }

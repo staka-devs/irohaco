@@ -8,7 +8,11 @@ import dev.irohaco.core.contracts.IndexItemSkipped
 import dev.irohaco.core.contracts.IndexJobKind
 import dev.irohaco.core.contracts.IndexSource
 import dev.irohaco.core.contracts.MediaIndexStore
+import dev.irohaco.core.contracts.TextIndexStore
+import dev.irohaco.core.contracts.TextMatch
+import dev.irohaco.core.contracts.TextRecognizer
 import dev.irohaco.core.contracts.VideoQuality
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import java.security.MessageDigest
 
@@ -55,12 +59,15 @@ class PlanMediaIndex(
 }
 
 /**
- * Embeds one image or video frame (INDEX_STATE_MACHINE.md §4 steps 3–4). A file that is gone or
- * changed is skipped, both before and after the model runs, so a vector never lands on a newer revision.
+ * Embeds one image or video frame and reads its text (INDEX_STATE_MACHINE.md §4 steps 3–4, IDX-003).
+ * A file that is gone or changed is skipped, both before and after the model runs, so a vector or text
+ * never lands on a newer revision. Text that cannot be read leaves the vector in place.
  */
 class EmbedMediaItem(
     private val store: MediaIndexStore,
     private val reader: IndexImageReader,
+    private val recognizer: TextRecognizer?,
+    private val texts: TextIndexStore?,
     /** Runs the model at background priority; searches by the user go first. */
     private val embed: suspend (ByteArray) -> FloatArray,
 ) : IndexItemProcessor {
@@ -70,11 +77,30 @@ class EmbedMediaItem(
             is IndexSource.Frame -> reader.readFrame(source.contentUri, source.timestampMs)
         }
         val vector = embed(bytes)
+        val text = recognizer?.let { recognize(it, bytes) }
         current(item)
+        if (text != null && recognizer != null) texts?.recordOcr(item.targetId, item.sourceRevisionDigest, text, recognizer.engineRevision)
         return vector
+    }
+
+    private suspend fun recognize(recognizer: TextRecognizer, bytes: ByteArray): String? = try {
+        recognizer.recognize(bytes)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null // the vector still counts; the text is read again when the file is indexed next
     }
 
     private suspend fun current(item: IndexItem) = store.source(item.targetId)
         ?.takeIf { it.revisionDigest == item.sourceRevisionDigest }
         ?: throw IndexItemSkipped("${item.targetId} is gone or has changed")
+}
+
+/** Finds files by the text in them (IDX-003); the search screen (M2-09) shows the matches. */
+class SearchText(private val store: TextIndexStore) {
+    suspend operator fun invoke(query: String): List<TextMatch> = if (query.isBlank()) emptyList() else store.search(query.trim(), LIMIT)
+
+    private companion object {
+        const val LIMIT = 200
+    }
 }

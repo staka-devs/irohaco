@@ -137,6 +137,27 @@ interface IndexImageReader {
     suspend fun readFrame(contentUri: String, timestampMs: Long): ByteArray
 }
 
+/** Reads the text in an image on this device; nothing is sent out (IDX-003, M2-07). */
+interface TextRecognizer {
+    /** Stored with each result, so results of another engine can be told apart and redone. */
+    val engineRevision: String
+
+    /** The text found in [image] (JPEG bytes), lines joined by newlines; empty when there is none. */
+    suspend fun recognize(image: ByteArray): String
+}
+
+/** A file whose text matched, with the frame's time when the text came from a video. */
+data class TextMatch(val assetId: String, val timestampMs: Long?, val text: String)
+
+/** OCR results in `ocr_observations`, and a full-text index over them that can be rebuilt (M2-07). */
+interface TextIndexStore {
+    /** Keeps [text] as the target's OCR at [revisionDigest], replacing what an older revision left. */
+    suspend fun recordOcr(targetId: String, revisionDigest: String, text: String, engineRevision: String)
+
+    /** Files whose OCR contains [query], available ones only. */
+    suspend fun search(query: String, limit: Int): List<TextMatch>
+}
+
 /** Says whether indexing must stop for now: heat, battery (AC-012, ARCHITECTURE §10.1). */
 fun interface ResourcePolicy {
     fun hold(): PauseReason?
