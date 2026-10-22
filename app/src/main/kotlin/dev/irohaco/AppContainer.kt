@@ -17,6 +17,7 @@ import dev.irohaco.core.application.BrowseTrash
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
+import dev.irohaco.core.application.IndexJobs
 import dev.irohaco.core.application.IndexLocations
 import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.application.ManageModels
@@ -31,11 +32,13 @@ import dev.irohaco.core.database.IrohacoDatabaseFactory
 import dev.irohaco.core.database.RoomCatalogStore
 import dev.irohaco.core.database.RoomCollectionsStore
 import dev.irohaco.core.database.RoomIdentityStore
+import dev.irohaco.core.database.RoomIndexJobStore
 import dev.irohaco.core.database.RoomLibraryReader
 import dev.irohaco.core.database.RoomLocationStore
 import dev.irohaco.core.database.RoomMarksStore
 import dev.irohaco.core.database.RoomModelProfiles
 import dev.irohaco.core.database.RoomTimelineReader
+import dev.irohaco.infrastructure.ai.AndroidResourcePolicy
 import dev.irohaco.infrastructure.ai.AndroidModelDownloader
 import dev.irohaco.infrastructure.ai.AndroidModelStorage
 import dev.irohaco.infrastructure.ai.LiteRtEmbeddingRuntime
@@ -170,6 +173,18 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     /** The local model's one owner; it loads the model only when inference is first asked for (MOD-004). */
     val aiResourceManager by aiLazy
+
+    /** Indexing jobs (M2-03); [IndexingService] runs them, one at a time. */
+    val indexJobs by lazy {
+        IndexJobs(
+            store = RoomIndexJobStore(database),
+            // shortcut: nothing turns a target into a vector yet, so every item fails; M2-05 adds the image processor.
+            processor = { throw UnsupportedOperationException("Image embedding arrives with M2-05") },
+            policy = AndroidResourcePolicy(appContext),
+            newId = { UUID.randomUUID().toString() },
+            now = System::currentTimeMillis,
+        )
+    }
 
     /** Frees the model when the system runs short of memory; nothing to do if it never loaded. */
     fun trimMemory() {
