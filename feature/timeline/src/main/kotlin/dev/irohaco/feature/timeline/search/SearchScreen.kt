@@ -78,6 +78,8 @@ data class SearchUi(
     val kind: MediaKind? = null,
     /** A space picked for this search without making it the default, such as one still being built (AC-005). */
     val spaceId: String? = null,
+    /** Searches every model and shows each one's rank (SRCH-005). */
+    val compare: Boolean = false,
     val searching: Boolean = false,
     val results: SearchResults? = null,
 )
@@ -95,6 +97,8 @@ class SearchViewModel(private val search: SearchMedia) : ViewModel() {
     fun toggleMeaning() = change { it.copy(byMeaning = !it.byMeaning) }
 
     fun toggleText() = change { it.copy(byText = !it.byText) }
+
+    fun toggleCompare() = change { it.copy(compare = !it.compare) }
 
     fun showKind(kind: MediaKind?) = change { it.copy(kind = kind) }
 
@@ -120,7 +124,7 @@ class SearchViewModel(private val search: SearchMedia) : ViewModel() {
         }
         _ui.update { it.copy(searching = true) }
         running = viewModelScope.launch {
-            val results = search(ui.query, ui.spaceId, ui.byMeaning, ui.byText, ui.kind)
+            val results = search(ui.query, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare)
             _ui.update { it.copy(searching = false, results = results) }
         }
     }
@@ -138,6 +142,7 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenMedia: (String) -> Unit, onPl
         onToggleMeaning = viewModel::toggleMeaning,
         onToggleText = viewModel::toggleText,
         onKind = viewModel::showKind,
+        onToggleCompare = viewModel::toggleCompare,
         onSpace = viewModel::pickSpace,
         onOpen = { hit -> hit.timestampMs?.let { onPlayAt(hit.item.assetId, it) } ?: onOpenMedia(hit.item.assetId) },
         onOpenSettings = onOpenSettings,
@@ -145,8 +150,8 @@ fun SearchScreen(viewModel: SearchViewModel, onOpenMedia: (String) -> Unit, onPl
 }
 
 /**
- * Search (DESIGN §4.3, SRCH-001〜004, SRCH-006): a search bar, condition chips, the model switch, a
- * banner when the index does not cover everything, and photos and video scenes in one grid.
+ * Search (DESIGN §4.3, SRCH-001〜006): a search bar, condition chips, the model switch or a comparison
+ * of every model, a banner when an index does not cover everything, and photos and video scenes in one grid.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -157,11 +162,13 @@ internal fun SearchContent(
     onToggleMeaning: () -> Unit,
     onToggleText: () -> Unit,
     onKind: (MediaKind?) -> Unit,
+    onToggleCompare: () -> Unit,
     onSpace: (EmbeddingSpace) -> Unit,
     onOpen: (SearchHit) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     var text by rememberSaveable { mutableStateOf(ui.query) }
+    val labels = spaceLabels(spaces)
     Scaffold { padding ->
         LazyVerticalGrid(
             columns = GridCells.Adaptive(112.dp),
@@ -192,14 +199,15 @@ internal fun SearchContent(
                 ) {}
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Conditions(ui, spaces, onToggleMeaning, onToggleText, onKind, onSpace)
+                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onKind, onToggleCompare, onSpace)
             }
             ui.results?.let { results ->
-                item(span = { GridItemSpan(maxLineSpan) }) { Notices(ui, results, onOpenSettings) }
+                item(span = { GridItemSpan(maxLineSpan) }) { Notices(ui, results, labels, onOpenSettings) }
             }
             if (ui.searching) item(span = { GridItemSpan(maxLineSpan) }) { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             val hits = ui.results?.hits.orEmpty()
-            items(hits, key = { "${it.item.assetId}@${it.timestampMs}" }) { hit -> HitCell(hit, onOpen) }
+            val compared = ui.results?.searched.orEmpty().takeIf { it.size > 1 }?.map { it.space.spaceId }
+            items(hits, key = { "${it.item.assetId}@${it.timestampMs}" }) { hit -> HitCell(hit, compared, labels, onOpen) }
             if (ui.results != null && hits.isEmpty() && !ui.searching) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Text(stringResource(R.string.search_nothing), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(vertical = IrohacoSpacing.xl))
@@ -218,28 +226,36 @@ internal fun SearchContent(
 private fun Conditions(
     ui: SearchUi,
     spaces: List<SpaceChoice>,
+    labels: Map<String, String>,
     onToggleMeaning: () -> Unit,
     onToggleText: () -> Unit,
     onKind: (MediaKind?) -> Unit,
+    onToggleCompare: () -> Unit,
     onSpace: (EmbeddingSpace) -> Unit,
 ) {
+    val searchable = spaces.count { it.space.state in PICKABLE }
     Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
             FilterChip(ui.byMeaning, onToggleMeaning, label = { Text(stringResource(R.string.search_by_meaning)) })
             FilterChip(ui.byText, onToggleText, label = { Text(stringResource(R.string.search_by_text)) })
             FilterChip(ui.kind == MediaKind.IMAGE, { onKind(if (ui.kind == MediaKind.IMAGE) null else MediaKind.IMAGE) }, label = { Text(stringResource(R.string.search_photos)) })
             FilterChip(ui.kind == MediaKind.VIDEO, { onKind(if (ui.kind == MediaKind.VIDEO) null else MediaKind.VIDEO) }, label = { Text(stringResource(R.string.search_videos)) })
+            // Comparing searches every model at once, so it needs two of them (SRCH-005).
+            if (searchable > 1) {
+                FilterChip(ui.compare, onToggleCompare, enabled = ui.byMeaning, label = { Text(stringResource(R.string.search_compare)) })
+            }
         }
         // The model switch appears once there is a choice (DESIGN §3: a few models side by side).
         if (spaces.size > 1) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
                 spaces.forEach { (space, coverage) ->
-                    val selected = if (ui.spaceId != null) space.spaceId == ui.spaceId else space.isDefault
+                    val selected = if (ui.compare) space.state in PICKABLE else if (ui.spaceId != null) space.spaceId == ui.spaceId else space.isDefault
                     FilterChip(
                         selected = selected,
                         onClick = { onSpace(space) },
-                        enabled = space.state in PICKABLE,
-                        label = { Text(space.modelName) },
+                        enabled = space.state in PICKABLE && !ui.compare,
+                        // Comparing, each model gets a letter the result cells use for its rank.
+                        label = { Text(listOfNotNull(letter(ui, space.spaceId), labels.getValue(space.spaceId)).joinToString("  ")) },
                         trailingIcon = space.badge(coverage)?.let { { StatusBadge(it) } },
                     )
                 }
@@ -249,14 +265,24 @@ private fun Conditions(
 }
 
 @Composable
-private fun Notices(ui: SearchUi, results: SearchResults, onOpenSettings: () -> Unit) {
-    val coverage = results.coverage
-    when {
-        ui.byMeaning && results.meaningUnavailable -> Banner(BadgeStatus.AiNotInstalled, stringResource(R.string.search_no_index)) {
+private fun Notices(ui: SearchUi, results: SearchResults, labels: Map<String, String>, onOpenSettings: () -> Unit) {
+    if (ui.byMeaning && results.meaningUnavailable) {
+        Banner(BadgeStatus.AiNotInstalled, stringResource(R.string.search_no_index)) {
             TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.search_open_settings)) }
         }
-        coverage != null && coverage < 1f -> Banner(BadgeStatus.LowCoverage, stringResource(R.string.search_coverage, (coverage * 100).toInt()))
+        return
     }
+    val partial = results.searched.filter { (it.coverage ?: 1f) < 1f }
+    if (partial.isEmpty()) return
+    Banner(
+        BadgeStatus.LowCoverage,
+        partial.map { (space, coverage) ->
+            val percent = ((coverage ?: 0f) * 100).toInt()
+            // With one model the banner needs no name; comparing, each model has its own share.
+            if (results.searched.size == 1) stringResource(R.string.search_coverage, percent)
+            else stringResource(R.string.search_coverage_of, labels.getValue(space.spaceId), percent)
+        }.joinToString("\n"),
+    )
 }
 
 @Composable
@@ -271,7 +297,7 @@ private fun Banner(status: BadgeStatus, text: String, action: (@Composable () ->
 }
 
 @Composable
-private fun HitCell(hit: SearchHit, onOpen: (SearchHit) -> Unit) {
+private fun HitCell(hit: SearchHit, compared: List<String>?, labels: Map<String, String>, onOpen: (SearchHit) -> Unit) {
     val item = hit.item
     val at = hit.timestampMs
     val context = LocalContext.current
@@ -279,10 +305,15 @@ private fun HitCell(hit: SearchHit, onOpen: (SearchHit) -> Unit) {
     val model: Any = if (at != null) ImageRequest.Builder(context).data(item.contentUri).videoFrameMillis(at).build() else GridThumbnail(item.contentUri)
     val evidence = hit.evidence.sortedBy { it.ordinal }.map { stringResource(it.label()) }.joinToString(" · ")
     val time = at?.let { formatDuration(it) }
+    // TalkBack hears each model by name; the cell shows only its letter.
+    val ranks = compared?.map { spaceId ->
+        val rank = hit.ranks[spaceId]
+        if (rank != null) stringResource(R.string.search_rank, labels.getValue(spaceId), rank) else stringResource(R.string.search_unranked, labels.getValue(spaceId))
+    }.orEmpty()
     Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
         MediaThumbnail(
             model = model,
-            contentDescription = listOfNotNull(stringResource(item.kindLabel()), time?.let { stringResource(R.string.search_at, it) }, evidence).joinToString(", "),
+            contentDescription = (listOfNotNull(stringResource(item.kindLabel()), time?.let { stringResource(R.string.search_at, it) }, evidence) + ranks).joinToString(", "),
             selected = false,
             label = time ?: item.durationMs?.let(::formatDuration),
             labelIcon = item.badgeIcon,
@@ -291,11 +322,38 @@ private fun HitCell(hit: SearchHit, onOpen: (SearchHit) -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(evidence, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
+        // Each model's own rank, never a score: scores of different models do not compare (SRCH-005).
+        if (compared != null) {
+            Text(
+                compared.mapIndexed { i, spaceId ->
+                    val rank = hit.ranks[spaceId]
+                    if (rank != null) stringResource(R.string.search_rank_short, LETTERS[i], rank) else stringResource(R.string.search_unranked_short, LETTERS[i])
+                }.joinToString(" · "),
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+            )
+        }
         hit.text?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2) }
     }
 }
 
+/** The model's name, numbered when two spaces share it (one model with two preprocessings). */
+private fun spaceLabels(spaces: List<SpaceChoice>): Map<String, String> {
+    val counts = spaces.groupingBy { it.space.modelName }.eachCount()
+    val seen = mutableMapOf<String, Int>()
+    return spaces.associate { (space, _) ->
+        val n = seen.merge(space.modelName, 1, Int::plus)!!
+        space.spaceId to if (counts.getValue(space.modelName) > 1) "${space.modelName} ($n)" else space.modelName
+    }
+}
+
 private val PICKABLE = setOf(SpaceState.READY, SpaceState.BUILDING, SpaceState.VERIFYING)
+
+/** Letters for the compared models, in the order they were searched. */
+private const val LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+private fun letter(ui: SearchUi, spaceId: String): String? =
+    ui.results?.searched?.takeIf { ui.compare && it.size > 1 }?.indexOfFirst { it.space.spaceId == spaceId }?.takeIf { it >= 0 }?.let { LETTERS[it].toString() }
 
 private fun EmbeddingSpace.badge(coverage: Float?): BadgeStatus? = when (state) {
     SpaceState.READY -> null
@@ -313,22 +371,25 @@ private fun Evidence.label() = when (this) {
 
 private fun TimelineItem.kindLabel() = if (kind == MediaKind.VIDEO) R.string.search_video_scene else R.string.search_photo
 
+private fun previewSpace(id: String, state: SpaceState, isDefault: Boolean) =
+    EmbeddingSpace(id, "EmbeddingGemma 2", state, id, isDefault, "m", 768, "L2", null, null, id)
+
 private val previewHits = listOf(
-    SearchHit(TimelineItem("p", MediaKind.IMAGE, "", 0), null, setOf(Evidence.MEANING, Evidence.TEXT), "丸の内北口"),
-    SearchHit(TimelineItem("v", MediaKind.VIDEO, "", 0, durationMs = 95_000), 42_000, setOf(Evidence.MEANING), null),
+    SearchHit(TimelineItem("p", MediaKind.IMAGE, "", 0), null, setOf(Evidence.MEANING, Evidence.TEXT), "丸の内北口", mapOf("a" to 1, "b" to 3)),
+    SearchHit(TimelineItem("v", MediaKind.VIDEO, "", 0, durationMs = 95_000), 42_000, setOf(Evidence.MEANING), null, mapOf("a" to 2)),
 )
 
 @IrohacoPreviews
 @Composable
 private fun SearchResultsPreview() {
     val spaces = listOf(
-        SpaceChoice(EmbeddingSpace("a", "EmbeddingGemma 2", SpaceState.READY, "s", null, isDefault = true), null),
-        SpaceChoice(EmbeddingSpace("b", "EmbeddingGemma 2", SpaceState.BUILDING, "s2", null, isDefault = false), 0.42f),
+        SpaceChoice(previewSpace("a", SpaceState.READY, isDefault = true), null),
+        SpaceChoice(previewSpace("b", SpaceState.BUILDING, isDefault = false), 0.42f),
     )
     IrohacoTheme(dynamicColor = false) {
         SearchContent(
-            SearchUi(query = "駅", spaceId = "b", results = SearchResults(previewHits, spaces[1].space, 0.42f, meaningUnavailable = false)),
-            spaces, {}, {}, {}, {}, {}, {}, {},
+            SearchUi(query = "駅", compare = true, results = SearchResults(previewHits, spaces, meaningUnavailable = false)),
+            spaces, {}, {}, {}, {}, {}, {}, {}, {},
         )
     }
 }
@@ -337,6 +398,6 @@ private fun SearchResultsPreview() {
 @Composable
 private fun SearchNoIndexPreview() {
     IrohacoTheme(dynamicColor = false) {
-        SearchContent(SearchUi(query = "駅", results = SearchResults(emptyList(), null, null, meaningUnavailable = true)), emptyList(), {}, {}, {}, {}, {}, {}, {})
+        SearchContent(SearchUi(query = "駅", results = SearchResults(emptyList(), emptyList(), meaningUnavailable = true)), emptyList(), {}, {}, {}, {}, {}, {}, {}, {})
     }
 }

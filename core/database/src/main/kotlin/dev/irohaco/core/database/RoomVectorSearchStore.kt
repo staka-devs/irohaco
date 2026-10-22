@@ -26,7 +26,8 @@ private const val VECTOR_FILES =
 
 private const val SPACES =
     """SELECT s.space_id AS spaceId, m.display_name AS modelName, s.lifecycle_state AS state, s.space_signature AS signature,
-         s.query_prefix AS queryPrefix,
+         s.query_prefix AS queryPrefix, s.model_profile_id AS modelProfileId, s.dimension AS dimension, s.normalization AS normalization,
+         s.corpus_prefix AS corpusPrefix, s.preprocessing_signature AS preprocessingSignature,
          EXISTS (SELECT 1 FROM search_profile_spaces p WHERE p.search_profile_id = '$DEFAULT_PROFILE' AND p.space_id = s.space_id) AS isDefault
        FROM embedding_spaces s JOIN model_profiles m ON m.model_profile_id = s.model_profile_id"""
 
@@ -60,6 +61,22 @@ interface VectorSearchDao {
         return true
     }
 
+    @Query("UPDATE embedding_spaces SET lifecycle_state = 'STALE' WHERE space_id IN (:spaceIds) AND lifecycle_state NOT IN ('STALE', 'DELETING')")
+    suspend fun staleSpaces(spaceIds: List<String>)
+
+    @Query("UPDATE indexing_jobs SET state = 'CANCELLED' WHERE space_id IN (:spaceIds) AND state IN ('PLANNED', 'RUNNING', 'PAUSING', 'PAUSED', 'VERIFYING')")
+    suspend fun cancelJobs(spaceIds: List<String>)
+
+    @Query("DELETE FROM search_profile_spaces WHERE space_id IN (:spaceIds)")
+    suspend fun unlinkProfiles(spaceIds: List<String>)
+
+    @Transaction
+    suspend fun markStale(spaceIds: List<String>) {
+        staleSpaces(spaceIds)
+        cancelJobs(spaceIds)
+        unlinkProfiles(spaceIds)
+    }
+
     @Query(
         """SELECT CAST((SELECT COUNT(DISTINCT a.asset_id) $VECTOR_FILES) AS REAL)
              / MAX(1, (SELECT COUNT(*) FROM media_assets a WHERE a.tombstoned_at IS NULL AND $REVISION IS NOT NULL))""",
@@ -67,7 +84,19 @@ interface VectorSearchDao {
     suspend fun coverage(spaceId: String): Float
 }
 
-data class SpaceRow(val spaceId: String, val modelName: String, val state: String, val signature: String, val queryPrefix: String?, val isDefault: Boolean)
+data class SpaceRow(
+    val spaceId: String,
+    val modelName: String,
+    val state: String,
+    val signature: String,
+    val queryPrefix: String?,
+    val isDefault: Boolean,
+    val modelProfileId: String,
+    val dimension: Int,
+    val normalization: String,
+    val corpusPrefix: String?,
+    val preprocessingSignature: String,
+)
 
 /** Nearest-vector search over `embedding_vectors`, one space at a time (M2-08). */
 class RoomVectorSearchStore(private val db: IrohacoDatabase) : VectorSearchStore {
@@ -78,6 +107,10 @@ class RoomVectorSearchStore(private val db: IrohacoDatabase) : VectorSearchStore
     override suspend fun space(spaceId: String) = dao.space(spaceId)?.toSpace()
 
     override suspend fun setDefault(spaceId: String) = dao.setDefault(spaceId)
+
+    override suspend fun markStale(spaceIds: List<String>) {
+        if (spaceIds.isNotEmpty()) dao.markStale(spaceIds)
+    }
 
     // shortcut: compares the query with every vector of the space, read from SQLite in a stream; move to an
     // ANN index (DATABASE_DESIGN §10) when the measured search time on the reference device is too long.
@@ -106,5 +139,6 @@ class RoomVectorSearchStore(private val db: IrohacoDatabase) : VectorSearchStore
 
     override suspend fun coverage(spaceId: String) = dao.coverage(spaceId)
 
-    private fun SpaceRow.toSpace() = EmbeddingSpace(spaceId, modelName, SpaceState.valueOf(state), signature, queryPrefix, isDefault)
+    private fun SpaceRow.toSpace() =
+        EmbeddingSpace(spaceId, modelName, SpaceState.valueOf(state), signature, isDefault, modelProfileId, dimension, normalization, queryPrefix, corpusPrefix, preprocessingSignature)
 }

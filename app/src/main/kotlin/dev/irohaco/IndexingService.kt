@@ -36,7 +36,8 @@ class IndexingService : Service() {
         val jobId = intent?.getStringExtra(EXTRA_JOB_ID)
         // One job at a time: a second start while one runs is ignored.
         if (jobId == null || running?.isActive == true) return START_NOT_STICKY
-        val jobs = (application as IrohacoApplication).container.indexJobs
+        val container = (application as IrohacoApplication).container
+        val jobs = container.indexJobs
         running = scope.launch {
             val progress = launch {
                 jobs.progress(jobId).filterNotNull().conflate().collect {
@@ -48,6 +49,8 @@ class IndexingService : Service() {
                 }
             }
             try {
+                // A job of a space built with an older model file is cancelled here, not resumed.
+                container.searchByMeaning.retireOldSpaces()
                 jobs.run(jobId)
             } finally {
                 progress.cancel()

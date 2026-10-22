@@ -19,7 +19,8 @@ class SearchByMeaning(
     private val store: VectorSearchStore,
     /** Turns the query into a vector with the local model, at search priority. */
     private val embedText: suspend (String) -> FloatArray,
-    private val localSignature: String = ImageSpaces.signature(ImageSpaces.LOCAL),
+    /** The SHA-256 of the model file the app runs; the catalog pins it. */
+    private val modelDigest: String = ModelCatalog.EMBEDDING.sha256,
 ) {
     fun spaces(): Flow<List<EmbeddingSpace>> = store.spaces()
 
@@ -28,18 +29,45 @@ class SearchByMeaning(
 
     suspend fun coverage(spaceId: String): Float = store.coverage(spaceId)
 
+    /**
+     * Marks spaces of another model file STALE and cancels their jobs; run before indexing, so a job
+     * paused before the model changed cannot mix vectors of two model files in one space.
+     */
+    suspend fun retireOldSpaces() {
+        val old = store.spaces().first().filter { it.state !in RETIRED && it.signature != ImageSpaces.signature(it.specWith(modelDigest)) }
+        store.markStale(old.map { it.spaceId })
+    }
+
     /** Null when there is nothing to search: no space yet, or one the local model cannot query. */
     suspend operator fun invoke(query: String, spaceId: String? = null): MeaningResult? {
         if (query.isBlank()) return null
         val space = (if (spaceId != null) store.space(spaceId) else store.spaces().first().firstOrNull { it.isDefault }) ?: return null
-        // A query vector of another model file would land in a different space (AC-004).
-        if (space.signature != localSignature || space.state !in SEARCHABLE) return null
-        val query = embedText((space.queryPrefix ?: "") + query.trim())
-        return MeaningResult(space, store.nearest(space.spaceId, query, LIMIT), store.coverage(space.spaceId))
+        if (!searchable(space)) return null
+        return search(space, query, mutableMapOf())
+    }
+
+    /**
+     * Searches every space the local model can query, each on its own (SRCH-005). The caller fuses
+     * the rankings; similarities of different spaces are never compared.
+     */
+    suspend fun compare(query: String): List<MeaningResult> {
+        if (query.isBlank()) return emptyList()
+        val queries = mutableMapOf<String?, FloatArray>()
+        return store.spaces().first().filter(::searchable).map { search(it, query, queries) }
+    }
+
+    // Built with the model file that runs now: a query vector of another file would land elsewhere (AC-004).
+    private fun searchable(space: EmbeddingSpace) = space.state in SEARCHABLE && space.signature == ImageSpaces.signature(space.specWith(modelDigest))
+
+    /** [queries] keeps the query vector per prefix: spaces of one model share it. */
+    private suspend fun search(space: EmbeddingSpace, query: String, queries: MutableMap<String?, FloatArray>): MeaningResult {
+        val vector = queries.getOrPut(space.queryPrefix) { embedText((space.queryPrefix ?: "") + query.trim()) }
+        return MeaningResult(space, store.nearest(space.spaceId, vector, LIMIT), store.coverage(space.spaceId))
     }
 
     private companion object {
         val SEARCHABLE = setOf(SpaceState.BUILDING, SpaceState.VERIFYING, SpaceState.READY)
+        val RETIRED = setOf(SpaceState.STALE, SpaceState.DELETING)
         const val LIMIT = 200
     }
 }

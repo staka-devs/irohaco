@@ -223,4 +223,10 @@
     <string name="search_at">%1$sの場面</string>
     <string name="search_video_scene">動画の場面</string>
     <string name="search_photo">写真</string>
+    <string name="search_compare">モデルを比較</string>
+    <string name="search_coverage_of">%1$s: 索引は写真と動画の%2$d%%を対象にしています。</string>
+    <string name="search_rank">%1$s: %2$d位</string>
+    <string name="search_unranked">%1$s: 見つからず</string>
+    <string name="search_rank_short">%1$s %2$d位</string>
+    <string name="search_unranked_short">%1$s –</string>
 </resources>

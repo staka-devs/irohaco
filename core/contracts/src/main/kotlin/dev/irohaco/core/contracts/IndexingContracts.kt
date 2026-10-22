@@ -122,9 +122,6 @@ interface MediaIndexStore {
 
     suspend fun hasVectors(spaceId: String): Boolean
 
-    /** Marks READY spaces of [modelProfileId] whose signature is not [current] STALE: the model file changed (ADR-0003). */
-    suspend fun markStale(modelProfileId: String, current: String)
-
     /**
      * Makes targets for every available image and for frames of every available video, in [folders]
      * (relative paths) or everywhere when null, and returns those without a vector of their current

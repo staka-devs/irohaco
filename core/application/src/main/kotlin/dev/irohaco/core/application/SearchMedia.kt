@@ -13,21 +13,31 @@ import kotlinx.coroutines.flow.map
 /** Why a result matched (SRCH-004); shown under it. */
 enum class Evidence { MEANING, TEXT }
 
-/** One photo, or one scene of a video at [timestampMs] (SRCH-002), with what matched. */
-data class SearchHit(val item: TimelineItem, val timestampMs: Long?, val evidence: Set<Evidence>, val text: String?)
+/**
+ * One photo, or one scene of a video at [timestampMs] (SRCH-002), with what matched. [ranks] holds
+ * where each searched space placed it (space id to rank from 1), for comparing models (SRCH-005).
+ */
+data class SearchHit(
+    val item: TimelineItem,
+    val timestampMs: Long?,
+    val evidence: Set<Evidence>,
+    val text: String?,
+    val ranks: Map<String, Int> = emptyMap(),
+)
 
 /** A space on the model switch. */
 data class SpaceChoice(val space: EmbeddingSpace, val coverage: Float?)
 
 /**
- * What a search found. [space] and [coverage] say which index answered by meaning and how much of the
+ * What a search found. [searched] lists the spaces that answered by meaning, each with how much of the
  * library it covers (SRCH-006); [meaningUnavailable] is true when no index or model could answer.
  */
-data class SearchResults(val hits: List<SearchHit>, val space: EmbeddingSpace?, val coverage: Float?, val meaningUnavailable: Boolean)
+data class SearchResults(val hits: List<SearchHit>, val searched: List<SpaceChoice>, val meaningUnavailable: Boolean)
 
 /**
- * The search screen's one entry (SRCH-001, SRCH-002, SRCH-004, SRCH-006): by meaning and by the text
- * in photos and frames, with the two rankings fused by rank (RRF), never by adding their scores.
+ * The search screen's one entry (SRCH-001, SRCH-002, SRCH-004〜006): by meaning in one space or, when
+ * comparing, in every space, and by the text in photos and frames. The rankings are fused by rank
+ * (RRF), never by adding scores, which mean nothing across spaces (ARCHITECTURE §7.2).
  */
 class SearchMedia(
     private val meaning: SearchByMeaning,
@@ -47,40 +57,47 @@ class SearchMedia(
         byMeaning: Boolean = true,
         byText: Boolean = true,
         kind: MediaKind? = null,
+        compare: Boolean = false,
     ): SearchResults {
-        val meant = if (byMeaning) meaningOrNull(query, spaceId) else null
+        val meant = if (byMeaning) meaningOrEmpty { if (compare) meaning.compare(query) else listOfNotNull(meaning(query, spaceId)) } else emptyList()
         val texts = if (byText) text(query) else emptyList()
         val fused = LinkedHashMap<Pair<String, Long?>, Fused>()
-        meant?.hits?.forEachIndexed { rank, hit -> fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, Evidence.MEANING, null) }
-        texts.forEachIndexed { rank, hit -> fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, Evidence.TEXT, hit.text) }
+        meant.forEach { result ->
+            result.hits.forEachIndexed { rank, hit ->
+                fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, Evidence.MEANING, null, result.space.spaceId)
+            }
+        }
+        texts.forEachIndexed { rank, hit -> fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, Evidence.TEXT, hit.text, null) }
         val found = items.items(fused.keys.map { it.first }).associateBy { it.assetId }
         val hits = fused.entries
             .sortedByDescending { it.value.score }
             .mapNotNull { (key, f) ->
                 val item = found[key.first]?.takeIf { kind == null || it.kind == kind } ?: return@mapNotNull null
-                SearchHit(item, key.second, f.evidence, f.text)
+                SearchHit(item, key.second, f.evidence, f.text, f.ranks)
             }
             .take(LIMIT)
-        return SearchResults(hits, meant?.space, meant?.coverage, byMeaning && meant == null)
+        return SearchResults(hits, meant.map { SpaceChoice(it.space, it.coverage) }, byMeaning && meant.isEmpty())
     }
 
-    private suspend fun meaningOrNull(query: String, spaceId: String?): MeaningResult? = try {
-        meaning(query, spaceId)
+    private suspend fun meaningOrEmpty(search: suspend () -> List<MeaningResult>): List<MeaningResult> = try {
+        search()
     } catch (e: ModelNotInstalledException) {
-        null
+        emptyList()
     } catch (e: ModelLoadException) {
-        null // the gallery and the text search keep working without the model (IST-010)
+        emptyList() // the gallery and the text search keep working without the model (IST-010)
     }
 
     private class Fused {
         var score = 0.0
         val evidence = mutableSetOf<Evidence>()
         var text: String? = null
+        val ranks = mutableMapOf<String, Int>()
 
-        fun add(rank: Int, kind: Evidence, matchedText: String?) {
+        fun add(rank: Int, kind: Evidence, matchedText: String?, spaceId: String?) {
             score += 1.0 / (RRF_K + rank + 1)
             evidence += kind
             if (matchedText != null) text = matchedText
+            if (spaceId != null) ranks[spaceId] = rank + 1
         }
     }
 
