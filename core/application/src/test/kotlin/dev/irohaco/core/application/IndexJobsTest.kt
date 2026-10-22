@@ -60,6 +60,8 @@ class IndexJobsTest {
         override suspend fun pauseInterrupted() {
             jobs.values.filter { it.state in setOf(IndexJobState.RUNNING, IndexJobState.PAUSING, IndexJobState.VERIFYING) }.forEach { it.state = IndexJobState.PAUSED }
         }
+        override fun latest(): Flow<String?> = flowOf(jobs.keys.lastOrNull())
+        override fun failedNames(jobId: String, limit: Int) = flowOf(emptyList<String>())
         override fun progress(jobId: String): Flow<IndexJobProgress?> {
             val s = jobs.getValue(jobId).items.values
             return flowOf(IndexJobProgress(jobs.getValue(jobId).state, s.count { it == "PENDING" || it == "RUNNING" }, s.count { it == "COMMITTED" }, s.count { it == "FAILED" }, 0))

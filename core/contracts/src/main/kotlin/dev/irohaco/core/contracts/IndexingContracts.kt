@@ -59,6 +59,12 @@ interface IndexJobStore {
     suspend fun pauseInterrupted()
 
     fun progress(jobId: String): Flow<IndexJobProgress?>
+
+    /** The job requested last, or null before the first one. */
+    fun latest(): Flow<String?>
+
+    /** File names of the job's failed items, for the failure list (IDX-002). */
+    fun failedNames(jobId: String, limit: Int): Flow<List<String>>
 }
 
 /** Turns one item into its vector, outside any database transaction (INDEX_STATE_MACHINE.md §4). */

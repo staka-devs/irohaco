@@ -96,6 +96,21 @@ class RoomIndexJobStoreTest {
     }
 
     @Test
+    fun `the latest job and its failed files are listed`() = runTest {
+        assertNull(store.latest().first())
+        setUp()
+        sql.execSQL("INSERT INTO storage_volumes(volume_id, provider_volume_name, state) VALUES ('v', 'external_primary', 'ONLINE')")
+        sql.execSQL(
+            """INSERT INTO media_sources(source_id, asset_id, volume_id, media_store_id, content_uri, display_name, mime_type, file_size_bytes, access_state)
+               VALUES ('sb', 'b', 'v', 1, 'content://b', 'IMG_0002.jpg', 'image/jpeg', 1, 'AVAILABLE')""",
+        )
+        store.create("k", "s", IndexJobKind.INCREMENTAL, true, 1, listOf(b))
+        assertEquals("k", store.latest().first())
+        store.fail("k", b)
+        assertEquals(listOf("IMG_0002.jpg"), store.failedNames("k", 50).first())
+    }
+
+    @Test
     fun `an initial job needs the user's request`() = runTest {
         setUp()
         assertFailsWith<Exception> { store.create("k", "s", IndexJobKind.INITIAL, false, 0, emptyList()) }

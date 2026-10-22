@@ -94,6 +94,16 @@ interface IndexingDao {
            FROM indexing_jobs j WHERE j.job_id = :jobId""",
     )
     fun progress(jobId: String): Flow<ProgressRow?>
+
+    @Query("SELECT job_id FROM indexing_jobs ORDER BY requested_at DESC, rowid DESC LIMIT 1")
+    fun latest(): Flow<String?>
+
+    @Query(
+        """SELECT COALESCE((SELECT MIN(s.display_name) FROM media_sources s WHERE s.asset_id = t.asset_id), i.target_id)
+           FROM indexing_job_items i JOIN embedding_targets t ON t.target_id = i.target_id
+           WHERE i.job_id = :jobId AND i.state = 'FAILED' ORDER BY i.rowid LIMIT :limit""",
+    )
+    fun failedNames(jobId: String, limit: Int): Flow<List<String>>
 }
 
 data class ProgressRow(val state: String, val pending: Int, val committed: Int, val failed: Int, val skipped: Int)
@@ -135,4 +145,8 @@ class RoomIndexJobStore(private val db: IrohacoDatabase) : IndexJobStore {
     override fun progress(jobId: String): Flow<IndexJobProgress?> = dao.progress(jobId).map { row ->
         row?.let { IndexJobProgress(IndexJobState.valueOf(it.state), it.pending, it.committed, it.failed, it.skipped) }
     }
+
+    override fun latest() = dao.latest()
+
+    override fun failedNames(jobId: String, limit: Int) = dao.failedNames(jobId, limit)
 }

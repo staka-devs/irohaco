@@ -122,6 +122,11 @@ class IndexJobs(
 
     fun progress(jobId: String): Flow<IndexJobProgress?> = store.progress(jobId)
 
+    /** The job requested last, which the indexing screen shows. */
+    fun latest(): Flow<String?> = store.latest()
+
+    fun failedNames(jobId: String): Flow<List<String>> = store.failedNames(jobId, FAILED_SHOWN)
+
     /**
      * Once per process: jobs a killed process left running are paused at their last checkpoint. An
      * item that was in progress [MAX_ATTEMPTS] times fails, so one file cannot crash every run.
@@ -154,5 +159,6 @@ class IndexJobs(
     private companion object {
         val ACTIVE = setOf(RUNNING, PAUSING)
         const val MAX_ATTEMPTS = 3
+        const val FAILED_SHOWN = 50
     }
 }
