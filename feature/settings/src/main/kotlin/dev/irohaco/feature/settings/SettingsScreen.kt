@@ -1,43 +1,20 @@
 package dev.irohaco.feature.settings
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.AlertDialog
-import androidx.compose.runtime.key
-import androidx.compose.runtime.remember
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.core.graphics.ColorUtils
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.IntSize
-import dev.irohaco.core.designsystem.component.ThemeSwatch
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.material3.Surface
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
-import androidx.compose.material3.adaptive.layout.AnimatedPane
-import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
-import androidx.compose.material3.adaptive.layout.PaneAdaptedValue
-import androidx.compose.material3.adaptive.layout.ThreePaneScaffoldDestinationItem
-import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
-import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.res.pluralStringResource
-import dev.irohaco.core.contracts.FolderRef
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -46,6 +23,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -53,39 +31,64 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.layout.AnimatedPane
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
+import androidx.compose.material3.adaptive.layout.PaneAdaptedValue
+import androidx.compose.material3.adaptive.layout.ThreePaneScaffoldDestinationItem
+import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
+import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.irohaco.core.contracts.FolderRef
+import dev.irohaco.core.contracts.MapProvider
+import dev.irohaco.core.contracts.ModelInstallState
+import dev.irohaco.core.contracts.ShareLocationPolicy
+import dev.irohaco.core.designsystem.component.ThemeSwatch
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.designsystem.tokens.MaterialPalette
 import dev.irohaco.core.designsystem.tokens.PaletteHue
-import dev.irohaco.core.contracts.MapProvider
-import dev.irohaco.core.contracts.ShareLocationPolicy
-import androidx.compose.foundation.clickable
 import dev.irohaco.core.domain.ThemeColor
 import dev.irohaco.core.domain.ThemeContrast
+import kotlinx.coroutines.launch
 
 /** Settings, in categories (DESIGN §2.1, §3, APP-001). Opened from the top app bars. */
 @Composable
@@ -96,12 +99,26 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, googleMapsA
     val mapProvider by viewModel.mapProvider.collectAsStateWithLifecycle()
     val mapConsented by viewModel.mapConsented.collectAsStateWithLifecycle()
     val excludedFolders by viewModel.excludedFolders.collectAsStateWithLifecycle()
+    val modelStates by viewModel.modelStates.collectAsStateWithLifecycle()
+    val importResult by viewModel.importResult.collectAsStateWithLifecycle()
+    val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { viewModel.importModel(it.toString()) } }
     SettingsContent(
         onBack = onBack,
         themeColor = themeColor,
         contrast = contrast,
         excludedFolders = excludedFolders,
         shareLocationPolicy = shareLocationPolicy,
+        modelSummary = viewModel.modelCatalog.firstOrNull()?.let { modelStates[it.id] } ?: ModelInstallState.NotInstalled,
+        ai = {
+            AiSettings(
+                models = viewModel.modelCatalog,
+                states = modelStates,
+                importResult = importResult,
+                onDownload = viewModel::downloadModel,
+                onImport = { pickModel.launch(arrayOf("application/octet-stream", "*/*")) },
+                onDelete = viewModel::deleteModel,
+            )
+        },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast) },
         library = { LibrarySettings(excludedFolders, viewModel::showFolder) },
         privacy = {
@@ -123,6 +140,7 @@ enum class SettingsCategory(@StringRes val title: Int, @DrawableRes val icon: In
     DISPLAY(R.string.settings_display, IrohacoIcons.Visibility),
     LIBRARY(R.string.settings_library, IrohacoIcons.Folder),
     PRIVACY(R.string.settings_privacy, IrohacoIcons.Lock),
+    AI(R.string.settings_ai, IrohacoIcons.SmartToy),
 }
 
 /**
@@ -141,6 +159,8 @@ internal fun SettingsContent(
     library: @Composable () -> Unit,
     privacy: @Composable () -> Unit,
     initial: SettingsCategory? = null,
+    modelSummary: ModelInstallState = ModelInstallState.NotInstalled,
+    ai: @Composable () -> Unit = {},
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator(initialDestinationHistory = initialHistory(initial))
     val scope = rememberCoroutineScope()
@@ -170,6 +190,7 @@ internal fun SettingsContent(
                                     pluralStringResource(R.plurals.settings_library_hidden, excludedFolders.size, excludedFolders.size)
                                 }
                                 SettingsCategory.PRIVACY -> stringResource(R.string.settings_share_location) + ": " + stringResource(sharePolicyLabel(shareLocationPolicy))
+                                SettingsCategory.AI -> modelStateLabel(modelSummary)
                             }
                             ListItem(
                                 headlineContent = { Text(stringResource(category.title)) },
@@ -204,6 +225,7 @@ internal fun SettingsContent(
                             SettingsCategory.DISPLAY -> display()
                             SettingsCategory.LIBRARY -> library()
                             SettingsCategory.PRIVACY -> privacy()
+                            SettingsCategory.AI -> ai()
                             null -> Text(
                                 stringResource(R.string.settings_pick_category),
                                 style = MaterialTheme.typography.bodyLarge,

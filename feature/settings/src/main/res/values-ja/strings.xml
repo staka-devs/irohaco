@@ -41,4 +41,23 @@
     <string name="settings_theme_color_other_summary">好きな色を選ぶか、色のコードを入力します</string>
     <string name="settings_theme_color_picker">色の選択。横が色合い、縦が明るさ</string>
     <string name="settings_done">完了</string>
+    <string name="settings_ai">AI</string>
+    <string name="settings_ai_not_installed">未導入</string>
+    <string name="settings_ai_downloading">ダウンロード中 %1$d%%</string>
+    <string name="settings_ai_verifying">ファイルを確認しています</string>
+    <string name="settings_ai_installed">使用可能</string>
+    <string name="settings_ai_failed_download">ダウンロードに失敗しました</string>
+    <string name="settings_ai_failed_digest">ファイルが一致しなかったため削除しました</string>
+    <string name="settings_ai_failed_unknown">Irohacoが知らないモデルのため、ファイルを削除しました</string>
+    <string name="settings_ai_failed_storage">ファイルを保存できませんでした</string>
+    <string name="settings_ai_download">ダウンロード</string>
+    <string name="settings_ai_download_note">モデルはこの端末の中だけで動きます。ダウンロードは大きく、モバイルデータを使うことがあります。ダウンロードはバックグラウンドで続きます。</string>
+    <string name="settings_ai_delete">削除</string>
+    <string name="settings_ai_delete_title">%1$sを削除しますか？</string>
+    <string name="settings_ai_delete_body">もう一度ダウンロードするまで、このモデルを使う検索は使えません。作った索引は残ります。</string>
+    <string name="settings_ai_cancel">キャンセル</string>
+    <string name="settings_ai_import">モデルのファイルを取り込む</string>
+    <string name="settings_ai_import_summary">上のモデルの.litertlmファイル</string>
+    <string name="settings_ai_import_done">取り込みました。使用可能です</string>
+    <string name="settings_ai_import_choose">選ぶ</string>
 </resources>

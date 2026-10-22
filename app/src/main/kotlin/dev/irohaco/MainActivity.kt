@@ -177,7 +177,7 @@ class MainActivity : ComponentActivity() {
     private fun FullScreen(route: String, open: (String) -> Unit, onBack: () -> Unit) {
         when {
             route == Route.SETTINGS -> SettingsScreen(
-                viewModel { SettingsViewModel(container.themeColorSettings, container.sharingSettings, container.mapSettings, container.browseLibrary) },
+                viewModel { SettingsViewModel(container.themeColorSettings, container.sharingSettings, container.mapSettings, container.browseLibrary, container.manageModels, container::downloadModel) },
                 onBack,
                 googleMapsAvailable = BuildConfig.GOOGLE_MAPS,
             )
