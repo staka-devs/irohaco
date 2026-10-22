@@ -29,6 +29,8 @@ import kotlin.math.sqrt
  *     Android/data/dev.irohaco/files/spike-a/images/<file>      the photos to search
  *     Android/data/dev.irohaco/files/spike-a/queries.json       [{"query": "花火", "relevant": ["a.jpg", ...]}, ...]
  *
+ * docs/verification/spike-a/build_spike_a.py builds the set from openly licensed COCO photos.
+ *
  * Arguments: `backend` = gpu (default) or cpu; `dim` = the Matryoshka output size (default: the model's).
  * The report goes to spike-a/report-<backend>-<dim>.json and to logcat under the tag SpikeA.
  */
