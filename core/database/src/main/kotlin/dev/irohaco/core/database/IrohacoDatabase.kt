@@ -78,6 +78,7 @@ abstract class IrohacoDatabase : RoomDatabase() {
     abstract fun locationDao(): LocationDao
     abstract fun modelProfileDao(): ModelProfileDao
     abstract fun indexingDao(): IndexingDao
+    abstract fun imageIndexDao(): ImageIndexDao
 }
 
 @Entity(

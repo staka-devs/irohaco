@@ -122,6 +122,8 @@ class RoomIndexJobStore(private val db: IrohacoDatabase) : IndexJobStore {
 
     override suspend fun fail(jobId: String, item: IndexItem) = dao.setItemState(jobId, item.targetId, item.sourceRevisionDigest, "FAILED")
 
+    override suspend fun skip(jobId: String, item: IndexItem) = dao.setItemState(jobId, item.targetId, item.sourceRevisionDigest, "SKIPPED")
+
     override suspend fun requeueRunning(jobId: String?, maxAttempts: Int) = dao.requeueRunning(jobId, maxAttempts)
 
     override suspend fun failUnstored(jobId: String) = dao.failUnstored(jobId)

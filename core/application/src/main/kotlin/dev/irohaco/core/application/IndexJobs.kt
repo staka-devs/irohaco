@@ -2,6 +2,7 @@ package dev.irohaco.core.application
 
 import dev.irohaco.core.contracts.IndexItemProcessor
 import dev.irohaco.core.contracts.IndexItem
+import dev.irohaco.core.contracts.IndexItemSkipped
 import dev.irohaco.core.contracts.IndexJobKind
 import dev.irohaco.core.contracts.IndexJobProgress
 import dev.irohaco.core.contracts.IndexJobState
@@ -82,6 +83,8 @@ class IndexJobs(
                     store.commit(jobId, item, newId(), processor.embed(item), now())
                 } catch (e: CancellationException) {
                     throw e
+                } catch (e: IndexItemSkipped) {
+                    store.skip(jobId, item)
                 } catch (e: ModelNotInstalledException) {
                     return failJob(jobId)
                 } catch (e: ModelLoadException) {
