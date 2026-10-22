@@ -1,6 +1,7 @@
 package dev.irohaco
 
 import android.Manifest
+import android.view.KeyEvent
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
@@ -9,7 +10,6 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
-import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
@@ -68,7 +68,9 @@ class TimelineTest {
         compose.waitUntilAtLeastOneExists(details, timeoutMillis = 5_000)
         compose.onNode(details).performClick()
         compose.waitUntilAtLeastOneExists(hasText("irohaco-l2-", substring = true), timeoutMillis = 5_000)
-        Espresso.pressBack() // system back goes to the sheet's window and closes only the sheet
+        // Back as a key to the focused window, the sheet's own, which closes only the sheet. Espresso's
+        // pressBack picks the activity's root and waits for it to regain focus, which fails on slow emulators.
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
         compose.waitUntilDoesNotExist(hasText("irohaco-l2-", substring = true), timeoutMillis = 5_000)
 
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
