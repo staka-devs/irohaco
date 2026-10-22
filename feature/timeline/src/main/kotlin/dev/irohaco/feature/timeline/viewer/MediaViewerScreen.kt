@@ -112,7 +112,7 @@ import java.time.format.DateTimeFormatter
 
 /** The full-screen photo viewer (PRD GAL-003, DESIGN §4.6). */
 @Composable
-fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
+fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimilar: (String) -> Unit = {}) {
     val start by viewModel.start.collectAsStateWithLifecycle()
     val items = viewModel.items.collectAsLazyPagingItems()
     val playing by viewModel.playing.collectAsStateWithLifecycle()
@@ -198,6 +198,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit) {
                 hasLocation = location is Detail.Value<GeoPoint>,
                 placeName = placeName,
                 onShare = { item -> context.startActivity(shareIntent(listOf(item))) },
+                onFindSimilar = { onFindSimilar(it.assetId) },
                 onShowOnMap = { (location as? Detail.Value<GeoPoint>)?.value?.let { context.startActivity(mapIntent(it)) } },
                 onTrash = { item ->
                     trashedUri = Uri.parse(item.contentUri)
@@ -226,6 +227,7 @@ internal fun MediaViewerContent(
     hasLocation: Boolean = false,
     placeName: String? = null,
     onShare: (TimelineItem) -> Unit = {},
+    onFindSimilar: (TimelineItem) -> Unit = {},
     onShowOnMap: (TimelineItem) -> Unit = {},
     onTrash: (TimelineItem) -> Unit = {},
 ) {
@@ -306,6 +308,7 @@ internal fun MediaViewerContent(
                             ViewerActionsMenu(
                                 hasLocation = hasLocation,
                                 onShare = { menu = false; onShare(item) },
+                                onFindSimilar = { menu = false; onFindSimilar(item) },
                                 onShowOnMap = { menu = false; onShowOnMap(item) },
                                 onShowDetails = { menu = false; onShowDetails(item) },
                                 onTrash = { menu = false; onTrash(item) },
@@ -325,6 +328,7 @@ internal fun MediaViewerContent(
 private fun ColumnScope.ViewerActionsMenu(
     hasLocation: Boolean,
     onShare: () -> Unit,
+    onFindSimilar: () -> Unit,
     onShowOnMap: () -> Unit,
     onShowDetails: () -> Unit,
     onTrash: () -> Unit,
@@ -333,6 +337,11 @@ private fun ColumnScope.ViewerActionsMenu(
         text = { Text(stringResource(R.string.timeline_share)) },
         leadingIcon = { Icon(painterResource(IrohacoIcons.Share), contentDescription = null) },
         onClick = onShare,
+    )
+    DropdownMenuItem(
+        text = { Text(stringResource(R.string.viewer_find_similar)) },
+        leadingIcon = { Icon(painterResource(IrohacoIcons.Search), contentDescription = null) },
+        onClick = onFindSimilar,
     )
     if (hasLocation) {
         DropdownMenuItem(
@@ -511,7 +520,7 @@ private fun MediaViewerPreview() {
 private fun ViewerMenuPreview() {
     IrohacoTheme(dynamicColor = false) {
         Surface {
-            Column { ViewerActionsMenu(hasLocation = true, onShare = {}, onShowOnMap = {}, onShowDetails = {}, onTrash = {}) }
+            Column { ViewerActionsMenu(hasLocation = true, onShare = {}, onFindSimilar = {}, onShowOnMap = {}, onShowDetails = {}, onTrash = {}) }
         }
     }
 }

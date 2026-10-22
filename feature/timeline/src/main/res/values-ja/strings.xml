@@ -250,4 +250,10 @@
     <string name="memo_by_ai_model">AI（%1$s）</string>
     <string name="memo_by_user">あなた</string>
     <string name="memo_revision">第%1$d版 · %2$s · %3$s</string>
+    <string name="search_dates">日付</string>
+    <string name="search_dates_apply">適用</string>
+    <string name="search_tag">タグ</string>
+    <string name="search_any_tag">すべてのタグ</string>
+    <string name="search_similar_title">似た写真</string>
+    <string name="viewer_find_similar">似た写真を探す</string>
 </resources>

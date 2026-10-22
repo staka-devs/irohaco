@@ -172,7 +172,7 @@ class MainActivity : ComponentActivity() {
                     onOpenMap = onOpenMap,
                 )
                 TopLevelDestination.SEARCH -> SearchScreen(
-                    viewModel { SearchViewModel(container.searchMedia) },
+                    viewModel { SearchViewModel(container.searchMedia, container.manageCollections) },
                     onOpenMedia = { onOpenMedia(it, null) },
                     onPlayAt = onPlayAt,
                     onOpenSettings = onOpenSettings,
@@ -203,6 +203,13 @@ class MainActivity : ComponentActivity() {
                 onOpenArea = { open(Route.list(MediaList.Area(it))) },
                 onBack = onBack,
             )
+            Route.isSimilar(route) -> SearchScreen(
+                viewModel { SearchViewModel(container.searchMedia, container.manageCollections, similarTo = Route.parseSimilar(route)) },
+                onOpenMedia = { open(Route.viewer(it)) },
+                onPlayAt = { assetId, ms -> open(Route.playVideoAt(assetId, ms)) },
+                onOpenSettings = { open(Route.SETTINGS) },
+                onBack = onBack,
+            )
             Route.isList(route) -> {
                 val list = Route.parseList(route)
                 CollectionScreen(
@@ -225,6 +232,7 @@ class MainActivity : ComponentActivity() {
                         )
                     },
                     onBack,
+                    onFindSimilar = { open(Route.similar(it)) },
                 )
             }
         }
@@ -255,6 +263,7 @@ object Route {
     const val MAP = "map"
     private const val VIEWER = "viewer:"
     private const val LIST = "list:"
+    private const val SIMILAR = "similar:"
     private const val SEP = '\u0000'
 
     data class Viewer(val assetId: String, val startMs: Long?, val list: MediaList?)
@@ -264,6 +273,13 @@ object Route {
 
     /** PlayVideoAt (ARCHITECTURE §1.2): opens the viewer on a video and plays it from [startMs]. */
     fun playVideoAt(assetId: String, startMs: Long) = "$VIEWER$assetId@$startMs"
+
+    /** Photos and video scenes like [assetId] (SRCH-001). */
+    fun similar(assetId: String) = SIMILAR + assetId
+
+    fun isSimilar(route: String) = route.startsWith(SIMILAR)
+
+    fun parseSimilar(route: String) = route.removePrefix(SIMILAR)
 
     fun parseViewer(route: String): Viewer {
         val parts = route.removePrefix(VIEWER).split(SEP, limit = 2)

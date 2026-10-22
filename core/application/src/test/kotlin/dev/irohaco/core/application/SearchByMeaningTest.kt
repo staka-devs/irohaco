@@ -28,6 +28,7 @@ class SearchByMeaningTest {
         }
         override suspend fun nearest(spaceId: String, query: FloatArray, limit: Int) = listOf(VectorHit("x", null)).also { searched += spaceId }
         override suspend fun coverage(spaceId: String) = if (spaceId == "b") 0.4f else 1f
+        override suspend fun vectorOf(spaceId: String, assetId: String): FloatArray? = null
     }
 
     private val search = SearchByMeaning(store, { embedded += it; floatArrayOf(1f) }, modelDigest = "d")

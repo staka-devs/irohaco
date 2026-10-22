@@ -13,13 +13,14 @@ import kotlinx.coroutines.flow.map
 
 class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, MediaItems {
     // A file in two places has two sources; the result keeps one row per asset.
-    override suspend fun items(assetIds: List<String>): List<TimelineItem> = assetIds.distinct().chunked(MAX_ARGS).flatMap { ids ->
+    override suspend fun items(assetIds: List<String>, tagId: String?): List<TimelineItem> = assetIds.distinct().chunked(MAX_ARGS).flatMap { ids ->
         db.timelineDao().page(
             SimpleSQLiteQuery(
                 """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
                           s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, 0 AS rating
-                   $FROM WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL AND a.asset_id IN (${ids.joinToString { "?" }})""",
-                ids.toTypedArray(),
+                   $FROM WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL AND a.asset_id IN (${ids.joinToString { "?" }})
+                     ${if (tagId != null) "AND EXISTS (SELECT 1 FROM media_tags mt WHERE mt.asset_id = a.asset_id AND mt.tag_id = ?)" else ""}""",
+                (ids + listOfNotNull(tagId)).toTypedArray(),
             ),
         ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes) }
     }.distinctBy { it.assetId }
