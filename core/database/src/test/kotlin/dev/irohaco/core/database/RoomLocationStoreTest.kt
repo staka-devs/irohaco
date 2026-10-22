@@ -4,7 +4,10 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.irohaco.core.contracts.CatalogChanges
 import dev.irohaco.core.contracts.CatalogVolume
+import dev.irohaco.core.contracts.InferredPlace
 import dev.irohaco.core.contracts.LocatedAsset
+import dev.irohaco.core.contracts.PlaceMatch
+import dev.irohaco.core.contracts.TimedPoint
 import dev.irohaco.core.contracts.MediaStoreEntry
 import dev.irohaco.core.contracts.NewCatalogAsset
 import dev.irohaco.core.contracts.TimelineQuery
@@ -89,5 +92,41 @@ class RoomLocationStoreTest {
         store.recordExif("nogps", null)
         val kanto = TimelineQuery(area = GeoBounds(south = 35.0, west = 139.0, north = 36.0, east = 140.0))
         assertEquals(listOf("tokyo"), RoomTimelineReader(db).page(kanto, 0, 10).map { it.assetId })
+    }
+
+    @Test
+    fun `areas are named once, guesses replace the old ones, and a place name finds confirmed files before guesses`() = runTest {
+        catalog("gps", "nogps", "unread")
+        val tokushima = GeoPoint(34.0703, 134.5548)
+        store.recordExif("gps", tokushima)
+        store.recordExif("nogps", null)
+
+        assertEquals(listOf(GeoPoint(34.07, 134.55)), store.unnamedAreas(10))
+        store.nameArea(GeoPoint(34.07, 134.55), "徳島市, 徳島県")
+        assertEquals(emptyList(), store.unnamedAreas(10))
+        assertEquals("徳島市, 徳島県", store.placeName("gps"))
+        assertEquals(listOf(TimedPoint("gps", 0, tokushima, "徳島市, 徳島県")), store.locatedTimes())
+        assertEquals(listOf("nogps" to 1L), store.unlocatedTimes())
+
+        store.replaceInferred(listOf(InferredPlace("nogps", tokushima, "徳島市, 徳島県", 0.8, "gps")))
+        store.replaceInferred(listOf(InferredPlace("nogps", tokushima, "徳島市, 徳島県", 0.7, "gps")))
+        assertEquals(listOf("徳島市, 徳島県"), store.placeNames(includeInferred = false))
+        assertEquals(
+            listOf(PlaceMatch("gps", "徳島市, 徳島県", false), PlaceMatch("nogps", "徳島市, 徳島県", true)),
+            store.filesAt(listOf("徳島市, 徳島県"), includeInferred = true, limit = 10),
+        )
+        assertEquals(listOf("gps"), store.filesAt(listOf("徳島市, 徳島県"), includeInferred = false, limit = 10).map { it.assetId })
+        // A guess never touches the file's own record.
+        assertEquals(listOf(LocatedAsset("gps", tokushima, "content://media/0")), store.located())
+    }
+
+    @Test
+    fun `an area looked up without a result is not a place name`() = runTest {
+        catalog("sea")
+        store.recordExif("sea", GeoPoint(30.0, 140.0))
+        store.nameArea(GeoPoint(30.0, 140.0), "")
+        assertEquals(emptyList(), store.unnamedAreas(10))
+        assertEquals(null, store.placeName("sea"))
+        assertEquals(emptyList(), store.placeNames(includeInferred = true))
     }
 }
