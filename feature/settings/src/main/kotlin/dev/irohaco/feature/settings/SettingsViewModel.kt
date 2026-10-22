@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.IndexJobs
 import dev.irohaco.core.application.ManageModels
-import dev.irohaco.core.application.PlanImageIndex
+import dev.irohaco.core.application.PlanMediaIndex
 import dev.irohaco.core.application.ThemeColorSettings
 import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.LibraryFolder
@@ -15,6 +15,7 @@ import dev.irohaco.core.contracts.ModelArtifact
 import dev.irohaco.core.contracts.ModelInstallState
 import dev.irohaco.core.contracts.ShareLocationPolicy
 import dev.irohaco.core.contracts.SharingSettings
+import dev.irohaco.core.contracts.VideoQuality
 import dev.irohaco.core.domain.ThemeColor
 import dev.irohaco.core.domain.ThemeContrast
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,7 +39,7 @@ class SettingsViewModel(
     /** Starts a model download that outlives this screen, so the file is checked even if the user leaves. */
     private val startDownload: (String) -> Unit = {},
     private val indexJobs: IndexJobs? = null,
-    private val planImageIndex: PlanImageIndex? = null,
+    private val planMediaIndex: PlanMediaIndex? = null,
     /** Runs a job in the foreground service, so it carries on after the user leaves this screen. */
     private val runIndexJob: (String) -> Unit = {},
 ) : ViewModel() {
@@ -61,9 +62,13 @@ class SettingsViewModel(
         .map { folders -> folders.filterNot { it.offline } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Plans an image index of [folders] (relative paths; null for every folder) and runs it. */
-    fun startIndex(folders: Set<String>?) {
-        viewModelScope.launch { planImageIndex?.invoke(folders)?.let(runIndexJob) }
+    /** Videos whose frames stop before their end (PRD §5.2). */
+    val lowCoverageVideos: StateFlow<Int> = (planMediaIndex?.lowCoverageVideos() ?: flowOf(0))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    /** Plans an index of [folders] (relative paths; null for every folder), videos at [quality], and runs it. */
+    fun startIndex(folders: Set<String>?, quality: VideoQuality) {
+        viewModelScope.launch { planMediaIndex?.invoke(folders, quality)?.let(runIndexJob) }
     }
 
     fun pauseIndex(jobId: String) {

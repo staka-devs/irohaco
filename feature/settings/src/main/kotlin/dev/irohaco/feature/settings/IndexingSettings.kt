@@ -18,11 +18,13 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Surface
@@ -32,10 +34,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -45,6 +49,7 @@ import dev.irohaco.core.contracts.IndexJobProgress
 import dev.irohaco.core.contracts.IndexJobState
 import dev.irohaco.core.contracts.LibraryFolder
 import dev.irohaco.core.contracts.PauseReason
+import dev.irohaco.core.contracts.VideoQuality
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
@@ -54,8 +59,8 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 data class IndexingUi(val jobId: String, val progress: IndexJobProgress, val failedNames: List<String>, val pauseReason: PauseReason?)
 
 /**
- * Settings > AI > index (DESIGN §4.5, §4.7, IDX-001, IDX-002): starts an image index of every photo or
- * of chosen folders, shows its progress, and pauses, resumes, cancels and retries it.
+ * Settings > AI > index (DESIGN §4.5, §4.7, IDX-001, IDX-002): starts an index of every photo and video
+ * or of chosen folders, videos sampled at the chosen quality (IDX-004), shows its progress, and pauses, resumes, cancels and retries it.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -63,7 +68,8 @@ internal fun IndexingSettings(
     indexing: IndexingUi?,
     modelReady: Boolean,
     folders: List<LibraryFolder>,
-    onStart: (Set<String>?) -> Unit,
+    lowCoverageVideos: Int,
+    onStart: (Set<String>?, VideoQuality) -> Unit,
     onPause: (String) -> Unit,
     onResume: (String) -> Unit,
     onCancel: (String) -> Unit,
@@ -72,12 +78,13 @@ internal fun IndexingSettings(
     // Wrapped so that "every folder" (null) differs from "nothing to confirm".
     var confirming by remember { mutableStateOf<Target?>(null) }
     var choosing by remember { mutableStateOf(false) }
+    var quality by rememberSaveable { mutableStateOf(VideoQuality.BALANCED) }
     // The confirmation comes before the first index only (DESIGN §3).
     val start = { chosen: Set<String>? ->
         if (indexing == null) {
             confirming = Target(chosen)
         } else {
-            onStart(chosen)
+            onStart(chosen, quality)
         }
     }
     confirming?.let { target ->
@@ -86,7 +93,7 @@ internal fun IndexingSettings(
             title = { Text(stringResource(R.string.settings_index_confirm_title)) },
             text = { Text(stringResource(R.string.settings_index_confirm_body)) },
             confirmButton = {
-                TextButton(onClick = { confirming = null; onStart(target.folders) }) { Text(stringResource(R.string.settings_index_start)) }
+                TextButton(onClick = { confirming = null; onStart(target.folders, quality) }) { Text(stringResource(R.string.settings_index_start)) }
             },
             dismissButton = { TextButton(onClick = { confirming = null }) { Text(stringResource(R.string.settings_ai_cancel)) } },
         )
@@ -100,6 +107,13 @@ internal fun IndexingSettings(
         Text(stringResource(R.string.settings_index), style = MaterialTheme.typography.titleMedium)
         val active = indexing?.progress?.state in ACTIVE
         if (indexing != null) JobProgress(indexing, onPause, onResume, onCancel, onRetry)
+        if (lowCoverageVideos > 0) {
+            Text(
+                pluralStringResource(R.plurals.settings_index_low_coverage, lowCoverageVideos, lowCoverageVideos),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (!active) {
             if (!modelReady) {
                 Text(stringResource(R.string.settings_index_needs_model), style = MaterialTheme.typography.bodyMedium)
@@ -121,6 +135,14 @@ internal fun IndexingSettings(
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text(stringResource(R.string.settings_index_all)) }, onClick = { menu = false; start(null) })
                     DropdownMenuItem(text = { Text(stringResource(R.string.settings_index_folders)) }, onClick = { menu = false; choosing = true })
+                    HorizontalDivider()
+                    VideoQuality.entries.forEach { q ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(qualityLabel(q))) },
+                            leadingIcon = { RadioButton(selected = q == quality, onClick = null) },
+                            onClick = { quality = q },
+                        )
+                    }
                 }
             }
         }
@@ -145,7 +167,8 @@ private fun JobProgress(
     }
     Text(stringResource(R.string.settings_index_counts, done, p.total, percent), style = MaterialTheme.typography.bodyMedium)
     Text(stringResource(R.string.settings_index_remaining, p.pending, p.failed), style = MaterialTheme.typography.bodyMedium)
-    // Each photo keeps one vector of 4-byte values; the database adds little on top.
+    if (p.frames > 0) Text(stringResource(R.string.settings_index_scenes, p.frames), style = MaterialTheme.typography.bodyMedium)
+    // Each photo and video scene keeps one vector of 4-byte values; the database adds little on top.
     val bytes = p.total.toLong() * ImageSpaces.LOCAL.dimension * 4
     Text(
         stringResource(R.string.settings_index_storage, Formatter.formatShortFileSize(LocalContext.current, bytes)),
@@ -211,6 +234,11 @@ private fun FolderChooser(folders: List<LibraryFolder>, onDismiss: () -> Unit, o
     )
 }
 
+private fun qualityLabel(quality: VideoQuality) = when (quality) {
+    VideoQuality.BALANCED -> R.string.settings_index_quality_balanced
+    VideoQuality.THOROUGH -> R.string.settings_index_quality_thorough
+}
+
 private data class Target(val folders: Set<String>?)
 
 private val ACTIVE = setOf(IndexJobState.PLANNED, IndexJobState.RUNNING, IndexJobState.PAUSING, IndexJobState.PAUSED, IndexJobState.VERIFYING)
@@ -223,8 +251,8 @@ private fun IndexingRunningPreview() {
     IrohacoTheme(dynamicColor = false) {
         Surface {
             IndexingSettings(
-                IndexingUi("j", IndexJobProgress(IndexJobState.RUNNING, 580, 400, 20, 0), listOf("IMG_0001.jpg"), null),
-                modelReady = true, folders = previewFolders, onStart = {}, onPause = {}, onResume = {}, onCancel = {}, onRetry = {},
+                IndexingUi("j", IndexJobProgress(IndexJobState.RUNNING, 580, 400, 20, 0, frames = 300), listOf("IMG_0001.jpg"), null),
+                modelReady = true, folders = previewFolders, lowCoverageVideos = 0, onStart = { _, _ -> }, onPause = {}, onResume = {}, onCancel = {}, onRetry = {},
             )
         }
     }
@@ -237,7 +265,7 @@ private fun IndexingPartialPreview() {
         Surface {
             IndexingSettings(
                 IndexingUi("j", IndexJobProgress(IndexJobState.PARTIAL, 0, 998, 2, 0), listOf("IMG_0001.jpg", "IMG_0002.heic"), null),
-                modelReady = true, folders = previewFolders, onStart = {}, onPause = {}, onResume = {}, onCancel = {}, onRetry = {},
+                modelReady = true, folders = previewFolders, lowCoverageVideos = 2, onStart = { _, _ -> }, onPause = {}, onResume = {}, onCancel = {}, onRetry = {},
             )
         }
     }
@@ -248,7 +276,7 @@ private fun IndexingPartialPreview() {
 private fun IndexingNoModelPreview() {
     IrohacoTheme(dynamicColor = false) {
         Surface {
-            IndexingSettings(null, modelReady = false, folders = previewFolders, onStart = {}, onPause = {}, onResume = {}, onCancel = {}, onRetry = {})
+            IndexingSettings(null, modelReady = false, folders = previewFolders, lowCoverageVideos = 0, onStart = { _, _ -> }, onPause = {}, onResume = {}, onCancel = {}, onRetry = {})
         }
     }
 }

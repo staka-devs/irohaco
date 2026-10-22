@@ -90,7 +90,9 @@ interface IndexingDao {
              (SELECT COUNT(*) FROM indexing_job_items i WHERE i.job_id = j.job_id AND i.state IN ('PENDING', 'RUNNING')) AS pending,
              (SELECT COUNT(*) FROM indexing_job_items i WHERE i.job_id = j.job_id AND i.state = 'COMMITTED') AS committed,
              (SELECT COUNT(*) FROM indexing_job_items i WHERE i.job_id = j.job_id AND i.state = 'FAILED') AS failed,
-             (SELECT COUNT(*) FROM indexing_job_items i WHERE i.job_id = j.job_id AND i.state = 'SKIPPED') AS skipped
+             (SELECT COUNT(*) FROM indexing_job_items i WHERE i.job_id = j.job_id AND i.state = 'SKIPPED') AS skipped,
+             (SELECT COUNT(*) FROM indexing_job_items i JOIN embedding_targets t ON t.target_id = i.target_id
+              WHERE i.job_id = j.job_id AND t.frame_id IS NOT NULL) AS frames
            FROM indexing_jobs j WHERE j.job_id = :jobId""",
     )
     fun progress(jobId: String): Flow<ProgressRow?>
@@ -106,7 +108,7 @@ interface IndexingDao {
     fun failedNames(jobId: String, limit: Int): Flow<List<String>>
 }
 
-data class ProgressRow(val state: String, val pending: Int, val committed: Int, val failed: Int, val skipped: Int)
+data class ProgressRow(val state: String, val pending: Int, val committed: Int, val failed: Int, val skipped: Int, val frames: Int)
 
 /** `indexing_jobs` and `indexing_job_items`; vectors go into `embedding_vectors` as FLOAT32_LE (M2-03). */
 class RoomIndexJobStore(private val db: IrohacoDatabase) : IndexJobStore {
@@ -143,7 +145,7 @@ class RoomIndexJobStore(private val db: IrohacoDatabase) : IndexJobStore {
     override suspend fun pauseInterrupted() = dao.pauseInterrupted()
 
     override fun progress(jobId: String): Flow<IndexJobProgress?> = dao.progress(jobId).map { row ->
-        row?.let { IndexJobProgress(IndexJobState.valueOf(it.state), it.pending, it.committed, it.failed, it.skipped) }
+        row?.let { IndexJobProgress(IndexJobState.valueOf(it.state), it.pending, it.committed, it.failed, it.skipped, it.frames) }
     }
 
     override fun latest() = dao.latest()

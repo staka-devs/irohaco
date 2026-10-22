@@ -1,12 +1,15 @@
 package dev.irohaco.core.application
 
 import dev.irohaco.core.contracts.EmbeddingSpaceSpec
-import dev.irohaco.core.contracts.ImageIndexStore
 import dev.irohaco.core.contracts.IndexImageReader
 import dev.irohaco.core.contracts.IndexItem
 import dev.irohaco.core.contracts.IndexItemProcessor
 import dev.irohaco.core.contracts.IndexItemSkipped
 import dev.irohaco.core.contracts.IndexJobKind
+import dev.irohaco.core.contracts.IndexSource
+import dev.irohaco.core.contracts.MediaIndexStore
+import dev.irohaco.core.contracts.VideoQuality
+import kotlinx.coroutines.flow.Flow
 import java.security.MessageDigest
 
 /** The space photos go into with the local model (ARCHITECTURE §4.1); queries carry the model card's prefix. */
@@ -29,41 +32,49 @@ object ImageSpaces {
 }
 
 /**
- * Plans an image index the user asked for (IDX-001, IDX-003): every available image in the chosen
- * folders that has no vector of its current revision yet. The first job of a space is INITIAL.
+ * Plans an index the user asked for (IDX-001, IDX-003, IDX-004): every available image, and frames of
+ * every available video at [VideoQuality], in the chosen folders, that have no vector of their current
+ * revision yet. The first job of a space is INITIAL.
  */
-class PlanImageIndex(
-    private val store: ImageIndexStore,
+class PlanMediaIndex(
+    private val store: MediaIndexStore,
     private val jobs: IndexJobs,
     private val newId: () -> String,
+    private val now: () -> Long,
     private val spec: EmbeddingSpaceSpec = ImageSpaces.LOCAL,
 ) {
     /** Returns the planned job's id; folders are relative paths, null meaning every folder. */
-    suspend operator fun invoke(folders: Set<String>? = null): String {
+    suspend operator fun invoke(folders: Set<String>? = null, quality: VideoQuality = VideoQuality.BALANCED): String {
         val spaceId = store.ensureSpace(newId(), spec, ImageSpaces.signature(spec))
         val kind = if (store.hasVectors(spaceId)) IndexJobKind.INCREMENTAL else IndexJobKind.INITIAL
-        return jobs.start(spaceId, kind, store.planImages(spaceId, folders), requestedByUser = true)
+        return jobs.start(spaceId, kind, store.plan(spaceId, folders, quality, now()), requestedByUser = true)
     }
+
+    /** Videos not covered to their end, for the low coverage notice. */
+    fun lowCoverageVideos(): Flow<Int> = store.lowCoverageVideos()
 }
 
 /**
- * Embeds one image target (INDEX_STATE_MACHINE.md §4 steps 3–4). A file that is gone or changed is
- * skipped, both before and after the model runs, so a vector never lands on a newer revision.
+ * Embeds one image or video frame (INDEX_STATE_MACHINE.md §4 steps 3–4). A file that is gone or
+ * changed is skipped, both before and after the model runs, so a vector never lands on a newer revision.
  */
-class EmbedImageItem(
-    private val store: ImageIndexStore,
+class EmbedMediaItem(
+    private val store: MediaIndexStore,
     private val reader: IndexImageReader,
     /** Runs the model at background priority; searches by the user go first. */
     private val embed: suspend (ByteArray) -> FloatArray,
 ) : IndexItemProcessor {
     override suspend fun embed(item: IndexItem): FloatArray {
-        val source = current(item)
-        val vector = embed(reader.read(source.contentUri))
+        val bytes = when (val source = current(item)) {
+            is IndexSource.Image -> reader.read(source.contentUri)
+            is IndexSource.Frame -> reader.readFrame(source.contentUri, source.timestampMs)
+        }
+        val vector = embed(bytes)
         current(item)
         return vector
     }
 
-    private suspend fun current(item: IndexItem) = store.imageSource(item.targetId)
+    private suspend fun current(item: IndexItem) = store.source(item.targetId)
         ?.takeIf { it.revisionDigest == item.sourceRevisionDigest }
         ?: throw IndexItemSkipped("${item.targetId} is gone or has changed")
 }

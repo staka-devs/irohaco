@@ -13,7 +13,7 @@ DDL = ROOT / 'database' / 'schema.sql'
 OUT = ROOT / 'core/database/src/main/kotlin/dev/irohaco/core/database/IrohacoDatabase.kt'
 KOTLIN_TYPES = {'TEXT': 'String', 'INTEGER': 'Long', 'REAL': 'Double', 'BLOB': 'ByteArray'}
 # Hand-written DAOs in core:database; add one here to expose it on IrohacoDatabase.
-DAOS = ['CatalogDao', 'TimelineDao', 'LibraryDao', 'MarksDao', 'CollectionsDao', 'IdentityDao', 'LocationDao', 'ModelProfileDao', 'IndexingDao', 'ImageIndexDao']
+DAOS = ['CatalogDao', 'TimelineDao', 'LibraryDao', 'MarksDao', 'CollectionsDao', 'IdentityDao', 'LocationDao', 'ModelProfileDao', 'IndexingDao', 'MediaIndexDao']
 FK_ACTIONS = {'NO ACTION': 'NO_ACTION', 'RESTRICT': 'RESTRICT', 'CASCADE': 'CASCADE', 'SET NULL': 'SET_NULL', 'SET DEFAULT': 'SET_DEFAULT'}
 
 
