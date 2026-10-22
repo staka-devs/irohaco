@@ -69,9 +69,18 @@ class RemovableStorageTest {
 
     private fun mediaStoreSees(name: String) = name in MediaStore.getExternalVolumeNames(context)
 
+    // Turning the virtual disk on or off resets every volume, the built-in storage too, on some versions.
+    private fun waitForBuiltInStorage() {
+        waitFor(60) {
+            sh("sm list-volumes").lines().any { it.startsWith("emulated") && " mounted" in it } &&
+                mediaStoreSees(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        }
+    }
+
     @Before
     fun insertCard() {
         sh("sm set-virtual-disk true")
+        waitForBuiltInStorage()
         val disk = (1..20).firstNotNullOfOrNull {
             sh("sm list-disks adoptable").lines().firstOrNull { it.startsWith("disk:") }?.trim() ?: run { Thread.sleep(500); null }
         }
@@ -89,6 +98,8 @@ class RemovableStorageTest {
     fun removeCard() {
         photo?.let { runCatching { resolver.delete(it, null, null) } }
         sh("sm set-virtual-disk false")
+        // Later tests sync the built-in storage; it must be back before they start.
+        waitForBuiltInStorage()
         container.database.close()
         context.deleteDatabase(dbName)
     }
