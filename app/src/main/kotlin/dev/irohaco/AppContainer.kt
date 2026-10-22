@@ -19,6 +19,7 @@ import dev.irohaco.core.application.EmbedMemo
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
+import dev.irohaco.core.application.IndexChanges
 import dev.irohaco.core.application.IndexJobs
 import dev.irohaco.core.application.IndexLocations
 import dev.irohaco.core.application.ManageAnnotations
@@ -65,6 +66,7 @@ import dev.irohaco.infrastructure.media.AndroidShareFiles
 import dev.irohaco.infrastructure.media.AndroidTrashReader
 import dev.irohaco.infrastructure.media.MediaStoreCatalogSource
 import dev.irohaco.infrastructure.preferences.DataStoreAppearanceSettings
+import dev.irohaco.infrastructure.preferences.DataStoreIndexSettings
 import dev.irohaco.infrastructure.preferences.DataStoreLibrarySettings
 import dev.irohaco.infrastructure.preferences.DataStoreMapSettings
 import dev.irohaco.infrastructure.preferences.DataStoreSharingSettings
@@ -173,7 +175,25 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     /** Picks up downloads the system kept running while the app was closed. */
     fun resumeModelDownloads() {
-        scope.launch(Dispatchers.IO) { manageModels.refresh() }
+        scope.launch(Dispatchers.IO) {
+            manageModels.refresh()
+            // An app update can bring another model file: its old spaces show as needing a new index.
+            searchByMeaning.retireOldSpaces()
+        }
+    }
+
+    val indexSettings by lazy { DataStoreIndexSettings(settingsStore) }
+
+    /** Indexes new and changed files by itself when the user turned it on (M2-12); the app is in front during a sync. */
+    private val indexChanges by lazy {
+        IndexChanges(planMediaIndex, indexJobs, searchByMeaning, indexSettings) { jobId ->
+            try {
+                IndexingService.start(appContext, jobId)
+                true
+            } catch (e: IllegalStateException) {
+                false // ForegroundServiceStartNotAllowedException: the app went to the background meanwhile
+            }
+        }
     }
 
     private val aiLazy = lazy {
@@ -253,8 +273,9 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     suspend fun syncCatalog() {
         try {
             withContext(Dispatchers.IO) {
-                syncMediaCatalog()
+                val changed = syncMediaCatalog()
                 RoomIdentityStore(database).findCandidates()
+                if (changed) indexChanges()
             }
         } catch (e: CancellationException) {
             throw e

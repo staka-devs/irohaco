@@ -34,6 +34,8 @@ class IndexMediaTest {
     private val store = object : MediaIndexStore {
         override suspend fun ensureSpace(newSpaceId: String, spec: EmbeddingSpaceSpec, signature: String) = "s"
         override suspend fun hasVectors(spaceId: String) = false
+        override suspend fun findSpace(signature: String) = null
+        override suspend fun pendingCount(spaceId: String) = 0
         override suspend fun plan(spaceId: String, folders: Set<String>?, quality: VideoQuality, now: Long) = emptyList<IndexItem>()
         override suspend fun source(targetId: String) = sources[targetId]
         override fun lowCoverageVideos() = flowOf(0)

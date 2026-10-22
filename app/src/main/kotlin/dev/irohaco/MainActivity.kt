@@ -189,6 +189,7 @@ class MainActivity : ComponentActivity() {
                     SettingsViewModel(
                         container.themeColorSettings, container.sharingSettings, container.mapSettings, container.browseLibrary,
                         container.manageModels, container::downloadModel, container.indexJobs, container.planMediaIndex,
+                        container.indexSettings, container.searchByMeaning.spaces(),
                     ) { IndexingService.start(applicationContext, it) }
                 },
                 onBack,

@@ -105,6 +105,9 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, googleMapsA
     val indexing by viewModel.indexing.collectAsStateWithLifecycle()
     val indexFolders by viewModel.indexFolders.collectAsStateWithLifecycle()
     val lowCoverageVideos by viewModel.lowCoverageVideos.collectAsStateWithLifecycle()
+    val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
+    val autoIndex by viewModel.autoIndex.collectAsStateWithLifecycle()
+    val needsRebuild by viewModel.needsRebuild.collectAsStateWithLifecycle()
     val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { viewModel.importModel(it.toString()) } }
     SettingsContent(
@@ -128,6 +131,10 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, googleMapsA
                 modelReady = viewModel.modelCatalog.any { modelStates[it.id] is ModelInstallState.Installed },
                 folders = indexFolders,
                 lowCoverageVideos = lowCoverageVideos,
+                pendingCount = pendingCount,
+                autoIndex = autoIndex,
+                onAutoIndex = viewModel::setAutoIndex,
+                needsRebuild = needsRebuild,
                 onStart = { folders, quality ->
                     // The job runs either way; without the permission only its progress notification is hidden.
                     notifications.launch(Manifest.permission.POST_NOTIFICATIONS)

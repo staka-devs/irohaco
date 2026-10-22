@@ -122,6 +122,9 @@ interface MediaIndexStore {
     /** The space with [signature], created BUILDING under [newSpaceId] if there is none yet. */
     suspend fun ensureSpace(newSpaceId: String, spec: EmbeddingSpaceSpec, signature: String): String
 
+    /** The space with [signature], or null before one is made. */
+    suspend fun findSpace(signature: String): String?
+
     suspend fun hasVectors(spaceId: String): Boolean
 
     /**
@@ -136,6 +139,12 @@ interface MediaIndexStore {
 
     /** The target of a search memo at its current revision, made if needed; null when the memo is not searchable. */
     suspend fun memoItem(annotationId: String): IndexItem?
+
+    /**
+     * Available files with no vector of their current revision in [spaceId], plus searchable memos with
+     * none of theirs: what an index of changes would take up (IDX-005). Videos with no known length are left out.
+     */
+    suspend fun pendingCount(spaceId: String): Int
 
     /** Stores a vector outside a job; one already stored for the space, target and revision is kept. */
     suspend fun putVector(spaceId: String, item: IndexItem, vectorId: String, vector: FloatArray, createdAt: Long)
@@ -175,4 +184,11 @@ interface TextIndexStore {
 /** Says whether indexing must stop for now: heat, battery (AC-012, ARCHITECTURE §10.1). */
 fun interface ResourcePolicy {
     fun hold(): PauseReason?
+}
+
+/** Whether changed and new files are indexed by themselves once the first index is done (IDX-005); off until the user turns it on. */
+interface IndexSettings {
+    val autoIndex: Flow<Boolean>
+
+    suspend fun setAutoIndex(enabled: Boolean)
 }

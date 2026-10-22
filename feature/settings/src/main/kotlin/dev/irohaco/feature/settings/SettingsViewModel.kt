@@ -7,7 +7,9 @@ import dev.irohaco.core.application.IndexJobs
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.PlanMediaIndex
 import dev.irohaco.core.application.ThemeColorSettings
+import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.FolderRef
+import dev.irohaco.core.contracts.IndexSettings
 import dev.irohaco.core.contracts.LibraryFolder
 import dev.irohaco.core.contracts.MapProvider
 import dev.irohaco.core.contracts.MapSettings
@@ -15,14 +17,17 @@ import dev.irohaco.core.contracts.ModelArtifact
 import dev.irohaco.core.contracts.ModelInstallState
 import dev.irohaco.core.contracts.ShareLocationPolicy
 import dev.irohaco.core.contracts.SharingSettings
+import dev.irohaco.core.contracts.SpaceState
 import dev.irohaco.core.contracts.VideoQuality
 import dev.irohaco.core.domain.ThemeColor
 import dev.irohaco.core.domain.ThemeContrast
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -40,6 +45,8 @@ class SettingsViewModel(
     private val startDownload: (String) -> Unit = {},
     private val indexJobs: IndexJobs? = null,
     private val planMediaIndex: PlanMediaIndex? = null,
+    private val indexSettings: IndexSettings? = null,
+    private val spaces: Flow<List<EmbeddingSpace>> = flowOf(emptyList()),
     /** Runs a job in the foreground service, so it carries on after the user leaves this screen. */
     private val runIndexJob: (String) -> Unit = {},
 ) : ViewModel() {
@@ -63,6 +70,24 @@ class SettingsViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Videos whose frames stop before their end (PRD §5.2). */
+    /** Indexes changes by itself after a sync (IDX-005). */
+    val autoIndex: StateFlow<Boolean> = (indexSettings?.autoIndex ?: flowOf(false))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setAutoIndex(enabled: Boolean) {
+        viewModelScope.launch { indexSettings?.setAutoIndex(enabled) }
+    }
+
+    /** Files and memos the index lacks or has at an older revision; counted again whenever a job changes state. */
+    val pendingCount: StateFlow<Int?> = indexing.map { it?.progress?.state }.distinctUntilChanged()
+        .map { planMediaIndex?.pendingCount() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** The model file changed: the old index is STALE and none of the new one exists yet (ADR-0003). */
+    val needsRebuild: StateFlow<Boolean> = spaces
+        .map { list -> list.any { it.state == SpaceState.STALE } && list.none { it.state in LIVE } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     val lowCoverageVideos: StateFlow<Int> = (planMediaIndex?.lowCoverageVideos() ?: flowOf(0))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
@@ -156,3 +181,5 @@ class SettingsViewModel(
         viewModelScope.launch { sharing?.setShareLocationPolicy(policy) }
     }
 }
+
+private val LIVE = setOf(SpaceState.BUILDING, SpaceState.VERIFYING, SpaceState.READY)

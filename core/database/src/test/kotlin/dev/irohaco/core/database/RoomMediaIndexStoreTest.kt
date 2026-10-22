@@ -2,6 +2,8 @@ package dev.irohaco.core.database
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import dev.irohaco.core.contracts.AnnotationAuthor
+import dev.irohaco.core.contracts.AnnotationKind
 import dev.irohaco.core.contracts.EmbeddingSpaceSpec
 import dev.irohaco.core.contracts.IndexSource
 import dev.irohaco.core.contracts.IndexItem
@@ -111,6 +113,23 @@ class RoomMediaIndexStoreTest {
         val frames = store.plan(store.ensureSpace("s1", spec, "sig"), null, VideoQuality.BALANCED, 0).count { it.targetId.startsWith("frame:") }
         assertEquals(VideoQuality.BALANCED.maxFrames, frames)
         assertEquals(1, store.lowCoverageVideos().first())
+    }
+
+    @Test
+    fun `the pending count is what lacks a vector of its current revision, memos included`() = runTest {
+        setUp()
+        assertEquals(null, store.findSpace("sig"))
+        // Before the first index: every available image (a, b); the video c has no known length.
+        assertEquals(2, store.pendingCount(""))
+        val space = store.ensureSpace("s1", spec, "sig")
+        assertEquals(space, store.findSpace("sig"))
+        store.plan(space, null, VideoQuality.BALANCED, 0)
+        store.putVector(space, IndexItem("asset:a", "10:5"), "v1", floatArrayOf(0.6f, 0.8f), 0)
+        assertEquals(1, store.pendingCount(space))
+        sql.execSQL("UPDATE media_sources SET observed_modified_at = 6 WHERE asset_id = 'a'")
+        assertEquals(2, store.pendingCount(space))
+        RoomAnnotationStore(db).create("n", "b", AnnotationKind.CONTEXT, "メモ", AnnotationAuthor.USER, null, 0)
+        assertEquals(3, store.pendingCount(space))
     }
 
     private fun segments() = sql.query("SELECT start_ms, end_ms FROM video_segments ORDER BY extraction_profile_id, start_ms").use {

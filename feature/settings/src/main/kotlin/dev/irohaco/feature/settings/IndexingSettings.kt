@@ -27,6 +27,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.SplitButtonLayout
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -74,6 +76,12 @@ internal fun IndexingSettings(
     onResume: (String) -> Unit,
     onCancel: (String) -> Unit,
     onRetry: (String) -> Unit,
+    /** Files and memos the index lacks or has at an older revision (IDX-005); null while counting. */
+    pendingCount: Int? = null,
+    autoIndex: Boolean = false,
+    onAutoIndex: (Boolean) -> Unit = {},
+    /** The model file changed and the index has to be built again (ADR-0003). */
+    needsRebuild: Boolean = false,
 ) {
     // Wrapped so that "every folder" (null) differs from "nothing to confirm".
     var confirming by remember { mutableStateOf<Target?>(null) }
@@ -114,9 +122,20 @@ internal fun IndexingSettings(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        if (needsRebuild) {
+            Text(stringResource(R.string.settings_index_rebuild), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+        }
         if (!active) {
             if (!modelReady) {
                 Text(stringResource(R.string.settings_index_needs_model), style = MaterialTheme.typography.bodyMedium)
+            }
+            // After the first index, the count says what pressing the button would still add (IDX-005).
+            if (indexing != null && pendingCount != null && !needsRebuild) {
+                Text(
+                    if (pendingCount == 0) stringResource(R.string.settings_index_up_to_date)
+                    else pluralStringResource(R.plurals.settings_index_pending, pendingCount, pendingCount),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
             var menu by remember { mutableStateOf(false) }
             Box {
@@ -145,6 +164,17 @@ internal fun IndexingSettings(
                     }
                 }
             }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
+            modifier = Modifier.toggleable(autoIndex, role = Role.Switch, onValueChange = onAutoIndex).padding(vertical = IrohacoSpacing.s),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.settings_index_auto), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.settings_index_auto_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = autoIndex, onCheckedChange = null)
         }
     }
 }
@@ -266,6 +296,7 @@ private fun IndexingPartialPreview() {
             IndexingSettings(
                 IndexingUi("j", IndexJobProgress(IndexJobState.PARTIAL, 0, 998, 2, 0), listOf("IMG_0001.jpg", "IMG_0002.heic"), null),
                 modelReady = true, folders = previewFolders, lowCoverageVideos = 2, onStart = { _, _ -> }, onPause = {}, onResume = {}, onCancel = {}, onRetry = {},
+                pendingCount = 12, autoIndex = true,
             )
         }
     }

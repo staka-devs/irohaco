@@ -90,4 +90,11 @@
     <plurals name="settings_index_low_coverage">
         <item quantity="other">長い動画%1$d本は途中までしか索引していないため、後半の場面は検索できません。</item>
     </plurals>
+    <string name="settings_index_rebuild">モデルが新しくなったため、前の索引は使えません。索引を作成し直してください。</string>
+    <string name="settings_index_up_to_date">すべて索引済みです。</string>
+    <plurals name="settings_index_pending">
+        <item quantity="other">前回の索引のあとに追加または変更されたものが%1$d件あります。</item>
+    </plurals>
+    <string name="settings_index_auto">変更を自動で索引する</string>
+    <string name="settings_index_auto_summary">写真や動画が増えたり変わったりしたら、アプリを開いたときに索引します。最初の索引のあとから使えます。</string>
 </resources>
