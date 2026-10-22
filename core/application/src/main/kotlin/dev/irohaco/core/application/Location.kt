@@ -1,7 +1,6 @@
 package dev.irohaco.core.application
 
 import dev.irohaco.core.contracts.LocationStore
-import dev.irohaco.core.contracts.MapProvider
 import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.MediaDetailsReader
 import dev.irohaco.core.contracts.PlaceNames
@@ -11,7 +10,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -44,14 +42,10 @@ class BrowseMap(private val store: LocationStore, private val settings: MapSetti
 
     fun changes() = store.changes()
 
-    val provider: Flow<MapProvider> = settings.provider
+    /** Whether OpenFreeMap may receive the map's area, and the place name service its points. */
+    val allowed: Flow<Boolean> = settings.allowed
 
-    /** Whether the active provider may receive the map's area and place lookups. */
-    val allowed: Flow<Boolean> = combine(settings.provider, settings.consented) { provider, consented -> provider in consented }
-
-    suspend fun allow(granted: Boolean) = settings.setConsent(settings.provider.first(), granted)
-
-    suspend fun setProvider(provider: MapProvider) = settings.setProvider(provider)
+    suspend fun allow(granted: Boolean) = settings.setAllowed(granted)
 
     /** The place name of an item, looked up once and kept; null without the user's consent. */
     suspend fun placeName(assetId: String, point: GeoPoint): String? {
