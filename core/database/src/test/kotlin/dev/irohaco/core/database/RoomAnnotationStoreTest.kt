@@ -69,6 +69,28 @@ class RoomAnnotationStoreTest {
     }
 
     @Test
+    fun `a memo on a scene is found at the scene's start, and only an indexed scene takes one`() = runTest {
+        setUp()
+        sql.execSQL("INSERT INTO media_assets(asset_id, media_kind, first_seen_at) VALUES ('c', 'VIDEO', 0)")
+        sql.execSQL(
+            """INSERT INTO media_sources(source_id, asset_id, volume_id, media_store_id, content_uri, display_name, mime_type,
+                 file_size_bytes, observed_modified_at, observed_duration_ms, access_state)
+               VALUES ('sc', 'c', 'v', 3, 'content://c', 'c.mp4', 'video/mp4', 20, 5, 25000, 'AVAILABLE')""",
+        )
+        assertEquals(false, memos.createOnScene("x", "c", 15_000, AnnotationKind.KEYWORDS, "ろうそく", AnnotationAuthor.USER, null, 1))
+        val space = media.ensureSpace("S", EmbeddingSpaceSpec("m", "d", 2, "L2", null, null, "p"), "sig")
+        media.plan(space, null, VideoQuality.BALANCED, 0)
+
+        assertEquals(true, memos.createOnScene("n", "c", 15_000, AnnotationKind.KEYWORDS, "ろうそく", AnnotationAuthor.USER, null, 1))
+        assertEquals(10_000L until 20_000L, memos.annotations("c").first().single().scene)
+        assertEquals(listOf(10_000L), texts.search("ろうそく", 10).map { it.timestampMs })
+
+        val item = media.memoItem("n")!!
+        media.putVector(space, item, "v", floatArrayOf(0f, 1f), 0)
+        assertEquals(listOf(VectorHit("c", 10_000, fromMemo = true)), vectors.nearest(space, floatArrayOf(0f, 1f), 1))
+    }
+
+    @Test
     fun `an AI revision names its model`() = runTest {
         setUp()
         memos.create("n", "a", AnnotationKind.AI_CAPTION, "白い梅", AnnotationAuthor.AI, "m", 1)

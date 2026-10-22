@@ -30,6 +30,24 @@ interface AnnotationDao {
     )
     suspend fun insertAnnotation(annotationId: String, assetId: String, kind: String, createdAt: Long)
 
+    /** The shortest indexed scene of [assetId]'s current revision that holds [atMs]. */
+    @Query(
+        """SELECT g.segment_id FROM video_segments g JOIN media_revisions mrv ON mrv.revision_id = g.revision_id
+             JOIN media_assets a ON a.asset_id = mrv.asset_id
+           WHERE a.asset_id = :assetId AND mrv.file_digest = $REVISION AND :atMs >= g.start_ms AND :atMs < g.end_ms
+           ORDER BY g.end_ms - g.start_ms LIMIT 1""",
+    )
+    suspend fun sceneAt(assetId: String, atMs: Long): String?
+
+    @Query("INSERT OR IGNORE INTO annotation_subjects(subject_id, segment_id) VALUES ('scene:' || :segmentId, :segmentId)")
+    suspend fun insertSceneSubject(segmentId: String)
+
+    @Query(
+        """INSERT INTO semantic_annotations(annotation_id, subject_id, annotation_kind, searchable, exportable, created_at)
+           VALUES (:annotationId, (SELECT subject_id FROM annotation_subjects WHERE segment_id = :segmentId), :kind, 1, 1, :createdAt)""",
+    )
+    suspend fun insertSceneAnnotation(annotationId: String, segmentId: String, kind: String, createdAt: Long)
+
     @Query(
         """INSERT INTO semantic_annotation_revisions(annotation_id, revision_no, author, model_profile_id, text, modified_at)
            VALUES (:annotationId, (SELECT COALESCE(MAX(revision_no), 0) + 1 FROM semantic_annotation_revisions WHERE annotation_id = :annotationId),
@@ -39,9 +57,10 @@ interface AnnotationDao {
 
     @Query(
         """SELECT n.annotation_id AS annotationId, n.annotation_kind AS kind, n.searchable AS searchable, n.created_at AS createdAt,
-             r.revision_no AS revisionNo, r.author AS author, r.model_profile_id AS modelProfileId, r.text AS text, r.modified_at AS modifiedAt
-           FROM semantic_annotations n JOIN annotation_subjects s ON s.subject_id = n.subject_id $CURRENT
-           WHERE s.asset_id = :assetId ORDER BY n.created_at, n.annotation_id""",
+             r.revision_no AS revisionNo, r.author AS author, r.model_profile_id AS modelProfileId, r.text AS text, r.modified_at AS modifiedAt,
+             sg.start_ms AS sceneStartMs, sg.end_ms AS sceneEndMs
+           FROM semantic_annotations n $MEMO_FILE $CURRENT
+           WHERE a.asset_id = :assetId ORDER BY sg.start_ms IS NOT NULL, sg.start_ms, n.created_at, n.annotation_id""",
     )
     fun annotations(assetId: String): Flow<List<AnnotationRow>>
 
@@ -80,6 +99,8 @@ data class AnnotationRow(
     val modelProfileId: String?,
     val text: String,
     val modifiedAt: Long,
+    val sceneStartMs: Long?,
+    val sceneEndMs: Long?,
 )
 
 data class RevisionRow(val revisionNo: Int, val author: String, val modelProfileId: String?, val text: String, val modifiedAt: Long)
@@ -99,6 +120,7 @@ class RoomAnnotationStore(private val db: IrohacoDatabase) : AnnotationStore {
                 it.searchable,
                 it.createdAt,
                 AnnotationRevision(it.revisionNo, AnnotationAuthor.valueOf(it.author), it.modelProfileId, it.text, it.modifiedAt),
+                it.sceneStartMs?.let { start -> it.sceneEndMs?.let { end -> start until end } },
             )
         }
     }
@@ -110,6 +132,24 @@ class RoomAnnotationStore(private val db: IrohacoDatabase) : AnnotationStore {
             dao.insertRevision(annotationId, author.name, modelProfileId, text, now)
             refreshFts(annotationId)
         }
+
+    override suspend fun createOnScene(
+        annotationId: String,
+        assetId: String,
+        atMs: Long,
+        kind: AnnotationKind,
+        text: String,
+        author: AnnotationAuthor,
+        modelProfileId: String?,
+        now: Long,
+    ): Boolean = db.withTransaction {
+        val segmentId = dao.sceneAt(assetId, atMs) ?: return@withTransaction false
+        dao.insertSceneSubject(segmentId)
+        dao.insertSceneAnnotation(annotationId, segmentId, kind.name, now)
+        dao.insertRevision(annotationId, author.name, modelProfileId, text, now)
+        refreshFts(annotationId)
+        true
+    }
 
     override suspend fun revise(annotationId: String, text: String, author: AnnotationAuthor, modelProfileId: String?, now: Long) =
         db.withTransaction {
@@ -148,3 +188,13 @@ class RoomAnnotationStore(private val db: IrohacoDatabase) : AnnotationStore {
         const val CREATE_FTS = "CREATE VIRTUAL TABLE IF NOT EXISTS annotation_fts USING fts4(terms, tokenize=simple)"
     }
 }
+
+/**
+ * A memo's file, `a`: the photo or video it is on, or the video whose scene `sg` it is on (M2-11, #155).
+ * `n` is the memo's `semantic_annotations` row.
+ */
+internal const val MEMO_FILE =
+    """JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
+       LEFT JOIN video_segments sg ON sg.segment_id = sub.segment_id
+       LEFT JOIN media_revisions sr ON sr.revision_id = sg.revision_id
+       JOIN media_assets a ON a.asset_id = COALESCE(sub.asset_id, sr.asset_id)"""

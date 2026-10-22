@@ -86,19 +86,18 @@ class RoomTextIndexStore(private val db: IrohacoDatabase) : TextIndexStore {
         } + memos(match, limit)
     }
 
-    /** Searchable memos whose current text matches (ANN-002); `annotation_fts` holds only those. */
+    /** Searchable memos whose current text matches (ANN-002), a scene's at its start; `annotation_fts` holds only those. */
     private fun memos(match: String, limit: Int): List<TextMatch> = sql.query(
-        """SELECT a.asset_id, r.text
+        """SELECT a.asset_id, sg.start_ms, r.text
            FROM annotation_fts JOIN semantic_annotations n ON n.rowid = annotation_fts.docid
-             JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
-             JOIN media_assets a ON a.asset_id = sub.asset_id
+             $MEMO_FILE
              JOIN semantic_annotation_revisions r ON r.annotation_id = n.annotation_id
                AND r.revision_no = (SELECT MAX(revision_no) FROM semantic_annotation_revisions WHERE annotation_id = n.annotation_id)
            WHERE annotation_fts MATCH ? AND n.searchable = 1 AND a.tombstoned_at IS NULL
              AND EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND s.access_state = 'AVAILABLE')
            ORDER BY a.asset_id LIMIT ?""",
         arrayOf<Any>(match, limit),
-    ).use { c -> buildList { while (c.moveToNext()) add(TextMatch(c.getString(0), null, c.getString(1), fromMemo = true)) } }
+    ).use { c -> buildList { while (c.moveToNext()) add(TextMatch(c.getString(0), if (c.isNull(1)) null else c.getLong(1), c.getString(2), fromMemo = true)) } }
 
     internal companion object {
         /** Run on every open: the table is derived and can be dropped and rebuilt from ocr_observations. */
