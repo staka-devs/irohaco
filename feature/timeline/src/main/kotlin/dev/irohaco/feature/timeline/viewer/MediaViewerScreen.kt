@@ -147,6 +147,8 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
     var trashedUri by remember { mutableStateOf<Uri?>(null) }
     val trashedMessage = stringResource(R.string.viewer_trashed)
     val undoLabel = stringResource(R.string.timeline_undo)
+    val sceneNotIndexed = stringResource(R.string.memo_scene_not_indexed)
+    LaunchedEffect(viewModel) { viewModel.sceneNotIndexed.collect { snackbar.showSnackbar(sceneNotIndexed) } }
     val restore = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { }
     val trash = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
@@ -169,11 +171,12 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
         memos = {
             MemoSection(
                 memos = memos,
-                onAdd = { kind, text -> detailsOf?.let { viewModel.addMemo(it, kind, text) } },
+                onAdd = { kind, text, atScene -> detailsOf?.let { viewModel.addMemo(it, kind, text, atScene) } },
                 onEdit = viewModel::editMemo,
                 onSearchable = viewModel::setMemoSearchable,
                 onDelete = viewModel::deleteMemo,
                 history = viewModel::memoHistory,
+                isVideo = detailsOf?.kind == MediaKind.VIDEO,
             )
         },
     )

@@ -120,8 +120,7 @@ interface MediaIndexDao {
     @Query(
         """INSERT OR IGNORE INTO embedding_targets(target_id, annotation_id)
            SELECT 'memo:' || n.annotation_id, n.annotation_id
-           FROM semantic_annotations n JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
-             JOIN media_assets a ON a.asset_id = sub.asset_id
+           FROM semantic_annotations n $MEMO_FILE
            WHERE n.searchable = 1 AND a.tombstoned_at IS NULL AND $IN_FOLDERS
              AND (:annotationId IS NULL OR n.annotation_id = :annotationId)""",
     )
@@ -131,8 +130,7 @@ interface MediaIndexDao {
         """SELECT targetId, sourceRevisionDigest FROM (
              SELECT t.target_id AS targetId, $MEMO_REVISION AS sourceRevisionDigest
              FROM embedding_targets t JOIN semantic_annotations n ON n.annotation_id = t.annotation_id
-               JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
-               JOIN media_assets a ON a.asset_id = sub.asset_id
+               $MEMO_FILE
              WHERE n.searchable = 1 AND a.tombstoned_at IS NULL AND $IN_FOLDERS
                AND (:annotationId IS NULL OR n.annotation_id = :annotationId))
            WHERE :annotationId IS NOT NULL OR NOT EXISTS (SELECT 1 FROM embedding_vectors v WHERE v.space_id = :spaceId
@@ -150,8 +148,7 @@ interface MediaIndexDao {
     @Query(
         """SELECT r.text AS text, 'rev:' || r.revision_no AS revisionDigest
            FROM embedding_targets t JOIN semantic_annotations n ON n.annotation_id = t.annotation_id
-             JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
-             JOIN media_assets a ON a.asset_id = sub.asset_id
+             $MEMO_FILE
              JOIN semantic_annotation_revisions r ON r.annotation_id = n.annotation_id
                AND r.revision_no = (SELECT MAX(revision_no) FROM semantic_annotation_revisions WHERE annotation_id = n.annotation_id)
            WHERE t.target_id = :targetId AND n.searchable = 1 AND a.tombstoned_at IS NULL AND $REVISION IS NOT NULL""",
@@ -170,8 +167,7 @@ interface MediaIndexDao {
                                   JOIN sampled_frames f ON f.segment_id = g.segment_id JOIN embedding_targets t ON t.frame_id = f.frame_id
                                   JOIN embedding_vectors v ON v.target_id = t.target_id
                                 WHERE r.asset_id = a.asset_id AND v.space_id = :spaceId AND v.source_revision_digest = $REVISION))
-           + (SELECT COUNT(*) FROM semantic_annotations n JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
-                JOIN media_assets a ON a.asset_id = sub.asset_id
+           + (SELECT COUNT(*) FROM semantic_annotations n $MEMO_FILE
               WHERE n.searchable = 1 AND a.tombstoned_at IS NULL AND $REVISION IS NOT NULL
                 AND NOT EXISTS (SELECT 1 FROM embedding_targets t JOIN embedding_vectors v ON v.target_id = t.target_id
                                 WHERE t.annotation_id = n.annotation_id AND v.space_id = :spaceId AND v.source_revision_digest = $MEMO_REVISION))""",

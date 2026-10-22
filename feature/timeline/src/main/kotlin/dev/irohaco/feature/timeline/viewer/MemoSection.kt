@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -27,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -38,6 +41,7 @@ import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.feature.timeline.R
+import dev.irohaco.feature.timeline.formatDuration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -50,21 +54,23 @@ import java.time.format.FormatStyle
 @Composable
 internal fun MemoSection(
     memos: List<Annotation>,
-    onAdd: (AnnotationKind, String) -> Unit,
+    onAdd: (AnnotationKind, String, Boolean) -> Unit,
     onEdit: (String, String) -> Unit,
     onSearchable: (String, Boolean) -> Unit,
     onDelete: (String) -> Unit,
     history: suspend (String) -> List<AnnotationRevision>,
+    /** A video offers to put the memo on the scene playing now (#155). */
+    isVideo: Boolean = false,
 ) {
     var adding by rememberSaveable { mutableStateOf(false) }
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     var showingHistory by rememberSaveable { mutableStateOf<String?>(null) }
     var deleting by rememberSaveable { mutableStateOf<String?>(null) }
 
-    if (adding) MemoEditor(null, null, onDismiss = { adding = false }) { kind, text -> adding = false; onAdd(kind, text) }
+    if (adding) MemoEditor(null, null, sceneOption = isVideo, onDismiss = { adding = false }) { kind, text, atScene -> adding = false; onAdd(kind, text, atScene) }
     editing?.let { id ->
         val memo = memos.firstOrNull { it.annotationId == id }
-        if (memo == null) editing = null else MemoEditor(memo.kind, memo.current.text, onDismiss = { editing = null }) { _, text -> editing = null; onEdit(id, text) }
+        if (memo == null) editing = null else MemoEditor(memo.kind, memo.current.text, sceneOption = false, onDismiss = { editing = null }) { _, text, _ -> editing = null; onEdit(id, text) }
     }
     showingHistory?.let { id -> MemoHistory(id, history) { showingHistory = null } }
     deleting?.let { id ->
@@ -83,7 +89,10 @@ internal fun MemoSection(
             Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(IrohacoSpacing.m), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
                     Text(
-                        listOfNotNull(stringResource(memo.kind.label()), memo.current.author.takeIf { it == AnnotationAuthor.AI }?.let { stringResource(R.string.memo_by_ai) })
+                        listOfNotNull(
+                            memo.scene?.let { stringResource(R.string.memo_scene, formatDuration(it.first), formatDuration(it.last + 1)) },
+                            stringResource(memo.kind.label()),
+                            memo.current.author.takeIf { it == AnnotationAuthor.AI }?.let { stringResource(R.string.memo_by_ai) })
                             .joinToString(" · "),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
@@ -112,9 +121,10 @@ internal fun MemoSection(
 
 /** Writes a new memo (with its kind) or the next revision of one; an empty text cannot be saved. */
 @Composable
-private fun MemoEditor(kind: AnnotationKind?, text: String?, onDismiss: () -> Unit, onSave: (AnnotationKind, String) -> Unit) {
+private fun MemoEditor(kind: AnnotationKind?, text: String?, sceneOption: Boolean, onDismiss: () -> Unit, onSave: (AnnotationKind, String, Boolean) -> Unit) {
     var chosen by rememberSaveable { mutableStateOf(kind ?: AnnotationKind.CONTEXT) }
     var value by rememberSaveable { mutableStateOf(text.orEmpty()) }
+    var atScene by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(if (text == null) R.string.memo_add else R.string.memo_edit)) },
@@ -127,9 +137,18 @@ private fun MemoEditor(kind: AnnotationKind?, text: String?, onDismiss: () -> Un
                     }
                 }
                 OutlinedTextField(value, { value = it }, label = { Text(stringResource(R.string.memo_text)) }, minLines = 3, modifier = Modifier.fillMaxWidth())
+                if (sceneOption) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.toggleable(atScene, role = Role.Checkbox) { atScene = it },
+                    ) {
+                        Checkbox(checked = atScene, onCheckedChange = null)
+                        Text(stringResource(R.string.memo_at_scene), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(chosen, value) }, enabled = value.isNotBlank()) { Text(stringResource(R.string.memo_save)) } },
+        confirmButton = { TextButton(onClick = { onSave(chosen, value, atScene) }, enabled = value.isNotBlank()) { Text(stringResource(R.string.memo_save)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.memo_cancel)) } },
     )
 }
@@ -178,8 +197,9 @@ private fun MemoSectionPreview() {
                     memos = listOf(
                         Annotation("a", AnnotationKind.CONTEXT, true, 0, user),
                         Annotation("b", AnnotationKind.AI_CAPTION, false, 0, AnnotationRevision(1, AnnotationAuthor.AI, "m", "白い梅の花と古い木の塀", 0)),
+                        Annotation("c", AnnotationKind.KEYWORDS, true, 0, AnnotationRevision(1, AnnotationAuthor.USER, null, "ろうそく 誕生日", 0), 20_000L until 30_000L),
                     ),
-                    onAdd = { _, _ -> }, onEdit = { _, _ -> }, onSearchable = { _, _ -> }, onDelete = {}, history = { emptyList() },
+                    onAdd = { _, _, _ -> }, onEdit = { _, _ -> }, onSearchable = { _, _ -> }, onDelete = {}, history = { emptyList() },
                 )
             }
         }

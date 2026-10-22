@@ -256,4 +256,7 @@
     <string name="search_any_tag">すべてのタグ</string>
     <string name="search_similar_title">似た写真</string>
     <string name="viewer_find_similar">似た写真を探す</string>
+    <string name="memo_at_scene">再生中の場面に付ける</string>
+    <string name="memo_scene">%1$s–%2$sの場面</string>
+    <string name="memo_scene_not_indexed">この場面はまだ索引されていません。先に検索用の索引を作成するか、動画全体にメモを付けてください。</string>
 </resources>

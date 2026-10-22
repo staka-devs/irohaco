@@ -31,6 +31,15 @@ class ManageAnnotations(
         }
     }
 
+    /** A memo on the scene of video [assetId] playing at [atMs] (#155); false when that scene is not indexed yet. */
+    suspend fun addToScene(assetId: String, atMs: Long, kind: AnnotationKind, text: String): Boolean {
+        require(text.isNotBlank()) { "A memo has text" }
+        val annotationId = newId()
+        if (!store.createOnScene(annotationId, assetId, atMs, kind, text.trim(), AnnotationAuthor.USER, null, now())) return false
+        onChanged(annotationId)
+        return true
+    }
+
     suspend fun edit(annotationId: String, text: String) {
         require(text.isNotBlank()) { "A memo has text" }
         store.revise(annotationId, text.trim(), AnnotationAuthor.USER, null, now())

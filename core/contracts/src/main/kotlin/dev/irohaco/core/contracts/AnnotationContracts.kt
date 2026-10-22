@@ -24,6 +24,8 @@ data class Annotation(
     val searchable: Boolean,
     val createdAt: Long,
     val current: AnnotationRevision,
+    /** The scene of a video the memo is on, from start until end in ms; null for a memo on the whole file (#155). */
+    val scene: LongRange? = null,
 )
 
 /**
@@ -31,9 +33,16 @@ data class Annotation(
  * index over the searchable ones' current text (M2-11).
  */
 interface AnnotationStore {
+    /** The memos on [assetId] and, for a video, on its scenes. */
     fun annotations(assetId: String): Flow<List<Annotation>>
 
     suspend fun create(annotationId: String, assetId: String, kind: AnnotationKind, text: String, author: AnnotationAuthor, modelProfileId: String?, now: Long)
+
+    /**
+     * A memo on the indexed scene of video [assetId] that holds [atMs], the shortest when qualities overlap.
+     * False when the video has no indexed scene there yet; nothing is written then.
+     */
+    suspend fun createOnScene(annotationId: String, assetId: String, atMs: Long, kind: AnnotationKind, text: String, author: AnnotationAuthor, modelProfileId: String?, now: Long): Boolean
 
     /** Adds a revision; the full-text index follows the new text. */
     suspend fun revise(annotationId: String, text: String, author: AnnotationAuthor, modelProfileId: String?, now: Long)

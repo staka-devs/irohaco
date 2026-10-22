@@ -38,7 +38,10 @@ import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.TimelinePagingSource
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emitAll
@@ -132,8 +135,22 @@ class ViewerViewModel(
         .flatMapLatest { id -> if (id == null || annotations == null) flowOf(emptyList()) else annotations.annotations(id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun addMemo(item: TimelineItem, kind: AnnotationKind, text: String) {
-        viewModelScope.launch { annotations?.add(item.assetId, kind, text) }
+    private val _sceneNotIndexed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** A memo for the playing scene could not be added: that scene is not indexed yet (#155). */
+    val sceneNotIndexed: SharedFlow<Unit> = _sceneNotIndexed.asSharedFlow()
+
+    /** [atScene]: on the scene of the video playing now, rather than on the whole file. */
+    fun addMemo(item: TimelineItem, kind: AnnotationKind, text: String, atScene: Boolean = false) {
+        // The player is read on the main thread, where it lives.
+        val at = playing.value?.takeIf { it.first == item.assetId }?.second?.currentPosition ?: 0
+        viewModelScope.launch {
+            if (!atScene) {
+                annotations?.add(item.assetId, kind, text)
+            } else if (annotations?.addToScene(item.assetId, at, kind, text) == false) {
+                _sceneNotIndexed.tryEmit(Unit)
+            }
+        }
     }
 
     fun editMemo(annotationId: String, text: String) {

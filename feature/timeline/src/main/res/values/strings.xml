@@ -260,4 +260,7 @@
     <string name="search_any_tag">Any tag</string>
     <string name="search_similar_title">Similar photos</string>
     <string name="viewer_find_similar">Find similar photos</string>
+    <string name="memo_at_scene">On the scene playing now</string>
+    <string name="memo_scene">Scene %1$s–%2$s</string>
+    <string name="memo_scene_not_indexed">This scene is not indexed yet. Build the search index first, or add the memo to the whole video.</string>
 </resources>

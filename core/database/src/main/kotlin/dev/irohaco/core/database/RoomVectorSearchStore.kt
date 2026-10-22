@@ -26,7 +26,9 @@ private const val VECTOR_FILES =
          LEFT JOIN media_revisions r ON r.revision_id = g.revision_id
          LEFT JOIN semantic_annotations n ON n.annotation_id = t.annotation_id
          LEFT JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
-         JOIN media_assets a ON a.asset_id = COALESCE(t.asset_id, r.asset_id, sub.asset_id)
+         LEFT JOIN video_segments sg ON sg.segment_id = sub.segment_id
+         LEFT JOIN media_revisions sr ON sr.revision_id = sg.revision_id
+         JOIN media_assets a ON a.asset_id = COALESCE(t.asset_id, r.asset_id, sub.asset_id, sr.asset_id)
        WHERE v.space_id = :spaceId AND a.tombstoned_at IS NULL AND $REVISION IS NOT NULL
          AND CASE WHEN t.annotation_id IS NULL THEN v.source_revision_digest = $REVISION
                   ELSE n.searchable = 1 AND v.source_revision_digest = $MEMO_REVISION END"""
@@ -124,7 +126,7 @@ class RoomVectorSearchStore(private val db: IrohacoDatabase) : VectorSearchStore
     override suspend fun nearest(spaceId: String, query: FloatArray, limit: Int): List<VectorHit> = withContext(Dispatchers.IO) {
         val best = PriorityQueue<Pair<Float, VectorHit>>(compareBy { it.first })
         val values = FloatArray(query.size)
-        db.openHelper.readableDatabase.query("SELECT a.asset_id, f.timestamp_ms, v.vector_blob, t.annotation_id IS NOT NULL ${VECTOR_FILES.replace(":spaceId", "?")}", arrayOf(spaceId))
+        db.openHelper.readableDatabase.query("SELECT a.asset_id, COALESCE(f.timestamp_ms, sg.start_ms), v.vector_blob, t.annotation_id IS NOT NULL ${VECTOR_FILES.replace(":spaceId", "?")}", arrayOf(spaceId))
             .use { c ->
                 while (c.moveToNext()) {
                     val blob = c.getBlob(2)
