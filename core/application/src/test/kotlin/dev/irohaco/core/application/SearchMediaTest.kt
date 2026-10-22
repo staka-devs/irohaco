@@ -66,6 +66,16 @@ class SearchMediaTest {
     }
 
     @Test
+    fun `a memo that matches says so, and the memo chip leaves memos out`() = runTest {
+        vectorHits = listOf(VectorHit("p1", null, fromMemo = true))
+        textHits = listOf(TextMatch("p2", null, "祖母の家", fromMemo = true), TextMatch("p1", null, "駅"))
+        val results = search("祖母")
+        assertEquals(setOf(Evidence.MEMO, Evidence.TEXT), results.hits.first { it.item.assetId == "p1" }.evidence)
+        assertEquals(setOf(Evidence.MEMO), results.hits.first { it.item.assetId == "p2" }.evidence)
+        assertEquals(listOf("p1"), search("祖母", byMemo = false).hits.map { it.item.assetId })
+    }
+
+    @Test
     fun `chips narrow the sources and the kinds`() = runTest {
         assertEquals(listOf("v1", "v1"), search("駅", kind = MediaKind.VIDEO).hits.map { it.item.assetId })
         assertEquals(setOf(Evidence.TEXT), search("駅", byMeaning = false).hits.flatMap { it.evidence }.toSet())

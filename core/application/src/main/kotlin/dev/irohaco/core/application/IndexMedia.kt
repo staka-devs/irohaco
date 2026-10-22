@@ -69,6 +69,8 @@ class EmbedMediaItem(
     private val reader: IndexImageReader,
     private val recognizer: TextRecognizer?,
     private val texts: TextIndexStore?,
+    /** Turns a search memo into a vector of the same space (the local model has no corpus prefix). */
+    private val embedText: suspend (String) -> FloatArray,
     /** Runs the model at background priority; searches by the user go first. */
     private val embed: suspend (ByteArray) -> FloatArray,
 ) : IndexItemProcessor {
@@ -76,6 +78,7 @@ class EmbedMediaItem(
         val bytes = when (val source = current(item)) {
             is IndexSource.Image -> reader.read(source.contentUri)
             is IndexSource.Frame -> reader.readFrame(source.contentUri, source.timestampMs)
+            is IndexSource.Text -> return embedText(source.text).also { current(item) }
         }
         val vector = embed(bytes)
         val text = recognizer?.let { recognize(it, bytes) }

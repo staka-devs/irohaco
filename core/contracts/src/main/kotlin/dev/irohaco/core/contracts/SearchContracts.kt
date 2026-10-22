@@ -24,8 +24,8 @@ data class EmbeddingSpace(
     fun specWith(modelDigest: String) = EmbeddingSpaceSpec(modelProfileId, modelDigest, dimension, normalization, queryPrefix, corpusPrefix, preprocessingSignature)
 }
 
-/** A file that matched by meaning, with the frame's time when it came from a video. */
-data class VectorHit(val assetId: String, val timestampMs: Long?)
+/** A file that matched by meaning, with the frame's time when it came from a video; [fromMemo] when its search memo matched. */
+data class VectorHit(val assetId: String, val timestampMs: Long?, val fromMemo: Boolean = false)
 
 /** Embedding spaces, the default search profile and nearest-vector search (M2-08, ADR-0003). */
 interface VectorSearchStore {

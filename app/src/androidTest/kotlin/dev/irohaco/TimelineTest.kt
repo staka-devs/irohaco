@@ -70,8 +70,15 @@ class TimelineTest {
         compose.waitUntilAtLeastOneExists(hasText("irohaco-l2-", substring = true), timeoutMillis = 5_000)
         // Back as a key to the focused window, the sheet's own, which closes only the sheet. Espresso's
         // pressBack picks the activity's root and waits for it to regain focus, which fails on slow emulators.
-        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
-        compose.waitUntilDoesNotExist(hasText("irohaco-l2-", substring = true), timeoutMillis = 5_000)
+        // A key sent while the sheet still opens can be lost there too, so it is sent again until the sheet goes.
+        val sheetText = hasText("irohaco-l2-", substring = true)
+        compose.waitForIdle()
+        repeat(BACK_TRIES) {
+            if (compose.onAllNodes(sheetText).fetchSemanticsNodes().isEmpty()) return@repeat
+            InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+            runCatching { compose.waitUntilDoesNotExist(sheetText, timeoutMillis = 3_000) }
+        }
+        compose.waitUntilDoesNotExist(sheetText, timeoutMillis = 1_000)
 
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntilDoesNotExist(back, timeoutMillis = 5_000)
@@ -109,3 +116,5 @@ class TimelineTest {
         compose.waitUntilAtLeastOneExists(folder, timeoutMillis = 5_000)
     }
 }
+
+private const val BACK_TRIES = 3

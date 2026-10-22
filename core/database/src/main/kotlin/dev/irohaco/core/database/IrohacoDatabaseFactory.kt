@@ -58,11 +58,12 @@ object IrohacoDatabaseFactory {
         return file
     }
 
-    // Foreign keys are off per connection unless asked for; ocr_fts is derived, so it is made here (M2-07).
+    // Foreign keys are off per connection unless asked for; ocr_fts and annotation_fts are derived, so they are made here (M2-07, M2-11).
     private object OnOpen : RoomDatabase.Callback() {
         override fun onOpen(db: SupportSQLiteDatabase) {
             db.execSQL("PRAGMA foreign_keys = ON")
             db.execSQL(RoomTextIndexStore.CREATE_FTS)
+            db.execSQL(RoomAnnotationStore.CREATE_FTS)
         }
     }
 }

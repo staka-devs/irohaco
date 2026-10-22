@@ -114,9 +114,57 @@ interface MediaIndexDao {
     )
     suspend fun unindexedFrames(spaceId: String, profileId: String, everywhere: Boolean, folders: List<String>): List<IndexItem>
 
+    @Query(
+        """INSERT OR IGNORE INTO embedding_targets(target_id, annotation_id)
+           SELECT 'memo:' || n.annotation_id, n.annotation_id
+           FROM semantic_annotations n JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
+             JOIN media_assets a ON a.asset_id = sub.asset_id
+           WHERE n.searchable = 1 AND a.tombstoned_at IS NULL AND $IN_FOLDERS
+             AND (:annotationId IS NULL OR n.annotation_id = :annotationId)""",
+    )
+    suspend fun insertMemoTargets(everywhere: Boolean, folders: List<String>, annotationId: String? = null)
+
+    @Query(
+        """SELECT targetId, sourceRevisionDigest FROM (
+             SELECT t.target_id AS targetId, $MEMO_REVISION AS sourceRevisionDigest
+             FROM embedding_targets t JOIN semantic_annotations n ON n.annotation_id = t.annotation_id
+               JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
+               JOIN media_assets a ON a.asset_id = sub.asset_id
+             WHERE n.searchable = 1 AND a.tombstoned_at IS NULL AND $IN_FOLDERS
+               AND (:annotationId IS NULL OR n.annotation_id = :annotationId))
+           WHERE :annotationId IS NOT NULL OR NOT EXISTS (SELECT 1 FROM embedding_vectors v WHERE v.space_id = :spaceId
+                             AND v.target_id = targetId AND v.source_revision_digest = sourceRevisionDigest)""",
+    )
+    suspend fun unindexedMemos(spaceId: String, everywhere: Boolean, folders: List<String>, annotationId: String? = null): List<IndexItem>
+
+    /** One memo's target at its current revision, wherever its file is, while the memo is searchable. */
+    @Transaction
+    suspend fun memoItem(annotationId: String): IndexItem? {
+        insertMemoTargets(everywhere = true, folders = emptyList(), annotationId = annotationId)
+        return unindexedMemos("", everywhere = true, folders = emptyList(), annotationId = annotationId).firstOrNull()
+    }
+
+    @Query(
+        """SELECT r.text AS text, 'rev:' || r.revision_no AS revisionDigest
+           FROM embedding_targets t JOIN semantic_annotations n ON n.annotation_id = t.annotation_id
+             JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
+             JOIN media_assets a ON a.asset_id = sub.asset_id
+             JOIN semantic_annotation_revisions r ON r.annotation_id = n.annotation_id
+               AND r.revision_no = (SELECT MAX(revision_no) FROM semantic_annotation_revisions WHERE annotation_id = n.annotation_id)
+           WHERE t.target_id = :targetId AND n.searchable = 1 AND a.tombstoned_at IS NULL AND $REVISION IS NOT NULL""",
+    )
+    suspend fun memoSource(targetId: String): MemoSourceRow?
+
+    @Query(
+        """INSERT OR IGNORE INTO embedding_vectors(vector_id, space_id, target_id, source_revision_digest, vector_blob, created_at)
+           VALUES (:vectorId, :spaceId, :targetId, :digest, :blob, :createdAt)""",
+    )
+    suspend fun putVector(spaceId: String, vectorId: String, targetId: String, digest: String, blob: ByteArray, createdAt: Long)
+
     @Transaction
     suspend fun plan(spaceId: String, everywhere: Boolean, folders: List<String>, quality: VideoQuality, now: Long): List<IndexItem> {
         insertImageTargets(everywhere, folders)
+        insertMemoTargets(everywhere, folders)
         val profileId = quality.profileId
         insertProfile(profileId, quality.intervalMs, quality.maxFrames)
         for (video in unsegmentedVideos(profileId, everywhere, folders)) {
@@ -132,7 +180,8 @@ interface MediaIndexDao {
                 insertFrameTarget(frameId)
             }
         }
-        return unindexedImages(spaceId, everywhere, folders) + unindexedFrames(spaceId, profileId, everywhere, folders)
+        return unindexedImages(spaceId, everywhere, folders) + unindexedFrames(spaceId, profileId, everywhere, folders) +
+            unindexedMemos(spaceId, everywhere, folders)
     }
 
     @Query(
@@ -170,9 +219,11 @@ data class IndexSourceRow(val contentUri: String?, val revisionDigest: String?)
 
 data class FrameSourceRow(val contentUri: String?, val revisionDigest: String?, val timestampMs: Long)
 
+data class MemoSourceRow(val text: String, val revisionDigest: String)
+
 private val VideoQuality.profileId get() = "fixed-${intervalMs}ms-max$maxFrames"
 
-/** Embedding spaces, one target per image asset, and segments and frames of videos (M2-05, M2-06). */
+/** Embedding spaces, one target per image asset, segments and frames of videos, and search memos (M2-05, M2-06, M2-11). */
 class RoomMediaIndexStore(private val db: IrohacoDatabase) : MediaIndexStore {
     private val dao get() = db.mediaIndexDao()
 
@@ -183,11 +234,18 @@ class RoomMediaIndexStore(private val db: IrohacoDatabase) : MediaIndexStore {
     override suspend fun plan(spaceId: String, folders: Set<String>?, quality: VideoQuality, now: Long) =
         dao.plan(spaceId, folders == null, folders.orEmpty().toList(), quality, now)
 
-    override suspend fun source(targetId: String): IndexSource? = if (targetId.startsWith("frame:")) {
+    override suspend fun source(targetId: String): IndexSource? = if (targetId.startsWith("memo:")) {
+        dao.memoSource(targetId)?.let { IndexSource.Text(it.text, it.revisionDigest) }
+    } else if (targetId.startsWith("frame:")) {
         dao.frameSource(targetId)?.let { IndexSource.Frame(it.contentUri ?: return null, it.timestampMs, it.revisionDigest ?: return null) }
     } else {
         dao.imageSource(targetId)?.let { IndexSource.Image(it.contentUri ?: return null, it.revisionDigest ?: return null) }
     }
 
     override fun lowCoverageVideos() = dao.lowCoverageVideos()
+
+    override suspend fun memoItem(annotationId: String) = dao.memoItem(annotationId)
+
+    override suspend fun putVector(spaceId: String, item: IndexItem, vectorId: String, vector: FloatArray, createdAt: Long) =
+        dao.putVector(spaceId, vectorId, item.targetId, item.sourceRevisionDigest, vector.toBlob(), createdAt)
 }

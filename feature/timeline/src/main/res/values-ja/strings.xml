@@ -229,4 +229,25 @@
     <string name="search_unranked">%1$s: 見つからず</string>
     <string name="search_rank_short">%1$s %2$d位</string>
     <string name="search_unranked_short">%1$s –</string>
+    <string name="search_by_memo">メモ</string>
+    <string name="memo_title">検索用メモ</string>
+    <string name="memo_add">メモを追加</string>
+    <string name="memo_edit">編集</string>
+    <string name="memo_history">履歴</string>
+    <string name="memo_delete">削除</string>
+    <string name="memo_delete_title">このメモを削除しますか？</string>
+    <string name="memo_delete_body">メモと履歴が消え、このメモでは検索に出なくなります。</string>
+    <string name="memo_cancel">キャンセル</string>
+    <string name="memo_save">保存</string>
+    <string name="memo_close">閉じる</string>
+    <string name="memo_text">メモ</string>
+    <string name="memo_searchable">検索に使う</string>
+    <string name="memo_kind_context">状況</string>
+    <string name="memo_kind_visual">写っているもの</string>
+    <string name="memo_kind_keywords">キーワード</string>
+    <string name="memo_kind_ai_caption">AIの説明</string>
+    <string name="memo_by_ai">AIが作成</string>
+    <string name="memo_by_ai_model">AI（%1$s）</string>
+    <string name="memo_by_user">あなた</string>
+    <string name="memo_revision">第%1$d版 · %2$s · %3$s</string>
 </resources>

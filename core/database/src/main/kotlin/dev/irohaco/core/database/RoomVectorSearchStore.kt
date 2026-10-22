@@ -15,14 +15,21 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.PriorityQueue
 
-/** A vector's file: the asset itself, or the video whose frame it is. */
+/**
+ * A vector's file: the asset itself, the video whose frame it is, or the file a search memo is on. A
+ * file's vectors count at its current revision; a memo's at the memo's, while it is searchable (AC-007).
+ */
 private const val VECTOR_FILES =
     """FROM embedding_vectors v JOIN embedding_targets t ON t.target_id = v.target_id
          LEFT JOIN sampled_frames f ON f.frame_id = t.frame_id
          LEFT JOIN video_segments g ON g.segment_id = f.segment_id
          LEFT JOIN media_revisions r ON r.revision_id = g.revision_id
-         JOIN media_assets a ON a.asset_id = COALESCE(t.asset_id, r.asset_id)
-       WHERE v.space_id = :spaceId AND a.tombstoned_at IS NULL AND v.source_revision_digest = $REVISION"""
+         LEFT JOIN semantic_annotations n ON n.annotation_id = t.annotation_id
+         LEFT JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
+         JOIN media_assets a ON a.asset_id = COALESCE(t.asset_id, r.asset_id, sub.asset_id)
+       WHERE v.space_id = :spaceId AND a.tombstoned_at IS NULL AND $REVISION IS NOT NULL
+         AND CASE WHEN t.annotation_id IS NULL THEN v.source_revision_digest = $REVISION
+                  ELSE n.searchable = 1 AND v.source_revision_digest = $MEMO_REVISION END"""
 
 private const val SPACES =
     """SELECT s.space_id AS spaceId, m.display_name AS modelName, s.lifecycle_state AS state, s.space_signature AS signature,
@@ -78,7 +85,7 @@ interface VectorSearchDao {
     }
 
     @Query(
-        """SELECT CAST((SELECT COUNT(DISTINCT a.asset_id) $VECTOR_FILES) AS REAL)
+        """SELECT CAST((SELECT COUNT(DISTINCT a.asset_id) $VECTOR_FILES AND t.annotation_id IS NULL) AS REAL)
              / MAX(1, (SELECT COUNT(*) FROM media_assets a WHERE a.tombstoned_at IS NULL AND $REVISION IS NOT NULL))""",
     )
     suspend fun coverage(spaceId: String): Float
@@ -117,7 +124,7 @@ class RoomVectorSearchStore(private val db: IrohacoDatabase) : VectorSearchStore
     override suspend fun nearest(spaceId: String, query: FloatArray, limit: Int): List<VectorHit> = withContext(Dispatchers.IO) {
         val best = PriorityQueue<Pair<Float, VectorHit>>(compareBy { it.first })
         val values = FloatArray(query.size)
-        db.openHelper.readableDatabase.query("SELECT a.asset_id, f.timestamp_ms, v.vector_blob ${VECTOR_FILES.replace(":spaceId", "?")}", arrayOf(spaceId))
+        db.openHelper.readableDatabase.query("SELECT a.asset_id, f.timestamp_ms, v.vector_blob, t.annotation_id IS NOT NULL ${VECTOR_FILES.replace(":spaceId", "?")}", arrayOf(spaceId))
             .use { c ->
                 while (c.moveToNext()) {
                     val blob = c.getBlob(2)
@@ -127,10 +134,10 @@ class RoomVectorSearchStore(private val db: IrohacoDatabase) : VectorSearchStore
                     var score = 0f
                     for (i in values.indices) score += values[i] * query[i]
                     if (best.size < limit) {
-                        best.add(score to VectorHit(c.getString(0), if (c.isNull(1)) null else c.getLong(1)))
+                        best.add(score to VectorHit(c.getString(0), if (c.isNull(1)) null else c.getLong(1), c.getInt(3) == 1))
                     } else if (score > best.peek()!!.first) {
                         best.poll()
-                        best.add(score to VectorHit(c.getString(0), if (c.isNull(1)) null else c.getLong(1)))
+                        best.add(score to VectorHit(c.getString(0), if (c.isNull(1)) null else c.getLong(1), c.getInt(3) == 1))
                     }
                 }
             }

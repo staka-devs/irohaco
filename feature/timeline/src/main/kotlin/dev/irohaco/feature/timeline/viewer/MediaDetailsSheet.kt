@@ -53,12 +53,13 @@ internal fun MediaDetailsSheet(
     tags: List<Tag> = emptyList(),
     onAddTag: () -> Unit = {},
     onRemoveTag: (String) -> Unit = {},
+    memos: @Composable () -> Unit = {},
 ) {
     if (state == ViewerViewModel.Details.Hidden) return
     IrohacoBottomSheet(onDismiss = onDismiss) {
         when (state) {
             ViewerViewModel.Details.Loading -> ExpressiveLoading(Modifier.padding(IrohacoSpacing.xl))
-            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate, tags, onAddTag, onRemoveTag)
+            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate, tags, onAddTag, onRemoveTag, memos)
             ViewerViewModel.Details.Hidden -> Unit
         }
     }
@@ -74,6 +75,7 @@ internal fun MediaDetailsContent(
     tags: List<Tag> = emptyList(),
     onAddTag: () -> Unit = {},
     onRemoveTag: (String) -> Unit = {},
+    memos: @Composable () -> Unit = {},
 ) {
     Column(
         Modifier
@@ -86,6 +88,7 @@ internal fun MediaDetailsContent(
         Text(stringResource(R.string.details_title), style = MaterialTheme.typography.titleLarge)
         RatingRow(rating, onRate)
         TagsRow(tags, onAddTag, onRemoveTag)
+        memos()
         when (result) {
             MediaDetailsResult.FileUnavailable -> Text(stringResource(R.string.details_file_unavailable), style = MaterialTheme.typography.bodyLarge)
             is MediaDetailsResult.Read -> DetailRows(result.details, kind, onAllowLocation)

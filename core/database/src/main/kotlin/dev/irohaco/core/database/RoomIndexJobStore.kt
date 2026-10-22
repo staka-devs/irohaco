@@ -156,7 +156,7 @@ class RoomIndexJobStore(private val db: IrohacoDatabase) : IndexJobStore {
         dao.setItemState(jobId, item.targetId, item.sourceRevisionDigest, "RUNNING", attempt = 1)
 
     override suspend fun commit(jobId: String, item: IndexItem, vectorId: String, vector: FloatArray, createdAt: Long) {
-        val blob = ByteBuffer.allocate(4 * vector.size).order(ByteOrder.LITTLE_ENDIAN).apply { asFloatBuffer().put(vector) }.array()
+        val blob = vector.toBlob()
         dao.commit(jobId, item, vectorId, blob, createdAt)
     }
 
@@ -182,3 +182,6 @@ class RoomIndexJobStore(private val db: IrohacoDatabase) : IndexJobStore {
 
     override fun failedNames(jobId: String, limit: Int) = dao.failedNames(jobId, limit)
 }
+
+/** FLOAT32_LE, the only `value_format` of `embedding_spaces`. */
+internal fun FloatArray.toBlob(): ByteArray = ByteBuffer.allocate(4 * size).order(ByteOrder.LITTLE_ENDIAN).apply { asFloatBuffer().put(this@toBlob) }.array()
