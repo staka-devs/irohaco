@@ -18,6 +18,8 @@ data class IndexJobProgress(
     val committed: Int,
     val failed: Int,
     val skipped: Int,
+    /** Items that are video frames, one per segment (IDX-004). */
+    val frames: Int = 0,
 ) {
     val total get() = pending + committed + failed + skipped
 }
@@ -87,26 +89,52 @@ data class EmbeddingSpaceSpec(
     val preprocessingSignature: String,
 )
 
-/** An image as it stands now: where to read it, and the revision its vector belongs to. */
-data class IndexImageSource(val contentUri: String, val revisionDigest: String)
+/** A target as it stands now: where to read it, and the revision its vector belongs to. */
+sealed interface IndexSource {
+    val contentUri: String
+    val revisionDigest: String
 
-/** Embedding spaces and image targets (M2-05). */
-interface ImageIndexStore {
+    data class Image(override val contentUri: String, override val revisionDigest: String) : IndexSource
+
+    /** A video frame at [timestampMs]; the frame shown may be the nearest key frame. */
+    data class Frame(override val contentUri: String, val timestampMs: Long, override val revisionDigest: String) : IndexSource
+}
+
+/**
+ * How densely videos are sampled (PRD §5.2). Each quality is its own extraction profile, so a finer
+ * pass adds frames next to the earlier ones.
+ */
+enum class VideoQuality(val intervalMs: Long, val maxFrames: Int) {
+    BALANCED(10_000, 1_080),
+    THOROUGH(3_000, 3_600),
+}
+
+/** Embedding spaces, and targets for images and video frames (M2-05, M2-06). */
+interface MediaIndexStore {
     /** The space with [signature], created BUILDING under [newSpaceId] if there is none yet. */
     suspend fun ensureSpace(newSpaceId: String, spec: EmbeddingSpaceSpec, signature: String): String
 
     suspend fun hasVectors(spaceId: String): Boolean
 
-    /** Makes a target for every available image, in [folders] (relative paths) or everywhere when null, and returns those without a vector of their current revision in [spaceId]. */
-    suspend fun planImages(spaceId: String, folders: Set<String>?): List<IndexItem>
+    /**
+     * Makes targets for every available image and for frames of every available video, in [folders]
+     * (relative paths) or everywhere when null, and returns those without a vector of their current
+     * revision in [spaceId]. Videos get segments and frames for [quality] first.
+     */
+    suspend fun plan(spaceId: String, folders: Set<String>?, quality: VideoQuality, now: Long): List<IndexItem>
 
-    /** The image behind [targetId], or null when it is gone or not available. */
-    suspend fun imageSource(targetId: String): IndexImageSource?
+    /** What [targetId] reads from, or null when it is gone or not available. */
+    suspend fun source(targetId: String): IndexSource?
+
+    /** Videos whose frames, in any quality, stop before the video ends (PRD §5.2 low coverage). */
+    fun lowCoverageVideos(): Flow<Int>
 }
 
-/** Reads an image reduced for the model; the display path stays separate (ARCHITECTURE §11). */
-fun interface IndexImageReader {
+/** Reads images and video frames reduced for the model; the display path stays separate (ARCHITECTURE §11). */
+interface IndexImageReader {
     suspend fun read(contentUri: String): ByteArray
+
+    suspend fun readFrame(contentUri: String, timestampMs: Long): ByteArray
 }
 
 /** Says whether indexing must stop for now: heat, battery (AC-012, ARCHITECTURE §10.1). */

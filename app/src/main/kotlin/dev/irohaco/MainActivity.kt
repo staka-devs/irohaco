@@ -180,7 +180,7 @@ class MainActivity : ComponentActivity() {
                 viewModel {
                     SettingsViewModel(
                         container.themeColorSettings, container.sharingSettings, container.mapSettings, container.browseLibrary,
-                        container.manageModels, container::downloadModel, container.indexJobs, container.planImageIndex,
+                        container.manageModels, container::downloadModel, container.indexJobs, container.planMediaIndex,
                     ) { IndexingService.start(applicationContext, it) }
                 },
                 onBack,

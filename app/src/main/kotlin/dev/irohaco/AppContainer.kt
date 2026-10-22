@@ -14,7 +14,7 @@ import dev.irohaco.core.application.AiResourceManager
 import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.BrowseMap
 import dev.irohaco.core.application.BrowseTrash
-import dev.irohaco.core.application.EmbedImageItem
+import dev.irohaco.core.application.EmbedMediaItem
 import dev.irohaco.core.application.GetLibraryAccess
 import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.GetTimelinePage
@@ -24,7 +24,7 @@ import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.application.OrganizeMedia
-import dev.irohaco.core.application.PlanImageIndex
+import dev.irohaco.core.application.PlanMediaIndex
 import dev.irohaco.core.application.PrepareShare
 import dev.irohaco.core.application.ReconcileIdentity
 import dev.irohaco.core.application.SyncMediaCatalog
@@ -35,7 +35,7 @@ import dev.irohaco.core.database.IrohacoDatabaseFactory
 import dev.irohaco.core.database.RoomCatalogStore
 import dev.irohaco.core.database.RoomCollectionsStore
 import dev.irohaco.core.database.RoomIdentityStore
-import dev.irohaco.core.database.RoomImageIndexStore
+import dev.irohaco.core.database.RoomMediaIndexStore
 import dev.irohaco.core.database.RoomIndexJobStore
 import dev.irohaco.core.database.RoomLibraryReader
 import dev.irohaco.core.database.RoomLocationStore
@@ -179,13 +179,13 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     /** The local model's one owner; it loads the model only when inference is first asked for (MOD-004). */
     val aiResourceManager by aiLazy
 
-    private val imageIndexStore by lazy { RoomImageIndexStore(database) }
+    private val mediaIndexStore by lazy { RoomMediaIndexStore(database) }
 
     /** Indexing jobs (M2-03); [IndexingService] runs them, one at a time. */
     val indexJobs by lazy {
         IndexJobs(
             store = RoomIndexJobStore(database),
-            processor = EmbedImageItem(imageIndexStore, AndroidIndexImageReader(appContext)) { bytes ->
+            processor = EmbedMediaItem(mediaIndexStore, AndroidIndexImageReader(appContext)) { bytes ->
                 aiResourceManager.withEmbedding(AiPriority.BACKGROUND_INDEX) { it.embedImage(bytes) }
             },
             policy = AndroidResourcePolicy(appContext),
@@ -194,8 +194,8 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
         )
     }
 
-    /** Plans an image index the user asked for (M2-05); the indexing screen (M2-04) starts the job. */
-    val planImageIndex by lazy { PlanImageIndex(imageIndexStore, indexJobs, { UUID.randomUUID().toString() }) }
+    /** Plans an index of images and video frames the user asked for (M2-05, M2-06); the indexing screen (M2-04) starts the job. */
+    val planMediaIndex by lazy { PlanMediaIndex(mediaIndexStore, indexJobs, { UUID.randomUUID().toString() }, System::currentTimeMillis) }
 
     /** Frees the model when the system runs short of memory; nothing to do if it never loaded. */
     fun trimMemory() {
