@@ -26,7 +26,7 @@ import java.util.PriorityQueue
 
 /**
  * The one owner of the local embedding model (ARCHITECTURE §10.1, MOD-003, MOD-004). Nothing loads at
- * app start: the model loads on the first request, on the GPU and else on the CPU, and is freed when
+ * app start: the model loads on the first request, on the backend [backendFor] picks, and is freed when
  * memory runs low or it sits unused. Requests run one at a time, the highest priority first.
  */
 class AiResourceManager(
@@ -35,6 +35,8 @@ class AiResourceManager(
     private val io: CoroutineDispatcher,
     private val scope: CoroutineScope,
     private val idleMs: Long = IDLE_MS,
+    /** The backend for a model file; a failure there is not retried on the other one (#169). */
+    private val backendFor: suspend (modelPath: String) -> AiBackend = { AiBackend.GPU },
 ) {
     private val _state = MutableStateFlow(ModelState.READY)
     val state: StateFlow<ModelState> = _state.asStateFlow()
@@ -85,23 +87,20 @@ class AiResourceManager(
             throw ModelNotInstalledException()
         }
         _state.value = ModelState.LOADING
-        var failure: Throwable? = null
-        for (backend in AiBackend.entries) {
-            try {
-                return withContext(io) { runtime.load(path, backend) }.also {
-                    session = it
-                    _backend.value = it.backend
-                    _state.value = ModelState.LOADED
-                }
-            } catch (e: CancellationException) {
-                _state.value = ModelState.READY
-                throw e
-            } catch (e: Throwable) { // a native library that fails to link is an Error, and the CPU may still work
-                failure = e // try the next local backend; never a remote one
+        try {
+            val backend = backendFor(path)
+            return withContext(io) { runtime.load(path, backend) }.also {
+                session = it
+                _backend.value = it.backend
+                _state.value = ModelState.LOADED
             }
+        } catch (e: CancellationException) {
+            _state.value = ModelState.READY
+            throw e
+        } catch (e: Throwable) { // a native library that fails to link is an Error, not an Exception
+            _state.value = ModelState.FAILED
+            throw ModelLoadException(e)
         }
-        _state.value = ModelState.FAILED
-        throw ModelLoadException(failure)
     }
 
     private companion object {

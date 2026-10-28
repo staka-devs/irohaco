@@ -14,6 +14,4 @@ dependencies {
     implementation(project(":core:contracts"))
     implementation(libs.litertlm.android)
     implementation(libs.mlkit.text.recognition.japanese)
-    testImplementation(libs.junit)
-    testImplementation(kotlin("test"))
 }

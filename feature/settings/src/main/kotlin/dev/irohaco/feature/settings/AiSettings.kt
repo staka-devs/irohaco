@@ -2,6 +2,7 @@ package dev.irohaco.feature.settings
 
 import android.text.format.Formatter
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +13,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,6 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import dev.irohaco.core.contracts.AiBackend
+import dev.irohaco.core.contracts.GpuCheck
 import dev.irohaco.core.contracts.ModelArtifact
 import dev.irohaco.core.contracts.ModelInstallState
 import dev.irohaco.core.contracts.ModelInstallState.Failed.Reason
@@ -33,7 +38,8 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 /**
  * Settings > AI (DESIGN §4.5, M2-02): each model with its state, its size, and what can be done with
  * it. Downloads and imports are checked by SHA-256 before the model becomes usable. A download can be
- * paused and resumed from where it stopped, cancelled, or retried after a failure.
+ * paused and resumed from where it stopped, cancelled, or retried after a failure. The model runs on
+ * the GPU or the CPU; where the GPU failed its check, only the CPU can be chosen (#169).
  */
 @Composable
 internal fun AiSettings(
@@ -45,6 +51,9 @@ internal fun AiSettings(
     onDelete: (String) -> Unit,
     onPause: (String) -> Unit = {},
     onCancel: (String) -> Unit = {},
+    backend: AiBackend? = null,
+    gpuCheck: GpuCheck? = null,
+    onSelectBackend: (AiBackend) -> Unit = {},
 ) {
     var deleting by remember { mutableStateOf<ModelArtifact?>(null) }
     deleting?.let { model ->
@@ -123,7 +132,31 @@ internal fun AiSettings(
             },
             trailingContent = { TextButton(onClick = onImport) { Text(stringResource(R.string.settings_ai_import_choose)) } },
         )
+        SectionTitle(R.string.settings_ai_backend)
+        val gpuFails = gpuCheck?.works == false
+        val running = if (gpuFails) AiBackend.CPU else backend ?: AiBackend.GPU
+        BackendRow(
+            R.string.settings_ai_backend_gpu,
+            running == AiBackend.GPU,
+            enabled = !gpuFails,
+            note = when {
+                gpuFails -> R.string.settings_ai_backend_gpu_fails
+                gpuCheck == null -> R.string.settings_ai_backend_gpu_unchecked
+                else -> null
+            },
+        ) { onSelectBackend(AiBackend.GPU) }
+        BackendRow(R.string.settings_ai_backend_cpu, running == AiBackend.CPU, enabled = true, note = null) { onSelectBackend(AiBackend.CPU) }
     }
+}
+
+@Composable
+private fun BackendRow(label: Int, selected: Boolean, enabled: Boolean, note: Int?, onClick: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(stringResource(label)) },
+        supportingContent = note?.let { { Text(stringResource(it)) } },
+        leadingContent = { RadioButton(selected = selected, onClick = null, enabled = enabled) },
+        modifier = Modifier.selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
+    )
 }
 
 /** One line for the category list: the default model's state. */
@@ -177,7 +210,15 @@ private fun AiSettingsPausedPreview() {
 private fun AiSettingsInstalledPreview() {
     IrohacoTheme(dynamicColor = false) {
         Surface {
-            AiSettings(listOf(previewModel), mapOf("m" to ModelInstallState.Installed("/m")), ModelInstallState.Failed(Reason.UNKNOWN_MODEL), {}, {}, {})
+            AiSettings(
+                listOf(previewModel),
+                mapOf("m" to ModelInstallState.Installed("/m")),
+                ModelInstallState.Failed(Reason.UNKNOWN_MODEL),
+                {},
+                {},
+                {},
+                gpuCheck = GpuCheck("/m", works = false),
+            )
         }
     }
 }

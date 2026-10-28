@@ -32,7 +32,23 @@ fun interface EmbeddingRuntime {
 
 class ModelNotInstalledException : IllegalStateException("No embedding model is installed")
 
-class ModelLoadException(cause: Throwable?) : IllegalStateException("The embedding model failed to load on every local backend", cause)
+class ModelLoadException(cause: Throwable?) : IllegalStateException("The embedding model failed to load on the chosen backend", cause)
+
+/** Whether the GPU ran [modelPath], found in a separate process so a driver crash leaves the app running (#169). */
+data class GpuCheck(val modelPath: String, val works: Boolean)
+
+/** The backend the user chose and what the GPU check found. */
+interface AiSettings {
+    /** Null until the user chooses; the GPU is then used where it works. */
+    val backend: Flow<AiBackend?>
+
+    suspend fun setBackend(backend: AiBackend)
+
+    /** The last check, for one model file; null before any. */
+    val gpuCheck: Flow<GpuCheck?>
+
+    suspend fun setGpuCheck(check: GpuCheck)
+}
 
 /** A model the app can fetch and check (MOD-002); its URL points at one fixed revision. */
 data class ModelArtifact(val id: String, val displayName: String, val url: String, val sizeBytes: Long, val sha256: String)

@@ -2,13 +2,16 @@ package dev.irohaco.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.irohaco.core.application.AiBackendChoice
 import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.IndexJobs
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.PlanMediaIndex
 import dev.irohaco.core.application.ThemeColorSettings
+import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.FolderRef
+import dev.irohaco.core.contracts.GpuCheck
 import dev.irohaco.core.contracts.IndexSettings
 import dev.irohaco.core.contracts.LibraryFolder
 import dev.irohaco.core.contracts.MapSettings
@@ -48,6 +51,7 @@ class SettingsViewModel(
     private val planMediaIndex: PlanMediaIndex? = null,
     private val indexSettings: IndexSettings? = null,
     private val spaces: Flow<List<EmbeddingSpace>> = flowOf(emptyList()),
+    private val aiBackends: AiBackendChoice? = null,
     /** Runs a job in the foreground service, so it carries on after the user leaves this screen. */
     private val runIndexJob: (String) -> Unit = {},
 ) : ViewModel() {
@@ -172,6 +176,15 @@ class SettingsViewModel(
 
     fun deleteModel(id: String) {
         viewModelScope.launch { models?.delete(id) }
+    }
+
+    /** The GPU or the CPU the user chose, null before they choose (#169). */
+    val aiBackend: StateFlow<AiBackend?> = (aiBackends?.backend ?: flowOf(null)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val gpuCheck: StateFlow<GpuCheck?> = (aiBackends?.gpuCheck ?: flowOf(null)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun selectAiBackend(backend: AiBackend) {
+        viewModelScope.launch { aiBackends?.select(backend) }
     }
 
     /** Folders hidden from the Photos tab, by path, for the Library page (GAL-002). */
