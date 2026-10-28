@@ -96,7 +96,7 @@ class AiResourceManager(
             } catch (e: CancellationException) {
                 _state.value = ModelState.READY
                 throw e
-            } catch (e: Exception) {
+            } catch (e: Throwable) { // a native library that fails to link is an Error, and the CPU may still work
                 failure = e // try the next local backend; never a remote one
             }
         }

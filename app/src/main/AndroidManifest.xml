@@ -15,6 +15,9 @@
         android:label="Irohaco"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.NoActionBar">
+        <!-- The vendor OpenCL the LiteRT-LM GPU backend runs on; without these apps cannot load it (ARCHITECTURE §10). -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
         <!-- ADR-0011: empty unless MAPS_API_KEY is in local.properties; Google Maps is offered only then. -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
