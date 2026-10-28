@@ -22,16 +22,19 @@ import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.IndexChanges
 import dev.irohaco.core.application.IndexJobs
 import dev.irohaco.core.application.IndexLocations
+import dev.irohaco.core.application.InferPlaces
 import dev.irohaco.core.application.ManageAnnotations
 import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.MarkMedia
+import dev.irohaco.core.application.NamePlaces
 import dev.irohaco.core.application.OrganizeMedia
 import dev.irohaco.core.application.PlanMediaIndex
 import dev.irohaco.core.application.PrepareShare
 import dev.irohaco.core.application.ReconcileIdentity
 import dev.irohaco.core.application.SearchByMeaning
 import dev.irohaco.core.application.SearchMedia
+import dev.irohaco.core.application.SearchPlaces
 import dev.irohaco.core.application.SearchText
 import dev.irohaco.core.application.SyncMediaCatalog
 import dev.irohaco.core.application.ThemeColorSettings
@@ -133,7 +136,12 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     /** Reads the GPS of files not read yet; cancelling it (the app leaving the screen) pauses it (GAL-017). */
     suspend fun indexLocations() {
         try {
-            withContext(Dispatchers.IO) { IndexLocations(locationStore, AndroidMediaDetailsReader(appContext))() }
+            withContext(Dispatchers.IO) {
+                IndexLocations(locationStore, AndroidMediaDetailsReader(appContext))()
+                // Then names for the points, with the map consent only, and guesses for the files without GPS (M2-13).
+                NamePlaces(locationStore, AndroidPlaceNames(appContext), browseMap.allowed)()
+                InferPlaces(locationStore)()
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -216,7 +224,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val searchText by lazy { SearchText(textIndexStore) }
 
     /** The search screen: by meaning and by text, fused by rank (M2-09). */
-    val searchMedia by lazy { SearchMedia(searchByMeaning, searchText, RoomTimelineReader(database)) }
+    val searchMedia by lazy { SearchMedia(searchByMeaning, searchText, RoomTimelineReader(database), SearchPlaces(locationStore)) }
 
     /** Searches by meaning in one embedding space at a time (M2-08); the query runs before any indexing. */
     val searchByMeaning by lazy {

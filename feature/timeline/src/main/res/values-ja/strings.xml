@@ -258,4 +258,7 @@
     <string name="memo_at_scene">再生中の場面に付ける</string>
     <string name="memo_scene">%1$s–%2$sの場面</string>
     <string name="memo_scene_not_indexed">この場面はまだ索引されていません。先に検索用の索引を作成するか、動画全体にメモを付けてください。</string>
+    <string name="search_inferred_places">推定した場所も含める</string>
+    <string name="search_place">場所</string>
+    <string name="search_place_inferred">場所（推定）</string>
 </resources>

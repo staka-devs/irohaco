@@ -101,6 +101,8 @@ data class SearchUi(
     /** Capture time in [from, until) and a tag (SRCH-004). */
     val filters: SearchFilters = SearchFilters(),
     val tagName: String? = null,
+    /** Places guessed from photos taken near in time count too (`include_inferred`, SRCH-003). */
+    val inferredPlaces: Boolean = true,
     val searching: Boolean = false,
     val results: SearchResults? = null,
 )
@@ -140,6 +142,8 @@ class SearchViewModel(
 
     fun toggleCompare() = change { it.copy(compare = !it.compare) }
 
+    fun toggleInferredPlaces() = change { it.copy(inferredPlaces = !it.inferredPlaces) }
+
     fun showKind(kind: MediaKind?) = change { it.copy(kind = kind) }
 
     /** A READY space becomes the default for every search (AC-004); another one is searched just this time. */
@@ -167,7 +171,7 @@ class SearchViewModel(
             val results = if (similarTo != null) {
                 search.similar(similarTo, ui.spaceId, ui.kind, ui.filters)
             } else {
-                search(ui.query, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare, ui.byMemo, ui.filters)
+                search(ui.query, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare, ui.byMemo, ui.filters, ui.inferredPlaces)
             }
             _ui.update { it.copy(searching = false, results = results) }
         }
@@ -193,6 +197,7 @@ fun SearchScreen(
         tags = tags,
         onDates = viewModel::showDates,
         onTag = viewModel::showTag,
+        onToggleInferredPlaces = viewModel::toggleInferredPlaces,
         onBack = onBack,
         onSearch = viewModel::search,
         onToggleMeaning = viewModel::toggleMeaning,
@@ -227,6 +232,7 @@ internal fun SearchContent(
     tags: List<Tag> = emptyList(),
     onDates: (Long?, Long?) -> Unit = { _, _ -> },
     onTag: (Tag?) -> Unit = {},
+    onToggleInferredPlaces: () -> Unit = {},
     onBack: (() -> Unit)? = null,
 ) {
     var text by rememberSaveable { mutableStateOf(ui.query) }
@@ -265,7 +271,7 @@ internal fun SearchContent(
                 ) {}
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTag, similar = onBack != null)
+                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTag, onToggleInferredPlaces, similar = onBack != null)
             }
             ui.results?.let { results ->
                 item(span = { GridItemSpan(maxLineSpan) }) { Notices(ui, results, labels, onOpenSettings) }
@@ -302,6 +308,7 @@ private fun Conditions(
     tags: List<Tag>,
     onDates: (Long?, Long?) -> Unit,
     onTag: (Tag?) -> Unit,
+    onToggleInferredPlaces: () -> Unit,
     /** The similar photos page: no query, so only conditions on the files apply. */
     similar: Boolean,
 ) {
@@ -320,6 +327,7 @@ private fun Conditions(
             val dates = ui.filters.fromMs?.let { from -> ui.filters.untilMs?.let { until -> dateRangeLabel(from, until) } }
             FilterChip(dates != null, { if (dates != null) onDates(null, null) else pickingDates = true }, label = { Text(dates ?: stringResource(R.string.search_dates)) })
             TagChip(ui, tags, onTag)
+            if (!similar) FilterChip(ui.inferredPlaces, onToggleInferredPlaces, label = { Text(stringResource(R.string.search_inferred_places)) })
             // Comparing searches every model at once, so it needs two of them (SRCH-005).
             if (searchable > 1 && !similar) {
                 FilterChip(ui.compare, onToggleCompare, enabled = ui.byMeaning, label = { Text(stringResource(R.string.search_compare)) })
@@ -507,6 +515,8 @@ private fun Evidence.label() = when (this) {
     Evidence.MEANING -> R.string.search_by_meaning
     Evidence.TEXT -> R.string.search_by_text
     Evidence.MEMO -> R.string.search_by_memo
+    Evidence.PLACE -> R.string.search_place
+    Evidence.PLACE_INFERRED -> R.string.search_place_inferred
 }
 
 private fun TimelineItem.kindLabel() = if (kind == MediaKind.VIDEO) R.string.search_video_scene else R.string.search_photo
