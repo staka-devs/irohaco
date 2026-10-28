@@ -81,6 +81,9 @@
     <string name="settings_index_cancelled">キャンセルしました</string>
     <string name="settings_index_counts">%2$d件中%1$d件（%3$d%%）</string>
     <string name="settings_index_remaining">残り%1$d件 · 失敗%2$d件</string>
+    <string name="settings_index_eta_measuring">残り時間を計算中</string>
+    <string name="settings_index_eta_minutes">残り約%1$d分</string>
+    <string name="settings_index_eta_hours">残り約%1$d時間%2$d分</string>
     <string name="settings_index_storage">使用容量の見込み: 約%1$s</string>
     <string name="settings_index_pause">一時停止</string>
     <string name="settings_index_resume">再開</string>

@@ -81,6 +81,9 @@
     <string name="settings_index_cancelled">Cancelled</string>
     <string name="settings_index_counts">%1$d of %2$d items (%3$d%%)</string>
     <string name="settings_index_remaining">%1$d left · %2$d failed</string>
+    <string name="settings_index_eta_measuring">Estimating time left</string>
+    <string name="settings_index_eta_minutes">About %1$d min left</string>
+    <string name="settings_index_eta_hours">About %1$d h %2$d min left</string>
     <string name="settings_index_storage">Estimated size: about %1$s</string>
     <string name="settings_index_pause">Pause</string>
     <string name="settings_index_resume">Resume</string>
