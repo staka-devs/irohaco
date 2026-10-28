@@ -138,7 +138,7 @@ interface LocationDao {
         """SELECT le.asset_id AS assetId, le.place_text AS placeName, le.evidence_source <> 'EXIF' AS inferred
            FROM location_evidence le JOIN media_assets a ON a.asset_id = le.asset_id
            WHERE le.place_text IN (:names) AND a.tombstoned_at IS NULL
-             AND EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND s.access_state = 'AVAILABLE')
+             AND EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE')
              AND ((le.evidence_source = 'EXIF' AND le.evidence_status = 'CONFIRMED')
                   OR (:includeInferred AND le.evidence_source = 'NEARBY_MEDIA' AND le.evidence_status = 'CANDIDATE'))
            ORDER BY inferred, le.confidence DESC LIMIT :limit""",
