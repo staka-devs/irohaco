@@ -89,6 +89,7 @@ import dev.irohaco.core.domain.Detail
 import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaFormat
 import coil3.request.ImageRequest
+import coil3.video.videoFrameMillis
 import coil3.gif.AnimatedImageDecoder
 import android.provider.Settings
 import dev.irohaco.core.contracts.TimelineItem
@@ -258,7 +259,20 @@ internal fun MediaViewerContent(
                 val player = playing?.takeIf { it.first == item?.assetId }?.second
                 if (item != null && player != null) {
                     Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { chrome = !chrome }) }) {
-                        VideoPlayer(player, showControls = chrome, modifier = Modifier.fillMaxSize().navigationBarsPadding())
+                        val context = LocalContext.current
+                        VideoPlayer(
+                            player,
+                            showControls = chrome,
+                            modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+                            scrubFrame = { positionMs, frameModifier ->
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context).data(item.contentUri).videoFrameMillis(positionMs).build(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = frameModifier,
+                                )
+                            },
+                        )
                     }
                 } else {
                     MediaPage(
