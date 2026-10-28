@@ -1,14 +1,16 @@
 package dev.irohaco
 
 import android.Manifest
-import android.view.KeyEvent
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -68,17 +70,13 @@ class TimelineTest {
         compose.waitUntilAtLeastOneExists(details, timeoutMillis = 5_000)
         compose.onNode(details).performClick()
         compose.waitUntilAtLeastOneExists(hasText("irohaco-l2-", substring = true), timeoutMillis = 5_000)
-        // Back as a key to the focused window, the sheet's own, which closes only the sheet. Espresso's
-        // pressBack picks the activity's root and waits for it to regain focus, which fails on slow emulators.
-        // A key sent while the sheet still opens can be lost there too, so it is sent again until the sheet goes.
+        // The sheet's own dismiss action, as TalkBack closes it. A Back key goes to whichever window has
+        // focus, which on a slow emulator can still be the activity's while the sheet opens, and was lost.
         val sheetText = hasText("irohaco-l2-", substring = true)
-        compose.waitForIdle()
-        repeat(BACK_TRIES) {
-            if (compose.onAllNodes(sheetText).fetchSemanticsNodes().isEmpty()) return@repeat
-            InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
-            runCatching { compose.waitUntilDoesNotExist(sheetText, timeoutMillis = 3_000) }
-        }
-        compose.waitUntilDoesNotExist(sheetText, timeoutMillis = 1_000)
+        val dismiss = SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss)
+        compose.waitUntilAtLeastOneExists(dismiss, timeoutMillis = 5_000)
+        compose.onAllNodes(dismiss).onFirst().performSemanticsAction(SemanticsActions.Dismiss)
+        compose.waitUntilDoesNotExist(sheetText, timeoutMillis = 5_000)
 
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitUntilDoesNotExist(back, timeoutMillis = 5_000)
@@ -117,4 +115,3 @@ class TimelineTest {
     }
 }
 
-private const val BACK_TRIES = 3
