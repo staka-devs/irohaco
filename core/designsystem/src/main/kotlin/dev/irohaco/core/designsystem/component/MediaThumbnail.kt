@@ -29,10 +29,12 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -114,7 +116,20 @@ fun MediaThumbnail(
                     .padding(horizontal = IrohacoSpacing.xs),
             ) {
                 if (labelIcon != null) Icon(painterResource(labelIcon), contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                if (label != null) Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White)
+                if (label != null) {
+                    // In a dense grid the length does not fit; the play mark stays alone instead of a cut-off time.
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints.copy(maxWidth = Constraints.Infinity))
+                            if (placeable.width > constraints.maxWidth) layout(0, 0) {} else layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                        },
+                    )
+                }
             }
         }
         if (selected) {

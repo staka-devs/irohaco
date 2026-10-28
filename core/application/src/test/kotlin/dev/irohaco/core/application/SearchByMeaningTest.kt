@@ -26,7 +26,7 @@ class SearchByMeaningTest {
         override suspend fun markStale(spaceIds: List<String>) {
             staled += spaceIds
         }
-        override suspend fun nearest(spaceId: String, query: FloatArray, limit: Int) = listOf(VectorHit("x", null)).also { searched += spaceId }
+        override suspend fun nearest(spaceId: String, query: FloatArray, limit: Int) = listOf(VectorHit("x", null, 0.5f)).also { searched += spaceId }
         override suspend fun coverage(spaceId: String) = if (spaceId == "b") 0.4f else 1f
         override suspend fun vectorOf(spaceId: String, assetId: String): FloatArray? = null
     }

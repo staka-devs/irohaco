@@ -84,8 +84,8 @@ class RoomVectorSearchStoreTest {
         build(a, mapOf("a" to floatArrayOf(1f, 0f), "b" to floatArrayOf(0.6f, 0.8f), "c" to floatArrayOf(0f, 1f)))
         build(other, mapOf("c" to floatArrayOf(1f, 0f)))
 
-        assertEquals(listOf("a", "b", "c"), store.nearest(a, floatArrayOf(1f, 0f), 10).map { it.assetId })
-        assertEquals(listOf(VectorHit("c", null)), store.nearest(a, floatArrayOf(0f, 1f), 1))
+        assertEquals(listOf("a" to 1f, "b" to 0.6f, "c" to 0f), store.nearest(a, floatArrayOf(1f, 0f), 10).map { it.assetId to it.similarity })
+        assertEquals(listOf(VectorHit("c", null, 1f)), store.nearest(a, floatArrayOf(0f, 1f), 1))
         assertEquals(listOf("c"), store.nearest(other, floatArrayOf(1f, 0f), 10).map { it.assetId })
 
         sql.execSQL("UPDATE media_sources SET access_state = 'INACCESSIBLE' WHERE asset_id = 'a'")

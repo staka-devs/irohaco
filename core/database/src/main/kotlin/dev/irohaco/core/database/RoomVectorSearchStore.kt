@@ -136,10 +136,10 @@ class RoomVectorSearchStore(private val db: IrohacoDatabase) : VectorSearchStore
                     var score = 0f
                     for (i in values.indices) score += values[i] * query[i]
                     if (best.size < limit) {
-                        best.add(score to VectorHit(c.getString(0), if (c.isNull(1)) null else c.getLong(1), c.getInt(3) == 1))
+                        best.add(score to VectorHit(c.getString(0), if (c.isNull(1)) null else c.getLong(1), score, c.getInt(3) == 1))
                     } else if (score > best.peek()!!.first) {
                         best.poll()
-                        best.add(score to VectorHit(c.getString(0), if (c.isNull(1)) null else c.getLong(1), c.getInt(3) == 1))
+                        best.add(score to VectorHit(c.getString(0), if (c.isNull(1)) null else c.getLong(1), score, c.getInt(3) == 1))
                     }
                 }
             }

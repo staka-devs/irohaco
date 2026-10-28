@@ -17,7 +17,8 @@ enum class Evidence { MEANING, TEXT, MEMO, PLACE, PLACE_INFERRED }
 
 /**
  * One photo, or one scene of a video at [timestampMs] (SRCH-002), with what matched. [ranks] holds
- * where each searched space placed it (space id to rank from 1), for comparing models (SRCH-005).
+ * where each searched space placed it (space id to rank from 1), for comparing models (SRCH-005), and
+ * [similarities] its cosine similarity there; similarities of different spaces are never compared.
  */
 data class SearchHit(
     val item: TimelineItem,
@@ -25,6 +26,7 @@ data class SearchHit(
     val evidence: Set<Evidence>,
     val text: String?,
     val ranks: Map<String, Int> = emptyMap(),
+    val similarities: Map<String, Float> = emptyMap(),
 )
 
 /** A space on the model switch. */
@@ -39,7 +41,7 @@ data class SearchResults(val hits: List<SearchHit>, val searched: List<SpaceChoi
 /**
  * The search screen's one entry (SRCH-001, SRCH-002, SRCH-004〜006): by meaning in one space or, when
  * comparing, in every space, and by the text in photos and frames. The rankings are fused by rank
- * (RRF), never by adding scores, which mean nothing across spaces (ARCHITECTURE §7.2).
+ * (RRF), never by adding similarities, which mean nothing across spaces (ARCHITECTURE §7.2).
  */
 class SearchMedia(
     private val meaning: SearchByMeaning,
@@ -92,7 +94,7 @@ class SearchMedia(
         meant.forEach { result ->
             result.hits.forEachIndexed { rank, hit ->
                 val evidence = if (hit.fromMemo) Evidence.MEMO else Evidence.MEANING
-                fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, evidence, null, result.space.spaceId)
+                fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, evidence, null, result.space.spaceId, hit.similarity)
             }
         }
         atPlaces.forEachIndexed { rank, hit ->
@@ -106,7 +108,7 @@ class SearchMedia(
             .sortedByDescending { it.value.score }
             .mapNotNull { (key, f) ->
                 val item = found[key.first]?.takeIf { (kind == null || it.kind == kind) && filters.admits(it.sortTimeMs) } ?: return@mapNotNull null
-                SearchHit(item, key.second, f.evidence, f.text, f.ranks)
+                SearchHit(item, key.second, f.evidence, f.text, f.ranks, f.similarities)
             }
             .take(LIMIT)
         return SearchResults(hits, meant.map { SpaceChoice(it.space, it.coverage) }, meaningAsked && meant.isEmpty())
@@ -125,13 +127,15 @@ class SearchMedia(
         val evidence = mutableSetOf<Evidence>()
         var text: String? = null
         val ranks = mutableMapOf<String, Int>()
+        val similarities = mutableMapOf<String, Float>()
 
-        fun add(rank: Int, kind: Evidence, matchedText: String?, spaceId: String?) {
+        fun add(rank: Int, kind: Evidence, matchedText: String?, spaceId: String?, similarity: Float? = null) {
             score += 1.0 / (RRF_K + rank + 1)
             evidence += kind
             if (matchedText != null) text = matchedText
             // A photo and its memo can both match in one space; the better rank stands for both.
             if (spaceId != null) ranks.merge(spaceId, rank + 1, ::minOf)
+            if (spaceId != null && similarity != null) similarities.merge(spaceId, similarity, ::maxOf)
         }
     }
 

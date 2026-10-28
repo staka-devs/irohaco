@@ -38,7 +38,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -66,6 +65,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -502,10 +502,19 @@ private fun TimelineGrid(
     onToggleGroup: (LocalDate) -> Unit,
     labelAt: suspend (Int) -> TimelineLabel? = { null },
 ) {
-    // Cells ahead are composed, so their thumbnails are loading before they show (M1-34).
-    val currentColumns by rememberUpdatedState(columns)
-    val gridState = rememberLazyGridState(cacheWindow = remember { ColumnsCacheWindow { currentColumns } })
-    LaunchedEffect(scrollToTop) { scrollToTop.collect { gridState.scrollToItem(0) } }
+    // Cells ahead are composed, so their thumbnails are loading before they show (M1-34). A new state
+    // per column count, at the same first cell: the cache window keeps prefetching lines of the old
+    // count and reads past them when the columns change (an ArrayIndexOutOfBounds in Compose, #181).
+    val last = remember { arrayOfNulls<LazyGridState>(1) }
+    val saver = listSaver<LazyGridState, Int>(
+        save = { listOf(it.firstVisibleItemIndex, it.firstVisibleItemScrollOffset) },
+        restore = { LazyGridState(ColumnsCacheWindow(columns), it[0], it[1]) },
+    )
+    val gridState = rememberSaveable(columns, saver = saver) {
+        LazyGridState(ColumnsCacheWindow(columns), last[0]?.firstVisibleItemIndex ?: 0, last[0]?.firstVisibleItemScrollOffset ?: 0)
+    }
+    last[0] = gridState
+    LaunchedEffect(scrollToTop, gridState) { scrollToTop.collect { gridState.scrollToItem(0) } }
     val currentSelection by rememberUpdatedState(selection)
     val selectRange by rememberUpdatedState(onSelectRange)
     val formatter = rememberDateFormatter()
@@ -586,7 +595,7 @@ private fun TimelineGrid(
             }
         }
         // The date of the first visible row stays at the top while scrolling (DESIGN §4.1).
-        val pinned by remember(cells) {
+        val pinned by remember(cells, gridState) {
             derivedStateOf {
                 // The list is empty until the first page arrives.
                 val index = gridState.firstVisibleItemIndex
@@ -700,7 +709,7 @@ private fun Modifier.dragToSelect(
     cells: LazyPagingItems<TimelineCell>,
     selection: () -> Map<String, TimelineItem>,
     onSelect: (Map<String, TimelineItem>) -> Unit,
-): Modifier = pointerInput(cells) {
+): Modifier = pointerInput(cells, gridState) {
     fun indexAt(position: Offset): Int? = gridState.layoutInfo.visibleItemsInfo.firstOrNull { item ->
         position.x >= item.offset.x && position.x < item.offset.x + item.size.width &&
             position.y >= item.offset.y && position.y < item.offset.y + item.size.height
@@ -851,10 +860,10 @@ internal fun stepColumns(levels: List<Int>, columns: Int, by: Int): Int {
  * cells in a dense grid.
  */
 @OptIn(ExperimentalFoundationApi::class)
-private class ColumnsCacheWindow(private val columns: () -> Int) : LazyLayoutCacheWindow {
-    override fun Density.calculateAheadWindow(viewport: Int): Int = viewport * 8 / columns().coerceAtLeast(4)
+private class ColumnsCacheWindow(private val columns: Int) : LazyLayoutCacheWindow {
+    override fun Density.calculateAheadWindow(viewport: Int): Int = viewport * 8 / columns.coerceAtLeast(4)
 
-    override fun Density.calculateBehindWindow(viewport: Int): Int = viewport * 4 / columns().coerceAtLeast(4)
+    override fun Density.calculateBehindWindow(viewport: Int): Int = viewport * 4 / columns.coerceAtLeast(4)
 }
 
 private const val PINCH_STEP = 1.3f
