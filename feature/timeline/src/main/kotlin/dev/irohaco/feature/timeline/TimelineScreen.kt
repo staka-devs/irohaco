@@ -84,6 +84,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -372,14 +373,14 @@ internal fun TimelineContent(
     var sorting by rememberSaveable { mutableStateOf(false) }
     if (sorting) SortSheet(query, onQueryChange, onDismiss = { sorting = false }, grouping = grouping, onGrouping = onGrouping)
     BoxWithConstraints {
-        // Column ranges per width class (DESIGN §4.1): Compact 3–10, Medium 5–12, Expanded 6–16.
-        val range = when {
-            maxWidth < 600.dp -> 3..10
-            maxWidth < 840.dp -> 5..12
-            else -> 6..16
+        // Column steps per width class (DESIGN §4.1); the steps widen as the cells shrink, so a few pinches reach an overview.
+        val levels = when {
+            maxWidth < 600.dp -> listOf(3, 4, 5, 7, 10, 14, 20, 28)
+            maxWidth < 840.dp -> listOf(5, 6, 8, 11, 15, 21, 30, 40)
+            else -> listOf(6, 8, 10, 13, 18, 25, 34, 45)
         }
-        var chosen by rememberSaveable { mutableIntStateOf(range.first + 1) }
-        val columns = chosen.coerceIn(range)
+        var chosen by rememberSaveable { mutableIntStateOf(levels[1]) }
+        val columns = stepColumns(levels, chosen, 0)
         val noAccess = access.images == LibraryAccess.NONE && access.videos == LibraryAccess.NONE
         // The bar slides away while scrolling down and comes back on any scroll up (DESIGN §3, M1-27).
         // The selection bar does not take part, so the count and the clear button stay in view.
@@ -424,14 +425,14 @@ internal fun TimelineContent(
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.timeline_columns_fewer)) },
                                     leadingIcon = { Icon(painterResource(IrohacoIcons.ZoomIn), null) },
-                                    enabled = columns > range.first,
-                                    onClick = { menu = false; chosen = (columns - 1).coerceIn(range) },
+                                    enabled = columns > levels.first(),
+                                    onClick = { menu = false; chosen = stepColumns(levels, columns, -1) },
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.timeline_columns_more)) },
                                     leadingIcon = { Icon(painterResource(IrohacoIcons.ZoomOut), null) },
-                                    enabled = columns < range.last,
-                                    onClick = { menu = false; chosen = (columns + 1).coerceIn(range) },
+                                    enabled = columns < levels.last(),
+                                    onClick = { menu = false; chosen = stepColumns(levels, columns, 1) },
                                 )
                             }
                         }
@@ -449,8 +450,8 @@ internal fun TimelineContent(
                         cells = cells,
                         columns = columns,
                         bottomPadding = padding.calculateBottomPadding(),
-                        onFewerColumns = { chosen = (columns - 1).coerceIn(range) },
-                        onMoreColumns = { chosen = (columns + 1).coerceIn(range) },
+                        onFewerColumns = { chosen = stepColumns(levels, columns, -1) },
+                        onMoreColumns = { chosen = stepColumns(levels, columns, 1) },
                         onOpenMedia = onOpenMedia,
                         selection = selection,
                         onToggle = onToggle,
@@ -501,8 +502,9 @@ private fun TimelineGrid(
     onToggleGroup: (LocalDate) -> Unit,
     labelAt: suspend (Int) -> TimelineLabel? = { null },
 ) {
-    // Cells two screens ahead are composed, so their thumbnails are loading before they show (M1-34).
-    val gridState = rememberLazyGridState(cacheWindow = LazyLayoutCacheWindow(aheadFraction = 2f, behindFraction = 1f))
+    // Cells ahead are composed, so their thumbnails are loading before they show (M1-34).
+    val currentColumns by rememberUpdatedState(columns)
+    val gridState = rememberLazyGridState(cacheWindow = remember { ColumnsCacheWindow { currentColumns } })
     LaunchedEffect(scrollToTop) { scrollToTop.collect { gridState.scrollToItem(0) } }
     val currentSelection by rememberUpdatedState(selection)
     val selectRange by rememberUpdatedState(onSelectRange)
@@ -836,6 +838,24 @@ private fun Modifier.pinchToChangeColumns(onFewer: () -> Unit, onMore: () -> Uni
         }
     },
 )
+
+/** The step [by] steps away from the one that holds [columns], kept within [levels]. */
+internal fun stepColumns(levels: List<Int>, columns: Int, by: Int): Int {
+    val at = levels.indexOfFirst { it >= columns }.takeIf { it >= 0 } ?: levels.lastIndex
+    return levels[(at + by).coerceIn(levels.indices)]
+}
+
+/**
+ * Two screens ahead and one behind at four columns, less as the columns grow: the cells in a screen
+ * grow with the square of the columns, so a fixed number of screens would compose and load far more
+ * cells in a dense grid.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private class ColumnsCacheWindow(private val columns: () -> Int) : LazyLayoutCacheWindow {
+    override fun Density.calculateAheadWindow(viewport: Int): Int = viewport * 8 / columns().coerceAtLeast(4)
+
+    override fun Density.calculateBehindWindow(viewport: Int): Int = viewport * 4 / columns().coerceAtLeast(4)
+}
 
 private const val PINCH_STEP = 1.3f
 

@@ -50,7 +50,7 @@ private const val SelectedScale = 0.9f
  * instead of decoding the original, and falls back to the original only when there is none.
  */
 data class GridThumbnail(val contentUri: String) {
-    /** The image loader's memory-cache key: one entry per file, whatever the cell size. */
+    /** The start of the image loader's memory-cache key; the loader adds the size step. */
     val memoryKey: String get() = "grid:$contentUri"
 }
 
