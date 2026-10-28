@@ -228,6 +228,7 @@
     <string name="search_unranked">%1$s: 見つからず</string>
     <string name="search_rank_short">%1$s %2$d位</string>
     <string name="search_unranked_short">%1$s –</string>
+    <string name="search_similarity">類似度 %1$s</string>
     <string name="search_by_memo">メモ</string>
     <string name="memo_title">検索用メモ</string>
     <string name="memo_add">メモを追加</string>

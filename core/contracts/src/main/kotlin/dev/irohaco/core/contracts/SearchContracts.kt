@@ -24,8 +24,11 @@ data class EmbeddingSpace(
     fun specWith(modelDigest: String) = EmbeddingSpaceSpec(modelProfileId, modelDigest, dimension, normalization, queryPrefix, corpusPrefix, preprocessingSignature)
 }
 
-/** A file that matched by meaning, with the frame's time when it came from a video; [fromMemo] when its search memo matched. */
-data class VectorHit(val assetId: String, val timestampMs: Long?, val fromMemo: Boolean = false)
+/**
+ * A file that matched by meaning, with the frame's time when it came from a video; [fromMemo] when its
+ * search memo matched. [similarity] is the cosine similarity to the query, comparable only within one space (AC-004).
+ */
+data class VectorHit(val assetId: String, val timestampMs: Long?, val similarity: Float, val fromMemo: Boolean = false)
 
 /** Embedding spaces, the default search profile and nearest-vector search (M2-08, ADR-0003). */
 interface VectorSearchStore {
@@ -44,7 +47,7 @@ interface VectorSearchStore {
 
     /**
      * The [limit] targets of [spaceId] nearest to [query], available files at their current revision
-     * only, nearest first. Scores are not returned: they mean nothing across spaces (AC-004).
+     * only, nearest first, each with its cosine similarity to [query].
      */
     suspend fun nearest(spaceId: String, query: FloatArray, limit: Int): List<VectorHit>
 

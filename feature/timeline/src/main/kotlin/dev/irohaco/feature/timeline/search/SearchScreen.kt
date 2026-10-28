@@ -450,17 +450,28 @@ private fun HitCell(hit: SearchHit, compared: List<String>?, labels: Map<String,
     val context = LocalContext.current
     // A scene shows its own frame; the grid's small copy would show the video's first one.
     val model: Any = if (at != null) ImageRequest.Builder(context).data(item.contentUri).videoFrameMillis(at).build() else GridThumbnail(item.contentUri)
-    val evidence = hit.evidence.sortedBy { it.ordinal }.map { stringResource(it.label()) }.joinToString(" · ")
+    // The similarity goes with the label of what matched by meaning: the photo, or else its memo.
+    val similarity = if (compared == null) hit.similarities.values.singleOrNull() else null
+    val scored = if (Evidence.MEANING in hit.evidence) Evidence.MEANING else Evidence.MEMO
+    val labelled = hit.evidence.sortedBy { it.ordinal }.map { it to stringResource(it.label()) }
+    val evidence = labelled.joinToString(" · ") { (e, label) -> if (e == scored && similarity != null) "$label ${similarity.twoPlaces()}" else label }
+    val spokenSimilarity = similarity?.let { stringResource(R.string.search_similarity, it.twoPlaces()) }
+    val spoken = labelled.joinToString(" · ") { (e, label) -> if (e == scored && spokenSimilarity != null) "$label, $spokenSimilarity" else label }
     val time = at?.let { formatDuration(it) }
     // TalkBack hears each model by name; the cell shows only its letter.
     val ranks = compared?.map { spaceId ->
         val rank = hit.ranks[spaceId]
-        if (rank != null) stringResource(R.string.search_rank, labels.getValue(spaceId), rank) else stringResource(R.string.search_unranked, labels.getValue(spaceId))
+        val label = labels.getValue(spaceId)
+        if (rank != null) {
+            listOfNotNull(stringResource(R.string.search_rank, label, rank), hit.similarities[spaceId]?.let { stringResource(R.string.search_similarity, it.twoPlaces()) }).joinToString(", ")
+        } else {
+            stringResource(R.string.search_unranked, label)
+        }
     }.orEmpty()
     Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
         MediaThumbnail(
             model = model,
-            contentDescription = (listOfNotNull(stringResource(item.kindLabel()), time?.let { stringResource(R.string.search_at, it) }, evidence) + ranks).joinToString(", "),
+            contentDescription = (listOfNotNull(stringResource(item.kindLabel()), time?.let { stringResource(R.string.search_at, it) }, spoken) + ranks).joinToString(", "),
             selected = false,
             label = time ?: item.durationMs?.let(::formatDuration),
             labelIcon = item.badgeIcon,
@@ -469,12 +480,16 @@ private fun HitCell(hit: SearchHit, compared: List<String>?, labels: Map<String,
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(evidence, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
-        // Each model's own rank, never a score: scores of different models do not compare (SRCH-005).
+        // Each model's own rank and similarity, side by side but never added: they do not compare across models (SRCH-005).
         if (compared != null) {
             Text(
                 compared.mapIndexed { i, spaceId ->
                     val rank = hit.ranks[spaceId]
-                    if (rank != null) stringResource(R.string.search_rank_short, LETTERS[i], rank) else stringResource(R.string.search_unranked_short, LETTERS[i])
+                    if (rank != null) {
+                        stringResource(R.string.search_rank_short, LETTERS[i], rank) + hit.similarities[spaceId]?.let { " ${it.twoPlaces()}" }.orEmpty()
+                    } else {
+                        stringResource(R.string.search_unranked_short, LETTERS[i])
+                    }
                 }.joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
@@ -483,6 +498,9 @@ private fun HitCell(hit: SearchHit, compared: List<String>?, labels: Map<String,
         hit.text?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2) }
     }
 }
+
+/** A cosine similarity as shown: two decimal places, never a percentage, since a good match can be far from 1. */
+private fun Float.twoPlaces() = "%.2f".format(this)
 
 /** The model's name, numbered when two spaces share it (one model with two preprocessings). */
 private fun spaceLabels(spaces: List<SpaceChoice>): Map<String, String> {
@@ -525,8 +543,8 @@ private fun previewSpace(id: String, state: SpaceState, isDefault: Boolean) =
     EmbeddingSpace(id, "EmbeddingGemma 2", state, id, isDefault, "m", 768, "L2", null, null, id)
 
 private val previewHits = listOf(
-    SearchHit(TimelineItem("p", MediaKind.IMAGE, "", 0), null, setOf(Evidence.MEANING, Evidence.TEXT), "丸の内北口", mapOf("a" to 1, "b" to 3)),
-    SearchHit(TimelineItem("v", MediaKind.VIDEO, "", 0, durationMs = 95_000), 42_000, setOf(Evidence.MEANING), null, mapOf("a" to 2)),
+    SearchHit(TimelineItem("p", MediaKind.IMAGE, "", 0), null, setOf(Evidence.MEANING, Evidence.TEXT), "丸の内北口", mapOf("a" to 1, "b" to 3), mapOf("a" to 0.42f, "b" to 0.37f)),
+    SearchHit(TimelineItem("v", MediaKind.VIDEO, "", 0, durationMs = 95_000), 42_000, setOf(Evidence.MEANING), null, mapOf("a" to 2), mapOf("a" to 0.39f)),
 )
 
 @IrohacoPreviews

@@ -87,7 +87,7 @@ class RoomAnnotationStoreTest {
 
         val item = media.memoItem("n")!!
         media.putVector(space, item, "v", floatArrayOf(0f, 1f), 0)
-        assertEquals(listOf(VectorHit("c", 10_000, fromMemo = true)), vectors.nearest(space, floatArrayOf(0f, 1f), 1))
+        assertEquals(listOf(VectorHit("c", 10_000, 1f, fromMemo = true)), vectors.nearest(space, floatArrayOf(0f, 1f), 1))
     }
 
     @Test
@@ -107,11 +107,11 @@ class RoomAnnotationStoreTest {
         assertEquals(IndexSource.Text("祖母の家", "rev:1"), media.source("memo:n"))
         media.putVector(space, IndexItem("asset:a", "10:5"), "v1", floatArrayOf(1f, 0f), 0)
         media.putVector(space, IndexItem("memo:n", "rev:1"), "v2", floatArrayOf(0f, 1f), 0)
-        assertEquals(listOf(VectorHit("a", null, fromMemo = true)), vectors.nearest(space, floatArrayOf(0f, 1f), 1))
+        assertEquals(listOf(VectorHit("a", null, 1f, fromMemo = true)), vectors.nearest(space, floatArrayOf(0f, 1f), 1))
 
         memos.revise("n", "祖父の畑", AnnotationAuthor.USER, null, 2)
         assertEquals(listOf(IndexItem("memo:n", "rev:2")), media.plan(space, null, VideoQuality.BALANCED, 0))
-        assertEquals(listOf(VectorHit("a", null, fromMemo = false)), vectors.nearest(space, floatArrayOf(0f, 1f), 1))
+        assertEquals(listOf(VectorHit("a", null, 0f, fromMemo = false)), vectors.nearest(space, floatArrayOf(0f, 1f), 1))
         assertEquals(IndexItem("memo:n", "rev:2"), media.memoItem("n"))
 
         memos.setSearchable("n", false)
