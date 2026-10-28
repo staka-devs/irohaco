@@ -7,7 +7,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pinch
 import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
 import dev.irohaco.core.contracts.TimelineItem
@@ -17,6 +20,7 @@ import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.core.domain.MediaLibraryAccess
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,7 +32,7 @@ import java.time.ZoneOffset
 class TimelineGestureTest {
     @get:Rule val rule = createComposeRule()
 
-    private val items = (0 until 6).map { TimelineItem("a$it", MediaKind.IMAGE, "content://test/$it", 0) }
+    private var items = (0 until 6).map { TimelineItem("a$it", MediaKind.IMAGE, "content://test/$it", 0) }
     private var selection by mutableStateOf(emptyMap<String, TimelineItem>())
     private var opened = 0
 
@@ -71,5 +75,21 @@ class TimelineGestureTest {
         rule.waitForIdle()
         assertEquals(listOf("a0", "a1", "a2"), selection.keys.toList())
         assertEquals(0, opened)
+    }
+
+    @Test
+    fun `pinching in from four columns keeps shrinking the cells`() {
+        items = (0 until 500).map { TimelineItem("a$it", MediaKind.IMAGE, "content://test/$it", it * 600_000L) }
+        showGrid()
+        var width = photos[0].fetchSemanticsNode().boundsInRoot.width
+        repeat(3) {
+            rule.onRoot().performTouchInput {
+                pinch(center - Offset(140f, 0f), center - Offset(10f, 0f), center + Offset(140f, 0f), center + Offset(10f, 0f))
+            }
+            rule.waitForIdle()
+            val now = photos[0].fetchSemanticsNode().boundsInRoot.width
+            assertTrue("$now < $width", now < width)
+            width = now
+        }
     }
 }
