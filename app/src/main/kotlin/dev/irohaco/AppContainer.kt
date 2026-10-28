@@ -10,6 +10,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import dev.irohaco.core.application.AiBackendChoice
 import dev.irohaco.core.application.AiResourceManager
 import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.BrowseMap
@@ -68,6 +69,7 @@ import dev.irohaco.infrastructure.media.AndroidPlaceNames
 import dev.irohaco.infrastructure.media.AndroidShareFiles
 import dev.irohaco.infrastructure.media.AndroidTrashReader
 import dev.irohaco.infrastructure.media.MediaStoreCatalogSource
+import dev.irohaco.infrastructure.preferences.DataStoreAiSettings
 import dev.irohaco.infrastructure.preferences.DataStoreAppearanceSettings
 import dev.irohaco.infrastructure.preferences.DataStoreIndexSettings
 import dev.irohaco.infrastructure.preferences.DataStoreLibrarySettings
@@ -202,13 +204,19 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
         }
     }
 
-    private val aiLazy = lazy {
+    private val aiLazy: Lazy<AiResourceManager> = lazy {
         AiResourceManager(
             locator = manageModels.embeddingLocator,
             runtime = LiteRtEmbeddingRuntime(appContext.cacheDir.path),
             io = Dispatchers.IO,
             scope = scope,
+            backendFor = aiBackendChoice::resolve,
         )
+    }
+
+    /** The GPU or the CPU (#169); the GPU is tried in a separate process before the app loads the model on it. */
+    val aiBackendChoice: AiBackendChoice by lazy {
+        AiBackendChoice(DataStoreAiSettings(settingsStore), { GpuProbeService.gpuWorks(appContext, it) }) { aiResourceManager.release() }
     }
 
     /** The local model's one owner; it loads the model only when inference is first asked for (MOD-004). */

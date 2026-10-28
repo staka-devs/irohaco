@@ -57,6 +57,11 @@
     <string name="settings_ai_import_summary">A .litertlm file of one of the models above</string>
     <string name="settings_ai_import_done">Imported</string>
     <string name="settings_ai_import_choose">Choose</string>
+    <string name="settings_ai_backend">Run on</string>
+    <string name="settings_ai_backend_gpu">GPU</string>
+    <string name="settings_ai_backend_cpu">CPU</string>
+    <string name="settings_ai_backend_gpu_unchecked">Checked when the model first loads</string>
+    <string name="settings_ai_backend_gpu_fails">Does not run on this device\'s GPU</string>
     <string name="settings_index">Search index</string>
     <string name="settings_index_start">Build index</string>
     <string name="settings_index_choose_target">Choose what to index</string>

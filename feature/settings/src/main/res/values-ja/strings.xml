@@ -57,6 +57,11 @@
     <string name="settings_ai_import_summary">上のモデルの.litertlmファイル</string>
     <string name="settings_ai_import_done">取り込み完了</string>
     <string name="settings_ai_import_choose">選ぶ</string>
+    <string name="settings_ai_backend">処理に使うプロセッサ</string>
+    <string name="settings_ai_backend_gpu">GPU</string>
+    <string name="settings_ai_backend_cpu">CPU</string>
+    <string name="settings_ai_backend_gpu_unchecked">動くかどうかは、モデルを初めて読み込むときに確かめます</string>
+    <string name="settings_ai_backend_gpu_fails">この端末のGPUでは動きません</string>
     <string name="settings_index">検索用の索引</string>
     <string name="settings_index_start">索引を作成</string>
     <string name="settings_index_choose_target">索引の対象を選ぶ</string>

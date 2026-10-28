@@ -83,6 +83,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val contrast by viewModel.contrast.collectAsStateWithLifecycle()
     val shareLocationPolicy by viewModel.shareLocationPolicy.collectAsStateWithLifecycle()
     val mapAllowed by viewModel.mapAllowed.collectAsStateWithLifecycle()
+    val aiBackend by viewModel.aiBackend.collectAsStateWithLifecycle()
+    val gpuCheck by viewModel.gpuCheck.collectAsStateWithLifecycle()
     val excludedFolders by viewModel.excludedFolders.collectAsStateWithLifecycle()
     val modelStates by viewModel.modelStates.collectAsStateWithLifecycle()
     val importResult by viewModel.importResult.collectAsStateWithLifecycle()
@@ -112,6 +114,9 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 onDelete = viewModel::deleteModel,
                 onPause = viewModel::pauseDownload,
                 onCancel = viewModel::cancelDownload,
+                backend = aiBackend,
+                gpuCheck = gpuCheck,
+                onSelectBackend = viewModel::selectAiBackend,
             )
             IndexingSettings(
                 indexing = indexing,
@@ -437,7 +442,7 @@ internal fun PrivacySettings(
 }
 
 @Composable
-private fun SectionTitle(text: Int) {
+internal fun SectionTitle(text: Int) {
     Text(
         stringResource(text),
         style = MaterialTheme.typography.titleSmall,

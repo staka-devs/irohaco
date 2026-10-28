@@ -34,6 +34,11 @@
             android:name=".ModelDownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <!-- Tries the GPU in its own process, so a driver crash leaves the app running (#169). -->
+        <service
+            android:name=".GpuProbeService"
+            android:exported="false"
+            android:process=":gpu_probe" />
     </application>
 
 </manifest>

@@ -43,8 +43,16 @@ class AiResourceManagerTest {
         }
     }
 
-    private fun TestScope.manager() =
-        AiResourceManager({ if (installed) "/models/embedding.litertlm" else null }, runtime, StandardTestDispatcher(testScheduler), backgroundScope, idleMs = 1_000)
+    private var chosen = AiBackend.GPU
+
+    private fun TestScope.manager() = AiResourceManager(
+        { if (installed) "/models/embedding.litertlm" else null },
+        runtime,
+        StandardTestDispatcher(testScheduler),
+        backgroundScope,
+        idleMs = 1_000,
+        backendFor = { chosen },
+    )
 
     @Test
     fun `loads nothing until the first request, then keeps the model`() = runTest {
@@ -61,25 +69,26 @@ class AiResourceManagerTest {
     }
 
     @Test
-    fun `falls back to the CPU when the GPU cannot load it`() = runTest {
+    fun `loads on the chosen backend`() = runTest {
+        chosen = AiBackend.CPU
+        val ai = manager()
+        ai.withEmbedding(AiPriority.USER_SEARCH) { }
+        assertEquals(listOf(AiBackend.CPU), loads)
+        assertEquals(AiBackend.CPU, ai.backend.value)
+    }
+
+    @Test
+    fun `fails without trying the other backend`() = runTest {
         failOn = setOf(AiBackend.GPU)
         val ai = manager()
-        ai.withEmbedding(AiPriority.USER_SEARCH) { }
-        assertEquals(listOf(AiBackend.GPU, AiBackend.CPU), loads)
-        assertEquals(AiBackend.CPU, ai.backend.value)
+        assertFailsWith<ModelLoadException> { ai.withEmbedding(AiPriority.USER_SEARCH) { } }
+        assertEquals(listOf(AiBackend.GPU), loads)
+        assertEquals(ModelState.FAILED, ai.state.value)
     }
 
     @Test
-    fun `falls back to the CPU when the GPU's native library does not link`() = runTest {
+    fun `fails, not crashes, when the native library does not link`() = runTest {
         linkFailOn = setOf(AiBackend.GPU)
-        val ai = manager()
-        ai.withEmbedding(AiPriority.USER_SEARCH) { }
-        assertEquals(AiBackend.CPU, ai.backend.value)
-    }
-
-    @Test
-    fun `fails when no local backend can load it`() = runTest {
-        failOn = AiBackend.entries.toSet()
         val ai = manager()
         assertFailsWith<ModelLoadException> { ai.withEmbedding(AiPriority.USER_SEARCH) { } }
         assertEquals(ModelState.FAILED, ai.state.value)
