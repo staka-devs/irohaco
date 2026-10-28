@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -122,8 +124,14 @@ class IndexJobs(
 
     fun progress(jobId: String): Flow<IndexJobProgress?> = store.progress(jobId)
 
-    /** The job requested last, which the indexing screen shows. */
-    fun latest(): Flow<String?> = store.latest()
+    /**
+     * The job requested last, which the indexing screen shows. A job a killed process left running is
+     * paused first, so the screen offers to resume it instead of showing it as running (#177).
+     */
+    fun latest(): Flow<String?> = flow {
+        recover()
+        emitAll(store.latest())
+    }
 
     fun failedNames(jobId: String): Flow<List<String>> = store.failedNames(jobId, FAILED_SHOWN)
 
