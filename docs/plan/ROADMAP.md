@@ -98,7 +98,7 @@
 
 | ID | タイトル | 種類 / 領域 | 要求・設計 | 依存 |
 |---|---|---|---|---|
-| M3-01 | ADR: EXIF書き戻しの対応形式 | adr / metadata | ARCH §15 未起票 | M2-14 |
+| M3-01 | ADR: EXIF書き戻しの対応形式 | adr / metadata | ADR-0030 | M2-14 |
 | M3-02 | メタデータDB編集（撮影日時・GPS・説明・タグ・評価、出典区別） | feature / metadata | MET-002, MET-005 | M2-14 |
 | M3-03 | 外部変更との3-way競合検出と解決UI | feature / metadata | ADR-0007, INT-002 | M3-02 |
 | M3-04 | 原本への選択的書き戻し・コピー書き出し・プライバシー情報除去 | feature / metadata | MET-003, AC-008, ADR-0004 | M3-01, M3-03 |
