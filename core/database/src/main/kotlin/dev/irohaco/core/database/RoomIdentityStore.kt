@@ -11,11 +11,11 @@ import kotlinx.coroutines.flow.Flow
 private const val MATCHES = """
     FROM media_discoveries d
     JOIN identity_resolutions r ON r.discovery_id = d.discovery_id AND r.resolution_kind = 'NEW_ASSET'
-    JOIN media_sources sn ON sn.asset_id = r.selected_asset_id AND sn.access_state = 'AVAILABLE'
+    JOIN media_sources sn ON sn.asset_id = r.selected_asset_id AND +sn.access_state = 'AVAILABLE'
     JOIN media_sources so ON so.access_state = 'MISSING_CANDIDATE' AND so.asset_id <> sn.asset_id
          AND so.display_name = sn.display_name AND so.observed_taken_at = sn.observed_taken_at
     JOIN media_assets o ON o.asset_id = so.asset_id AND o.tombstoned_at IS NULL
-    WHERE NOT EXISTS (SELECT 1 FROM media_sources sa WHERE sa.asset_id = so.asset_id AND sa.access_state = 'AVAILABLE')"""
+    WHERE NOT EXISTS (SELECT 1 FROM media_sources sa WHERE sa.asset_id = so.asset_id AND +sa.access_state = 'AVAILABLE')"""
 
 @Dao
 interface IdentityDao {
@@ -40,10 +40,10 @@ interface IdentityDao {
                   sn.content_uri AS newContentUri
            FROM identity_candidates c
            JOIN identity_resolutions r ON r.discovery_id = c.discovery_id AND r.resolution_kind = 'NEW_ASSET'
-           JOIN media_sources sn ON sn.asset_id = r.selected_asset_id AND sn.access_state = 'AVAILABLE'
+           JOIN media_sources sn ON sn.asset_id = r.selected_asset_id AND +sn.access_state = 'AVAILABLE'
            JOIN media_sources so ON so.asset_id = c.asset_id AND so.access_state = 'MISSING_CANDIDATE'
            WHERE c.candidate_state = 'PENDING'
-             AND NOT EXISTS (SELECT 1 FROM media_sources sa WHERE sa.asset_id = c.asset_id AND sa.access_state = 'AVAILABLE')
+             AND NOT EXISTS (SELECT 1 FROM media_sources sa WHERE sa.asset_id = c.asset_id AND +sa.access_state = 'AVAILABLE')
            GROUP BY c.discovery_id, c.asset_id
            ORDER BY sn.display_name""",
     )

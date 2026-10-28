@@ -12,12 +12,14 @@ import kotlinx.coroutines.flow.Flow
 
 // shortcut: a revision is the file's size and modified time until catalog sync records media_revisions digests;
 // a pixel edit that keeps both is missed until then.
+// The unary + keeps access_state off ix_media_sources_access: without statistics SQLite took that index
+// for these per-asset lookups and read every available source once per asset (hours on large libraries).
 internal const val REVISION =
     """(SELECT MIN(s.file_size_bytes || ':' || COALESCE(s.observed_modified_at, 0)) FROM media_sources s
-        WHERE s.asset_id = a.asset_id AND s.access_state = 'AVAILABLE')"""
+        WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE')"""
 
 private const val IN_FOLDERS =
-    """EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND s.access_state = 'AVAILABLE'
+    """EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE'
                AND (:everywhere OR COALESCE(s.relative_path, '') IN (:folders)))"""
 
 @Dao
@@ -74,7 +76,7 @@ interface MediaIndexDao {
     @Query(
         """SELECT assetId, digest, durationMs FROM (
              SELECT a.asset_id AS assetId, $REVISION AS digest,
-               (SELECT MAX(s.observed_duration_ms) FROM media_sources s WHERE s.asset_id = a.asset_id AND s.access_state = 'AVAILABLE') AS durationMs
+               (SELECT MAX(s.observed_duration_ms) FROM media_sources s WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE') AS durationMs
              FROM media_assets a WHERE a.media_kind = 'VIDEO' AND a.tombstoned_at IS NULL AND $IN_FOLDERS)
            WHERE durationMs > 0 AND NOT EXISTS (
              SELECT 1 FROM video_segments g WHERE g.revision_id = assetId || ':' || digest AND g.extraction_profile_id = :profileId)""",
@@ -156,6 +158,7 @@ interface MediaIndexDao {
     suspend fun memoSource(targetId: String): MemoSourceRow?
 
     // Two EXISTS rather than one join on COALESCE, so each side uses its own index.
+    // CROSS JOIN keeps the frame check in this order; left to itself SQLite read every vector of the space per asset.
     @Query(
         """SELECT
              (SELECT COUNT(*) FROM media_assets a
@@ -163,9 +166,9 @@ interface MediaIndexDao {
                 AND (a.media_kind = 'IMAGE' OR EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND s.observed_duration_ms > 0))
                 AND NOT EXISTS (SELECT 1 FROM embedding_targets t JOIN embedding_vectors v ON v.target_id = t.target_id
                                 WHERE t.asset_id = a.asset_id AND v.space_id = :spaceId AND v.source_revision_digest = $REVISION)
-                AND NOT EXISTS (SELECT 1 FROM media_revisions r JOIN video_segments g ON g.revision_id = r.revision_id
-                                  JOIN sampled_frames f ON f.segment_id = g.segment_id JOIN embedding_targets t ON t.frame_id = f.frame_id
-                                  JOIN embedding_vectors v ON v.target_id = t.target_id
+                AND NOT EXISTS (SELECT 1 FROM media_revisions r CROSS JOIN video_segments g ON g.revision_id = r.revision_id
+                                  CROSS JOIN sampled_frames f ON f.segment_id = g.segment_id CROSS JOIN embedding_targets t ON t.frame_id = f.frame_id
+                                  CROSS JOIN embedding_vectors v ON v.target_id = t.target_id
                                 WHERE r.asset_id = a.asset_id AND v.space_id = :spaceId AND v.source_revision_digest = $REVISION))
            + (SELECT COUNT(*) FROM semantic_annotations n $MEMO_FILE
               WHERE n.searchable = 1 AND a.tombstoned_at IS NULL AND $REVISION IS NOT NULL
@@ -204,7 +207,7 @@ interface MediaIndexDao {
     }
 
     @Query(
-        """SELECT (SELECT MIN(s.content_uri) FROM media_sources s WHERE s.asset_id = a.asset_id AND s.access_state = 'AVAILABLE') AS contentUri,
+        """SELECT (SELECT MIN(s.content_uri) FROM media_sources s WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE') AS contentUri,
              $REVISION AS revisionDigest
            FROM embedding_targets t JOIN media_assets a ON a.asset_id = t.asset_id
            WHERE t.target_id = :targetId AND a.tombstoned_at IS NULL""",
@@ -212,7 +215,7 @@ interface MediaIndexDao {
     suspend fun imageSource(targetId: String): IndexSourceRow?
 
     @Query(
-        """SELECT (SELECT MIN(s.content_uri) FROM media_sources s WHERE s.asset_id = a.asset_id AND s.access_state = 'AVAILABLE') AS contentUri,
+        """SELECT (SELECT MIN(s.content_uri) FROM media_sources s WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE') AS contentUri,
              $REVISION AS revisionDigest, f.timestamp_ms AS timestampMs
            FROM embedding_targets t JOIN sampled_frames f ON f.frame_id = t.frame_id
              JOIN video_segments g ON g.segment_id = f.segment_id

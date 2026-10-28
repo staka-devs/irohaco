@@ -78,7 +78,7 @@ class RoomTextIndexStore(private val db: IrohacoDatabase) : TextIndexStore {
                  LEFT JOIN media_revisions r ON r.revision_id = g.revision_id
                  JOIN media_assets a ON a.asset_id = COALESCE(o.asset_id, r.asset_id)
                WHERE ocr_fts MATCH ? AND a.tombstoned_at IS NULL
-                 AND EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND s.access_state = 'AVAILABLE')
+                 AND EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE')
                ORDER BY a.asset_id, f.timestamp_ms LIMIT ?""",
             arrayOf<Any>(match, limit),
         ).use { c ->
@@ -94,7 +94,7 @@ class RoomTextIndexStore(private val db: IrohacoDatabase) : TextIndexStore {
              JOIN semantic_annotation_revisions r ON r.annotation_id = n.annotation_id
                AND r.revision_no = (SELECT MAX(revision_no) FROM semantic_annotation_revisions WHERE annotation_id = n.annotation_id)
            WHERE annotation_fts MATCH ? AND n.searchable = 1 AND a.tombstoned_at IS NULL
-             AND EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND s.access_state = 'AVAILABLE')
+             AND EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE')
            ORDER BY a.asset_id LIMIT ?""",
         arrayOf<Any>(match, limit),
     ).use { c -> buildList { while (c.moveToNext()) add(TextMatch(c.getString(0), if (c.isNull(1)) null else c.getLong(1), c.getString(2), fromMemo = true)) } }

@@ -47,7 +47,7 @@ interface CollectionsDao {
     @Query(
         """SELECT al.album_id AS albumId, al.title AS title,
                   (SELECT count(*) FROM album_items ai WHERE ai.album_id = al.album_id
-                     AND EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = ai.asset_id AND s.access_state = 'AVAILABLE')) AS itemCount,
+                     AND EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = ai.asset_id AND +s.access_state = 'AVAILABLE')) AS itemCount,
                   (SELECT s.content_uri FROM album_items ai JOIN media_sources s ON s.asset_id = ai.asset_id
                      WHERE ai.album_id = al.album_id AND s.access_state = 'AVAILABLE'
                      ORDER BY ai.sort_order LIMIT 1) AS coverUri
