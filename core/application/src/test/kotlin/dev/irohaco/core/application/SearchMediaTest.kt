@@ -17,8 +17,8 @@ import kotlin.test.assertEquals
 class SearchMediaTest {
     private val space = testSpace("a", SpaceState.BUILDING, isDefault = true, prefix = null)
     private val other = testSpace("b", SpaceState.READY, prefix = null, preprocessing = "p2")
-    private val otherHits = listOf(VectorHit("p2", null), VectorHit("p1", null))
-    private var vectorHits = listOf(VectorHit("p1", null), VectorHit("v1", 20_000), VectorHit("p2", null))
+    private val otherHits = listOf(VectorHit("p2", null, 0.8f), VectorHit("p1", null, 0.7f))
+    private var vectorHits = listOf(VectorHit("p1", null, 0.5f), VectorHit("v1", 20_000, 0.4f), VectorHit("p2", null, 0.3f))
     private var textHits = listOf(TextMatch("p2", null, "看板"), TextMatch("v1", 40_000, "駅"))
     private var modelMissing = false
     private var embeds = 0
@@ -63,13 +63,14 @@ class SearchMediaTest {
         assertEquals(listOf("p2", "p1", "v1", "v1"), results.hits.map { it.item.assetId })
         assertEquals(mapOf("a" to 3, "b" to 1), results.hits[0].ranks)
         assertEquals(mapOf("a" to 1, "b" to 2), results.hits[1].ranks)
+        assertEquals(mapOf("a" to 0.3f, "b" to 0.8f), results.hits[0].similarities)
         assertEquals(listOf("a", "b"), results.searched.map { it.space.spaceId })
         assertEquals(1, embeds)
     }
 
     @Test
     fun `a memo that matches says so, and the memo chip leaves memos out`() = runTest {
-        vectorHits = listOf(VectorHit("p1", null, fromMemo = true))
+        vectorHits = listOf(VectorHit("p1", null, 0.5f, fromMemo = true))
         textHits = listOf(TextMatch("p2", null, "祖母の家", fromMemo = true), TextMatch("p1", null, "駅"))
         val results = search("祖母")
         assertEquals(setOf(Evidence.MEMO, Evidence.TEXT), results.hits.first { it.item.assetId == "p1" }.evidence)
@@ -108,7 +109,7 @@ class SearchMediaTest {
 
     @Test
     fun `a file that is no longer available is left out`() = runTest {
-        vectorHits = listOf(VectorHit("gone", null))
+        vectorHits = listOf(VectorHit("gone", null, 0.5f))
         textHits = emptyList()
         assertEquals(emptyList(), search("駅").hits)
     }
