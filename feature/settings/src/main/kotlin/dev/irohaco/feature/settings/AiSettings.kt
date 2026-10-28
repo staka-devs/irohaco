@@ -32,7 +32,8 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 
 /**
  * Settings > AI (DESIGN §4.5, M2-02): each model with its state, its size, and what can be done with
- * it. Downloads and imports are checked by SHA-256 before the model becomes usable.
+ * it. Downloads and imports are checked by SHA-256 before the model becomes usable. A download can be
+ * paused and resumed from where it stopped, cancelled, or retried after a failure.
  */
 @Composable
 internal fun AiSettings(
@@ -42,6 +43,8 @@ internal fun AiSettings(
     onDownload: (String) -> Unit,
     onImport: () -> Unit,
     onDelete: (String) -> Unit,
+    onPause: (String) -> Unit = {},
+    onCancel: (String) -> Unit = {},
 ) {
     var deleting by remember { mutableStateOf<ModelArtifact?>(null) }
     deleting?.let { model ->
@@ -64,11 +67,13 @@ internal fun AiSettings(
                 supportingContent = {
                     Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
                         Text(modelStateLabel(state) + " · " + Formatter.formatShortFileSize(context, model.sizeBytes))
-                        if (state is ModelInstallState.Downloading) {
-                            LinearProgressIndicator(
-                                progress = { if (state.totalBytes > 0) state.downloadedBytes.toFloat() / state.totalBytes else 0f },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                        val bytes = when (state) {
+                            is ModelInstallState.Downloading -> state.downloadedBytes to state.totalBytes
+                            is ModelInstallState.Paused -> state.downloadedBytes to state.totalBytes
+                            else -> null
+                        }
+                        bytes?.let { (done, total) ->
+                            LinearProgressIndicator(progress = { if (total > 0) done.toFloat() / total else 0f }, modifier = Modifier.fillMaxWidth())
                         }
                     }
                 },
@@ -79,8 +84,23 @@ internal fun AiSettings(
             ) {
                 when (state) {
                     is ModelInstallState.Installed -> OutlinedButton(onClick = { deleting = model }) { Text(stringResource(R.string.settings_ai_delete)) }
-                    is ModelInstallState.Downloading, ModelInstallState.Verifying -> Unit
-                    else -> Button(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_download)) }
+                    is ModelInstallState.Downloading -> {
+                        Button(onClick = { onPause(model.id) }) { Text(stringResource(R.string.settings_ai_pause)) }
+                        OutlinedButton(onClick = { onCancel(model.id) }) { Text(stringResource(R.string.settings_ai_cancel)) }
+                    }
+                    is ModelInstallState.Paused -> {
+                        Button(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_resume)) }
+                        OutlinedButton(onClick = { onCancel(model.id) }) { Text(stringResource(R.string.settings_ai_cancel)) }
+                    }
+                    ModelInstallState.Verifying -> Unit
+                    // A failed download keeps what it got, and the retry resumes from there.
+                    is ModelInstallState.Failed -> {
+                        Button(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_retry)) }
+                        if (state.reason == Reason.DOWNLOAD) {
+                            OutlinedButton(onClick = { onCancel(model.id) }) { Text(stringResource(R.string.settings_ai_cancel)) }
+                        }
+                    }
+                    ModelInstallState.NotInstalled -> Button(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_download)) }
                 }
             }
         }
@@ -114,6 +134,10 @@ internal fun modelStateLabel(state: ModelInstallState): String = when (state) {
         R.string.settings_ai_downloading,
         if (state.totalBytes > 0) (100 * state.downloadedBytes / state.totalBytes).toInt() else 0,
     )
+    is ModelInstallState.Paused -> stringResource(
+        R.string.settings_ai_paused,
+        if (state.totalBytes > 0) (100 * state.downloadedBytes / state.totalBytes).toInt() else 0,
+    )
     ModelInstallState.Verifying -> stringResource(R.string.settings_ai_verifying)
     is ModelInstallState.Installed -> stringResource(R.string.settings_ai_installed)
     is ModelInstallState.Failed -> stringResource(
@@ -134,6 +158,16 @@ private fun AiSettingsDownloadingPreview() {
     IrohacoTheme(dynamicColor = false) {
         Surface {
             AiSettings(listOf(previewModel), mapOf("m" to ModelInstallState.Downloading(150_000_000, 387_710_976)), null, {}, {}, {})
+        }
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun AiSettingsPausedPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        Surface {
+            AiSettings(listOf(previewModel), mapOf("m" to ModelInstallState.Paused(150_000_000, 387_710_976)), null, {}, {}, {})
         }
     }
 }

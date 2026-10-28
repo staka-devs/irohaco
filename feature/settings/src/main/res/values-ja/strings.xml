@@ -44,6 +44,10 @@
     <string name="settings_ai_failed_unknown">対応していないモデルのため削除</string>
     <string name="settings_ai_failed_storage">保存に失敗</string>
     <string name="settings_ai_download">ダウンロード</string>
+    <string name="settings_ai_paused">一時停止中 %1$d%%</string>
+    <string name="settings_ai_pause">一時停止</string>
+    <string name="settings_ai_resume">再開</string>
+    <string name="settings_ai_retry">再試行</string>
     <string name="settings_ai_download_note">モデルはこの端末の中だけで動きます。ダウンロードは大きく、モバイルデータを使うことがあります。ダウンロードはバックグラウンドで続きます。</string>
     <string name="settings_ai_delete">削除</string>
     <string name="settings_ai_delete_title">%1$sを削除しますか？</string>
@@ -88,6 +92,9 @@
     <plurals name="settings_index_pending">
         <item quantity="other">未索引または変更あり: %1$d件</item>
     </plurals>
+    <string name="settings_index_preparing">索引の対象を準備中</string>
+    <string name="settings_index_start_failed">索引を開始できませんでした</string>
+    <string name="settings_index_dismiss">閉じる</string>
     <string name="settings_index_auto">変更を自動で索引</string>
     <string name="settings_index_auto_summary">写真や動画の追加・変更を、アプリを開いたときに索引。最初の索引のあとから有効</string>
 </resources>

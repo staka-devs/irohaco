@@ -92,6 +92,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
     val autoIndex by viewModel.autoIndex.collectAsStateWithLifecycle()
     val needsRebuild by viewModel.needsRebuild.collectAsStateWithLifecycle()
+    val preparing by viewModel.preparing.collectAsStateWithLifecycle()
+    val startFailed by viewModel.startFailed.collectAsStateWithLifecycle()
     val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { viewModel.importModel(it.toString()) } }
     SettingsContent(
@@ -101,9 +103,15 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 models = viewModel.modelCatalog,
                 states = modelStates,
                 importResult = importResult,
-                onDownload = viewModel::downloadModel,
+                onDownload = { id ->
+                    // The download runs either way; without the permission only its progress notification is hidden.
+                    notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    viewModel.downloadModel(id)
+                },
                 onImport = { pickModel.launch(arrayOf("application/octet-stream", "*/*")) },
                 onDelete = viewModel::deleteModel,
+                onPause = viewModel::pauseDownload,
+                onCancel = viewModel::cancelDownload,
             )
             IndexingSettings(
                 indexing = indexing,
@@ -123,6 +131,10 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 onResume = viewModel::resumeIndex,
                 onCancel = viewModel::cancelIndex,
                 onRetry = viewModel::retryIndex,
+                preparing = preparing,
+                onCancelPreparing = viewModel::cancelPreparing,
+                startFailed = startFailed,
+                onDismissStartFailed = viewModel::dismissStartFailed,
             )
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast) },

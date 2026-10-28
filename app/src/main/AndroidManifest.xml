@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- ADR-0011: only the map tiles and place names go out, and only after the user allows it on first use. -->
+    <!-- Model downloads the user starts (M2-02); map tiles and place names only after the user allows them (ADR-0011). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- M2-03: an indexing job the user started keeps running in the background, within dataSync's limits. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -25,6 +25,10 @@
         </activity>
         <service
             android:name=".IndexingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        <service
+            android:name=".ModelDownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
     </application>

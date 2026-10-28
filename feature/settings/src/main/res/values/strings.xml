@@ -44,6 +44,10 @@
     <string name="settings_ai_failed_unknown">Unsupported model; removed</string>
     <string name="settings_ai_failed_storage">Could not save</string>
     <string name="settings_ai_download">Download</string>
+    <string name="settings_ai_paused">Paused %1$d%%</string>
+    <string name="settings_ai_pause">Pause</string>
+    <string name="settings_ai_resume">Resume</string>
+    <string name="settings_ai_retry">Retry</string>
     <string name="settings_ai_download_note">Models run on this device only. A download is large and can use mobile data; it carries on in the background.</string>
     <string name="settings_ai_delete">Delete</string>
     <string name="settings_ai_delete_title">Delete %1$s?</string>
@@ -90,6 +94,9 @@
         <item quantity="one">%1$d new or changed item</item>
         <item quantity="other">%1$d new or changed items</item>
     </plurals>
+    <string name="settings_index_preparing">Preparing what to index</string>
+    <string name="settings_index_start_failed">Could not start the index</string>
+    <string name="settings_index_dismiss">Dismiss</string>
     <string name="settings_index_auto">Index changes automatically</string>
     <string name="settings_index_auto_summary">Indexes added or edited photos and videos when you open the app. Available after the first index</string>
 </resources>

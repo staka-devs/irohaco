@@ -55,8 +55,8 @@ import dev.irohaco.core.database.RoomTextIndexStore
 import dev.irohaco.core.database.RoomTimelineReader
 import dev.irohaco.core.database.RoomVectorSearchStore
 import dev.irohaco.infrastructure.ai.AndroidResourcePolicy
-import dev.irohaco.infrastructure.ai.AndroidModelDownloader
 import dev.irohaco.infrastructure.ai.AndroidModelStorage
+import dev.irohaco.infrastructure.ai.HttpModelDownloader
 import dev.irohaco.infrastructure.ai.LiteRtEmbeddingRuntime
 import dev.irohaco.infrastructure.ai.MlKitTextRecognizer
 import dev.irohaco.infrastructure.media.AndroidIndexImageReader
@@ -173,15 +173,13 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     /** Downloads, imports and checks model files (M2-02). */
     val manageModels by lazy {
-        ManageModels(AndroidModelStorage(appContext), AndroidModelDownloader(appContext), RoomModelProfiles(database))
+        ManageModels(AndroidModelStorage(appContext), HttpModelDownloader(), RoomModelProfiles(database))
     }
 
-    /** Starts a model download that keeps being followed after the screen that asked for it closes. */
-    fun downloadModel(id: String) {
-        scope.launch(Dispatchers.IO) { manageModels.download(id) }
-    }
+    /** Starts or resumes a model download that keeps going after the screen that asked for it closes. */
+    fun downloadModel(id: String) = ModelDownloadService.start(appContext, id)
 
-    /** Picks up downloads the system kept running while the app was closed. */
+    /** Shows installed models, and downloads a stopped process left part of as paused. */
     fun resumeModelDownloads() {
         scope.launch(Dispatchers.IO) {
             manageModels.refresh()

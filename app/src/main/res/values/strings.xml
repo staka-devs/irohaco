@@ -6,5 +6,7 @@
     <string name="destination_library">Library</string>
     <string name="indexing_channel">Indexing</string>
     <string name="indexing_title">Building the search index</string>
+    <string name="model_download_channel">Model downloads</string>
+    <string name="model_download_title">Downloading the AI model</string>
     <string name="indexing_progress">%1$d of %2$d</string>
 </resources>

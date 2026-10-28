@@ -82,6 +82,12 @@ internal fun IndexingSettings(
     onAutoIndex: (Boolean) -> Unit = {},
     /** The model file changed and the index has to be built again (ADR-0003). */
     needsRebuild: Boolean = false,
+    /** The files to index are being listed; the job does not exist yet. */
+    preparing: Boolean = false,
+    onCancelPreparing: () -> Unit = {},
+    /** The last start could not list the files or start the job. */
+    startFailed: Boolean = false,
+    onDismissStartFailed: () -> Unit = {},
 ) {
     // Wrapped so that "every folder" (null) differs from "nothing to confirm".
     var confirming by remember { mutableStateOf<Target?>(null) }
@@ -125,7 +131,23 @@ internal fun IndexingSettings(
         if (needsRebuild) {
             Text(stringResource(R.string.settings_index_rebuild), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
         }
-        if (!active) {
+        if (preparing) {
+            Text(stringResource(R.string.settings_index_preparing), style = MaterialTheme.typography.bodyLarge)
+            LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+            OutlinedButton(onClick = onCancelPreparing) { Text(stringResource(R.string.settings_ai_cancel)) }
+        }
+        if (startFailed) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.settings_index_start_failed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onDismissStartFailed) { Text(stringResource(R.string.settings_index_dismiss)) }
+            }
+        }
+        if (!active && !preparing) {
             if (!modelReady) {
                 Text(stringResource(R.string.settings_index_needs_model), style = MaterialTheme.typography.bodyMedium)
             }
@@ -208,7 +230,8 @@ private fun JobProgress(
     Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
         when (p.state) {
             IndexJobState.PLANNED, IndexJobState.RUNNING -> Button(onClick = { onPause(indexing.jobId) }) { Text(stringResource(R.string.settings_index_pause)) }
-            IndexJobState.PAUSED -> Button(onClick = { onResume(indexing.jobId) }) { Text(stringResource(R.string.settings_index_resume)) }
+            // A job that failed (the model did not load) resumes where it stopped, like a paused one.
+            IndexJobState.PAUSED, IndexJobState.FAILED -> Button(onClick = { onResume(indexing.jobId) }) { Text(stringResource(R.string.settings_index_resume)) }
             else -> Unit
         }
         if (p.state in ACTIVE) OutlinedButton(onClick = { onCancel(indexing.jobId) }) { Text(stringResource(R.string.settings_ai_cancel)) }
