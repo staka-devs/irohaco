@@ -1,5 +1,6 @@
 package dev.irohaco.feature.settings
 
+import android.os.SystemClock
 import android.text.format.Formatter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +57,7 @@ import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
+import kotlin.math.ceil
 
 /** The job requested last, as the indexing section shows it. */
 data class IndexingUi(val jobId: String, val progress: IndexJobProgress, val failedNames: List<String>, val pauseReason: PauseReason?)
@@ -219,6 +221,19 @@ private fun JobProgress(
     }
     Text(stringResource(R.string.settings_index_counts, done, p.total, percent), style = MaterialTheme.typography.bodyMedium)
     Text(stringResource(R.string.settings_index_remaining, p.pending, p.failed), style = MaterialTheme.typography.bodyMedium)
+    if (p.state == IndexJobState.RUNNING) {
+        // The rate is measured from when this screen saw the job running, so a resume starts it over.
+        val since = remember(indexing.jobId, p.state) { done to SystemClock.elapsedRealtime() }
+        val left = minutesLeft(since.first, since.second, done, SystemClock.elapsedRealtime(), p.pending)
+        Text(
+            when {
+                left == null -> stringResource(R.string.settings_index_eta_measuring)
+                left < 60 -> stringResource(R.string.settings_index_eta_minutes, left)
+                else -> stringResource(R.string.settings_index_eta_hours, left / 60, left % 60)
+            },
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
     if (p.frames > 0) Text(stringResource(R.string.settings_index_scenes, p.frames), style = MaterialTheme.typography.bodyMedium)
     // Each photo and video scene keeps one vector of 4-byte values; the database adds little on top.
     val bytes = p.total.toLong() * ImageSpaces.LOCAL.dimension * 4
@@ -244,6 +259,21 @@ private fun JobProgress(
         }
     }
 }
+
+/**
+ * Whole minutes left for [remaining] items at the rate the job went from [sinceDone] items at [sinceMs]
+ * to [done] at [nowMs]; null until enough has gone by for the rate to settle (#179).
+ * shortcut: one rate for photos and video frames, so it reads short while frames, which are slower, are left; weigh them apart if users find it off.
+ */
+internal fun minutesLeft(sinceDone: Int, sinceMs: Long, done: Int, nowMs: Long, remaining: Int): Long? {
+    val went = done - sinceDone
+    val elapsedMs = nowMs - sinceMs
+    if (went < ETA_MIN_ITEMS || elapsedMs < ETA_MIN_MS) return null
+    return ceil(remaining.toDouble() * elapsedMs / went / 60_000).toLong()
+}
+
+private const val ETA_MIN_ITEMS = 10
+private const val ETA_MIN_MS = 30_000L
 
 @Composable
 private fun stateLabel(state: IndexJobState, reason: PauseReason?): String = stringResource(
