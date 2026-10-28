@@ -26,11 +26,13 @@ class AiResourceManagerTest {
     private val loads = mutableListOf<AiBackend>()
     private val closed = mutableListOf<AiBackend>()
     private var failOn = emptySet<AiBackend>()
+    private var linkFailOn = emptySet<AiBackend>()
     private var installed = true
 
     private val runtime = EmbeddingRuntime { _, backend ->
         loads += backend
         if (backend in failOn) error("$backend cannot run it")
+        if (backend in linkFailOn) throw UnsatisfiedLinkError("no OpenCL for $backend")
         object : EmbeddingSession {
             override val backend = backend
             override fun embedText(text: String) = floatArrayOf(text.length.toFloat())
@@ -64,6 +66,14 @@ class AiResourceManagerTest {
         val ai = manager()
         ai.withEmbedding(AiPriority.USER_SEARCH) { }
         assertEquals(listOf(AiBackend.GPU, AiBackend.CPU), loads)
+        assertEquals(AiBackend.CPU, ai.backend.value)
+    }
+
+    @Test
+    fun `falls back to the CPU when the GPU's native library does not link`() = runTest {
+        linkFailOn = setOf(AiBackend.GPU)
+        val ai = manager()
+        ai.withEmbedding(AiPriority.USER_SEARCH) { }
         assertEquals(AiBackend.CPU, ai.backend.value)
     }
 
