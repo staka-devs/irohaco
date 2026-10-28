@@ -10,6 +10,7 @@ import dev.irohaco.core.contracts.PauseReason
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -140,6 +141,17 @@ class IndexJobsTest {
         assertEquals(IndexJobState.PAUSED, jobs.getValue("j").state)
         assertEquals(listOf("FAILED", "PENDING"), listOf(jobs.getValue("j").items[items[0]], jobs.getValue("j").items[items[1]]))
         assertEquals(IndexJobState.PARTIAL, indexJobs.run("j"))
+    }
+
+    @Test
+    fun `the screen sees a job a killed process left running as paused`() = runTest {
+        store.create("j", "s", IndexJobKind.INITIAL, true, 0, items)
+        jobs.getValue("j").state = IndexJobState.RUNNING
+        jobs.getValue("j").items[items[0]] = "RUNNING"
+        jobs.getValue("j").attempts[items[0]] = 1
+        assertEquals("j", indexJobs.latest().first())
+        assertEquals(IndexJobState.PAUSED, jobs.getValue("j").state)
+        assertEquals("PENDING", jobs.getValue("j").items[items[0]])
     }
 
     @Test
