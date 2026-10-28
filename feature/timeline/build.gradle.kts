@@ -54,7 +54,6 @@ dependencies {
     implementation(libs.coil.gif) // the viewer plays GIF and animated WebP (GAL-016)
     implementation(libs.coil.video) // search shows the matched frame of a video scene (M2-09)
     implementation(libs.maplibre.android) // ADR-0011: the default map
-    implementation(libs.maps.compose) // ADR-0011: Google Maps, when a key is built in
     implementation(libs.androidx.media3.common)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)

@@ -21,6 +21,8 @@ class AndroidModelStorage(private val context: Context) : ModelStorage {
 
     override fun partial(id: String): String = File(dir, "$id.partial").path
 
+    override fun partialBytes(id: String): Long = File(dir, "$id.partial").length()
+
     override suspend fun copyIn(sourceUri: String): String = withContext(Dispatchers.IO) {
         val target = File(dir, "import-${UUID.randomUUID()}.partial")
         val input = context.contentResolver.openInputStream(Uri.parse(sourceUri)) ?: throw IOException("Cannot open $sourceUri")

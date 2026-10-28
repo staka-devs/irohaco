@@ -11,7 +11,6 @@ import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.IndexSettings
 import dev.irohaco.core.contracts.LibraryFolder
-import dev.irohaco.core.contracts.MapProvider
 import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.ModelArtifact
 import dev.irohaco.core.contracts.ModelInstallState
@@ -21,7 +20,9 @@ import dev.irohaco.core.contracts.SpaceState
 import dev.irohaco.core.contracts.VideoQuality
 import dev.irohaco.core.domain.ThemeColor
 import dev.irohaco.core.domain.ThemeContrast
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -91,9 +92,41 @@ class SettingsViewModel(
     val lowCoverageVideos: StateFlow<Int> = (planMediaIndex?.lowCoverageVideos() ?: flowOf(0))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    private var planning: Job? = null
+    private val _preparing = MutableStateFlow(false)
+    private val _startFailed = MutableStateFlow(false)
+
+    /** True while the files to index are listed, before the job exists. */
+    val preparing: StateFlow<Boolean> = _preparing
+
+    /** The last start could not list the files or start the job; the user can try again. */
+    val startFailed: StateFlow<Boolean> = _startFailed
+
     /** Plans an index of [folders] (relative paths; null for every folder), videos at [quality], and runs it. */
     fun startIndex(folders: Set<String>?, quality: VideoQuality) {
-        viewModelScope.launch { planMediaIndex?.invoke(folders, quality)?.let(runIndexJob) }
+        if (planning?.isActive == true) return
+        _startFailed.value = false
+        planning = viewModelScope.launch {
+            _preparing.value = true
+            try {
+                planMediaIndex?.invoke(folders, quality)?.let(runIndexJob)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _startFailed.value = true // also when the system refuses the foreground service
+            } finally {
+                _preparing.value = false
+            }
+        }
+    }
+
+    /** Stops listing the files; nothing is kept, as no job was made yet. */
+    fun cancelPreparing() {
+        planning?.cancel()
+    }
+
+    fun dismissStartFailed() {
+        _startFailed.value = false
     }
 
     fun pauseIndex(jobId: String) {
@@ -124,6 +157,14 @@ class SettingsViewModel(
     val importResult: StateFlow<ModelInstallState?> = _importResult
 
     fun downloadModel(id: String) = startDownload(id)
+
+    fun pauseDownload(id: String) {
+        models?.pause(id)
+    }
+
+    fun cancelDownload(id: String) {
+        viewModelScope.launch { models?.cancel(id) }
+    }
 
     fun importModel(uri: String) {
         viewModelScope.launch { _importResult.value = models?.import(uri) }
@@ -161,20 +202,11 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setContrast(contrast) }
     }
 
-    /** The map's provider and which providers the user allowed (ADR-0011). */
-    val mapProvider: StateFlow<MapProvider> =
-        (map?.provider ?: flowOf(MapProvider.OPEN_FREE_MAP)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapProvider.OPEN_FREE_MAP)
+    /** Whether the online map is allowed (ADR-0011); off, the map asks again before it next loads. */
+    val mapAllowed: StateFlow<Boolean> = (map?.allowed ?: flowOf(false)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    val mapConsented: StateFlow<Set<MapProvider>> =
-        (map?.consented ?: flowOf(emptySet())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
-
-    fun selectMapProvider(provider: MapProvider) {
-        viewModelScope.launch { map?.setProvider(provider) }
-    }
-
-    /** Takes back every provider's consent; the map asks again before it next loads. */
-    fun revokeMapConsent() {
-        viewModelScope.launch { MapProvider.entries.forEach { map?.setConsent(it, false) } }
+    fun setMapAllowed(allowed: Boolean) {
+        viewModelScope.launch { map?.setAllowed(allowed) }
     }
 
     fun selectShareLocationPolicy(policy: ShareLocationPolicy) {

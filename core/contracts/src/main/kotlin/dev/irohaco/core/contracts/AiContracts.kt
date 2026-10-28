@@ -43,6 +43,9 @@ sealed interface ModelInstallState {
 
     data class Downloading(val downloadedBytes: Long, val totalBytes: Long) : ModelInstallState
 
+    /** Stopped by the user or by the system with part of the file kept; a download resumes from there. */
+    data class Paused(val downloadedBytes: Long, val totalBytes: Long) : ModelInstallState
+
     data object Verifying : ModelInstallState
 
     data class Installed(val path: String) : ModelInstallState
@@ -60,6 +63,9 @@ interface ModelStorage {
     /** Where a download of [id] lands before it is checked. */
     fun partial(id: String): String
 
+    /** How much of [id]'s download is kept, 0 when none. */
+    fun partialBytes(id: String): Long
+
     /** Copies a file the user picked into storage, unchecked, and returns its path. */
     suspend fun copyIn(sourceUri: String): String
 
@@ -73,24 +79,14 @@ interface ModelStorage {
     suspend fun delete(id: String)
 }
 
-/** A download's progress as the system download service reports it. */
-sealed interface DownloadStatus {
-    data object None : DownloadStatus
-
-    data class Running(val downloadedBytes: Long, val totalBytes: Long) : DownloadStatus
-
-    data class Done(val path: String) : DownloadStatus
-
-    data object Failed : DownloadStatus
-}
-
+/** Fetches a model file over HTTPS (MOD-002). */
 interface ModelDownloader {
-    suspend fun start(artifact: ModelArtifact, destination: String)
-
-    /** Follows a download until it is done, fails or does not exist; the flow then completes. */
-    fun status(artifact: ModelArtifact): Flow<DownloadStatus>
-
-    suspend fun cancel(artifact: ModelArtifact)
+    /**
+     * Appends to [destination] from its current length until the whole file is there, so a paused or
+     * dropped download resumes; [onProgress] gets the bytes so far and the total. Cancelling leaves the
+     * part already written. Throws [java.io.IOException] when the network or the server fails.
+     */
+    suspend fun fetch(artifact: ModelArtifact, destination: String, onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit)
 }
 
 /** The models that indexes and searches refer to (`model_profiles`). */

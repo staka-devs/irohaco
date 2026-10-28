@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- ADR-0011: only the map tiles and place names go out, and only after the user allows it on first use. -->
+    <!-- Model downloads the user starts (M2-02); map tiles and place names only after the user allows them (ADR-0011). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- M2-03: an indexing job the user started keeps running in the background, within dataSync's limits. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -18,10 +18,6 @@
         <!-- The vendor OpenCL the LiteRT-LM GPU backend runs on; without these apps cannot load it (ARCHITECTURE §10). -->
         <uses-native-library android:name="libOpenCL.so" android:required="false" />
         <uses-native-library android:name="libvndksupport.so" android:required="false" />
-        <!-- ADR-0011: empty unless MAPS_API_KEY is in local.properties; Google Maps is offered only then. -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${MAPS_API_KEY}" />
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -32,6 +28,10 @@
         </activity>
         <service
             android:name=".IndexingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        <service
+            android:name=".ModelDownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
     </application>

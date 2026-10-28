@@ -193,13 +193,11 @@ class MainActivity : ComponentActivity() {
                     ) { IndexingService.start(applicationContext, it) }
                 },
                 onBack,
-                googleMapsAvailable = BuildConfig.GOOGLE_MAPS,
             )
             route == Route.IDENTITY -> IdentityScreen(viewModel { IdentityViewModel(container.reconcileIdentity) }, onBack)
             route == Route.TRASH -> TrashScreen(viewModel { TrashViewModel(container.browseTrash, container::syncCatalog) }, onBack)
             route == Route.MAP -> MapScreen(
                 viewModel { MapViewModel(container.browseMap) },
-                googleMapsAvailable = BuildConfig.GOOGLE_MAPS,
                 onOpenArea = { open(Route.list(MediaList.Area(it))) },
                 onBack = onBack,
             )
