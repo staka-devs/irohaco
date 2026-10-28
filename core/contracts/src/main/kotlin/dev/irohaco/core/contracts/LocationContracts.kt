@@ -34,18 +34,14 @@ fun interface PlaceNames {
     suspend fun nameOf(point: GeoPoint): String?
 }
 
-/** Where the map's tiles come from (ADR-0011). */
-enum class MapProvider { OPEN_FREE_MAP, GOOGLE }
-
+/**
+ * Whether the user allowed the online map (ADR-0011): OpenFreeMap gets the area shown, and the place
+ * name service the points asked for. Off until the user turns it on.
+ */
 interface MapSettings {
-    val provider: Flow<MapProvider>
+    val allowed: Flow<Boolean>
 
-    suspend fun setProvider(provider: MapProvider)
-
-    /** Providers the user allowed to receive the map's area and the place names asked for. */
-    val consented: Flow<Set<MapProvider>>
-
-    suspend fun setConsent(provider: MapProvider, granted: Boolean)
+    suspend fun setAllowed(allowed: Boolean)
 }
 
 /** A located file and when it was taken, for naming places and guessing where nearby photos were taken. */

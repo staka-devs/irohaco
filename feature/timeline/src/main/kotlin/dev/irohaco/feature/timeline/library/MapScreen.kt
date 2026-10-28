@@ -54,15 +54,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import coil3.compose.AsyncImage
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng as GoogleLatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MarkerComposable
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberUpdatedMarkerState
 import dev.irohaco.core.application.BrowseMap
 import dev.irohaco.core.contracts.LocatedAsset
-import dev.irohaco.core.contracts.MapProvider
 import dev.irohaco.core.designsystem.component.GridThumbnail
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
@@ -93,8 +86,6 @@ class MapViewModel(private val browse: BrowseMap) : ViewModel() {
     /** Null until the setting loads; nothing is fetched before then. */
     val allowed: StateFlow<Boolean?> = browse.allowed.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    val provider: StateFlow<MapProvider> = browse.provider.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapProvider.OPEN_FREE_MAP)
-
     fun allow(granted: Boolean) {
         viewModelScope.launch { browse.allow(granted) }
     }
@@ -102,14 +93,12 @@ class MapViewModel(private val browse: BrowseMap) : ViewModel() {
 
 /**
  * Photos and videos on a map, grouped with a count (PRD GAL-017). The map only loads once the user
- * allowed its provider to receive the area shown (ADR-0011); declining points to the device's map app.
+ * allowed OpenFreeMap to receive the area shown (ADR-0011); declining points to the device's map app.
  */
 @Composable
-fun MapScreen(viewModel: MapViewModel, googleMapsAvailable: Boolean, onOpenArea: (GeoBounds) -> Unit, onBack: () -> Unit) {
+fun MapScreen(viewModel: MapViewModel, onOpenArea: (GeoBounds) -> Unit, onBack: () -> Unit) {
     val points by viewModel.located.collectAsStateWithLifecycle()
     val allowed by viewModel.allowed.collectAsStateWithLifecycle()
-    val provider by viewModel.provider.collectAsStateWithLifecycle()
-    val active = if (provider == MapProvider.GOOGLE && googleMapsAvailable) MapProvider.GOOGLE else MapProvider.OPEN_FREE_MAP
     var declined by remember { mutableStateOf(false) }
     // Once the map is agreed to, ask the OS for the GPS permission too: without it no location is read
     // at all (M1-32). Returning from the system dialog resumes the app, which re-runs IndexLocations.
@@ -125,13 +114,9 @@ fun MapScreen(viewModel: MapViewModel, googleMapsAvailable: Boolean, onOpenArea:
         onAllow = { viewModel.allow(true) },
         onDecline = { declined = true },
         onBack = onBack,
-        providerName = stringResource(if (active == MapProvider.GOOGLE) R.string.map_provider_google else R.string.map_provider_openfreemap),
+        providerName = stringResource(R.string.map_provider_openfreemap),
     ) {
-        val located = points.orEmpty()
-        when (active) {
-            MapProvider.GOOGLE -> GoogleClusterMap(located, onOpenArea)
-            MapProvider.OPEN_FREE_MAP -> MapLibreClusterMap(located, onOpenArea)
-        }
+        MapLibreClusterMap(points.orEmpty(), onOpenArea)
     }
 }
 
@@ -254,25 +239,6 @@ private fun MapLibreClusterMap(located: List<LocatedAsset>, onOpenArea: (GeoBoun
                     },
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun GoogleClusterMap(located: List<LocatedAsset>, onOpenArea: (GeoBounds) -> Unit) {
-    val camera = rememberCameraPositionState {
-        position = located.firstOrNull()?.let { CameraPosition.fromLatLngZoom(GoogleLatLng(it.point.latitude, it.point.longitude), 5f) }
-            ?: CameraPosition.fromLatLngZoom(GoogleLatLng(35.68, 139.76), 2f)
-    }
-    val clusters = remember(located, camera.position.zoom.toInt()) { clusterPoints(located.map { it.point }, camera.position.zoom.toDouble()) }
-    GoogleMap(modifier = Modifier.fillMaxSize(), cameraPositionState = camera) {
-        clusters.forEach { cluster ->
-            // shortcut: a count only, as a marker is drawn once as a bitmap before its photo loads; add photos if Google is used much.
-            MarkerComposable(
-                cluster.count,
-                state = rememberUpdatedMarkerState(GoogleLatLng(cluster.center.latitude, cluster.center.longitude)),
-                onClick = { onOpenArea(cluster.bounds); true },
-            ) { CountBadge(cluster.count) }
         }
     }
 }
