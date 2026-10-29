@@ -58,6 +58,7 @@ import dev.irohaco.core.application.SearchHit
 import dev.irohaco.core.application.SearchMedia
 import dev.irohaco.core.application.SearchResults
 import dev.irohaco.core.application.SpaceChoice
+import dev.irohaco.core.application.QueryReader
 import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.SpaceState
 import dev.irohaco.core.contracts.Tag
@@ -86,12 +87,17 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 /** The search's conditions and what they found; [results] is null before the first search. */
 data class SearchUi(
     val query: String = "",
+    /** The query without the dates and the kind read out of it (#203); what is searched. */
+    val rest: String = "",
+    /** Only files at the place the query names (#203). */
+    val atPlace: Boolean = true,
     val byMeaning: Boolean = true,
     val byText: Boolean = true,
     val byMemo: Boolean = true,
@@ -157,7 +163,21 @@ class SearchViewModel(
 
     fun showTag(tag: Tag?) = change { it.copy(filters = it.filters.copy(tagId = tag?.tagId), tagName = tag?.name) }
 
-    fun search(query: String) = change { it.copy(query = query.trim()) }
+    /** The dates and the kind the query names become the conditions, which the user can still change (#203). */
+    fun search(query: String) {
+        val read = QueryReader.read(query, ZonedDateTime.now())
+        change {
+            it.copy(
+                query = query.trim(),
+                rest = read.rest,
+                kind = read.kind ?: it.kind,
+                filters = if (read.fromMs != null) it.filters.copy(fromMs = read.fromMs, untilMs = read.untilMs) else it.filters,
+                atPlace = true,
+            )
+        }
+    }
+
+    fun toggleAtPlace() = change { it.copy(atPlace = !it.atPlace) }
 
     fun toggleMeaning() = change { it.copy(byMeaning = !it.byMeaning) }
 
@@ -197,7 +217,7 @@ class SearchViewModel(
             val results = if (similarTo != null) {
                 search.similar(similarTo, ui.spaceId, ui.kind, ui.filters)
             } else {
-                search(ui.query, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare, ui.byMemo, ui.filters, ui.inferredPlaces)
+                search(ui.rest.ifEmpty { ui.query }, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare, ui.byMemo, ui.filters, ui.inferredPlaces, ui.atPlace)
             }
             _ui.update { it.copy(searching = false, results = results) }
             // Loading a model takes half a minute; start while the user looks at the results.
@@ -226,6 +246,7 @@ fun SearchScreen(
         onDates = viewModel::showDates,
         onTag = viewModel::showTag,
         onToggleInferredPlaces = viewModel::toggleInferredPlaces,
+        onToggleAtPlace = viewModel::toggleAtPlace,
         onBack = onBack,
         onSearch = viewModel::search,
         onToggleMeaning = viewModel::toggleMeaning,
@@ -262,6 +283,7 @@ internal fun SearchContent(
     onDates: (Long?, Long?) -> Unit = { _, _ -> },
     onTag: (Tag?) -> Unit = {},
     onToggleInferredPlaces: () -> Unit = {},
+    onToggleAtPlace: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     onAsk: (() -> Unit)? = null,
 ) {
@@ -301,7 +323,7 @@ internal fun SearchContent(
                 ) {}
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTag, onToggleInferredPlaces, similar = onBack != null)
+                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTag, onToggleInferredPlaces, onToggleAtPlace, similar = onBack != null)
             }
             ui.results?.let { results ->
                 item(span = { GridItemSpan(maxLineSpan) }) { Notices(ui, results, labels, onOpenSettings) }
@@ -342,6 +364,7 @@ private fun Conditions(
     onDates: (Long?, Long?) -> Unit,
     onTag: (Tag?) -> Unit,
     onToggleInferredPlaces: () -> Unit,
+    onToggleAtPlace: () -> Unit,
     /** The similar photos page: no query, so only conditions on the files apply. */
     similar: Boolean,
 ) {
@@ -359,6 +382,7 @@ private fun Conditions(
             FilterChip(ui.kind == MediaKind.VIDEO, { onKind(if (ui.kind == MediaKind.VIDEO) null else MediaKind.VIDEO) }, label = { Text(stringResource(R.string.search_videos)) })
             val dates = ui.filters.fromMs?.let { from -> ui.filters.untilMs?.let { until -> dateRangeLabel(from, until) } }
             FilterChip(dates != null, { if (dates != null) onDates(null, null) else pickingDates = true }, label = { Text(dates ?: stringResource(R.string.search_dates)) })
+            ui.results?.place?.let { place -> FilterChip(ui.atPlace, onToggleAtPlace, label = { Text(place) }) }
             TagChip(ui, tags, onTag)
             if (!similar) FilterChip(ui.inferredPlaces, onToggleInferredPlaces, label = { Text(stringResource(R.string.search_inferred_places)) })
             // Comparing searches every model at once, so it needs two of them (SRCH-005).
