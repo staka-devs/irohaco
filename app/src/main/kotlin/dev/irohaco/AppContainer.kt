@@ -67,6 +67,7 @@ import dev.irohaco.infrastructure.media.AndroidIndexImageReader
 import dev.irohaco.infrastructure.media.AndroidMediaDetailsReader
 import dev.irohaco.infrastructure.media.AndroidMediaFiles
 import dev.irohaco.infrastructure.media.AndroidMediaFormatProbe
+import dev.irohaco.infrastructure.media.AndroidMediaAccessCheck
 import dev.irohaco.infrastructure.media.AndroidMediaLibraryAccess
 import dev.irohaco.infrastructure.media.AndroidPlaceNames
 import dev.irohaco.infrastructure.media.AndroidMetadataFiles
@@ -240,7 +241,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val searchText by lazy { SearchText(textIndexStore) }
 
     /** The search screen: by meaning and by text, fused by rank (M2-09). */
-    val searchMedia by lazy { SearchMedia(searchByMeaning, searchText, RoomTimelineReader(database), SearchPlaces(locationStore)) }
+    val searchMedia by lazy { SearchMedia(searchByMeaning, searchText, RoomTimelineReader(database), AndroidMediaAccessCheck(appContext, libraryAccess), SearchPlaces(locationStore)) }
 
     /** Searches by meaning in one embedding space at a time (M2-08); the query runs before any indexing. */
     val searchByMeaning by lazy {

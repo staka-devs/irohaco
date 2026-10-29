@@ -22,6 +22,7 @@ class SearchMediaTest {
     private var textHits = listOf(TextMatch("p2", null, "看板"), TextMatch("v1", 40_000, "駅"))
     private var modelMissing = false
     private var embeds = 0
+    private var revoked = emptySet<String>()
     private val tagged = mapOf("trip" to setOf("p2", "v1"))
 
     private val vectors = object : VectorSearchStore {
@@ -46,7 +47,15 @@ class SearchMediaTest {
         SearchByMeaning(vectors, embedText = { embeds++; if (modelMissing) throw ModelNotInstalledException() else floatArrayOf(1f) }, modelDigest = "d"),
         SearchText(texts),
         { ids, tag -> catalog.filter { it.assetId in ids && (tag == null || it.assetId in tagged.getValue(tag)) } },
+        { items -> items.filter { it.assetId !in revoked } },
     )
+
+    @Test
+    fun `a file the OS no longer lets the app read is left out, though the catalog still lists it`() = runTest {
+        revoked = setOf("p2")
+        assertEquals(listOf("p1", "v1", "v1"), search("駅前の看板").hits.map { it.item.assetId })
+        assertEquals(emptyList(), search.similar("p1").hits.filter { it.item.assetId == "p2" })
+    }
 
     @Test
     fun `meaning and text are fused by rank, and a file found by both comes first`() = runTest {
