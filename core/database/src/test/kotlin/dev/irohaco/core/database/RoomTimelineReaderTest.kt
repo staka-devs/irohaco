@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.irohaco.core.contracts.CatalogChanges
 import dev.irohaco.core.contracts.CatalogVolume
+import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.MediaStoreEntry
 import dev.irohaco.core.contracts.NewCatalogAsset
 import dev.irohaco.core.contracts.TimelineLabel
@@ -104,6 +105,30 @@ class RoomTimelineReaderTest {
         assertEquals(listOf(TimelineLabel.Rating(0)), reader.labels(TimelineQuery(TimelineSortKey.RATING)))
     }
 
+    @Test
+    fun `a file is in hidden folders only when every available copy is`() = runTest {
+        RoomCatalogStore(db).apply(
+            CatalogChanges(
+                observedAtMs = 1,
+                newVolumes = listOf(CatalogVolume("v1", "external_primary", null, null)),
+                newAssets = listOf(
+                    asset("hidden", id = 1, taken = 1, modified = 1, path = "Private/"),
+                    asset("shown", id = 2, taken = 1, modified = 1, path = "DCIM/"),
+                    asset("copied", id = 3, taken = 1, modified = 1, path = "Private/"),
+                    asset("root", id = 4, taken = 1, modified = 1),
+                ),
+            ),
+        )
+        db.openHelper.writableDatabase.execSQL(
+            """INSERT INTO media_sources(source_id, asset_id, volume_id, media_store_id, content_uri, display_name, relative_path, mime_type, file_size_bytes, access_state)
+               VALUES ('s-copy', 'copied', 'v1', 5, 'content://media/5', '5.jpg', 'DCIM/', 'image/jpeg', 1, 'AVAILABLE')""",
+        )
+        assertEquals(setOf("hidden"), reader.onlyIn(setOf(FolderRef("v1", "Private/"))))
+        assertEquals(setOf("hidden", "root"), reader.onlyIn(setOf(FolderRef("v1", "Private/"), FolderRef("v1", ""))))
+        assertEquals(setOf("hidden", "shown", "copied"), reader.onlyIn(setOf(FolderRef("v1", "Private/"), FolderRef("v1", "DCIM/"))))
+        assertEquals(emptySet(), reader.onlyIn(emptySet()))
+    }
+
     private val newest = TimelineQuery()
 
     private fun asset(
@@ -114,11 +139,12 @@ class RoomTimelineReaderTest {
         fileName: String = "$id.jpg",
         size: Long = 1,
         kind: MediaKind = MediaKind.IMAGE,
+        path: String? = null,
     ) = NewCatalogAsset(
         discoveryId = "d-$name",
         assetId = name,
         sourceId = "s-$name",
         volumeId = "v1",
-        entry = MediaStoreEntry(id, kind, "content://media/$id", fileName, null, "image/jpeg", size, modified, taken),
+        entry = MediaStoreEntry(id, kind, "content://media/$id", fileName, path, "image/jpeg", size, modified, taken),
     )
 }

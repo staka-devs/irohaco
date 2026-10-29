@@ -85,6 +85,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -138,7 +139,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     private val locationStore by lazy { RoomLocationStore(database) }
 
-    val browseMap by lazy { BrowseMap(locationStore, mapSettings, AndroidPlaceNames(appContext)) }
+    val browseMap by lazy { BrowseMap(locationStore, mapSettings, AndroidPlaceNames(appContext), ::hiddenMedia) }
 
     /** Reads the GPS of files not read yet; cancelling it (the app leaving the screen) pauses it (GAL-017). */
     suspend fun indexLocations() {
@@ -241,7 +242,10 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val searchText by lazy { SearchText(textIndexStore) }
 
     /** The search screen: by meaning and by text, fused by rank (M2-09). */
-    val searchMedia by lazy { SearchMedia(searchByMeaning, searchText, RoomTimelineReader(database), AndroidMediaAccessCheck(appContext, libraryAccess), SearchPlaces(locationStore)) }
+    val searchMedia by lazy { SearchMedia(searchByMeaning, searchText, RoomTimelineReader(database), AndroidMediaAccessCheck(appContext, libraryAccess), SearchPlaces(locationStore), ::hiddenMedia) }
+
+    /** Files in the folders hidden from the timeline; search and the map leave them out too (GAL-002). */
+    private suspend fun hiddenMedia(): Set<String> = RoomTimelineReader(database).onlyIn(browseLibrary.excludedFolders().first())
 
     /** Searches by meaning in one embedding space at a time (M2-08); the query runs before any indexing. */
     val searchByMeaning by lazy {

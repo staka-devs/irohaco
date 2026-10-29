@@ -38,6 +38,11 @@ sealed interface TimelineLabel {
 /** A folder on one volume, such as "DCIM/Camera/"; the volume root is "" (PRD GAL-002). */
 data class FolderRef(val volumeId: String, val relativePath: String)
 
+/** The files whose every available copy is in one of [folders], so hiding the folders hides them (GAL-002). */
+fun interface FolderMedia {
+    suspend fun onlyIn(folders: Set<FolderRef>): Set<String>
+}
+
 /** The order and filter of the timeline (PRD GAL-006). Taken time falls back to the modification time. */
 data class TimelineQuery(
     val sortKey: TimelineSortKey = TimelineSortKey.TAKEN,
