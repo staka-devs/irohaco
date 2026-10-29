@@ -290,4 +290,14 @@
     <string name="file_not_restored">書き込む前のファイルに戻せませんでした</string>
     <string name="file_copy_saved">コピーを保存しました</string>
     <string name="file_copy_not_saved">コピーを保存できませんでした</string>
+    <string name="search_ask">この結果について AI に聞く</string>
+    <string name="search_asking">上位の写真と場面を見て答えを作っています</string>
+    <string name="search_ask_no_model">質問に答えるモデルが入っていません。設定の AI でダウンロードしてください。</string>
+    <string name="search_ask_nothing">答えに使える写真がありません。</string>
+    <string name="search_ask_failed">答えを作れませんでした。</string>
+    <string name="search_ask_retry">もう一度</string>
+    <string name="search_ask_caution">端末の AI が上位の写真と場面だけを見て答えています。間違うことがあります。</string>
+    <string name="search_basis_observed">写っている</string>
+    <string name="search_basis_user_stated">メモにある</string>
+    <string name="search_basis_inferred">推測</string>
 </resources>

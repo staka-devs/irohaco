@@ -105,4 +105,6 @@
     <string name="settings_index_dismiss">閉じる</string>
     <string name="settings_index_auto">変更を自動で索引</string>
     <string name="settings_index_auto_summary">写真や動画の追加・変更を、アプリを開いたときに索引。最初の索引のあとから有効</string>
+    <string name="settings_ai_answer_model">質問に答えるモデル</string>
+    <string name="settings_ai_answer_model_hint">検索した写真と動画の場面を見て、質問に答えます。上でダウンロードしたモデルから選べます。</string>
 </resources>

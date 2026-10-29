@@ -7,12 +7,19 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.AiSettings
+import dev.irohaco.core.contracts.AnswerModelSettings
 import dev.irohaco.core.contracts.GpuCheck
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
-class DataStoreAiSettings(private val store: DataStore<Preferences>) : AiSettings {
+class DataStoreAiSettings(private val store: DataStore<Preferences>) : AiSettings, AnswerModelSettings {
+    override val answerModel: Flow<String?> = store.data.map { it[ANSWER_MODEL] }.distinctUntilChanged()
+
+    override suspend fun setAnswerModel(id: String) {
+        store.edit { it[ANSWER_MODEL] = id }
+    }
+
     override val backend: Flow<AiBackend?> =
         store.data.map { prefs -> prefs[BACKEND]?.let { name -> AiBackend.entries.firstOrNull { it.name == name } } }.distinctUntilChanged()
 
@@ -36,5 +43,6 @@ class DataStoreAiSettings(private val store: DataStore<Preferences>) : AiSetting
         val BACKEND = stringPreferencesKey("ai_backend")
         val GPU_MODEL = stringPreferencesKey("ai_gpu_checked_model")
         val GPU_WORKS = booleanPreferencesKey("ai_gpu_works")
+        val ANSWER_MODEL = stringPreferencesKey("ai_answer_model")
     }
 }

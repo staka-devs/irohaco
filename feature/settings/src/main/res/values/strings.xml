@@ -107,4 +107,6 @@
     <string name="settings_index_dismiss">Dismiss</string>
     <string name="settings_index_auto">Index changes automatically</string>
     <string name="settings_index_auto_summary">Indexes added or edited photos and videos when you open the app. Available after the first index</string>
+    <string name="settings_ai_answer_model">Model that answers questions</string>
+    <string name="settings_ai_answer_model_hint">Looks at the photos and video scenes a search found and answers your question. Pick one of the models downloaded above.</string>
 </resources>
