@@ -85,7 +85,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.text.style.TextAlign
+import dev.irohaco.core.contracts.FieldEdit
 import dev.irohaco.core.domain.Detail
+import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaFormat
 import coil3.request.ImageRequest
@@ -127,7 +129,35 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
     val tags by viewModel.tags.collectAsStateWithLifecycle()
     val memos by viewModel.memos.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
+    val edits by viewModel.edits.collectAsStateWithLifecycle()
     var tagging by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<EditableField?>(null) }
+    val fileDetails = ((details as? ViewerViewModel.Details.Shown)?.result as? MediaDetailsResult.Read)?.details
+    detailsOf?.let { item ->
+        val done = { editing = null }
+        when (editing) {
+            EditableField.TAKEN -> TakenAtDialog(
+                initialMs = edits.takenAtMs ?: item.sortTimeMs,
+                onDismiss = done,
+                onSave = { done(); viewModel.setTakenAt(item, it) },
+            )
+            EditableField.LOCATION -> LocationDialog(
+                initial = (location as? Detail.Value<GeoPoint>)?.value,
+                onDismiss = done,
+                onSave = { done(); viewModel.setLocation(item, it) },
+            )
+            EditableField.DESCRIPTION -> DescriptionDialog(
+                initial = when (val e = edits.description) {
+                    is FieldEdit.Set -> e.value
+                    FieldEdit.Removed -> ""
+                    null -> (fileDetails?.description as? Detail.Value<String>)?.value.orEmpty()
+                },
+                onDismiss = done,
+                onSave = { done(); viewModel.setDescription(item, it) },
+            )
+            null -> Unit
+        }
+    }
     if (tagging) {
         TagDialog(
             tags = allTags,
@@ -179,6 +209,17 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
                 history = viewModel::memoHistory,
                 isVideo = detailsOf?.kind == MediaKind.VIDEO,
             )
+        },
+        edits = edits,
+        onEdit = { editing = it },
+        onRevert = { field ->
+            detailsOf?.let {
+                when (field) {
+                    EditableField.TAKEN -> viewModel.setTakenAt(it, null)
+                    EditableField.LOCATION -> viewModel.setLocation(it, null)
+                    EditableField.DESCRIPTION -> viewModel.setDescription(it, null)
+                }
+            }
         },
     )
     Box(Modifier.fillMaxSize()) {

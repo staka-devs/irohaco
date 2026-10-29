@@ -108,6 +108,32 @@ interface MarksStore {
     suspend fun setRating(assetId: String, rating: Int?)
 }
 
+/** A field the user changed in the app's DB; the file keeps its own value (PRD MET-002, MET-005). */
+sealed interface FieldEdit<out T> {
+    data class Set<T>(val value: T) : FieldEdit<T>
+
+    /** Shown as having no value, even when the file has one. */
+    data object Removed : FieldEdit<Nothing>
+}
+
+/** The user's edits of an asset; null for a field left as the file has it. */
+data class MetadataEdits(
+    val takenAtMs: Long? = null,
+    val location: FieldEdit<GeoPoint>? = null,
+    val description: FieldEdit<String>? = null,
+)
+
+/** Edits kept in the DB only (ADR-0004); null in a setter goes back to the file's value. */
+interface MetadataEditStore {
+    fun edits(assetId: String): Flow<MetadataEdits>
+
+    suspend fun setTakenAt(assetId: String, takenAtMs: Long?)
+
+    suspend fun setLocation(assetId: String, edit: FieldEdit<GeoPoint>?)
+
+    suspend fun setDescription(assetId: String, edit: FieldEdit<String>?)
+}
+
 data class Tag(val tagId: String, val name: String, val itemCount: Int)
 
 data class Album(val albumId: String, val title: String, val itemCount: Int, val coverUri: String?)

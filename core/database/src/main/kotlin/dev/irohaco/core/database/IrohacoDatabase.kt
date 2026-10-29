@@ -81,6 +81,7 @@ abstract class IrohacoDatabase : RoomDatabase() {
     abstract fun mediaIndexDao(): MediaIndexDao
     abstract fun vectorSearchDao(): VectorSearchDao
     abstract fun annotationDao(): AnnotationDao
+    abstract fun metadataDao(): MetadataDao
 }
 
 @Entity(
