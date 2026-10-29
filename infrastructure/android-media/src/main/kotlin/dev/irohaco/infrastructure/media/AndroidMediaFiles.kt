@@ -9,6 +9,7 @@ import dev.irohaco.core.contracts.MediaFiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.io.InputStream
 
 /**
  * Move and rename update the MediaStore row, so its id and the asset stay the same. Copy inserts a
@@ -53,6 +54,16 @@ class AndroidMediaFiles(private val context: Context) : MediaFiles {
     override suspend fun copy(contentUri: String, folder: String) = withContext(Dispatchers.IO) {
         val uri = Uri.parse(contentUri)
         val row = row(uri) ?: return@withContext FileOperationResult.NOT_FOUND
+        insertCopy(row, folder) { resolver.openInputStream(uri) }
+    }
+
+    /** A new file in the folder of [contentUri], with its name and type, filled from [open]. */
+    internal suspend fun copyBeside(contentUri: String, open: () -> InputStream?) = withContext(Dispatchers.IO) {
+        val row = row(Uri.parse(contentUri)) ?: return@withContext FileOperationResult.NOT_FOUND
+        insertCopy(row, row.folder, open)
+    }
+
+    private fun insertCopy(row: Row, folder: String, open: () -> InputStream?): FileOperationResult {
         val collection = if (row.mime.startsWith("video/")) VIDEOS_PRIMARY else IMAGES_PRIMARY
         // MediaStore appends " (1)" when the folder already has the name, so a copy never overwrites.
         val values = ContentValues().apply {
@@ -65,9 +76,9 @@ class AndroidMediaFiles(private val context: Context) : MediaFiles {
             resolver.insert(collection, values)
         } catch (e: IllegalArgumentException) {
             null // a folder MediaStore does not accept for this type
-        } ?: return@withContext FileOperationResult.FAILED
-        try {
-            val input = resolver.openInputStream(uri) ?: throw IOException("cannot open $uri")
+        } ?: return FileOperationResult.FAILED
+        return try {
+            val input = open() ?: throw IOException("cannot open the source of ${row.name}")
             input.use { i -> resolver.openOutputStream(copy)!!.use { o -> i.copyTo(o) } }
             resolver.update(copy, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
             FileOperationResult.DONE

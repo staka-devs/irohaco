@@ -315,7 +315,7 @@ private fun outcomeMessage(resources: Resources, outcome: TimelineViewModel.Outc
     }
 
 /** The system dialog that lets this app change files other apps own (GAL-005). */
-private fun writeRequest(context: Context, uris: List<Uri>): IntentSenderRequest =
+internal fun writeRequest(context: Context, uris: List<Uri>): IntentSenderRequest =
     IntentSenderRequest.Builder(MediaStore.createWriteRequest(context.contentResolver, uris).intentSender).build()
 
 /** Hands the selected files to another app with read access only. */

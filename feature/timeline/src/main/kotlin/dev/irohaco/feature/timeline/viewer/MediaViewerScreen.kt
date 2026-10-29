@@ -57,6 +57,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -108,6 +109,7 @@ import dev.irohaco.feature.timeline.R
 import dev.irohaco.feature.timeline.TagDialog
 import dev.irohaco.feature.timeline.shareIntent
 import dev.irohaco.feature.timeline.trashRequest
+import dev.irohaco.feature.timeline.writeRequest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -133,6 +135,10 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
     val edits by viewModel.edits.collectAsStateWithLifecycle()
     var tagging by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<MetadataField?>(null) }
+    val fileWrite by viewModel.fileWrite.collectAsStateWithLifecycle()
+    val writeToCheck by viewModel.writeToCheck.collectAsStateWithLifecycle()
+    var writing by remember { mutableStateOf(false) }
+    var copying by remember { mutableStateOf(false) }
     val fileDetails = ((details as? ViewerViewModel.Details.Shown)?.result as? MediaDetailsResult.Read)?.details
     detailsOf?.let { item ->
         val done = { editing = null }
@@ -181,6 +187,33 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
     val undoLabel = stringResource(R.string.timeline_undo)
     val sceneNotIndexed = stringResource(R.string.memo_scene_not_indexed)
     LaunchedEffect(viewModel) { viewModel.sceneNotIndexed.collect { snackbar.showSnackbar(sceneNotIndexed) } }
+    // Writing to the file changes a file other apps may own, so the system asks the user first (MET-003).
+    var afterGrant by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val deniedMessage = stringResource(R.string.timeline_change_denied)
+    val grant = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) afterGrant?.invoke() else scope.launch { snackbar.showSnackbar(deniedMessage) }
+        afterGrant = null
+    }
+    fun withWriteGrant(item: TimelineItem, action: () -> Unit) {
+        afterGrant = action
+        grant.launch(writeRequest(context, listOf(Uri.parse(item.contentUri))))
+    }
+    detailsOf?.let { item ->
+        if (writing) {
+            WriteToFileDialog(edits, onDismiss = { writing = false }) { fields ->
+                writing = false
+                withWriteGrant(item) { viewModel.writeToFile(item, fields) }
+            }
+        }
+        if (copying) {
+            SaveCopyDialog(onDismiss = { copying = false }) { removeLocation ->
+                copying = false
+                viewModel.saveCopy(item, removeLocation)
+            }
+        }
+    }
+    val resources = LocalResources.current
+    LaunchedEffect(viewModel) { viewModel.fileOutcomes.collect { snackbar.showSnackbar(resources.getString(it.message)) } }
     val restore = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { }
     val trash = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
@@ -223,6 +256,19 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
             }
         },
         onKeep = { field -> detailsOf?.let { viewModel.keepEdit(it, field) } },
+        fileActions = {
+            FileWriteSection(
+                edits = edits,
+                fileWrite = fileWrite,
+                writeToCheck = writeToCheck,
+                locationReadable = fileDetails?.location != Detail.NoPermission,
+                onAllowLocation = { allowLocation.launch(Manifest.permission.ACCESS_MEDIA_LOCATION) },
+                onWrite = { writing = true },
+                onSaveCopy = { copying = true },
+                onRestore = { operation -> detailsOf?.let { item -> withWriteGrant(item) { viewModel.restoreFile(item, operation) } } },
+                onKeepFile = viewModel::keepFile,
+            )
+        },
     )
     Box(Modifier.fillMaxSize()) {
         when (val s = start) {
@@ -623,3 +669,14 @@ private fun HdrWindow(hdr: Boolean) {
         onDispose { activity.window.colorMode = ActivityInfo.COLOR_MODE_DEFAULT }
     }
 }
+
+private val ViewerViewModel.FileOutcome.message: Int
+    get() = when (this) {
+        ViewerViewModel.FileOutcome.WRITTEN -> R.string.file_written
+        ViewerViewModel.FileOutcome.NOT_WRITTEN -> R.string.file_not_written
+        ViewerViewModel.FileOutcome.CHECK_FAILED -> R.string.file_check_failed
+        ViewerViewModel.FileOutcome.RESTORED -> R.string.file_restored
+        ViewerViewModel.FileOutcome.NOT_RESTORED -> R.string.file_not_restored
+        ViewerViewModel.FileOutcome.COPY_SAVED -> R.string.file_copy_saved
+        ViewerViewModel.FileOutcome.COPY_NOT_SAVED -> R.string.file_copy_not_saved
+    }

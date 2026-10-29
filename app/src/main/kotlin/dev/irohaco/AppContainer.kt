@@ -29,6 +29,7 @@ import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.application.EditMetadata
+import dev.irohaco.core.application.WriteMetadataToFile
 import dev.irohaco.core.application.NamePlaces
 import dev.irohaco.core.application.OrganizeMedia
 import dev.irohaco.core.application.PlanMediaIndex
@@ -68,6 +69,7 @@ import dev.irohaco.infrastructure.media.AndroidMediaFiles
 import dev.irohaco.infrastructure.media.AndroidMediaFormatProbe
 import dev.irohaco.infrastructure.media.AndroidMediaLibraryAccess
 import dev.irohaco.infrastructure.media.AndroidPlaceNames
+import dev.irohaco.infrastructure.media.AndroidMetadataFiles
 import dev.irohaco.infrastructure.media.AndroidShareFiles
 import dev.irohaco.infrastructure.media.AndroidTrashReader
 import dev.irohaco.infrastructure.media.MediaStoreCatalogSource
@@ -158,7 +160,11 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     val markMedia by lazy { MarkMedia(RoomMarksStore(database)) }
 
-    val editMetadata by lazy { EditMetadata(RoomMetadataEditStore(database)) }
+    private val metadataEdits by lazy { RoomMetadataEditStore(database) }
+
+    val editMetadata by lazy { EditMetadata(metadataEdits) }
+
+    val writeMetadataToFile by lazy { WriteMetadataToFile(metadataEdits, metadataEdits, AndroidMetadataFiles(appContext)) }
 
     val manageCollections by lazy { ManageCollections(RoomCollectionsStore(database)) }
 

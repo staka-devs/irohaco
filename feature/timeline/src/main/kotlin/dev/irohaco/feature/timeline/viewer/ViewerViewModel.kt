@@ -19,6 +19,8 @@ import dev.irohaco.core.contracts.AnnotationRevision
 import dev.irohaco.core.contracts.AssetMarks
 import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.application.EditMetadata
+import dev.irohaco.core.application.FileWriteResult
+import dev.irohaco.core.application.WriteMetadataToFile
 import dev.irohaco.core.contracts.FieldEdit
 import dev.irohaco.core.contracts.MetadataEdits
 import dev.irohaco.core.contracts.MetadataField
@@ -76,9 +78,13 @@ class ViewerViewModel(
     private val map: BrowseMap? = null,
     private val annotations: ManageAnnotations? = null,
     private val metadata: EditMetadata? = null,
+    private val writer: WriteMetadataToFile? = null,
 ) : ViewModel() {
     private val currentItem = MutableStateFlow<TimelineItem?>(null)
     private val current = currentItem.map { it?.assetId }.distinctUntilChanged()
+
+    // Counts the writes to files, so what was read from the page's file is read again.
+    private val fileWrites = MutableStateFlow(0)
 
     /** RAW, HDR or Motion Photo of the page on screen, for its label (PRD GAL-009). */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -94,7 +100,7 @@ class ViewerViewModel(
 
     /** GPS of the page on screen, read the same way as the details sheet (PRD GAL-013), unless the user edited it. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val location: StateFlow<Detail<GeoPoint>> = currentItem
+    val location: StateFlow<Detail<GeoPoint>> = currentItem.combine(fileWrites) { item, _ -> item }
         .flatMapLatest { item ->
             flow {
                 emit(
@@ -218,6 +224,56 @@ class ViewerViewModel(
 
     /** Keeps the user's value over the one another app wrote into the file since (INT-002). */
     fun keepEdit(item: TimelineItem, field: MetadataField) = applyEdit(item) { keepEdit(item.assetId, field) }
+
+    /** Whether the page on screen takes its edits into the file itself, and into a copy (ADR-0030). */
+    data class FileWrite(val toFile: Boolean = false, val toCopy: Boolean = false)
+
+    val fileWrite: StateFlow<FileWrite> = combine(currentItem, format) { item, format ->
+        FileWrite(item != null && writer?.canWriteFile(item, format) == true, item != null && writer?.canSaveCopy(item) == true)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FileWrite())
+
+    /** The write of the page on screen whose file did not read back as written, for the user to restore or keep (AC-008). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val writeToCheck: StateFlow<String?> = current
+        .flatMapLatest { id -> if (id == null || writer == null) flowOf(null) else writer.recoveryRequired(id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    enum class FileOutcome { WRITTEN, NOT_WRITTEN, CHECK_FAILED, RESTORED, NOT_RESTORED, COPY_SAVED, COPY_NOT_SAVED }
+
+    private val _fileOutcomes = MutableSharedFlow<FileOutcome>(extraBufferCapacity = 1)
+    val fileOutcomes: SharedFlow<FileOutcome> = _fileOutcomes.asSharedFlow()
+
+    /** Writes the chosen edits into the file; the caller holds the OS write grant (MET-003). */
+    fun writeToFile(item: TimelineItem, fields: Set<MetadataField>) = changeFile(item) {
+        when (write(item, fields)) {
+            FileWriteResult.WRITTEN -> FileOutcome.WRITTEN
+            FileWriteResult.NOT_WRITTEN -> FileOutcome.NOT_WRITTEN
+            FileWriteResult.CHECK_FAILED -> FileOutcome.CHECK_FAILED
+        }
+    }
+
+    /** Puts back the file as it was before the write; the caller holds the OS write grant. */
+    fun restoreFile(item: TimelineItem, operationId: String) = changeFile(item) {
+        if (restore(item, operationId)) FileOutcome.RESTORED else FileOutcome.NOT_RESTORED
+    }
+
+    fun keepFile(operationId: String) {
+        viewModelScope.launch { writer?.keepFile(operationId) }
+    }
+
+    fun saveCopy(item: TimelineItem, removeLocation: Boolean) {
+        val writer = writer ?: return
+        viewModelScope.launch { _fileOutcomes.emit(if (writer.saveCopy(item, removeLocation)) FileOutcome.COPY_SAVED else FileOutcome.COPY_NOT_SAVED) }
+    }
+
+    private fun changeFile(item: TimelineItem, change: suspend WriteMetadataToFile.() -> FileOutcome) {
+        val writer = writer ?: return
+        viewModelScope.launch {
+            _fileOutcomes.emit(writer.change())
+            fileWrites.value++
+            if (_details.value is Details.Shown) showDetails(item)
+        }
+    }
 
     fun setRating(item: TimelineItem, rating: Int?) {
         viewModelScope.launch { mark?.setRating(item.assetId, rating) }
