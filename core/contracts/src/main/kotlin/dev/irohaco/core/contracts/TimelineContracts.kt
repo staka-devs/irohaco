@@ -116,11 +116,24 @@ sealed interface FieldEdit<out T> {
     data object Removed : FieldEdit<Nothing>
 }
 
-/** The user's edits of an asset; null for a field left as the file has it. */
+/** The fields the user can edit in the DB. */
+enum class MetadataField { TAKEN, LOCATION, DESCRIPTION }
+
+/** A location as the text the edits keep and compare. */
+fun GeoPoint.toMetadataText() = "$latitude,$longitude"
+
+fun geoPointOfMetadataText(text: String): GeoPoint = text.split(',').let { GeoPoint(it[0].toDouble(), it[1].toDouble()) }
+
+/**
+ * The user's edits of an asset; null for a field left as the file has it.
+ * [conflicts] holds the edited fields another app changed in the file since (INT-002), each with the file's
+ * value when the user edited it, as text (see [MetadataEditStore.compareWithFile]).
+ */
 data class MetadataEdits(
     val takenAtMs: Long? = null,
     val location: FieldEdit<GeoPoint>? = null,
     val description: FieldEdit<String>? = null,
+    val conflicts: Map<MetadataField, String?> = emptyMap(),
 )
 
 /** Edits kept in the DB only (ADR-0004); null in a setter goes back to the file's value. */
@@ -132,6 +145,16 @@ interface MetadataEditStore {
     suspend fun setLocation(assetId: String, edit: FieldEdit<GeoPoint>?)
 
     suspend fun setDescription(assetId: String, edit: FieldEdit<String>?)
+
+    /**
+     * Compares the file's values with those it had when each field was edited (UC-META-02): an unchanged field
+     * stays, one the file now shares with the edit moves the base on, and any other change is a conflict.
+     * Both maps hold fields as text, null for no value; [file] leaves out the fields that could not be read.
+     */
+    suspend fun compareWithFile(assetId: String, file: Map<MetadataField, String?>, edited: Map<MetadataField, String?>)
+
+    /** Keeps the edit over the file's newer value (KEEP_LOCAL); taking the file's value is reverting the edit. */
+    suspend fun keepEdit(assetId: String, field: MetadataField)
 }
 
 data class Tag(val tagId: String, val name: String, val itemCount: Int)

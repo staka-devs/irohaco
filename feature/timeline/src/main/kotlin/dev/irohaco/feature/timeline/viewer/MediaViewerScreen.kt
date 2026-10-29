@@ -86,6 +86,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.text.style.TextAlign
 import dev.irohaco.core.contracts.FieldEdit
+import dev.irohaco.core.contracts.MetadataField
 import dev.irohaco.core.domain.Detail
 import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.GeoPoint
@@ -131,22 +132,22 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
     val edits by viewModel.edits.collectAsStateWithLifecycle()
     var tagging by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<EditableField?>(null) }
+    var editing by remember { mutableStateOf<MetadataField?>(null) }
     val fileDetails = ((details as? ViewerViewModel.Details.Shown)?.result as? MediaDetailsResult.Read)?.details
     detailsOf?.let { item ->
         val done = { editing = null }
         when (editing) {
-            EditableField.TAKEN -> TakenAtDialog(
+            MetadataField.TAKEN -> TakenAtDialog(
                 initialMs = edits.takenAtMs ?: item.sortTimeMs,
                 onDismiss = done,
                 onSave = { done(); viewModel.setTakenAt(item, it) },
             )
-            EditableField.LOCATION -> LocationDialog(
+            MetadataField.LOCATION -> LocationDialog(
                 initial = (location as? Detail.Value<GeoPoint>)?.value,
                 onDismiss = done,
                 onSave = { done(); viewModel.setLocation(item, it) },
             )
-            EditableField.DESCRIPTION -> DescriptionDialog(
+            MetadataField.DESCRIPTION -> DescriptionDialog(
                 initial = when (val e = edits.description) {
                     is FieldEdit.Set -> e.value
                     FieldEdit.Removed -> ""
@@ -215,12 +216,13 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
         onRevert = { field ->
             detailsOf?.let {
                 when (field) {
-                    EditableField.TAKEN -> viewModel.setTakenAt(it, null)
-                    EditableField.LOCATION -> viewModel.setLocation(it, null)
-                    EditableField.DESCRIPTION -> viewModel.setDescription(it, null)
+                    MetadataField.TAKEN -> viewModel.setTakenAt(it, null)
+                    MetadataField.LOCATION -> viewModel.setLocation(it, null)
+                    MetadataField.DESCRIPTION -> viewModel.setDescription(it, null)
                 }
             }
         },
+        onKeep = { field -> detailsOf?.let { viewModel.keepEdit(it, field) } },
     )
     Box(Modifier.fillMaxSize()) {
         when (val s = start) {

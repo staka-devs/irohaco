@@ -134,9 +134,6 @@ interface LocationDao {
     )
     suspend fun placeNames(includeInferred: Boolean): List<String>
 
-    @Query("SELECT evidence_status AS status, latitude, longitude FROM location_evidence WHERE asset_id = :assetId AND evidence_source = 'USER'")
-    fun observeUser(assetId: String): Flow<UserLocationRow?>
-
     @Query("DELETE FROM location_evidence WHERE asset_id = :assetId AND evidence_source = 'USER'")
     suspend fun deleteUser(assetId: String)
 

@@ -8,6 +8,9 @@ import dev.irohaco.core.contracts.FieldEdit
 import dev.irohaco.core.contracts.InferredPlace
 import dev.irohaco.core.contracts.MediaStoreEntry
 import dev.irohaco.core.contracts.MetadataEdits
+import dev.irohaco.core.contracts.MetadataField.DESCRIPTION
+import dev.irohaco.core.contracts.MetadataField.LOCATION
+import dev.irohaco.core.contracts.MetadataField.TAKEN
 import dev.irohaco.core.contracts.NewCatalogAsset
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.domain.GeoBounds
@@ -121,5 +124,70 @@ class RoomMetadataEditStoreTest {
         assertEquals(listOf(GeoPoint(34.69, 135.5)), locations.unnamedAreas(10))
         locations.nameArea(GeoPoint(34.69, 135.5), "Osaka")
         assertEquals("Osaka", locations.placeName("a"))
+    }
+
+    private suspend fun conflicts(asset: String) = edits.edits(asset).first().conflicts
+
+    private fun count(sql: String) = db.openHelper.readableDatabase.query(sql).use { it.moveToFirst(); it.getInt(0) }
+
+    @Test
+    fun `a file changed by another app after the edit is a conflict until the user keeps the edit`() = runTest {
+        catalog("a")
+        edits.setDescription("a", FieldEdit.Set("Harbour at dawn"))
+        edits.compareWithFile("a", mapOf(DESCRIPTION to "Harbour"), mapOf(DESCRIPTION to "Harbour at dawn"))
+        edits.compareWithFile("a", mapOf(DESCRIPTION to "Harbour", TAKEN to "2025-10-29T01:30"), mapOf(DESCRIPTION to "Harbour at dawn"))
+        assertEquals(emptyMap(), conflicts("a"))
+
+        val changed = mapOf(DESCRIPTION to "Pier")
+        edits.compareWithFile("a", changed, mapOf(DESCRIPTION to "Harbour at dawn"))
+        edits.compareWithFile("a", changed, mapOf(DESCRIPTION to "Harbour at dawn"))
+        assertEquals(mapOf(DESCRIPTION to "Harbour"), conflicts("a"))
+        assertEquals(FieldEdit.Set("Harbour at dawn"), edits.edits("a").first().description)
+        assertEquals(1, count("SELECT count(*) FROM metadata_conflicts"))
+
+        edits.keepEdit("a", DESCRIPTION)
+        edits.compareWithFile("a", changed, mapOf(DESCRIPTION to "Harbour at dawn"))
+        assertEquals(emptyMap(), conflicts("a"))
+        assertEquals(1, count("SELECT count(*) FROM metadata_conflicts WHERE resolution_code = 'KEEP_LOCAL'"))
+    }
+
+    @Test
+    fun `a file that comes to hold the edited value moves the base on`() = runTest {
+        catalog("a")
+        edits.setLocation("a", FieldEdit.Removed)
+        edits.compareWithFile("a", mapOf(LOCATION to "35.68,139.76"), mapOf(LOCATION to null))
+        edits.compareWithFile("a", mapOf(LOCATION to null), mapOf(LOCATION to null))
+        assertEquals(emptyMap(), conflicts("a"))
+        assertEquals(emptyMap(), conflicts("a"))
+        // The base moved on to the file without GPS, so new GPS in the file conflicts with the removal.
+        edits.compareWithFile("a", mapOf(LOCATION to "34.69,135.5"), mapOf(LOCATION to null))
+        assertEquals(mapOf(LOCATION to null), conflicts("a"))
+    }
+
+    @Test
+    fun `a value that could not be read is never taken for a change`() = runTest {
+        catalog("a")
+        edits.setTakenAt("a", 5000)
+        edits.compareWithFile("a", mapOf(TAKEN to "2025-10-29T01:30"), mapOf(TAKEN to "1970-01-01T00:00:05"))
+        edits.compareWithFile("a", emptyMap(), mapOf(TAKEN to "1970-01-01T00:00:05"))
+        assertEquals(emptyMap(), conflicts("a"))
+    }
+
+    @Test
+    fun `editing a conflicting field again or taking the file's value ends the conflict`() = runTest {
+        catalog("a", "b")
+        for (asset in listOf("a", "b")) {
+            edits.setDescription(asset, FieldEdit.Set("Harbour at dawn"))
+            edits.compareWithFile(asset, mapOf(DESCRIPTION to "Harbour"), mapOf(DESCRIPTION to "Harbour at dawn"))
+            edits.compareWithFile(asset, mapOf(DESCRIPTION to "Pier"), mapOf(DESCRIPTION to "Harbour at dawn"))
+        }
+        edits.setDescription("a", FieldEdit.Set("Pier at dawn"))
+        edits.compareWithFile("a", mapOf(DESCRIPTION to "Pier"), mapOf(DESCRIPTION to "Pier at dawn"))
+        assertEquals(emptyMap(), conflicts("a"))
+        assertEquals(1, count("SELECT count(*) FROM metadata_conflicts WHERE resolution_code = 'MANUAL_MERGE'"))
+
+        edits.setDescription("b", null)
+        assertEquals(MetadataEdits(), edits.edits("b").first())
+        assertEquals(0, count("SELECT count(*) FROM metadata_conflicts c JOIN metadata_override_sets o USING (override_id) WHERE o.asset_id = 'b'"))
     }
 }

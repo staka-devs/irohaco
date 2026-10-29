@@ -264,6 +264,8 @@
     <string name="search_place_inferred">場所（推定）</string>
     <string name="details_edited">アプリで編集済み。ファイルの値: %1$s</string>
     <string name="details_revert">ファイルの値に戻す</string>
+    <string name="details_conflict">編集したあとで、ファイルの値がほかのアプリで変わりました。編集したときのファイルの値: %1$s</string>
+    <string name="details_keep_edit">アプリの値を残す</string>
     <string name="details_edit">%1$sを編集</string>
     <string name="edit_next">次へ</string>
     <string name="edit_latitude">緯度</string>
