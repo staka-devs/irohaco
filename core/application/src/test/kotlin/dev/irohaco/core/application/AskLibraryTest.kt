@@ -70,6 +70,7 @@ class AskLibraryTest {
         assertTrue(answer.known)
         // A scene has no memo, so the model cannot have it from the user.
         assertEquals(listOf("p" to Basis.OBSERVED, "m" to Basis.USER_STATED, "v" to Basis.INFERRED), answer.citations.map { it.hit.item.assetId to it.basis })
+        assertEquals(listOf(1, 2, 3), answer.citations.map { it.number })
         assertEquals(listOf("content://p", "content://m", "content://v@72000"), read)
         assertEquals(3, asked.single().first)
         assertTrue("User's memo: \"Grandma's 80th birthday\"" in asked.single().second)
