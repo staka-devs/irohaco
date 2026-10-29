@@ -272,6 +272,11 @@ fun interface TrashReader {
     suspend fun list(): List<TrashedItem>
 }
 
+/** Forgets the files the user deleted for good (ADR-0018); a file with another copy keeps its data on that copy. */
+fun interface DeletedMediaStore {
+    suspend fun purge(contentUris: List<String>)
+}
+
 /** Tells which special format a photo is (PRD GAL-009); unreadable files are plain ones. */
 fun interface MediaFormatProbe {
     suspend fun probe(contentUri: String, kind: MediaKind): MediaFormat

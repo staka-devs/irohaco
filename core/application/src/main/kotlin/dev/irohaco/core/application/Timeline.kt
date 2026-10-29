@@ -1,6 +1,7 @@
 package dev.irohaco.core.application
 
 import dev.irohaco.core.contracts.CollectionsStore
+import dev.irohaco.core.contracts.DeletedMediaStore
 import dev.irohaco.core.contracts.FileOperationResult
 import dev.irohaco.core.contracts.FieldEdit
 import dev.irohaco.core.contracts.MarksStore
@@ -21,6 +22,7 @@ import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineReader
 import dev.irohaco.core.contracts.TrashReader
+import dev.irohaco.core.contracts.TrashedItem
 import dev.irohaco.core.domain.Detail
 import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaDetails
@@ -298,9 +300,15 @@ class PrepareShare(private val detailsReader: MediaDetailsReader, private val sh
     suspend fun cleanUp() = shareFiles.cleanUp()
 }
 
-/** The trash (PRD GAL-015): MediaStore's own, so restoring or deleting for good go through the OS. */
-class BrowseTrash(private val reader: TrashReader) {
+/**
+ * The trash (PRD GAL-015): MediaStore's own, so restoring or deleting for good go through the OS. A file
+ * deleted for good leaves nothing in the DB (ADR-0018); one only moved to the trash keeps everything.
+ */
+class BrowseTrash(private val reader: TrashReader, private val deleted: DeletedMediaStore) {
     suspend fun list() = reader.list()
+
+    /** Call once the system confirmed the delete. */
+    suspend fun deletedForever(items: List<TrashedItem>) = deleted.purge(items.map { it.contentUri })
 }
 
 private const val LABELS_KEPT_MS = 30_000L
