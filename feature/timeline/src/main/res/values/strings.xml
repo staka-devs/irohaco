@@ -294,4 +294,14 @@
     <string name="file_not_restored">Could not put the file back as it was</string>
     <string name="file_copy_saved">Copy saved</string>
     <string name="file_copy_not_saved">Could not save the copy</string>
+    <string name="search_ask">Ask AI about these results</string>
+    <string name="search_asking">Looking at the top photos and scenes</string>
+    <string name="search_ask_no_model">No model to answer questions is installed. Download one in Settings, AI.</string>
+    <string name="search_ask_nothing">There are no photos to answer from.</string>
+    <string name="search_ask_failed">The answer could not be made.</string>
+    <string name="search_ask_retry">Try again</string>
+    <string name="search_ask_caution">The AI on this device answered from the top photos and scenes only. It can be wrong.</string>
+    <string name="search_basis_observed">Seen in it</string>
+    <string name="search_basis_user_stated">In your memo</string>
+    <string name="search_basis_inferred">Guessed</string>
 </resources>

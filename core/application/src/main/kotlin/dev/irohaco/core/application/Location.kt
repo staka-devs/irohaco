@@ -1,5 +1,6 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.contracts.LocatedAsset
 import dev.irohaco.core.contracts.LocationStore
 import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.MediaDetailsReader
@@ -37,8 +38,17 @@ class IndexLocations(private val store: LocationStore, private val reader: Media
 }
 
 /** The map and the place names, which go outside only once the user allowed it (ADR-0011). */
-class BrowseMap(private val store: LocationStore, private val settings: MapSettings, private val places: PlaceNames) {
-    suspend fun located() = store.located()
+class BrowseMap(
+    private val store: LocationStore,
+    private val settings: MapSettings,
+    private val places: PlaceNames,
+    /** Files in the folders hidden from the timeline, which the map leaves out too (GAL-002). */
+    private val hidden: suspend () -> Set<String> = { emptySet() },
+) {
+    suspend fun located(): List<LocatedAsset> {
+        val hiddenNow = hidden()
+        return store.located().filter { it.assetId !in hiddenNow }
+    }
 
     fun changes() = store.changes()
 

@@ -1,6 +1,8 @@
 package dev.irohaco.core.database
 
 import androidx.sqlite.db.SimpleSQLiteQuery
+import dev.irohaco.core.contracts.FolderMedia
+import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.MediaItems
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineLabel
@@ -8,10 +10,25 @@ import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineReader
 import dev.irohaco.core.contracts.TimelineSortKey
 import dev.irohaco.core.domain.MediaKind
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
-class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, MediaItems {
+class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, MediaItems, FolderMedia {
+    override suspend fun onlyIn(folders: Set<FolderRef>): Set<String> {
+        if (folders.isEmpty()) return emptySet()
+        val inFolders = { alias: String -> folders.joinToString(" OR ") { "($alias.volume_id = ? AND ${PATH.replace("s.", "$alias.")} = ?)" } }
+        val args = folders.flatMap { listOf(it.volumeId, it.relativePath) }
+        return withContext(Dispatchers.IO) {
+            db.openHelper.readableDatabase.query(
+                """SELECT DISTINCT s.asset_id FROM media_sources s WHERE s.access_state = 'AVAILABLE' AND (${inFolders("s")})
+                     AND NOT EXISTS (SELECT 1 FROM media_sources o WHERE o.asset_id = s.asset_id AND o.access_state = 'AVAILABLE' AND NOT (${inFolders("o")}))""",
+                (args + args).toTypedArray(),
+            ).use { c -> buildSet { while (c.moveToNext()) add(c.getString(0)) } }
+        }
+    }
+
     // A file in two places has two sources; the result keeps one row per asset.
     override suspend fun items(assetIds: List<String>, tagId: String?): List<TimelineItem> = assetIds.distinct().chunked(MAX_ARGS).flatMap { ids ->
         db.timelineDao().page(

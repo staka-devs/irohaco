@@ -3,6 +3,7 @@ package dev.irohaco.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.irohaco.core.application.AiBackendChoice
+import dev.irohaco.core.application.AskLibrary
 import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.IndexJobs
 import dev.irohaco.core.application.ManageModels
@@ -52,6 +53,8 @@ class SettingsViewModel(
     private val indexSettings: IndexSettings? = null,
     private val spaces: Flow<List<EmbeddingSpace>> = flowOf(emptyList()),
     private val aiBackends: AiBackendChoice? = null,
+    /** The model that answers questions from search results (RAG-001); the user picks among those installed. */
+    private val ask: AskLibrary? = null,
     /** Runs a job in the foreground service, so it carries on after the user leaves this screen. */
     private val runIndexJob: (String) -> Unit = {},
 ) : ViewModel() {
@@ -185,6 +188,18 @@ class SettingsViewModel(
 
     fun selectAiBackend(backend: AiBackend) {
         viewModelScope.launch { aiBackends?.select(backend) }
+    }
+
+    val answerModels: List<ModelArtifact> = ask?.catalog.orEmpty()
+
+    /** The answer model in use: the picked one while installed, else the first installed one; null without any. */
+    val answerModel: StateFlow<String?> = combine(ask?.chosen ?: flowOf(null), modelStates) { picked, states ->
+        val installed = answerModels.map { it.id }.filter { states[it] is ModelInstallState.Installed }
+        picked?.takeIf { it in installed } ?: installed.firstOrNull()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun selectAnswerModel(id: String) {
+        viewModelScope.launch { ask?.choose(id) }
     }
 
     /** Folders hidden from the Photos tab, by path, for the Library page (GAL-002). */

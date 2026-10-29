@@ -49,6 +49,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import coil3.request.ImageRequest
 import coil3.video.videoFrameMillis
+import dev.irohaco.core.application.AskLibrary
+import dev.irohaco.core.application.AskResult
 import dev.irohaco.core.application.Evidence
 import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.application.SearchFilters
@@ -105,6 +107,9 @@ data class SearchUi(
     val inferredPlaces: Boolean = true,
     val searching: Boolean = false,
     val results: SearchResults? = null,
+    /** An answer from the results is being made (RAG-001); [answer] is what came of it, null before asking. */
+    val asking: Boolean = false,
+    val answer: AskResult? = null,
 )
 
 class SearchViewModel(
@@ -112,7 +117,11 @@ class SearchViewModel(
     collections: ManageCollections? = null,
     /** Opened from a photo's "find similar": the results are the photos like it, and there is no query. */
     private val similarTo: String? = null,
+    /** Answers the query from the results with a local model (RAG-001); null hides the button. */
+    private val askLibrary: AskLibrary? = null,
 ) : ViewModel() {
+    val canAsk = askLibrary != null && similarTo == null
+
     val spaces: StateFlow<List<SpaceChoice>> = search.spaces().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** The tags to narrow by (SRCH-004). */
@@ -122,6 +131,20 @@ class SearchViewModel(
     val ui: StateFlow<SearchUi> = _ui.asStateFlow()
 
     private var running: Job? = null
+    private var asking: Job? = null
+
+    /** Answers the query from the results shown now; a new search drops the answer. */
+    fun ask() {
+        val ui = _ui.value
+        val hits = ui.results?.hits ?: return
+        val library = askLibrary ?: return
+        asking?.cancel()
+        _ui.update { it.copy(asking = true, answer = null) }
+        asking = viewModelScope.launch {
+            val answer = library.ask(ui.query, hits)
+            _ui.update { it.copy(asking = false, answer = answer) }
+        }
+    }
 
     init {
         if (similarTo != null) change { it }
@@ -159,7 +182,8 @@ class SearchViewModel(
     }
 
     private fun change(edit: (SearchUi) -> SearchUi) {
-        _ui.update(edit)
+        asking?.cancel()
+        _ui.update { edit(it).copy(asking = false, answer = null) }
         val ui = _ui.value
         running?.cancel()
         if (ui.query.isEmpty() && similarTo == null) {
@@ -208,6 +232,7 @@ fun SearchScreen(
         onSpace = viewModel::pickSpace,
         onOpen = { hit -> hit.timestampMs?.let { onPlayAt(hit.item.assetId, it) } ?: onOpenMedia(hit.item.assetId) },
         onOpenSettings = onOpenSettings,
+        onAsk = if (viewModel.canAsk) viewModel::ask else null,
     )
 }
 
@@ -234,6 +259,7 @@ internal fun SearchContent(
     onTag: (Tag?) -> Unit = {},
     onToggleInferredPlaces: () -> Unit = {},
     onBack: (() -> Unit)? = null,
+    onAsk: (() -> Unit)? = null,
 ) {
     var text by rememberSaveable { mutableStateOf(ui.query) }
     val labels = spaceLabels(spaces)
@@ -277,6 +303,9 @@ internal fun SearchContent(
                 item(span = { GridItemSpan(maxLineSpan) }) { Notices(ui, results, labels, onOpenSettings) }
             }
             if (ui.searching) item(span = { GridItemSpan(maxLineSpan) }) { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+            if (onAsk != null && !ui.searching && ui.results?.hits.orEmpty().isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) { AnswerCard(ui.asking, ui.answer, onAsk, onOpen, onOpenSettings) }
+            }
             val hits = ui.results?.hits.orEmpty()
             val compared = ui.results?.searched.orEmpty().takeIf { it.size > 1 }?.map { it.space.spaceId }
             items(hits, key = { "${it.item.assetId}@${it.timestampMs}" }) { hit -> HitCell(hit, compared, labels, onOpen) }
@@ -537,7 +566,7 @@ private fun Evidence.label() = when (this) {
     Evidence.PLACE_INFERRED -> R.string.search_place_inferred
 }
 
-private fun TimelineItem.kindLabel() = if (kind == MediaKind.VIDEO) R.string.search_video_scene else R.string.search_photo
+internal fun TimelineItem.kindLabel() = if (kind == MediaKind.VIDEO) R.string.search_video_scene else R.string.search_photo
 
 private fun previewSpace(id: String, state: SpaceState, isDefault: Boolean) =
     EmbeddingSpace(id, "EmbeddingGemma 2", state, id, isDefault, "m", 768, "L2", null, null, id)
