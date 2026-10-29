@@ -307,4 +307,6 @@
     <string name="viewer_ask_send">聞く</string>
     <string name="viewer_asking">この写真や場面を見て答えを作っています</string>
     <string name="viewer_ask_caution">端末の AI がこの写真や場面だけを見て答えています。間違うことがあります。</string>
+    <string name="ask_title">AI に聞く</string>
+    <string name="ask_hint">写真について質問（例: 去年の夏はどこに行った？）</string>
 </resources>

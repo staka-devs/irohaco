@@ -209,9 +209,6 @@ class ViewerViewModel(
 
     val canAsk = ask != null
 
-    /** One question about the page on screen and its answer; [answer] is null while the model writes [partial]. */
-    data class AskTurn(val question: String, val answer: AskResult? = null, val partial: String = "")
-
     private val _turns = MutableStateFlow<List<AskTurn>>(emptyList())
     val turns: StateFlow<List<AskTurn>> = _turns.asStateFlow()
     private var asking: Job? = null

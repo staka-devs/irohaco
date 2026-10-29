@@ -38,16 +38,37 @@ import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.R
 import dev.irohaco.feature.timeline.search.AnswerCard
 
+/** One question and its answer; [answer] is null while the model writes [partial]. */
+data class AskTurn(val question: String, val answer: AskResult? = null, val partial: String = "")
+
 /** Questions about the photo or scene on screen and the answers, one under another (#201). */
 @Composable
-internal fun AskSheet(turns: List<ViewerViewModel.AskTurn>, isVideo: Boolean, onAsk: (String) -> Unit, onOpenSettings: () -> Unit, onDismiss: () -> Unit) {
+internal fun AskSheet(turns: List<AskTurn>, isVideo: Boolean, onAsk: (String) -> Unit, onOpenSettings: () -> Unit, onDismiss: () -> Unit) {
     IrohacoBottomSheet(onDismiss = onDismiss) {
-        AskContent(turns, isVideo, onAsk, onOpenSettings, onDismiss)
+        AskContent(
+            turns = turns,
+            hint = stringResource(if (isVideo) R.string.viewer_ask_hint_video else R.string.viewer_ask_hint),
+            onAsk = onAsk,
+            onOpen = { onDismiss() }, // the photo is open already
+            onOpenSettings = onOpenSettings,
+            askingLabel = R.string.viewer_asking,
+            caution = R.string.viewer_ask_caution,
+        )
     }
 }
 
+/** The turns one under another and a field for the next question; also the "Ask AI" screen's body (#202). */
 @Composable
-private fun AskContent(turns: List<ViewerViewModel.AskTurn>, isVideo: Boolean, onAsk: (String) -> Unit, onOpenSettings: () -> Unit, onClose: () -> Unit) {
+internal fun AskContent(
+    turns: List<AskTurn>,
+    hint: String,
+    onAsk: (String) -> Unit,
+    onOpen: (SearchHit) -> Unit,
+    onOpenSettings: () -> Unit,
+    askingLabel: Int,
+    caution: Int,
+    modifier: Modifier = Modifier,
+) {
     var question by rememberSaveable { mutableStateOf("") }
     val busy = turns.lastOrNull()?.answer == null && turns.isNotEmpty()
     val send = {
@@ -57,7 +78,7 @@ private fun AskContent(turns: List<ViewerViewModel.AskTurn>, isVideo: Boolean, o
         }
     }
     Column(
-        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = IrohacoSpacing.l).navigationBarsPadding().imePadding(),
+        modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = IrohacoSpacing.l).navigationBarsPadding().imePadding(),
         verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
     ) {
         turns.forEach { turn ->
@@ -66,18 +87,18 @@ private fun AskContent(turns: List<ViewerViewModel.AskTurn>, isVideo: Boolean, o
                 asking = turn.answer == null,
                 answer = turn.answer,
                 onAsk = { onAsk(turn.question) },
-                onOpen = { onClose() }, // the photo is open already
+                onOpen = onOpen,
                 onOpenSettings = onOpenSettings,
                 partial = turn.partial,
-                askingLabel = R.string.viewer_asking,
-                caution = R.string.viewer_ask_caution,
+                askingLabel = askingLabel,
+                caution = caution,
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = question,
                 onValueChange = { question = it },
-                label = { Text(stringResource(if (isVideo) R.string.viewer_ask_hint_video else R.string.viewer_ask_hint)) },
+                label = { Text(hint) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { send() }),
                 modifier = Modifier.weight(1f),
@@ -95,13 +116,15 @@ private fun AskContentPreview() {
         Surface {
             AskContent(
                 turns = listOf(
-                    ViewerViewModel.AskTurn("What is this?", AskResult.Answered("A pier at dusk [1].", known = true, citations = listOf(Citation(photo, Basis.OBSERVED, 1)))),
-                    ViewerViewModel.AskTurn("Where is it?", partial = "Probably a harbour"),
+                    AskTurn("What is this?", AskResult.Answered("A pier at dusk [1].", known = true, citations = listOf(Citation(photo, Basis.OBSERVED, 1)))),
+                    AskTurn("Where is it?", partial = "Probably a harbour"),
                 ),
-                isVideo = false,
+                hint = "Ask about this photo",
                 onAsk = {},
+                onOpen = {},
                 onOpenSettings = {},
-                onClose = {},
+                askingLabel = R.string.viewer_asking,
+                caution = R.string.viewer_ask_caution,
             )
         }
     }

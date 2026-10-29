@@ -235,6 +235,8 @@ fun SearchScreen(
     onOpenSettings: () -> Unit,
     /** Set for the "similar photos" page, which has a way back instead of a search bar. */
     onBack: (() -> Unit)? = null,
+    /** Opens the screen to ask AI freely (#202); null hides its button. */
+    onOpenAsk: (() -> Unit)? = null,
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val spaces by viewModel.spaces.collectAsStateWithLifecycle()
@@ -258,6 +260,7 @@ fun SearchScreen(
         onOpen = { hit -> hit.timestampMs?.let { onPlayAt(hit.item.assetId, it) } ?: onOpenMedia(hit.item.assetId) },
         onOpenSettings = onOpenSettings,
         onAsk = if (viewModel.canAsk) viewModel::ask else null,
+        onOpenAsk = onOpenAsk,
     )
 }
 
@@ -286,6 +289,7 @@ internal fun SearchContent(
     onToggleAtPlace: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     onAsk: (() -> Unit)? = null,
+    onOpenAsk: (() -> Unit)? = null,
 ) {
     var text by rememberSaveable { mutableStateOf(ui.query) }
     val labels = spaceLabels(spaces)
@@ -313,7 +317,10 @@ internal fun SearchContent(
                             placeholder = { Text(stringResource(R.string.search_placeholder)) },
                             leadingIcon = { Icon(painterResource(IrohacoIcons.Search), null) },
                             trailingIcon = {
-                                IconButton(onClick = onOpenSettings) { Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.timeline_settings)) }
+                                Row {
+                                    onOpenAsk?.let { IconButton(onClick = it) { Icon(painterResource(IrohacoIcons.SmartToy), stringResource(R.string.ask_title)) } }
+                                    IconButton(onClick = onOpenSettings) { Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.timeline_settings)) }
+                                }
                             },
                         )
                     },

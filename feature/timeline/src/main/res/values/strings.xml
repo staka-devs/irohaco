@@ -312,4 +312,6 @@
     <string name="viewer_ask_send">Ask</string>
     <string name="viewer_asking">Looking at this photo or scene</string>
     <string name="viewer_ask_caution">The AI on this device answered from this photo or scene only. It can be wrong.</string>
+    <string name="ask_title">Ask AI</string>
+    <string name="ask_hint">Ask about your photos, e.g. Where did I go last summer?</string>
 </resources>
