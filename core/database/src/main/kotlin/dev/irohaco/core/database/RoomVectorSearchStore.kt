@@ -33,6 +33,9 @@ private const val VECTOR_FILES =
          AND CASE WHEN t.annotation_id IS NULL THEN v.source_revision_digest = $REVISION
                   ELSE n.searchable = 1 AND v.source_revision_digest = $MEMO_REVISION END"""
 
+/** Rows per page of a search: 400 vectors of 768 floats fill about 1.2 MB of the 2 MB cursor window. */
+private const val PAGE = 400
+
 private const val SPACES =
     """SELECT s.space_id AS spaceId, m.display_name AS modelName, s.lifecycle_state AS state, s.space_signature AS signature,
          s.query_prefix AS queryPrefix, s.model_profile_id AS modelProfileId, s.dimension AS dimension, s.normalization AS normalization,
@@ -126,23 +129,32 @@ class RoomVectorSearchStore(private val db: IrohacoDatabase) : VectorSearchStore
     override suspend fun nearest(spaceId: String, query: FloatArray, limit: Int): List<VectorHit> = withContext(Dispatchers.IO) {
         val best = PriorityQueue<Pair<Float, VectorHit>>(compareBy { it.first })
         val values = FloatArray(query.size)
-        db.openHelper.readableDatabase.query("SELECT a.asset_id, COALESCE(f.timestamp_ms, sg.start_ms), v.vector_blob, t.annotation_id IS NOT NULL ${VECTOR_FILES.replace(":spaceId", "?")}", arrayOf(spaceId))
-            .use { c ->
+        // Pages that each fit one cursor window: a cursor larger than its window runs the query again from
+        // the first row for every window it fills, which made a search of a large library quadratic.
+        var after = Long.MIN_VALUE
+        do {
+            var read = 0
+            db.openHelper.readableDatabase.query(
+                """SELECT v.rowid, a.asset_id, COALESCE(f.timestamp_ms, sg.start_ms), v.vector_blob, t.annotation_id IS NOT NULL
+                   ${VECTOR_FILES.replace("v.space_id = :spaceId", "+v.space_id = ?")} AND v.rowid > ? ORDER BY v.rowid LIMIT $PAGE""",
+                arrayOf<Any>(spaceId, after),
+            ).use { c ->
                 while (c.moveToNext()) {
-                    val blob = c.getBlob(2)
+                    read++
+                    after = c.getLong(0)
+                    val blob = c.getBlob(3)
                     if (blob.size != 4 * query.size) continue
                     ByteBuffer.wrap(blob).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer().get(values)
                     // Both sides are L2-normalized, so the dot product is the cosine similarity.
                     var score = 0f
                     for (i in values.indices) score += values[i] * query[i]
-                    if (best.size < limit) {
-                        best.add(score to VectorHit(c.getString(0), if (c.isNull(1)) null else c.getLong(1), score, c.getInt(3) == 1))
-                    } else if (score > best.peek()!!.first) {
-                        best.poll()
-                        best.add(score to VectorHit(c.getString(0), if (c.isNull(1)) null else c.getLong(1), score, c.getInt(3) == 1))
+                    if (best.size < limit || score > best.peek()!!.first) {
+                        if (best.size == limit) best.poll()
+                        best.add(score to VectorHit(c.getString(1), if (c.isNull(2)) null else c.getLong(2), score, c.getInt(4) == 1))
                     }
                 }
             }
+        } while (read == PAGE)
         best.sortedByDescending { it.first }.map { it.second }
     }
 
