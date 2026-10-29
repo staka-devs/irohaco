@@ -7,6 +7,7 @@ import dev.irohaco.core.contracts.CatalogVolume
 import dev.irohaco.core.contracts.KnownSource
 import dev.irohaco.core.domain.AssetAvailability
 import dev.irohaco.core.domain.MediaKind
+import java.util.UUID
 
 class RoomCatalogStore(private val db: IrohacoDatabase) : CatalogStore {
     private val dao = db.catalogDao()
@@ -27,6 +28,7 @@ class RoomCatalogStore(private val db: IrohacoDatabase) : CatalogStore {
             if (changes.onlineVolumeIds.isNotEmpty()) dao.setVolumeState(changes.onlineVolumeIds, "ONLINE")
             if (changes.offlineVolumeIds.isNotEmpty()) dao.setVolumeState(changes.offlineVolumeIds, "OFFLINE")
             if (changes.detachedSourceIds.isNotEmpty()) dao.detach(changes.detachedSourceIds)
+            val before = dao.states(changes.refreshedSources.keys + changes.availability.keys).associate { it.sourceId to it.accessState }
 
             val added = changes.newAssets
             dao.insertDiscoveries(
@@ -52,7 +54,26 @@ class RoomCatalogStore(private val db: IrohacoDatabase) : CatalogStore {
                 dao.refresh(sourceId, e.contentUri, e.displayName, e.relativePath, e.mimeType, e.sizeBytes, e.modifiedAtMs, e.takenAtMs, e.durationMs)
             }
             changes.availability.forEach { (sourceId, state) -> dao.setAvailability(sourceId, state.name) }
+            val after = changes.refreshedSources.mapValues { AssetAvailability.AVAILABLE.name } + changes.availability.mapValues { it.value.name }
+            dao.insertAccessEvents(
+                after.mapNotNull { (sourceId, state) ->
+                    accessEvent(before[sourceId], state)?.let { MediaAccessEventsEntity(UUID.randomUUID().toString(), null, sourceId, it, at) }
+                },
+            )
             dao.upsertSyncStates(changes.syncedVolumes.map { CatalogSyncStateEntity(it.volumeId, it.mediaStoreVersion, it.generation, at) })
         }
     }
+}
+
+/**
+ * The audit code for a change of access (ADR-0009); it never decides access, which is asked of the OS each
+ * time. A file missing under full access is not an access change, so it leaves no event.
+ */
+private fun accessEvent(before: String?, after: String): String? = when {
+    before == null || before == after -> null
+    after == "INACCESSIBLE" -> "REVOKED"
+    after == "OFFLINE" -> "SOURCE_OFFLINE"
+    after == "AVAILABLE" && before == "OFFLINE" -> "SOURCE_RECONNECTED"
+    after == "AVAILABLE" && before == "INACCESSIBLE" -> "GRANTED"
+    else -> null
 }

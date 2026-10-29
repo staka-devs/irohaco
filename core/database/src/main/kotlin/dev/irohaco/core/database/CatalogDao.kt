@@ -60,9 +60,16 @@ interface CatalogDao {
     @Query("UPDATE media_sources SET access_state = :state WHERE source_id = :sourceId")
     suspend fun setAvailability(sourceId: String, state: String)
 
+    @Query("SELECT source_id AS sourceId, access_state AS accessState FROM media_sources WHERE source_id IN (:sourceIds)")
+    suspend fun states(sourceIds: Collection<String>): List<SourceState>
+
+    @Insert suspend fun insertAccessEvents(events: List<MediaAccessEventsEntity>)
+
     @Upsert suspend fun upsertSyncStates(states: List<CatalogSyncStateEntity>)
 }
 
 data class VolumeRow(val volumeId: String, val providerVolumeName: String, val mediaStoreVersion: String?, val lastGeneration: Long?)
 
 data class SourceRow(val sourceId: String, val mediaStoreId: Long?, val mediaKind: String, val accessState: String)
+
+data class SourceState(val sourceId: String, val accessState: String)

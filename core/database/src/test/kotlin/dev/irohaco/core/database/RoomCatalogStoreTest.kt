@@ -81,6 +81,16 @@ class RoomCatalogStoreTest {
         assertEquals(1L, store.knownSources("v1").single { it.sourceId == "s3" }.mediaStoreId)
     }
 
+    @Test
+    fun `a change of access leaves an audit event, and a file gone under full access leaves none`() = runTest {
+        store.apply(firstSync())
+        store.apply(CatalogChanges(observedAtMs = 2, availability = mapOf("s1" to AssetAvailability.INACCESSIBLE, "s2" to AssetAvailability.MISSING_CANDIDATE)))
+        store.apply(CatalogChanges(observedAtMs = 3, refreshedSources = mapOf("s1" to entry(1, MediaKind.IMAGE))))
+        store.apply(CatalogChanges(observedAtMs = 4, refreshedSources = mapOf("s1" to entry(1, MediaKind.IMAGE))))
+        assertEquals(listOf("REVOKED", "GRANTED"), strings("SELECT access_event_code FROM media_access_events WHERE source_id = 's1' ORDER BY observed_at"))
+        assertEquals(0, count("SELECT count(*) FROM media_access_events WHERE source_id = 's2'"))
+    }
+
     private fun firstSync() = CatalogChanges(
         observedAtMs = 1,
         newVolumes = listOf(CatalogVolume("v1", "external_primary", null, null)),
@@ -104,6 +114,9 @@ class RoomCatalogStoreTest {
         takenAtMs = if (id == 1L) 42 else null,
         durationMs = if (kind == MediaKind.VIDEO) 46_000 else null,
     )
+
+    private fun strings(sql: String): List<String> =
+        db.openHelper.readableDatabase.query(sql).use { buildList { while (it.moveToNext()) add(it.getString(0)) } }
 
     private fun count(sql: String): Int = db.openHelper.readableDatabase.query(sql).use { it.moveToFirst(); it.getInt(0) }
 }

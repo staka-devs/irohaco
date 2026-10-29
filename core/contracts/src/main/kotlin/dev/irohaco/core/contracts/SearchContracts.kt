@@ -62,3 +62,11 @@ interface VectorSearchStore {
 fun interface MediaItems {
     suspend fun items(assetIds: List<String>, tagId: String?): List<TimelineItem>
 }
+
+/**
+ * Asks the OS, at the moment a search or an answer is given, which of [items] the app may still read
+ * (ADR-0009, INT-004); the catalog's state is only as fresh as its last sync.
+ */
+fun interface MediaAccessCheck {
+    suspend fun readableNow(items: List<TimelineItem>): List<TimelineItem>
+}

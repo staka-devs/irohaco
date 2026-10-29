@@ -1,6 +1,7 @@
 package dev.irohaco.core.application
 
 import dev.irohaco.core.contracts.EmbeddingSpace
+import dev.irohaco.core.contracts.MediaAccessCheck
 import dev.irohaco.core.contracts.MediaItems
 import dev.irohaco.core.contracts.ModelLoadException
 import dev.irohaco.core.contracts.ModelNotInstalledException
@@ -47,6 +48,8 @@ class SearchMedia(
     private val meaning: SearchByMeaning,
     private val text: SearchText,
     private val items: MediaItems,
+    /** A file whose access was taken away since the last sync is left out too (ADR-0009). */
+    private val access: MediaAccessCheck,
     /** Files at a place the query names (SRCH-003); null leaves place names out. */
     private val places: SearchPlaces? = null,
 ) {
@@ -103,7 +106,7 @@ class SearchMedia(
         texts.forEachIndexed { rank, hit ->
             fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, if (hit.fromMemo) Evidence.MEMO else Evidence.TEXT, hit.text, null)
         }
-        val found = items.items(fused.keys.map { it.first }, filters.tagId).associateBy { it.assetId }
+        val found = access.readableNow(items.items(fused.keys.map { it.first }, filters.tagId)).associateBy { it.assetId }
         val hits = fused.entries
             .sortedByDescending { it.value.score }
             .mapNotNull { (key, f) ->
