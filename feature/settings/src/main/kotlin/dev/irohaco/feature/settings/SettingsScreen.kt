@@ -85,6 +85,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val mapAllowed by viewModel.mapAllowed.collectAsStateWithLifecycle()
     val aiBackend by viewModel.aiBackend.collectAsStateWithLifecycle()
     val gpuCheck by viewModel.gpuCheck.collectAsStateWithLifecycle()
+    val answerModel by viewModel.answerModel.collectAsStateWithLifecycle()
     val excludedFolders by viewModel.excludedFolders.collectAsStateWithLifecycle()
     val modelStates by viewModel.modelStates.collectAsStateWithLifecycle()
     val importResult by viewModel.importResult.collectAsStateWithLifecycle()
@@ -117,6 +118,9 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 backend = aiBackend,
                 gpuCheck = gpuCheck,
                 onSelectBackend = viewModel::selectAiBackend,
+                answerModels = viewModel.answerModels,
+                answerModel = answerModel,
+                onSelectAnswerModel = viewModel::selectAnswerModel,
             )
             IndexingSettings(
                 indexing = indexing,

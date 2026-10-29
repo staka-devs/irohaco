@@ -30,8 +30,47 @@ object ModelCatalog {
         sha256 = "92dcbea108899e5d6e30d919b0744f90d9967e80c67a4ab5503ac16d54f62eb0",
     )
 
-    // shortcut: the embedding model only; Gemma 4 joins with RAG in M3.
-    val ALL = listOf(EMBEDDING)
+    /** Answer models that take images (RAG-001), from LiteRT-LM's community conversions; the user picks one. */
+    val GEMMA_4_E2B = ModelArtifact(
+        id = "gemma-4-e2b-it",
+        displayName = "Gemma 4 E2B",
+        url = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/" +
+            "1caa527c1e88b55f046fcd8d2b4265606680663d/gemma-4-E2B-it.litertlm",
+        sizeBytes = 2_588_147_712,
+        sha256 = "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
+    )
+
+    val GEMMA_4_E4B = ModelArtifact(
+        id = "gemma-4-e4b-it",
+        displayName = "Gemma 4 E4B",
+        url = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/" +
+            "e6a3892a8c22cf87ff99583996149cf3cb32452b/gemma-4-E4B-it.litertlm",
+        sizeBytes = 3_659_530_240,
+        sha256 = "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0",
+    )
+
+    // The "fixB" build passes the whole image to the model; the stock one passes its top quarter (LiteRT-LM#3246).
+    val LFM_2_5_VL_1_6B = ModelArtifact(
+        id = "lfm2.5-vl-1.6b",
+        displayName = "LFM2.5-VL 1.6B",
+        url = "https://huggingface.co/litert-community/LFM2.5-VL-1.6B/resolve/" +
+            "b2d1e67c8bd0981d706874b7aa1642b0001d0f68/LFM2.5-VL-1.6B_int4_fixB.litertlm",
+        sizeBytes = 1_298_139_472,
+        sha256 = "79ca9db8af91e40486a5dfcaf26549180fd6c811ad85f826e3aef20ad0bd565c",
+    )
+
+    val LFM_3_VL_2B = ModelArtifact(
+        id = "lfm3-vl-2b",
+        displayName = "LFM3-VL 2B",
+        url = "https://huggingface.co/litert-community/LFM3-VL-2B-LiteRT/resolve/" +
+            "04edc61317524af452c4defaf990febdc5c356cf/LFM3-VL-2B_f16.litertlm",
+        sizeBytes = 4_439_967_995,
+        sha256 = "e9e15f4da346a8eb7fc5d2dc276dde9a9cecf1424d50193deeb2d098bf664877",
+    )
+
+    val ANSWER = listOf(GEMMA_4_E2B, GEMMA_4_E4B, LFM_2_5_VL_1_6B, LFM_3_VL_2B)
+
+    val ALL = listOf(EMBEDDING) + ANSWER
 }
 
 /**
@@ -50,6 +89,9 @@ class ManageModels(
 
     /** Reads the embedding model's checked file; the AI resource manager loads it from here. */
     val embeddingLocator = ModelLocator { storage.installed(ModelCatalog.EMBEDDING.id) }
+
+    /** The checked file of [id], or null while it is not installed. */
+    fun installed(id: String): String? = storage.installed(id)
 
     /** Running downloads, so a pause or a cancel can stop them; and why each one was stopped. */
     private val running = ConcurrentHashMap<String, Job>()

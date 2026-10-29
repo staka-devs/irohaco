@@ -172,7 +172,7 @@ class MainActivity : ComponentActivity() {
                     onOpenMap = onOpenMap,
                 )
                 TopLevelDestination.SEARCH -> SearchScreen(
-                    viewModel { SearchViewModel(container.searchMedia, container.manageCollections) },
+                    viewModel { SearchViewModel(container.searchMedia, container.manageCollections, askLibrary = container.askLibrary) },
                     onOpenMedia = { onOpenMedia(it, null) },
                     onPlayAt = onPlayAt,
                     onOpenSettings = onOpenSettings,
@@ -189,7 +189,7 @@ class MainActivity : ComponentActivity() {
                     SettingsViewModel(
                         container.themeColorSettings, container.sharingSettings, container.mapSettings, container.browseLibrary,
                         container.manageModels, container::downloadModel, container.indexJobs, container.planMediaIndex,
-                        container.indexSettings, container.searchByMeaning.spaces(), container.aiBackendChoice,
+                        container.indexSettings, container.searchByMeaning.spaces(), container.aiBackendChoice, container.askLibrary,
                     ) { IndexingService.start(applicationContext, it) }
                 },
                 onBack,

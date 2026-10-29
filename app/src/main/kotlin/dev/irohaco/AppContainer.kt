@@ -12,6 +12,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import dev.irohaco.core.application.AiBackendChoice
 import dev.irohaco.core.application.AiResourceManager
+import dev.irohaco.core.application.AskLibrary
 import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.BrowseMap
 import dev.irohaco.core.application.BrowseTrash
@@ -41,6 +42,7 @@ import dev.irohaco.core.application.SearchPlaces
 import dev.irohaco.core.application.SearchText
 import dev.irohaco.core.application.SyncMediaCatalog
 import dev.irohaco.core.application.ThemeColorSettings
+import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.AiPriority
 import dev.irohaco.core.database.IrohacoDatabase
 import dev.irohaco.core.database.IrohacoDatabaseFactory
@@ -61,6 +63,7 @@ import dev.irohaco.core.database.RoomVectorSearchStore
 import dev.irohaco.infrastructure.ai.AndroidResourcePolicy
 import dev.irohaco.infrastructure.ai.AndroidModelStorage
 import dev.irohaco.infrastructure.ai.HttpModelDownloader
+import dev.irohaco.infrastructure.ai.LiteRtAnswerRuntime
 import dev.irohaco.infrastructure.ai.LiteRtEmbeddingRuntime
 import dev.irohaco.infrastructure.ai.MlKitTextRecognizer
 import dev.irohaco.infrastructure.media.AndroidIndexImageReader
@@ -291,9 +294,30 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     /** Plans an index of images and video frames the user asked for (M2-05, M2-06); the indexing screen (M2-04) starts the job. */
     val planMediaIndex by lazy { PlanMediaIndex(mediaIndexStore, indexJobs, { UUID.randomUUID().toString() }, System::currentTimeMillis) }
 
-    /** Frees the model when the system runs short of memory; nothing to do if it never loaded. */
+    private val askLazy: Lazy<AskLibrary> = lazy {
+        AskLibrary(
+            installed = manageModels::installed,
+            settings = DataStoreAiSettings(settingsStore),
+            runtime = LiteRtAnswerRuntime(appContext.cacheDir.path),
+            images = AndroidIndexImageReader(appContext),
+            io = Dispatchers.IO,
+            scope = scope,
+            beforeLoad = { if (aiLazy.isInitialized()) aiResourceManager.release() },
+            // shortcut: the GPU check ran the embedding model, not the answer model; probe the answer model
+            // in its own process too if a GPU driver turns out to crash on it alone.
+            backend = {
+                aiBackendChoice.backend.first() ?: if (aiBackendChoice.gpuCheck.first()?.works == true) AiBackend.GPU else AiBackend.CPU
+            },
+        )
+    }
+
+    /** Answers questions from the search results with a local model the user picked (RAG-001〜003). */
+    val askLibrary by askLazy
+
+    /** Frees the models when the system runs short of memory; nothing to do if they never loaded. */
     fun trimMemory() {
         if (aiLazy.isInitialized()) scope.launch { aiResourceManager.release() }
+        if (askLazy.isInitialized()) scope.launch { askLibrary.release() }
     }
 
     val reconcileIdentity by lazy { ReconcileIdentity(RoomIdentityStore(database), ::syncCatalog, System::currentTimeMillis) }

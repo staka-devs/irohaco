@@ -50,6 +50,24 @@ interface AiSettings {
     suspend fun setGpuCheck(check: GpuCheck)
 }
 
+/** The model the user picked to answer questions (RAG-001); null until they pick one. */
+interface AnswerModelSettings {
+    val answerModel: Flow<String?>
+
+    suspend fun setAnswerModel(id: String)
+}
+
+/** A loaded model that answers from images and text on this device (RAG-001). */
+interface AnswerSession : AutoCloseable {
+    /** One question in a fresh conversation, so an earlier question cannot leak into this answer. */
+    fun answer(instruction: String, images: List<ByteArray>, question: String): String
+}
+
+/** Loads an answer model; throws when [backend] cannot run it. */
+fun interface AnswerRuntime {
+    fun load(modelPath: String, backend: AiBackend): AnswerSession
+}
+
 /** A model the app can fetch and check (MOD-002); its URL points at one fixed revision. */
 data class ModelArtifact(val id: String, val displayName: String, val url: String, val sizeBytes: Long, val sha256: String)
 

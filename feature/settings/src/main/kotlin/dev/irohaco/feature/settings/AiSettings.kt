@@ -54,6 +54,9 @@ internal fun AiSettings(
     backend: AiBackend? = null,
     gpuCheck: GpuCheck? = null,
     onSelectBackend: (AiBackend) -> Unit = {},
+    answerModels: List<ModelArtifact> = emptyList(),
+    answerModel: String? = null,
+    onSelectAnswerModel: (String) -> Unit = {},
 ) {
     var deleting by remember { mutableStateOf<ModelArtifact?>(null) }
     deleting?.let { model ->
@@ -146,6 +149,29 @@ internal fun AiSettings(
             },
         ) { onSelectBackend(AiBackend.GPU) }
         BackendRow(R.string.settings_ai_backend_cpu, running == AiBackend.CPU, enabled = true, note = null) { onSelectBackend(AiBackend.CPU) }
+        if (answerModels.isNotEmpty()) {
+            SectionTitle(R.string.settings_ai_answer_model)
+            Text(
+                stringResource(R.string.settings_ai_answer_model_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = IrohacoSpacing.l),
+            )
+            answerModels.forEach { model ->
+                val installed = states[model.id] is ModelInstallState.Installed
+                ListItem(
+                    headlineContent = { Text(model.displayName) },
+                    supportingContent = if (installed) null else ({ Text(stringResource(R.string.settings_ai_not_installed)) }),
+                    leadingContent = { RadioButton(selected = model.id == answerModel, onClick = null, enabled = installed) },
+                    modifier = Modifier.selectable(
+                        selected = model.id == answerModel,
+                        enabled = installed,
+                        role = Role.RadioButton,
+                        onClick = { onSelectAnswerModel(model.id) },
+                    ),
+                )
+            }
+        }
     }
 }
 
