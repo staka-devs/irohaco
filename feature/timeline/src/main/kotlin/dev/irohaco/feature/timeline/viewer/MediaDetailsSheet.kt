@@ -16,7 +16,12 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.InputChip
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import dev.irohaco.core.contracts.FieldEdit
+import dev.irohaco.core.contracts.MetadataEdits
 import dev.irohaco.core.contracts.Tag
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.component.IrohacoBottomSheet
@@ -36,7 +41,9 @@ import dev.irohaco.core.domain.MediaDetails
 import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.R
+import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.roundToInt
@@ -54,12 +61,15 @@ internal fun MediaDetailsSheet(
     onAddTag: () -> Unit = {},
     onRemoveTag: (String) -> Unit = {},
     memos: @Composable () -> Unit = {},
+    edits: MetadataEdits = MetadataEdits(),
+    onEdit: (EditableField) -> Unit = {},
+    onRevert: (EditableField) -> Unit = {},
 ) {
     if (state == ViewerViewModel.Details.Hidden) return
     IrohacoBottomSheet(onDismiss = onDismiss) {
         when (state) {
             ViewerViewModel.Details.Loading -> ExpressiveLoading(Modifier.padding(IrohacoSpacing.xl))
-            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate, tags, onAddTag, onRemoveTag, memos)
+            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate, tags, onAddTag, onRemoveTag, memos, edits, onEdit, onRevert)
             ViewerViewModel.Details.Hidden -> Unit
         }
     }
@@ -76,6 +86,9 @@ internal fun MediaDetailsContent(
     onAddTag: () -> Unit = {},
     onRemoveTag: (String) -> Unit = {},
     memos: @Composable () -> Unit = {},
+    edits: MetadataEdits = MetadataEdits(),
+    onEdit: (EditableField) -> Unit = {},
+    onRevert: (EditableField) -> Unit = {},
 ) {
     Column(
         Modifier
@@ -91,20 +104,23 @@ internal fun MediaDetailsContent(
         memos()
         when (result) {
             MediaDetailsResult.FileUnavailable -> Text(stringResource(R.string.details_file_unavailable), style = MaterialTheme.typography.bodyLarge)
-            is MediaDetailsResult.Read -> DetailRows(result.details, kind, onAllowLocation)
+            is MediaDetailsResult.Read -> DetailRows(result.details, kind, onAllowLocation, edits, onEdit, onRevert)
         }
     }
 }
 
 @Composable
-private fun DetailRows(details: MediaDetails, kind: MediaKind, onAllowLocation: () -> Unit) {
+private fun DetailRows(details: MediaDetails, kind: MediaKind, onAllowLocation: () -> Unit, edits: MetadataEdits, onEdit: (EditableField) -> Unit, onRevert: (EditableField) -> Unit) {
     val context = LocalContext.current
     Row(R.string.details_file, Detail.Value(details.fileName)) { it }
     Row(R.string.details_folder, details.folder) { it }
     Row(R.string.details_size, details.sizeBytes) { Formatter.formatShortFileSize(context, it) }
     Row(R.string.details_type, details.mimeType) { it }
     Row(R.string.details_pixels, pixels(details)) { it }
-    Row(R.string.details_taken, details.takenAt) { DATE_TIME.format(it) }
+    EditableRow(
+        R.string.details_taken, details.takenAt, edits.takenAtMs?.let { FieldEdit.Set(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDateTime()) },
+        { onEdit(EditableField.TAKEN) }, { onRevert(EditableField.TAKEN) },
+    ) { DATE_TIME.format(it) }
     if (kind == MediaKind.VIDEO) {
         Row(R.string.details_duration, details.durationMs) { duration(it) }
     } else {
@@ -115,16 +131,39 @@ private fun DetailRows(details: MediaDetails, kind: MediaKind, onAllowLocation: 
         Row(R.string.details_iso, details.iso) { "ISO $it" }
         Row(R.string.details_focal_length, details.focalLengthMm) { "%.0f mm".format(it) }
     }
-    Row(R.string.details_location, details.location) { "%.5f, %.5f".format(it.latitude, it.longitude) }
-    if (details.location == Detail.NoPermission) {
+    EditableRow(R.string.details_location, details.location, edits.location, { onEdit(EditableField.LOCATION) }, { onRevert(EditableField.LOCATION) }) {
+        "%.5f, %.5f".format(it.latitude, it.longitude)
+    }
+    if (details.location == Detail.NoPermission && edits.location == null) {
         TextButton(onClick = onAllowLocation) { Text(stringResource(R.string.details_allow_location)) }
     }
     if (kind == MediaKind.IMAGE) {
         Row(R.string.details_headline, details.headline) { it }
-        Row(R.string.details_description, details.description) { it }
         Row(R.string.details_keywords, details.keywords) { it.joinToString() }
         Row(R.string.details_creator, details.creator) { it }
         Row(R.string.details_copyright, details.copyright) { it }
+    }
+    EditableRow(R.string.details_description, details.description, edits.description, { onEdit(EditableField.DESCRIPTION) }, { onRevert(EditableField.DESCRIPTION) }) { it }
+}
+
+/**
+ * A row the user can change in the DB (MET-002): the edited value is marked as such over the file's own,
+ * which stays one tap away (MET-005).
+ */
+@Composable
+private fun <T> EditableRow(label: Int, file: Detail<T>, edit: FieldEdit<T>?, onEdit: () -> Unit, onRevert: () -> Unit, format: (T) -> String) {
+    Box(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(label, if (edit == null) file else (edit as? FieldEdit.Set)?.let { Detail.Value(it.value) } ?: Detail.Missing, format)
+            if (edit != null) {
+                val original = detailText(file, format).first
+                Text(stringResource(R.string.details_edited, original), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = onRevert) { Text(stringResource(R.string.details_revert)) }
+            }
+        }
+        IconButton(onClick = onEdit, modifier = Modifier.align(Alignment.TopEnd)) {
+            Icon(painterResource(IrohacoIcons.Edit), contentDescription = stringResource(R.string.details_edit, stringResource(label)))
+        }
     }
 }
 
@@ -180,18 +219,22 @@ private fun TagsRow(tags: List<Tag>, onAdd: () -> Unit, onRemove: (String) -> Un
 private fun <T> Row(label: Int, detail: Detail<T>, format: (T) -> String) {
     Column(Modifier.fillMaxWidth()) {
         Text(stringResource(label), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val (text, muted) = when (detail) {
-            is Detail.Value -> format(detail.value) to false
-            Detail.Missing -> stringResource(R.string.details_missing) to true
-            Detail.NoPermission -> stringResource(R.string.details_no_permission) to true
-            Detail.Unreadable -> stringResource(R.string.details_unreadable) to true
-        }
+        val (text, muted) = detailText(detail, format)
         Text(
             text,
             style = MaterialTheme.typography.bodyLarge,
             color = if (muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
         )
     }
+}
+
+/** The value, or why there is none; the flag mutes the latter. */
+@Composable
+private fun <T> detailText(detail: Detail<T>, format: (T) -> String): Pair<String, Boolean> = when (detail) {
+    is Detail.Value -> format(detail.value) to false
+    Detail.Missing -> stringResource(R.string.details_missing) to true
+    Detail.NoPermission -> stringResource(R.string.details_no_permission) to true
+    Detail.Unreadable -> stringResource(R.string.details_unreadable) to true
 }
 
 private val DATE_TIME: DateTimeFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
@@ -235,6 +278,7 @@ private fun MediaDetailsPreview() {
                 onAllowLocation = {},
                 rating = 3,
                 tags = listOf(Tag("t1", "harbour", 0), Tag("t2", "Trip", 0)),
+                edits = MetadataEdits(description = FieldEdit.Set("Harbour at dawn")),
             )
         }
     }

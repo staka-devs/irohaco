@@ -28,6 +28,7 @@ import dev.irohaco.core.application.ManageAnnotations
 import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.MarkMedia
+import dev.irohaco.core.application.EditMetadata
 import dev.irohaco.core.application.NamePlaces
 import dev.irohaco.core.application.OrganizeMedia
 import dev.irohaco.core.application.PlanMediaIndex
@@ -51,6 +52,7 @@ import dev.irohaco.core.database.RoomIndexJobStore
 import dev.irohaco.core.database.RoomLibraryReader
 import dev.irohaco.core.database.RoomLocationStore
 import dev.irohaco.core.database.RoomMarksStore
+import dev.irohaco.core.database.RoomMetadataEditStore
 import dev.irohaco.core.database.RoomModelProfiles
 import dev.irohaco.core.database.RoomTextIndexStore
 import dev.irohaco.core.database.RoomTimelineReader
@@ -155,6 +157,8 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val getTimelinePage by lazy { GetTimelinePage(RoomTimelineReader(database)) }
 
     val markMedia by lazy { MarkMedia(RoomMarksStore(database)) }
+
+    val editMetadata by lazy { EditMetadata(RoomMetadataEditStore(database)) }
 
     val manageCollections by lazy { ManageCollections(RoomCollectionsStore(database)) }
 

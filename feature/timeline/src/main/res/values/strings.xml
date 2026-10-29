@@ -266,4 +266,11 @@
     <string name="search_inferred_places">Guessed places too</string>
     <string name="search_place">Place</string>
     <string name="search_place_inferred">Place (guessed)</string>
+    <string name="details_edited">Edited in Irohaco. In the file: %1$s</string>
+    <string name="details_revert">Use the file\'s value</string>
+    <string name="details_edit">Edit %1$s</string>
+    <string name="edit_next">Next</string>
+    <string name="edit_latitude">Latitude</string>
+    <string name="edit_longitude">Longitude</string>
+    <string name="edit_location_clear_hint">Clear both to remove the location. The file is not changed.</string>
 </resources>

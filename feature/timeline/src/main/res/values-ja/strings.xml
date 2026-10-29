@@ -262,4 +262,11 @@
     <string name="search_inferred_places">推定した場所も含める</string>
     <string name="search_place">場所</string>
     <string name="search_place_inferred">場所（推定）</string>
+    <string name="details_edited">アプリで編集済み。ファイルの値: %1$s</string>
+    <string name="details_revert">ファイルの値に戻す</string>
+    <string name="details_edit">%1$sを編集</string>
+    <string name="edit_next">次へ</string>
+    <string name="edit_latitude">緯度</string>
+    <string name="edit_longitude">経度</string>
+    <string name="edit_location_clear_hint">両方を空にすると、場所をなしにします。ファイルは変えません。</string>
 </resources>

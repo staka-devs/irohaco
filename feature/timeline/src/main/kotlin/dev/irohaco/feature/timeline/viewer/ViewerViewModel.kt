@@ -18,6 +18,9 @@ import dev.irohaco.core.contracts.AnnotationKind
 import dev.irohaco.core.contracts.AnnotationRevision
 import dev.irohaco.core.contracts.AssetMarks
 import dev.irohaco.core.application.MarkMedia
+import dev.irohaco.core.application.EditMetadata
+import dev.irohaco.core.contracts.FieldEdit
+import dev.irohaco.core.contracts.MetadataEdits
 import dev.irohaco.core.application.ManageAnnotations
 import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.contracts.Tag
@@ -70,6 +73,7 @@ class ViewerViewModel(
     private val formatProbe: MediaFormatProbe? = null,
     private val map: BrowseMap? = null,
     private val annotations: ManageAnnotations? = null,
+    private val metadata: EditMetadata? = null,
 ) : ViewModel() {
     private val currentItem = MutableStateFlow<TimelineItem?>(null)
     private val current = currentItem.map { it?.assetId }.distinctUntilChanged()
@@ -80,7 +84,13 @@ class ViewerViewModel(
         .flatMapLatest { item -> flow { emit(if (item == null || formatProbe == null) MediaFormat() else formatProbe.probe(item.contentUri, item.kind)) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MediaFormat())
 
-    /** GPS of the page on screen, read the same way as the details sheet (PRD GAL-013). */
+    /** The user's edits of the page on screen, kept in the DB (PRD MET-002). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val edits: StateFlow<MetadataEdits> = current
+        .flatMapLatest { id -> if (id == null || metadata == null) flowOf(MetadataEdits()) else metadata.edits(id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MetadataEdits())
+
+    /** GPS of the page on screen, read the same way as the details sheet (PRD GAL-013), unless the user edited it. */
     @OptIn(ExperimentalCoroutinesApi::class)
     val location: StateFlow<Detail<GeoPoint>> = currentItem
         .flatMapLatest { item ->
@@ -95,6 +105,13 @@ class ViewerViewModel(
                         }
                     },
                 )
+            }
+        }
+        .combine(edits) { file, edits ->
+            when (val edit = edits.location) {
+                null -> file
+                FieldEdit.Removed -> Detail.Missing
+                is FieldEdit.Set -> Detail.Value(edit.value)
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Detail.Missing)
@@ -173,6 +190,19 @@ class ViewerViewModel(
 
     fun setFavorite(item: TimelineItem, favorite: Boolean) {
         viewModelScope.launch { mark?.setFavorite(listOf(item), favorite) }
+    }
+
+    /** null goes back to the file's value. */
+    fun setTakenAt(item: TimelineItem, takenAtMs: Long?) {
+        viewModelScope.launch { metadata?.setTakenAt(item.assetId, takenAtMs) }
+    }
+
+    fun setLocation(item: TimelineItem, edit: FieldEdit<GeoPoint>?) {
+        viewModelScope.launch { metadata?.setLocation(item.assetId, edit) }
+    }
+
+    fun setDescription(item: TimelineItem, edit: FieldEdit<String>?) {
+        viewModelScope.launch { metadata?.setDescription(item.assetId, edit) }
     }
 
     fun setRating(item: TimelineItem, rating: Int?) {

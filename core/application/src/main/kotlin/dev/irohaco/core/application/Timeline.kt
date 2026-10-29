@@ -2,7 +2,9 @@ package dev.irohaco.core.application
 
 import dev.irohaco.core.contracts.CollectionsStore
 import dev.irohaco.core.contracts.FileOperationResult
+import dev.irohaco.core.contracts.FieldEdit
 import dev.irohaco.core.contracts.MarksStore
+import dev.irohaco.core.contracts.MetadataEditStore
 import dev.irohaco.core.contracts.MediaDetailsReader
 import dev.irohaco.core.contracts.MediaFiles
 import dev.irohaco.core.contracts.MediaLibraryAccessPort
@@ -14,6 +16,7 @@ import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineReader
 import dev.irohaco.core.contracts.TrashReader
 import dev.irohaco.core.domain.Detail
+import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.MediaLibraryAccess
 import dev.irohaco.core.domain.isValidName
@@ -100,6 +103,17 @@ class MarkMedia(private val store: MarksStore) {
     suspend fun setFavorite(items: List<TimelineItem>, favorite: Boolean) = store.setFavorite(items.map { it.assetId }, favorite)
 
     suspend fun setRating(assetId: String, rating: Int?) = store.setRating(assetId, rating)
+}
+
+/** Capture time, location and description edited in the DB only; the file stays as it is (PRD MET-002). */
+class EditMetadata(private val store: MetadataEditStore) {
+    fun edits(assetId: String) = store.edits(assetId)
+
+    suspend fun setTakenAt(assetId: String, takenAtMs: Long?) = store.setTakenAt(assetId, takenAtMs)
+
+    suspend fun setLocation(assetId: String, edit: FieldEdit<GeoPoint>?) = store.setLocation(assetId, edit)
+
+    suspend fun setDescription(assetId: String, edit: FieldEdit<String>?) = store.setDescription(assetId, edit)
 }
 
 /** Tags and user albums (PRD GAL-007). */

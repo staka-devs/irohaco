@@ -81,14 +81,14 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
      * this flow is collected would otherwise leave the timeline showing stale rows.
      */
     override fun changes(): Flow<Unit> =
-        db.invalidationTracker.createFlow("media_sources", "media_assets", "media_ratings", "media_tags", "album_items", emitInitialState = true).map { }
+        db.invalidationTracker.createFlow("media_sources", "media_assets", "media_ratings", "media_tags", "album_items", "metadata_override_values", "location_evidence", emitInitialState = true).map { }
 
     private companion object {
         // shortcut: no index on the sort expressions yet; add them if M0-13 measures slow pages at 10k items.
         const val FROM = "FROM media_sources s JOIN media_assets a ON a.asset_id = s.asset_id " +
             "LEFT JOIN media_ratings r ON r.asset_id = a.asset_id"
         const val MAX_ARGS = 500
-        const val TIME = "COALESCE(s.observed_taken_at, s.observed_modified_at, a.first_seen_at)"
+        const val TIME = "COALESCE($EDITED_TAKEN, s.observed_taken_at, s.observed_modified_at, a.first_seen_at)"
 
         // The volume root has a null relative path in MediaStore; FolderRef calls it "".
         const val PATH = "COALESCE(s.relative_path, '')"
@@ -108,8 +108,8 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             repeat(query.excludedFolders.size) { append(" AND NOT (s.volume_id = ? AND $PATH = ?)") }
             if (query.area != null) {
                 append(
-                    " AND EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = a.asset_id AND le.evidence_source = 'EXIF'" +
-                        " AND le.evidence_status = 'CONFIRMED' AND le.latitude BETWEEN ? AND ? AND le.longitude BETWEEN ? AND ?)",
+                    " AND EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = a.asset_id AND $SHOWN" +
+                        " AND le.latitude BETWEEN ? AND ? AND le.longitude BETWEEN ? AND ?)",
                 )
             }
         }

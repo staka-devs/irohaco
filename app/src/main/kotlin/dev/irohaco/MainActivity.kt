@@ -226,7 +226,7 @@ class MainActivity : ComponentActivity() {
                         ViewerViewModel(
                             page, viewer.assetId, viewer.startMs, container::newVideoPlayer, container.getMediaDetails, query,
                             container.markMedia, container.manageCollections, container.mediaFormatProbe,
-                            container.browseMap, container.manageAnnotations,
+                            container.browseMap, container.manageAnnotations, container.editMetadata,
                         )
                     },
                     onBack,
