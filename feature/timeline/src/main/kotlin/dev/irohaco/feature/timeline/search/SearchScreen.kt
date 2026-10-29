@@ -110,6 +110,8 @@ data class SearchUi(
     /** An answer from the results is being made (RAG-001); [answer] is what came of it, null before asking. */
     val asking: Boolean = false,
     val answer: AskResult? = null,
+    /** The answer so far while the model writes it. */
+    val partial: String = "",
 )
 
 class SearchViewModel(
@@ -139,10 +141,10 @@ class SearchViewModel(
         val hits = ui.results?.hits ?: return
         val library = askLibrary ?: return
         asking?.cancel()
-        _ui.update { it.copy(asking = true, answer = null) }
+        _ui.update { it.copy(asking = true, answer = null, partial = "") }
         asking = viewModelScope.launch {
-            val answer = library.ask(ui.query, hits)
-            _ui.update { it.copy(asking = false, answer = answer) }
+            val answer = library.ask(ui.query, hits) { text -> _ui.update { it.copy(partial = text) } }
+            _ui.update { it.copy(asking = false, answer = answer, partial = "") }
         }
     }
 
@@ -183,7 +185,7 @@ class SearchViewModel(
 
     private fun change(edit: (SearchUi) -> SearchUi) {
         asking?.cancel()
-        _ui.update { edit(it).copy(asking = false, answer = null) }
+        _ui.update { edit(it).copy(asking = false, answer = null, partial = "") }
         val ui = _ui.value
         running?.cancel()
         if (ui.query.isEmpty() && similarTo == null) {
@@ -198,6 +200,8 @@ class SearchViewModel(
                 search(ui.query, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare, ui.byMemo, ui.filters, ui.inferredPlaces)
             }
             _ui.update { it.copy(searching = false, results = results) }
+            // Loading a model takes half a minute; start while the user looks at the results.
+            if (canAsk && results.hits.isNotEmpty()) askLibrary?.warmUp()
         }
     }
 }
@@ -304,7 +308,7 @@ internal fun SearchContent(
             }
             if (ui.searching) item(span = { GridItemSpan(maxLineSpan) }) { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             if (onAsk != null && !ui.searching && ui.results?.hits.orEmpty().isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) { AnswerCard(ui.asking, ui.answer, onAsk, onOpen, onOpenSettings) }
+                item(span = { GridItemSpan(maxLineSpan) }) { AnswerCard(ui.asking, ui.answer, onAsk, onOpen, onOpenSettings, ui.partial) }
             }
             val hits = ui.results?.hits.orEmpty()
             val compared = ui.results?.searched.orEmpty().takeIf { it.size > 1 }?.map { it.space.spaceId }

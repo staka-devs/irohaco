@@ -41,10 +41,19 @@ class AskLibraryTest {
     private var loads = 0
     private var closed = 0
     private val asked = mutableListOf<Pair<Int, String>>()
+    private var warmed = 0
     private val runtime = AnswerRuntime { _, _ ->
         loads++
         object : AnswerSession {
-            override fun answer(instruction: String, images: List<ByteArray>, question: String) = reply.also { asked += images.size to question }
+            override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, onText: (String) -> Unit): String {
+                asked += images.size to question
+                // The reply arrives in pieces, as the runtime streams it.
+                reply.chunked(8).runningReduce { so, piece -> so + piece }.forEach(onText)
+                return reply
+            }
+            override suspend fun warm() {
+                warmed++
+            }
             override fun close() {
                 closed++
             }
@@ -58,7 +67,6 @@ class AskLibraryTest {
         images = images,
         io = StandardTestDispatcher(testScheduler),
         scope = backgroundScope,
-        beforeLoad = {},
         backend = { AiBackend.CPU },
     )
 
@@ -70,6 +78,7 @@ class AskLibraryTest {
         assertTrue(answer.known)
         // A scene has no memo, so the model cannot have it from the user.
         assertEquals(listOf("p" to Basis.OBSERVED, "m" to Basis.USER_STATED, "v" to Basis.INFERRED), answer.citations.map { it.hit.item.assetId to it.basis })
+        assertEquals(listOf(1, 2, 3), answer.citations.map { it.number })
         assertEquals(listOf("content://p", "content://m", "content://v@72000"), read)
         assertEquals(3, asked.single().first)
         assertTrue("User's memo: \"Grandma's 80th birthday\"" in asked.single().second)
@@ -99,9 +108,22 @@ class AskLibraryTest {
     }
 
     @Test
-    fun `the model loads once and is freed when it sits unused`() = runTest {
+    fun `the answer shows while it is written, without the reply's other lines`() = runTest {
+        reply = "<think>where</think>ANSWER: A pier at dusk [1].\nKNOWN: yes\nSOURCES: 1=OBSERVED"
+        val shown = mutableListOf<String>()
+        ask(setOf(ModelCatalog.GEMMA_4_E2B.id)).ask("Where?", listOf(photo)) { shown += it }
+        assertTrue(shown.none { "<think>" in it || "KNOWN" in it || "ANSWER" in it }, shown.toString())
+        assertEquals("A pier at dusk [1].", shown.last())
+        assertTrue(shown.any { it.isNotEmpty() && it != shown.last() }) // it grew before the end
+    }
+
+    @Test
+    fun `the model loads once, warmed up before the first question, and is freed when it sits unused`() = runTest {
         reply = "ANSWER: A pier [1].\nKNOWN: yes\nSOURCES: 1=OBSERVED"
         val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id))
+        library.warmUp()
+        runCurrent()
+        assertEquals(1, warmed)
         library.ask("Where?", listOf(photo))
         library.ask("Where?", listOf(photo))
         assertEquals(1, loads, "loads")

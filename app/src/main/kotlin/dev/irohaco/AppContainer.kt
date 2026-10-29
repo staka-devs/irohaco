@@ -303,7 +303,6 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
             images = AndroidIndexImageReader(appContext),
             io = Dispatchers.IO,
             scope = scope,
-            beforeLoad = { if (aiLazy.isInitialized()) aiResourceManager.release() },
             // shortcut: the GPU check ran the embedding model, not the answer model; probe the answer model
             // in its own process too if a GPU driver turns out to crash on it alone.
             backend = {

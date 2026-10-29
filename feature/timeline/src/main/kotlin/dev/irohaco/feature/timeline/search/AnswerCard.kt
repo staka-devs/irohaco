@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
 import coil3.video.videoFrameMillis
@@ -45,7 +46,15 @@ import dev.irohaco.feature.timeline.formatDuration
  * marked as seen in it, written in the user's memo, or guessed. Tapping one opens it at its scene.
  */
 @Composable
-internal fun AnswerCard(asking: Boolean, answer: AskResult?, onAsk: () -> Unit, onOpen: (SearchHit) -> Unit, onOpenSettings: () -> Unit) {
+internal fun AnswerCard(
+    asking: Boolean,
+    answer: AskResult?,
+    onAsk: () -> Unit,
+    onOpen: (SearchHit) -> Unit,
+    onOpenSettings: () -> Unit,
+    /** The answer so far while the model writes it. */
+    partial: String = "",
+) {
     if (answer == null && !asking) {
         OutlinedButton(onClick = onAsk) { Text(stringResource(R.string.search_ask)) }
         return
@@ -54,7 +63,11 @@ internal fun AnswerCard(asking: Boolean, answer: AskResult?, onAsk: () -> Unit, 
         Column(Modifier.padding(IrohacoSpacing.l), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
             when (answer) {
                 null -> {
-                    Text(stringResource(R.string.search_asking), style = MaterialTheme.typography.bodyMedium)
+                    if (partial.isEmpty()) {
+                        Text(stringResource(R.string.search_asking), style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        Text(partial, style = MaterialTheme.typography.bodyLarge)
+                    }
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
                 AskResult.NoModel -> {
@@ -91,15 +104,24 @@ private fun CitationCell(citation: Citation, onOpen: (SearchHit) -> Unit) {
     val context = LocalContext.current
     val model: Any = if (at != null) ImageRequest.Builder(context).data(hit.item.contentUri).videoFrameMillis(at).build() else GridThumbnail(hit.item.contentUri)
     val basis = stringResource(citation.basis.label())
+    val number = stringResource(R.string.search_source_number, citation.number)
     Column(Modifier.width(CELL), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
         MediaThumbnail(
             model = model,
-            contentDescription = listOfNotNull(stringResource(hit.item.kindLabel()), at?.let { stringResource(R.string.search_at, formatDuration(it)) }, basis).joinToString(", "),
+            contentDescription = listOfNotNull(stringResource(R.string.search_source_spoken, citation.number), stringResource(hit.item.kindLabel()), at?.let { stringResource(R.string.search_at, formatDuration(it)) }, basis).joinToString(", "),
             selected = false,
             label = at?.let { formatDuration(it) },
             modifier = Modifier.size(CELL).clickable { onOpen(hit) },
         )
-        Text(basis, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+        // A guess reads apart from what was seen or written (RAG-003): its own color and slanted.
+        val guessed = citation.basis == Basis.INFERRED
+        Text(
+            "$number $basis",
+            style = MaterialTheme.typography.labelSmall,
+            fontStyle = if (guessed) FontStyle.Italic else FontStyle.Normal,
+            color = if (guessed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+        )
     }
 }
 
@@ -125,10 +147,11 @@ private fun AnswerCardPreview() {
                     answer = AskResult.Answered(
                         "It was Grandma's 80th birthday [2], at the harbour [1]. The cake was cut in the evening [3].",
                         known = true,
-                        citations = listOf(Citation(photo, Basis.OBSERVED), Citation(memo, Basis.USER_STATED), Citation(scene, Basis.INFERRED)),
+                        citations = listOf(Citation(photo, Basis.OBSERVED, 1), Citation(memo, Basis.USER_STATED, 2), Citation(scene, Basis.INFERRED, 3)),
                     ),
                     onAsk = {}, onOpen = {}, onOpenSettings = {},
                 )
+                AnswerCard(asking = true, answer = null, onAsk = {}, onOpen = {}, onOpenSettings = {}, partial = "It was Grandma's 80th")
                 AnswerCard(asking = false, answer = AskResult.NoModel, onAsk = {}, onOpen = {}, onOpenSettings = {})
                 AnswerCard(asking = false, answer = null, onAsk = {}, onOpen = {}, onOpenSettings = {})
             }
