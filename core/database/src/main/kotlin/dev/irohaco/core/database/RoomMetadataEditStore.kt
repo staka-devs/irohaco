@@ -8,6 +8,8 @@ import dev.irohaco.core.contracts.FieldEdit
 import dev.irohaco.core.contracts.MetadataEditStore
 import dev.irohaco.core.contracts.MetadataEdits
 import dev.irohaco.core.contracts.MetadataField
+import dev.irohaco.core.contracts.MetadataWriteJournal
+import dev.irohaco.core.contracts.MetadataWriteState
 import dev.irohaco.core.contracts.geoPointOfMetadataText
 import dev.irohaco.core.contracts.toMetadataText
 import dev.irohaco.core.domain.GeoPoint
@@ -150,14 +152,8 @@ interface MetadataDao {
      */
     @Transaction
     suspend fun compare(assetId: String, file: Map<String, String?>, edited: Map<String, String?>, now: Long) {
-        val sorted = file.toSortedMap()
-        val digest = MessageDigest.getInstance("SHA-256").digest(sorted.toString().toByteArray())
-            .joinToString("") { "%02x".format(it) }
-        val revision = "meta:$assetId:$digest"
-        if (insertRevision(revision, assetId, digest, now) != -1L) {
-            sorted.forEach { (tag, text) -> if (text != null) insertObservation(revision, tag, text) }
-        }
-        for ((tag, remote) in sorted) {
+        val revision = revision(assetId, file, now)
+        for ((tag, remote) in file) {
             val id = overrideId(assetId, tag) ?: continue
             val base = baseRevision(id)
             when {
@@ -171,7 +167,80 @@ interface MetadataDao {
             }
         }
     }
+
+    private suspend fun revision(assetId: String, file: Map<String, String?>, now: Long): String {
+        val sorted = file.toSortedMap()
+        val digest = MessageDigest.getInstance("SHA-256").digest(sorted.toString().toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        val revision = "meta:$assetId:$digest"
+        if (insertRevision(revision, assetId, digest, now) != -1L) {
+            sorted.forEach { (tag, text) -> if (text != null) insertObservation(revision, tag, text) }
+        }
+        return revision
+    }
+
+    @Query("INSERT INTO metadata_write_operations(operation_id, asset_id, operation_state, requested_at) VALUES (:operationId, :assetId, 'REQUESTED', :now)")
+    suspend fun insertOperation(operationId: String, assetId: String, now: Long)
+
+    @Query(
+        """INSERT INTO metadata_write_operation_items(operation_id, override_id, written_local_revision_no)
+           SELECT :operationId, override_id, local_revision_no FROM metadata_override_sets
+           WHERE asset_id = :assetId AND namespace = '$NAMESPACE' AND tag_name IN (:tags)""",
+    )
+    suspend fun insertItems(operationId: String, assetId: String, tags: List<String>)
+
+    @Query("UPDATE metadata_write_operations SET operation_state = :state WHERE operation_id = :operationId")
+    suspend fun setState(operationId: String, state: String)
+
+    @Query("SELECT asset_id FROM metadata_write_operations WHERE operation_id = :operationId")
+    suspend fun operationAsset(operationId: String): String
+
+    /** The written edits the user has not changed since, which the file now holds. */
+    @Query(
+        """SELECT o.override_id FROM metadata_write_operation_items i JOIN metadata_override_sets o ON o.override_id = i.override_id
+           WHERE i.operation_id = :operationId AND o.local_revision_no = i.written_local_revision_no""",
+    )
+    suspend fun unchangedSinceWrite(operationId: String): List<String>
+
+    @Query("UPDATE metadata_write_operations SET operation_state = 'COMMITTED', after_revision_id = :revision WHERE operation_id = :operationId")
+    suspend fun setCommitted(operationId: String, revision: String)
+
+    @Query("DELETE FROM metadata_write_operation_items WHERE operation_id = :operationId")
+    suspend fun deleteItems(operationId: String)
+
+    @Query("DELETE FROM metadata_write_operations WHERE operation_id = :operationId")
+    suspend fun deleteOperation(operationId: String)
+
+    @Query("SELECT operation_id FROM metadata_write_operations WHERE asset_id = :assetId AND operation_state = 'RECOVERY_REQUIRED' LIMIT 1")
+    fun observeRecovery(assetId: String): Flow<String?>
+
+    @Query("SELECT operation_id AS operationId, operation_state AS state FROM metadata_write_operations WHERE operation_state NOT IN ('COMMITTED', 'RECOVERY_REQUIRED')")
+    suspend fun unfinished(): List<OperationRow>
+
+    @Query("SELECT tag_name FROM metadata_override_sets WHERE override_id = :overrideId")
+    suspend fun tagOf(overrideId: String): String
+
+    /**
+     * The file holds the written values now: the write keeps the revision read back, and the edits it carried
+     * are dropped unless the user changed them meanwhile. Returns the tags dropped.
+     */
+    @Transaction
+    suspend fun commitWrite(operationId: String, written: Map<String, String?>, now: Long): List<String> {
+        val assetId = operationAsset(operationId)
+        setCommitted(operationId, revision(assetId, written, now))
+        val done = unchangedSinceWrite(operationId)
+        deleteItems(operationId) // the sets they point at go next
+        return done.map { id -> tagOf(id).also { deleteConflicts(id); deleteBase(id); deleteValues(id); deleteSet(id) } }
+    }
+
+    @Transaction
+    suspend fun closeWrite(operationId: String) {
+        deleteItems(operationId)
+        deleteOperation(operationId)
+    }
 }
+
+data class OperationRow(val operationId: String, val state: String)
 
 data class OverrideRow(val tagName: String, val editMode: String, val textValue: String?, val intValue: Long?)
 
@@ -179,13 +248,14 @@ data class ConflictRow(val tagName: String, val base: String?)
 
 /**
  * Edits in the override tables, with the file's values they were made against (ADR-0007). The location is
- * also a USER row of `location_evidence`, which the map and the place search read.
+ * also a USER row of `location_evidence`, which the map and the place search read. Writes of the edits to the
+ * file are journaled in `metadata_write_operations` (ADR-0004).
  */
 class RoomMetadataEditStore(
     private val db: IrohacoDatabase,
     private val now: () -> Long = System::currentTimeMillis,
     private val newId: () -> String = { UUID.randomUUID().toString() },
-) : MetadataEditStore {
+) : MetadataEditStore, MetadataWriteJournal {
     private val dao get() = db.metadataDao()
 
     override fun edits(assetId: String): Flow<MetadataEdits> =
@@ -226,4 +296,32 @@ class RoomMetadataEditStore(
         dao.compare(assetId, file.mapKeys { it.key.tag }, edited.mapKeys { it.key.tag }, now())
 
     override suspend fun keepEdit(assetId: String, field: MetadataField) = dao.keep(assetId, field.tag, now())
+
+    override suspend fun begin(assetId: String, fields: Set<MetadataField>): String = newId().also { id ->
+        db.withTransaction {
+            dao.insertOperation(id, assetId, now())
+            dao.insertItems(id, assetId, fields.map { it.tag })
+        }
+    }
+
+    override suspend fun advance(operationId: String, state: MetadataWriteState) = dao.setState(operationId, state.name)
+
+    override suspend fun commit(operationId: String, written: Map<MetadataField, String?>) = db.withTransaction {
+        val dropped = dao.commitWrite(operationId, written.mapKeys { it.key.tag }, now())
+        if (LOCATION_TAG in dropped) {
+            // The file's GPS is now what the map and the place search should read.
+            val assetId = dao.operationAsset(operationId)
+            val locations = db.locationDao()
+            locations.setUser(assetId, null)
+            locations.deleteExif(assetId)
+            locations.recordExif(newId(), assetId, written[MetadataField.LOCATION]?.let(::geoPointOfMetadataText))
+        }
+    }
+
+    override suspend fun close(operationId: String) = dao.closeWrite(operationId)
+
+    override fun recoveryRequired(assetId: String): Flow<String?> = dao.observeRecovery(assetId)
+
+    override suspend fun unfinished(): Map<String, MetadataWriteState> =
+        dao.unfinished().associate { it.operationId to MetadataWriteState.valueOf(it.state) }
 }

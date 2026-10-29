@@ -5,7 +5,11 @@ import dev.irohaco.core.contracts.FileOperationResult
 import dev.irohaco.core.contracts.FieldEdit
 import dev.irohaco.core.contracts.MarksStore
 import dev.irohaco.core.contracts.MetadataEditStore
+import dev.irohaco.core.contracts.MetadataEdits
 import dev.irohaco.core.contracts.MetadataField
+import dev.irohaco.core.contracts.MetadataFiles
+import dev.irohaco.core.contracts.MetadataWriteJournal
+import dev.irohaco.core.contracts.MetadataWriteState
 import dev.irohaco.core.contracts.toMetadataText
 import dev.irohaco.core.contracts.MediaDetailsReader
 import dev.irohaco.core.contracts.MediaFiles
@@ -21,9 +25,13 @@ import dev.irohaco.core.domain.Detail
 import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaDetails
 import dev.irohaco.core.domain.MediaDetailsResult
+import dev.irohaco.core.domain.MediaFormat
 import dev.irohaco.core.domain.MediaLibraryAccess
 import dev.irohaco.core.domain.isValidName
 import dev.irohaco.core.domain.renamedFile
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -132,12 +140,7 @@ class EditMetadata(private val store: MetadataEditStore) {
             putRead(MetadataField.LOCATION, file.location) { it.toMetadataText() }
             putRead(MetadataField.DESCRIPTION, file.description) { it }
         }
-        val edited = buildMap {
-            edits.takenAtMs?.let { put(MetadataField.TAKEN, Instant.ofEpochMilli(it).atZone(zone).toLocalDateTime().toString()) }
-            edits.location?.let { put(MetadataField.LOCATION, (it as? FieldEdit.Set)?.value?.toMetadataText()) }
-            edits.description?.let { put(MetadataField.DESCRIPTION, (it as? FieldEdit.Set)?.value) }
-        }
-        store.compareWithFile(assetId, read, edited)
+        store.compareWithFile(assetId, read, edits.asText(zone))
     }
 
     suspend fun keepEdit(assetId: String, field: MetadataField) = store.keepEdit(assetId, field)
@@ -148,6 +151,109 @@ class EditMetadata(private val store: MetadataEditStore) {
             Detail.Missing -> put(field, null)
             else -> Unit
         }
+    }
+}
+
+/** The edited fields as the text the store compares and the file takes, null for a removed value. */
+private fun MetadataEdits.asText(zone: ZoneId): Map<MetadataField, String?> = buildMap {
+    takenAtMs?.let { put(MetadataField.TAKEN, Instant.ofEpochMilli(it).atZone(zone).toLocalDateTime().toString()) }
+    location?.let { put(MetadataField.LOCATION, (it as? FieldEdit.Set)?.value?.toMetadataText()) }
+    description?.let { put(MetadataField.DESCRIPTION, (it as? FieldEdit.Set)?.value) }
+}
+
+/** How a write of edits to the file ended (AC-008). */
+enum class FileWriteResult {
+    WRITTEN,
+
+    /** The file was never touched; the edits stay in the DB. */
+    NOT_WRITTEN,
+
+    /** The file was replaced but did not read back as written; the user restores or keeps it. */
+    CHECK_FAILED,
+}
+
+/**
+ * Writes the DB edits into the file itself or into a copy (MET-003, ADR-0030), journaled so a stopped process
+ * leaves a way back (ADR-0004). A write to the file needs the OS write grant, which the caller asks for first.
+ */
+class WriteMetadataToFile(
+    private val store: MetadataEditStore,
+    private val journal: MetadataWriteJournal,
+    private val files: MetadataFiles,
+    private val zone: () -> ZoneId = ZoneId::systemDefault,
+) {
+    /** A JPEG with no video or gain map after the image, whose place a longer header would move (ADR-0030). */
+    fun canWriteFile(item: TimelineItem, format: MediaFormat) = item.mimeType == JPEG && !format.motionPhoto && !format.hdr
+
+    /** The formats whose EXIF the app can write. */
+    fun canSaveCopy(item: TimelineItem) = item.mimeType in setOf(JPEG, "image/png", "image/webp")
+
+    private val settling = Mutex()
+    private var settled = false
+
+    /** The write of the asset whose file waits for the user to restore or keep it. */
+    fun recoveryRequired(assetId: String): Flow<String?> = flow {
+        settleStopped()
+        emitAll(journal.recoveryRequired(assetId))
+    }
+
+    suspend fun write(item: TimelineItem, fields: Set<MetadataField>): FileWriteResult {
+        settleStopped()
+        val values = store.edits(item.assetId).first().asText(zone()).filterKeys { it in fields }
+        if (values.isEmpty()) return FileWriteResult.NOT_WRITTEN
+        val operation = journal.begin(item.assetId, values.keys)
+        if (!files.stage(operation, item.contentUri, values)) {
+            forget(operation)
+            return FileWriteResult.NOT_WRITTEN
+        }
+        journal.advance(operation, MetadataWriteState.STAGED)
+        journal.advance(operation, MetadataWriteState.WRITE_PENDING)
+        val replaced = files.replace(operation, item.contentUri)
+        journal.advance(operation, MetadataWriteState.VERIFYING)
+        if (replaced && files.verify(operation, item.contentUri, values)) {
+            journal.commit(operation, values)
+            files.discard(operation)
+            return FileWriteResult.WRITTEN
+        }
+        // A failed replace may still have truncated the file, so it is checked by the user either way.
+        journal.advance(operation, MetadataWriteState.RECOVERY_REQUIRED)
+        return FileWriteResult.CHECK_FAILED
+    }
+
+    /** Puts back the file as it was before the write; the edits stay in the DB. */
+    suspend fun restore(item: TimelineItem, operationId: String): Boolean =
+        files.restore(operationId, item.contentUri).also { if (it) forget(operationId) }
+
+    /** Keeps the file as the write left it. */
+    suspend fun keepFile(operationId: String) = forget(operationId)
+
+    /**
+     * Once a process, before its first write: a write a stopped process left before touching the file is dropped,
+     * one it left after waits for the user. Later, unfinished writes are this process's own, still running.
+     */
+    private suspend fun settleStopped() = settling.withLock {
+        if (settled) return@withLock
+        settled = true
+        journal.unfinished().forEach { (operation, state) ->
+            if (state == MetadataWriteState.REQUESTED || state == MetadataWriteState.STAGED) {
+                forget(operation)
+            } else {
+                journal.advance(operation, MetadataWriteState.RECOVERY_REQUIRED)
+            }
+        }
+    }
+
+    /** Saves a new file beside the original with all the edits and, if asked, without any location. */
+    suspend fun saveCopy(item: TimelineItem, removeLocation: Boolean): Boolean =
+        files.saveCopy(item.contentUri, store.edits(item.assetId).first().asText(zone()), removeLocation)
+
+    private suspend fun forget(operationId: String) {
+        journal.close(operationId)
+        files.discard(operationId)
+    }
+
+    private companion object {
+        const val JPEG = "image/jpeg"
     }
 }
 

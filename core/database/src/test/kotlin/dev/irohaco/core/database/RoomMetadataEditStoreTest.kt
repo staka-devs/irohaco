@@ -11,8 +11,10 @@ import dev.irohaco.core.contracts.MetadataEdits
 import dev.irohaco.core.contracts.MetadataField.DESCRIPTION
 import dev.irohaco.core.contracts.MetadataField.LOCATION
 import dev.irohaco.core.contracts.MetadataField.TAKEN
+import dev.irohaco.core.contracts.MetadataWriteState
 import dev.irohaco.core.contracts.NewCatalogAsset
 import dev.irohaco.core.contracts.TimelineQuery
+import dev.irohaco.core.contracts.toMetadataText
 import dev.irohaco.core.domain.GeoBounds
 import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaKind
@@ -189,5 +191,39 @@ class RoomMetadataEditStoreTest {
         edits.setDescription("b", null)
         assertEquals(MetadataEdits(), edits.edits("b").first())
         assertEquals(0, count("SELECT count(*) FROM metadata_conflicts c JOIN metadata_override_sets o USING (override_id) WHERE o.asset_id = 'b'"))
+    }
+
+    @Test
+    fun `a committed write drops the written edits and puts the file's GPS on the map`() = runTest {
+        catalog("a")
+        locations.recordExif("a", tokyo)
+        edits.setLocation("a", FieldEdit.Set(osaka))
+        edits.setDescription("a", FieldEdit.Set("Pier"))
+        val op = edits.begin("a", setOf(LOCATION))
+        edits.advance(op, MetadataWriteState.WRITE_PENDING)
+        assertEquals(mapOf(op to MetadataWriteState.WRITE_PENDING), edits.unfinished())
+        edits.commit(op, mapOf(LOCATION to osaka.toMetadataText()))
+        assertEquals(MetadataEdits(description = FieldEdit.Set("Pier")), edits.edits("a").first())
+        assertEquals(mapOf("a" to osaka), locations.located().associate { it.assetId to it.point })
+        assertEquals(emptyMap(), edits.unfinished())
+        assertEquals(1, count("SELECT count(*) FROM metadata_write_operations WHERE operation_state = 'COMMITTED' AND after_revision_id IS NOT NULL"))
+    }
+
+    @Test
+    fun `an edit changed while it was being written stays, and a closed write is forgotten`() = runTest {
+        catalog("a")
+        edits.setDescription("a", FieldEdit.Set("Pier"))
+        val op = edits.begin("a", setOf(DESCRIPTION))
+        edits.setDescription("a", FieldEdit.Set("Harbour"))
+        edits.commit(op, mapOf(DESCRIPTION to "Pier"))
+        assertEquals(FieldEdit.Set("Harbour"), edits.edits("a").first().description)
+
+        val failed = edits.begin("a", setOf(DESCRIPTION))
+        edits.advance(failed, MetadataWriteState.RECOVERY_REQUIRED)
+        assertEquals(failed, edits.recoveryRequired("a").first())
+        assertEquals(emptyMap(), edits.unfinished())
+        edits.close(failed)
+        assertEquals(null, edits.recoveryRequired("a").first())
+        assertEquals(FieldEdit.Set("Harbour"), edits.edits("a").first().description)
     }
 }

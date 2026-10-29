@@ -67,12 +67,13 @@ internal fun MediaDetailsSheet(
     onEdit: (MetadataField) -> Unit = {},
     onRevert: (MetadataField) -> Unit = {},
     onKeep: (MetadataField) -> Unit = {},
+    fileActions: @Composable () -> Unit = {},
 ) {
     if (state == ViewerViewModel.Details.Hidden) return
     IrohacoBottomSheet(onDismiss = onDismiss) {
         when (state) {
             ViewerViewModel.Details.Loading -> ExpressiveLoading(Modifier.padding(IrohacoSpacing.xl))
-            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate, tags, onAddTag, onRemoveTag, memos, edits, onEdit, onRevert, onKeep)
+            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate, tags, onAddTag, onRemoveTag, memos, edits, onEdit, onRevert, onKeep, fileActions)
             ViewerViewModel.Details.Hidden -> Unit
         }
     }
@@ -93,6 +94,7 @@ internal fun MediaDetailsContent(
     onEdit: (MetadataField) -> Unit = {},
     onRevert: (MetadataField) -> Unit = {},
     onKeep: (MetadataField) -> Unit = {},
+    fileActions: @Composable () -> Unit = {},
 ) {
     Column(
         Modifier
@@ -108,7 +110,10 @@ internal fun MediaDetailsContent(
         memos()
         when (result) {
             MediaDetailsResult.FileUnavailable -> Text(stringResource(R.string.details_file_unavailable), style = MaterialTheme.typography.bodyLarge)
-            is MediaDetailsResult.Read -> DetailRows(result.details, kind, onAllowLocation, edits, onEdit, onRevert, onKeep)
+            is MediaDetailsResult.Read -> {
+                DetailRows(result.details, kind, onAllowLocation, edits, onEdit, onRevert, onKeep)
+                fileActions()
+            }
         }
     }
 }

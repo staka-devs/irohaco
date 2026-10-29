@@ -29,6 +29,9 @@ interface LocationDao {
     )
     suspend fun unindexed(limit: Int): List<TimelineRow>
 
+    @Query("DELETE FROM location_evidence WHERE asset_id = :assetId AND evidence_source = 'EXIF'")
+    suspend fun deleteExif(assetId: String)
+
     @Query("SELECT COUNT(*) FROM location_evidence WHERE asset_id = :assetId AND evidence_source = 'EXIF'")
     suspend fun exifCount(assetId: String): Int
 

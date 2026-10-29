@@ -275,4 +275,23 @@
     <string name="edit_latitude">Latitude</string>
     <string name="edit_longitude">Longitude</string>
     <string name="edit_location_clear_hint">Clear both to remove the location. The file is not changed.</string>
+    <string name="file_write">Write to the file</string>
+    <string name="file_write_confirm">Write</string>
+    <string name="file_write_explain">Writes the chosen fields into the file\'s EXIF. The file as it was stays in the app until the written values are checked.</string>
+    <string name="file_write_conflict">Settle the conflict with the file first.</string>
+    <string name="file_write_unsupported">Files of this type cannot be written to.</string>
+    <string name="file_write_needs_location">Without the permission, writing would drop the file\'s location, so allow location access to write to the file.</string>
+    <string name="file_write_unchecked">The file could not be checked after the write. Put back the file as it was, or keep it as it is.</string>
+    <string name="file_write_restore">Put back as it was</string>
+    <string name="file_write_keep">Keep as it is</string>
+    <string name="file_save_copy">Save a copy</string>
+    <string name="file_save_copy_explain">Saves a copy with your edits written in, in the same folder as the file. The file itself is not changed.</string>
+    <string name="file_save_copy_remove_location">Leave the location out of the copy</string>
+    <string name="file_written">Written to the file</string>
+    <string name="file_not_written">Could not write to the file. It is unchanged, and your edits stay in the app</string>
+    <string name="file_check_failed">The written file could not be checked. You can put it back as it was from the details</string>
+    <string name="file_restored">The file is back as it was</string>
+    <string name="file_not_restored">Could not put the file back as it was</string>
+    <string name="file_copy_saved">Copy saved</string>
+    <string name="file_copy_not_saved">Could not save the copy</string>
 </resources>

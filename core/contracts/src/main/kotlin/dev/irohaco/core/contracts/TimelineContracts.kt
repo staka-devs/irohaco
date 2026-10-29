@@ -157,6 +157,55 @@ interface MetadataEditStore {
     suspend fun keepEdit(assetId: String, field: MetadataField)
 }
 
+/**
+ * Where a write of edits to the file stands (ADR-0004). The OS grant comes before [MetadataWriteJournal.begin],
+ * so the schema's PERMISSION_PENDING is not used; COMMITTED is reached through [MetadataWriteJournal.commit].
+ */
+enum class MetadataWriteState { REQUESTED, STAGED, WRITE_PENDING, VERIFYING, RECOVERY_REQUIRED }
+
+/** The journal of writes of edits to the file, which outlives a stopped process (INDEX_STATE_MACHINE §7). */
+interface MetadataWriteJournal {
+    /** Records a write of the fields' edits as they are now; returns its operation id. */
+    suspend fun begin(assetId: String, fields: Set<MetadataField>): String
+
+    suspend fun advance(operationId: String, state: MetadataWriteState)
+
+    /** The file now holds [written] (fields as text, null for none): the write is COMMITTED and those edits are dropped. */
+    suspend fun commit(operationId: String, written: Map<MetadataField, String?>)
+
+    /** Forgets a write whose file is as the user wants it: never touched, restored, or kept as it is. */
+    suspend fun close(operationId: String)
+
+    /** The write of the asset that left its file unchecked, if any, for the user to restore or keep. */
+    fun recoveryRequired(assetId: String): Flow<String?>
+
+    /** The writes a stopped process left unfinished, by operation id. */
+    suspend fun unfinished(): Map<String, MetadataWriteState>
+}
+
+/**
+ * The file side of writing edits (ADR-0030). [values] holds fields as text as [MetadataEditStore] keeps them,
+ * null to take the field out of the file. [operationId] names the backup and the working copy.
+ */
+interface MetadataFiles {
+    /** Copies the file aside and writes [values] into a working copy, read back and checked; false leaves nothing to write. */
+    suspend fun stage(operationId: String, contentUri: String, values: Map<MetadataField, String?>): Boolean
+
+    /** Puts the working copy in place of the file; needs the OS write grant. */
+    suspend fun replace(operationId: String, contentUri: String): Boolean
+
+    /** Reads the file back: [values] and the image data must be as staged. */
+    suspend fun verify(operationId: String, contentUri: String, values: Map<MetadataField, String?>): Boolean
+
+    /** Puts the backup back in place of the file; needs the OS write grant. */
+    suspend fun restore(operationId: String, contentUri: String): Boolean
+
+    suspend fun discard(operationId: String)
+
+    /** Saves a new file next to the original with [values] written and, if asked, without any location (MET-003). */
+    suspend fun saveCopy(contentUri: String, values: Map<MetadataField, String?>, removeLocation: Boolean): Boolean
+}
+
 data class Tag(val tagId: String, val name: String, val itemCount: Int)
 
 data class Album(val albumId: String, val title: String, val itemCount: Int, val coverUri: String?)

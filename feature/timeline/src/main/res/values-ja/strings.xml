@@ -271,4 +271,23 @@
     <string name="edit_latitude">緯度</string>
     <string name="edit_longitude">経度</string>
     <string name="edit_location_clear_hint">両方を空にすると、場所をなしにします。ファイルは変えません。</string>
+    <string name="file_write">原本に書き込む</string>
+    <string name="file_write_confirm">書き込む</string>
+    <string name="file_write_explain">選んだ項目を原本のEXIFに書き込みます。書き込む前のファイルは、書き込んだ内容を確かめ終わるまでアプリの中に残します。</string>
+    <string name="file_write_conflict">ファイルとの競合を先に解決してください。</string>
+    <string name="file_write_unsupported">この形式の原本には書き込めません。</string>
+    <string name="file_write_needs_location">許可がないとファイルの位置情報が書き込みで消えるので、原本に書き込むには位置情報を許可してください。</string>
+    <string name="file_write_unchecked">原本に書き込んだあとで、書き込んだ内容を確かめられませんでした。書き込む前のファイルに戻すか、このままにするかを選んでください。</string>
+    <string name="file_write_restore">書き込む前に戻す</string>
+    <string name="file_write_keep">このままにする</string>
+    <string name="file_save_copy">コピーとして保存</string>
+    <string name="file_save_copy_explain">アプリで編集した値を書き込んだコピーを、元のファイルと同じフォルダーに保存します。原本は変えません。</string>
+    <string name="file_save_copy_remove_location">コピーから位置情報を外す</string>
+    <string name="file_written">原本に書き込みました</string>
+    <string name="file_not_written">原本に書き込めませんでした。原本は変えず、アプリの値を残しています</string>
+    <string name="file_check_failed">書き込んだ内容を確かめられませんでした。詳細から書き込む前に戻せます</string>
+    <string name="file_restored">書き込む前のファイルに戻しました</string>
+    <string name="file_not_restored">書き込む前のファイルに戻せませんでした</string>
+    <string name="file_copy_saved">コピーを保存しました</string>
+    <string name="file_copy_not_saved">コピーを保存できませんでした</string>
 </resources>
