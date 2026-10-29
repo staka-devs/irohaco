@@ -26,8 +26,9 @@ class TrashViewModelTest {
     private val b = TrashedItem(2, "content://2", MediaKind.IMAGE, "b.jpg", null)
     private var items = listOf(a, b)
     private var changed = 0
+    private val purged = mutableListOf<String>()
 
-    private fun viewModel() = TrashViewModel(BrowseTrash(TrashReader { items }), onChanged = { changed++ })
+    private fun viewModel() = TrashViewModel(BrowseTrash(TrashReader { items }) { purged += it }, onChanged = { changed++ })
 
     @Test
     fun `selects, deselects, selects all and clears`() = runTest {
@@ -51,5 +52,16 @@ class TrashViewModelTest {
         assertEquals(1, changed)
         assertEquals(emptySet(), vm.selection.value)
         assertEquals(listOf(b), vm.items.value)
+    }
+
+    @Test
+    fun `files deleted for good leave the DB, and only the selected ones`() = runTest {
+        val vm = viewModel()
+        vm.toggle(b.mediaStoreId)
+        items = listOf(a)
+        vm.deletedForever()
+        assertEquals(listOf("content://2"), purged)
+        assertEquals(1, changed)
+        assertEquals(listOf(a), vm.items.value)
     }
 }
