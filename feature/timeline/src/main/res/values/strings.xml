@@ -304,4 +304,6 @@
     <string name="search_basis_observed">Seen in it</string>
     <string name="search_basis_user_stated">In your memo</string>
     <string name="search_basis_inferred">Guessed</string>
+    <string name="search_source_number" translatable="false">[%1$d]</string>
+    <string name="search_source_spoken">Source %1$d</string>
 </resources>

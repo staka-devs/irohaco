@@ -22,8 +22,11 @@ import kotlinx.coroutines.withContext
 /** Where a cited fact comes from (RAG-003): seen in the image, written by the user, or guessed. */
 enum class Basis { OBSERVED, USER_STATED, INFERRED }
 
-/** A search result the answer rests on, tapped to open the photo or the video at its scene (RAG-002). */
-data class Citation(val hit: SearchHit, val basis: Basis)
+/**
+ * A search result the answer rests on, tapped to open the photo or the video at its scene (RAG-002).
+ * [number] is how the answer's text cites it, as in "[2]".
+ */
+data class Citation(val hit: SearchHit, val basis: Basis, val number: Int)
 
 sealed interface AskResult {
     /** [known] is false when the sources do not answer the question; the text then says so (RAG-003). */
@@ -172,7 +175,7 @@ OBSERVED means you can see it in the image. USER_STATED means it comes from the 
                 sources.getOrNull(n - 1)?.let { hit ->
                     // Only a memo the user wrote is what the user stated.
                     val basis = bases[n]?.takeUnless { it == Basis.USER_STATED && Evidence.MEMO !in hit.evidence } ?: Basis.INFERRED
-                    Citation(hit, basis)
+                    Citation(hit, basis, n)
                 }
             }
             return AskResult.Answered(answer, known, citations)
