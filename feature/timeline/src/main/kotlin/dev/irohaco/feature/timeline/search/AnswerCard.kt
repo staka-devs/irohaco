@@ -46,7 +46,15 @@ import dev.irohaco.feature.timeline.formatDuration
  * marked as seen in it, written in the user's memo, or guessed. Tapping one opens it at its scene.
  */
 @Composable
-internal fun AnswerCard(asking: Boolean, answer: AskResult?, onAsk: () -> Unit, onOpen: (SearchHit) -> Unit, onOpenSettings: () -> Unit) {
+internal fun AnswerCard(
+    asking: Boolean,
+    answer: AskResult?,
+    onAsk: () -> Unit,
+    onOpen: (SearchHit) -> Unit,
+    onOpenSettings: () -> Unit,
+    /** The answer so far while the model writes it. */
+    partial: String = "",
+) {
     if (answer == null && !asking) {
         OutlinedButton(onClick = onAsk) { Text(stringResource(R.string.search_ask)) }
         return
@@ -55,7 +63,11 @@ internal fun AnswerCard(asking: Boolean, answer: AskResult?, onAsk: () -> Unit, 
         Column(Modifier.padding(IrohacoSpacing.l), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
             when (answer) {
                 null -> {
-                    Text(stringResource(R.string.search_asking), style = MaterialTheme.typography.bodyMedium)
+                    if (partial.isEmpty()) {
+                        Text(stringResource(R.string.search_asking), style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        Text(partial, style = MaterialTheme.typography.bodyLarge)
+                    }
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
                 AskResult.NoModel -> {
@@ -139,6 +151,7 @@ private fun AnswerCardPreview() {
                     ),
                     onAsk = {}, onOpen = {}, onOpenSettings = {},
                 )
+                AnswerCard(asking = true, answer = null, onAsk = {}, onOpen = {}, onOpenSettings = {}, partial = "It was Grandma's 80th")
                 AnswerCard(asking = false, answer = AskResult.NoModel, onAsk = {}, onOpen = {}, onOpenSettings = {})
                 AnswerCard(asking = false, answer = null, onAsk = {}, onOpen = {}, onOpenSettings = {})
             }

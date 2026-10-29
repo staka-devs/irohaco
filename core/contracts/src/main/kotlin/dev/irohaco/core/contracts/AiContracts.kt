@@ -59,8 +59,14 @@ interface AnswerModelSettings {
 
 /** A loaded model that answers from images and text on this device (RAG-001). */
 interface AnswerSession : AutoCloseable {
-    /** One question in a fresh conversation, so an earlier question cannot leak into this answer. */
-    fun answer(instruction: String, images: List<ByteArray>, question: String): String
+    /**
+     * One question in a fresh conversation, so an earlier question cannot leak into this answer. [onText]
+     * gets the reply so far each time it grows; the whole reply is returned at the end.
+     */
+    suspend fun answer(instruction: String, images: List<ByteArray>, question: String, onText: (String) -> Unit = {}): String
+
+    /** Runs one tiny turn, so the first real question does not wait for the runtime to set itself up. */
+    suspend fun warm()
 }
 
 /** Loads an answer model; throws when [backend] cannot run it. */

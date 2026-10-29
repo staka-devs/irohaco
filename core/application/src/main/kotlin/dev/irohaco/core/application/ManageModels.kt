@@ -49,16 +49,6 @@ object ModelCatalog {
         sha256 = "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0",
     )
 
-    // The "fixB" build passes the whole image to the model; the stock one passes its top quarter (LiteRT-LM#3246).
-    val LFM_2_5_VL_1_6B = ModelArtifact(
-        id = "lfm2.5-vl-1.6b",
-        displayName = "LFM2.5-VL 1.6B",
-        url = "https://huggingface.co/litert-community/LFM2.5-VL-1.6B/resolve/" +
-            "b2d1e67c8bd0981d706874b7aa1642b0001d0f68/LFM2.5-VL-1.6B_int4_fixB.litertlm",
-        sizeBytes = 1_298_139_472,
-        sha256 = "79ca9db8af91e40486a5dfcaf26549180fd6c811ad85f826e3aef20ad0bd565c",
-    )
-
     val LFM_3_VL_2B = ModelArtifact(
         id = "lfm3-vl-2b",
         displayName = "LFM3-VL 2B",
@@ -68,7 +58,8 @@ object ModelCatalog {
         sha256 = "e9e15f4da346a8eb7fc5d2dc276dde9a9cecf1424d50193deeb2d098bf664877",
     )
 
-    val ANSWER = listOf(GEMMA_4_E2B, GEMMA_4_E4B, LFM_2_5_VL_1_6B, LFM_3_VL_2B)
+    // LFM2.5-VL 1.6B was left out: its vision encoder failed on the GPU and took 38 s for four images on the CPU.
+    val ANSWER = listOf(GEMMA_4_E2B, GEMMA_4_E4B, LFM_3_VL_2B)
 
     val ALL = listOf(EMBEDDING) + ANSWER
 }
