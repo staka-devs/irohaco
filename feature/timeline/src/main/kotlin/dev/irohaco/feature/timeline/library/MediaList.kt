@@ -5,8 +5,9 @@ import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.domain.GeoBounds
 
 /**
- * A list a grid and its viewer show: one folder, album or tag, or the favorites. The timeline's
- * order and kind still apply; folders hidden from the timeline are not hidden here.
+ * A list a grid and its viewer show: one folder, album or tag, the favorites, or a group on the map.
+ * The timeline's order and kind still apply. Folders hidden from the timeline stay hidden in a map
+ * group, as on the map itself, and show everywhere else (GAL-002).
  */
 sealed interface MediaList {
     data class Folder(val folder: FolderRef) : MediaList
@@ -27,7 +28,7 @@ sealed interface MediaList {
             is Album -> base.copy(albumId = albumId)
             is Tag -> base.copy(tagId = tagId)
             Favorites -> base.copy(favoritesOnly = true)
-            is Area -> base.copy(area = bounds)
+            is Area -> timeline.copy(area = bounds)
         }
     }
 }

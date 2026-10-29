@@ -23,6 +23,7 @@ class SearchMediaTest {
     private var modelMissing = false
     private var embeds = 0
     private var revoked = emptySet<String>()
+    private var hidden = emptySet<String>()
     private val tagged = mapOf("trip" to setOf("p2", "v1"))
 
     private val vectors = object : VectorSearchStore {
@@ -48,7 +49,14 @@ class SearchMediaTest {
         SearchText(texts),
         { ids, tag -> catalog.filter { it.assetId in ids && (tag == null || it.assetId in tagged.getValue(tag)) } },
         { items -> items.filter { it.assetId !in revoked } },
+        hidden = { hidden },
     )
+
+    @Test
+    fun `a file in a folder hidden from the timeline is left out of search too`() = runTest {
+        hidden = setOf("v1")
+        assertEquals(listOf("p2", "p1"), search("駅前の看板").hits.map { it.item.assetId })
+    }
 
     @Test
     fun `a file the OS no longer lets the app read is left out, though the catalog still lists it`() = runTest {

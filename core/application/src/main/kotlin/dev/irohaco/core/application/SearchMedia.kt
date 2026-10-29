@@ -52,6 +52,8 @@ class SearchMedia(
     private val access: MediaAccessCheck,
     /** Files at a place the query names (SRCH-003); null leaves place names out. */
     private val places: SearchPlaces? = null,
+    /** Files in the folders hidden from the timeline, which search leaves out too (GAL-002). */
+    private val hidden: suspend () -> Set<String> = { emptySet() },
 ) {
     /** The spaces to pick from; one still being built carries how much it covers (AC-005). */
     fun spaces(): Flow<List<SpaceChoice>> = meaning.spaces().map { spaces ->
@@ -106,7 +108,9 @@ class SearchMedia(
         texts.forEachIndexed { rank, hit ->
             fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, if (hit.fromMemo) Evidence.MEMO else Evidence.TEXT, hit.text, null)
         }
-        val found = access.readableNow(items.items(fused.keys.map { it.first }, filters.tagId)).associateBy { it.assetId }
+        val hiddenNow = hidden()
+        val ids = fused.keys.map { it.first }.filter { it !in hiddenNow }
+        val found = access.readableNow(items.items(ids, filters.tagId)).associateBy { it.assetId }
         val hits = fused.entries
             .sortedByDescending { it.value.score }
             .mapNotNull { (key, f) ->
