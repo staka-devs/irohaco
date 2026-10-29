@@ -49,6 +49,7 @@ import dev.irohaco.core.database.RoomCatalogStore
 import dev.irohaco.core.database.RoomCollectionsStore
 import dev.irohaco.core.database.RoomIdentityStore
 import dev.irohaco.core.database.RoomMediaIndexStore
+import dev.irohaco.core.database.RoomMediaPurge
 import dev.irohaco.core.database.RoomIndexJobStore
 import dev.irohaco.core.database.RoomLibraryReader
 import dev.irohaco.core.database.RoomLocationStore
@@ -132,7 +133,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     val prepareShare by lazy { PrepareShare(AndroidMediaDetailsReader(appContext), AndroidShareFiles(appContext)) }
 
-    val browseTrash by lazy { BrowseTrash(AndroidTrashReader(appContext)) }
+    val browseTrash by lazy { BrowseTrash(AndroidTrashReader(appContext), RoomMediaPurge(database)) }
 
     val mapSettings by lazy { DataStoreMapSettings(settingsStore) }
 

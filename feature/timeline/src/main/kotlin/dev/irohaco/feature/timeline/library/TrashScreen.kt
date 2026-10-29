@@ -92,6 +92,17 @@ class TrashViewModel(
         clearSelection()
         viewModelScope.launch { onChanged(); refresh() }
     }
+
+    /** The system confirmed deleting the selected files for good; their rows go from the DB too (ADR-0018). */
+    fun deletedForever() {
+        val gone = _items.value.filter { it.mediaStoreId in _selection.value }
+        clearSelection()
+        viewModelScope.launch {
+            browse.deletedForever(gone)
+            onChanged()
+            refresh()
+        }
+    }
 }
 
 /** The trash: MediaStore's own, so another app's deletions show up too (PRD GAL-015). */
@@ -104,7 +115,7 @@ fun TrashScreen(viewModel: TrashViewModel, onBack: () -> Unit) {
         if (it.resultCode == Activity.RESULT_OK) viewModel.changed()
     }
     val delete = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
-        if (it.resultCode == Activity.RESULT_OK) viewModel.changed()
+        if (it.resultCode == Activity.RESULT_OK) viewModel.deletedForever()
     }
     val selected = items.filter { it.mediaStoreId in selection }
     TrashContent(
@@ -119,7 +130,7 @@ fun TrashScreen(viewModel: TrashViewModel, onBack: () -> Unit) {
     )
 }
 
-/** The system dialog that permanently deletes files (GAL-015); the asset's own DB rows stay (M1-09). */
+/** The system dialog that permanently deletes files (GAL-015). */
 private fun deleteForeverRequest(context: Context, uris: List<Uri>): IntentSenderRequest =
     IntentSenderRequest.Builder(MediaStore.createDeleteRequest(context.contentResolver, uris).intentSender).build()
 
