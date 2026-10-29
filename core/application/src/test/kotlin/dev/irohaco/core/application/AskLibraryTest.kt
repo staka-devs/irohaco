@@ -132,4 +132,32 @@ class AskLibraryTest {
         runCurrent()
         assertEquals(1, closed, "closed when unused")
     }
+
+    @Test
+    fun `a photo in the viewer is asked about with its memo, time, place and the earlier turns`() = runTest {
+        reply = "ANSWER: At the harbour [1].\nKNOWN: yes\nSOURCES: 1=USER_STATED"
+        val video = TimelineItem("v", MediaKind.VIDEO, "content://v", 0)
+        val earlier = listOf("q1" to "a1", "q2" to "a2", "q3" to "a3", "q4" to "a4")
+        val answer = assertIs<AskResult.Answered>(
+            ask(setOf(ModelCatalog.GEMMA_4_E2B.id)).askAbout("And who?", video, 5_000, listOf("Harbour trip", " "), 0, "Kyoto", earlier),
+        )
+        assertEquals(Basis.USER_STATED, answer.citations.single().basis)
+        assertEquals(listOf("content://v@5000"), read)
+        val prompt = asked.single().second
+        assertTrue("User's memo: \"Harbour trip\"" in prompt, prompt)
+        assertTrue("[1] was taken on " in prompt && " in Kyoto." in prompt, prompt)
+        assertTrue("q1" !in prompt && "Earlier question: q4\nEarlier answer: a4" in prompt, prompt)
+        assertTrue(prompt.endsWith("Question: And who?"), prompt)
+    }
+
+    @Test
+    fun `a photo with no memo cannot be what the user stated`() = runTest {
+        reply = "ANSWER: A pier [1].\nKNOWN: yes\nSOURCES: 1=USER_STATED"
+        val answer = assertIs<AskResult.Answered>(
+            ask(setOf(ModelCatalog.GEMMA_4_E2B.id)).askAbout("Where?", photo.item, null, emptyList(), null, null, emptyList()),
+        )
+        assertEquals(Basis.INFERRED, answer.citations.single().basis)
+        assertEquals(listOf("content://p"), read)
+        assertTrue("was taken" !in asked.single().second)
+    }
 }

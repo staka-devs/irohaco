@@ -227,10 +227,12 @@ class MainActivity : ComponentActivity() {
                             page, viewer.assetId, viewer.startMs, container::newVideoPlayer, container.getMediaDetails, query,
                             container.markMedia, container.manageCollections, container.mediaFormatProbe,
                             container.browseMap, container.manageAnnotations, container.editMetadata, container.writeMetadataToFile,
+                            container.askLibrary,
                         )
                     },
                     onBack,
                     onFindSimilar = { open(Route.similar(it)) },
+                    onOpenSettings = { open(Route.SETTINGS) },
                 )
             }
         }

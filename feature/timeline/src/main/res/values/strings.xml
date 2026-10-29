@@ -306,4 +306,10 @@
     <string name="search_basis_inferred">Guessed</string>
     <string name="search_source_number" translatable="false">[%1$d]</string>
     <string name="search_source_spoken">Source %1$d</string>
+    <string name="viewer_ask">Ask AI</string>
+    <string name="viewer_ask_hint">Ask about this photo</string>
+    <string name="viewer_ask_hint_video">Ask about this scene</string>
+    <string name="viewer_ask_send">Ask</string>
+    <string name="viewer_asking">Looking at this photo or scene</string>
+    <string name="viewer_ask_caution">The AI on this device answered from this photo or scene only. It can be wrong.</string>
 </resources>

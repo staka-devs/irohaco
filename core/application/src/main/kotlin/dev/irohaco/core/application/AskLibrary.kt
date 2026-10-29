@@ -6,6 +6,7 @@ import dev.irohaco.core.contracts.AnswerRuntime
 import dev.irohaco.core.contracts.AnswerSession
 import dev.irohaco.core.contracts.IndexImageReader
 import dev.irohaco.core.contracts.ModelArtifact
+import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -18,6 +19,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
 /** Where a cited fact comes from (RAG-003): seen in the image, written by the user, or guessed. */
 enum class Basis { OBSERVED, USER_STATED, INFERRED }
@@ -91,8 +96,27 @@ class AskLibrary(
         }
     }
 
-    /** [onText] gets the answer's text so far while the model writes it. */
-    suspend fun ask(question: String, hits: List<SearchHit>, onText: (String) -> Unit = {}): AskResult {
+    /**
+     * Asks about the photo or the video's scene open in the viewer (#201). The model also gets when and where
+     * it was taken, the user's memos on it, and the last few questions and answers, so a follow-up can build on them.
+     */
+    suspend fun askAbout(
+        question: String,
+        item: TimelineItem,
+        frameMs: Long?,
+        memos: List<String>,
+        takenAtMs: Long?,
+        place: String?,
+        earlier: List<Pair<String, String>>,
+        onText: (String) -> Unit = {},
+    ): AskResult {
+        val memo = memos.filter { it.isNotBlank() }.joinToString(" / ").ifEmpty { null }
+        val hit = SearchHit(item, frameMs ?: 0L.takeIf { item.kind == MediaKind.VIDEO }, setOfNotNull(Evidence.MEMO.takeIf { memo != null }), memo)
+        return ask(question, listOf(hit), context(takenAtMs, place, earlier), onText)
+    }
+
+    /** [onText] gets the answer's text so far while the model writes it; [context] goes just before the question. */
+    suspend fun ask(question: String, hits: List<SearchHit>, context: String = "", onText: (String) -> Unit = {}): AskResult {
         val path = modelPath() ?: return AskResult.NoModel
         val sources = hits.take(MAX_SOURCES)
         if (question.isBlank() || sources.isEmpty()) return AskResult.NothingFound
@@ -101,7 +125,7 @@ class AskLibrary(
                 sources.map { hit -> hit.timestampMs?.let { images.readFrame(hit.item.contentUri, it) } ?: images.read(hit.item.contentUri) }
             }
             val reply = withSession(path) { session ->
-                session.answer(INSTRUCTION, pictures, prompt(question, sources)) { onText(visibleAnswer(it)) }
+                session.answer(INSTRUCTION, pictures, prompt(question, sources, context)) { onText(visibleAnswer(it)) }
             }
             parseAnswer(reply, sources)
         } catch (e: CancellationException) {
@@ -159,8 +183,23 @@ KNOWN: <yes, or no when the sources do not answer the question; then say in ANSW
 SOURCES: <each source you used and how you know: 1=OBSERVED, 2=USER_STATED, 3=INFERRED>
 OBSERVED means you can see it in the image. USER_STATED means it comes from the user's memo. INFERRED means you guessed it."""
 
-        /** The question and one line of notes per source. */
-        fun prompt(question: String, sources: List<SearchHit>): String = buildString {
+        /** Earlier turns kept for a follow-up; each image already costs about 256 of the 2,048 tokens. */
+        const val MAX_EARLIER = 3
+
+        /** When and where source [1] was taken, and the chat so far. */
+        fun context(takenAtMs: Long?, place: String?, earlier: List<Pair<String, String>>, zone: ZoneId = ZoneId.systemDefault()): String = buildString {
+            val taken = takenAtMs?.let { LocalDateTime.ofInstant(Instant.ofEpochMilli(it), zone).truncatedTo(ChronoUnit.MINUTES) }
+            if (taken != null || place != null) {
+                append("[1] was taken")
+                taken?.let { append(" on ").append(it) }
+                place?.let { append(" in ").append(it) }
+                append(".\n")
+            }
+            earlier.takeLast(MAX_EARLIER).forEach { (q, a) -> append("Earlier question: ").append(q).append("\nEarlier answer: ").append(a).append('\n') }
+        }
+
+        /** The question, one line of notes per source, and [context] before the question. */
+        fun prompt(question: String, sources: List<SearchHit>, context: String = ""): String = buildString {
             sources.forEachIndexed { i, hit ->
                 append("[${i + 1}] ")
                 append(if (hit.item.kind == MediaKind.VIDEO) "video" else "photo")
@@ -171,6 +210,7 @@ OBSERVED means you can see it in the image. USER_STATED means it comes from the 
                 read?.let { append(". Text read in the image: \"$it\"") }
                 append('\n')
             }
+            append(context)
             append("Question: ").append(question.trim())
         }
 

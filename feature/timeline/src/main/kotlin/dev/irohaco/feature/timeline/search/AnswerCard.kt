@@ -54,6 +54,9 @@ internal fun AnswerCard(
     onOpenSettings: () -> Unit,
     /** The answer so far while the model writes it. */
     partial: String = "",
+    /** What the card says while the model has not written yet, and the caution under an answer. */
+    askingLabel: Int = R.string.search_asking,
+    caution: Int = R.string.search_ask_caution,
 ) {
     if (answer == null && !asking) {
         OutlinedButton(onClick = onAsk) { Text(stringResource(R.string.search_ask)) }
@@ -64,7 +67,7 @@ internal fun AnswerCard(
             when (answer) {
                 null -> {
                     if (partial.isEmpty()) {
-                        Text(stringResource(R.string.search_asking), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(askingLabel), style = MaterialTheme.typography.bodyMedium)
                     } else {
                         Text(partial, style = MaterialTheme.typography.bodyLarge)
                     }
@@ -87,7 +90,7 @@ internal fun AnswerCard(
                         }
                     }
                     Text(
-                        stringResource(R.string.search_ask_caution),
+                        stringResource(caution),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
