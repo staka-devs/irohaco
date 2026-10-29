@@ -1,6 +1,11 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.contracts.InferredPlace
 import dev.irohaco.core.contracts.ModelNotInstalledException
+import dev.irohaco.core.contracts.PlaceEvidenceStore
+import dev.irohaco.core.contracts.PlaceMatch
+import dev.irohaco.core.contracts.TimedPoint
+import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.contracts.SpaceState
 import dev.irohaco.core.contracts.TextIndexStore
 import dev.irohaco.core.contracts.TextMatch
@@ -51,6 +56,24 @@ class SearchMediaTest {
         { items -> items.filter { it.assetId !in revoked } },
         hidden = { hidden },
     )
+
+    @Test
+    fun `a place the query names narrows the results until the user lets it go`() = runTest {
+        val places = object : PlaceEvidenceStore {
+            override suspend fun unnamedAreas(limit: Int) = emptyList<GeoPoint>()
+            override suspend fun nameArea(area: GeoPoint, name: String) {}
+            override suspend fun locatedTimes() = emptyList<TimedPoint>()
+            override suspend fun unlocatedTimes() = emptyList<Pair<String, Long>>()
+            override suspend fun replaceInferred(places: List<InferredPlace>) {}
+            override suspend fun placeNames(includeInferred: Boolean) = listOf("京都市, 京都府")
+            override suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int) = listOf(PlaceMatch("p2", "京都市, 京都府", inferred = false))
+        }
+        val atPlaces = SearchMedia(SearchByMeaning(vectors, embedText = { floatArrayOf(1f) }, modelDigest = "d"), SearchText(texts), { ids, _ -> catalog.filter { it.assetId in ids } }, { it }, SearchPlaces(places))
+        val narrowed = atPlaces("京都の看板", onlyAtPlace = true)
+        assertEquals(listOf("p2"), narrowed.hits.map { it.item.assetId })
+        assertEquals("京都市", narrowed.place)
+        assertEquals(listOf("p2", "p1", "v1", "v1"), atPlaces("京都の看板").hits.map { it.item.assetId })
+    }
 
     @Test
     fun `a file in a folder hidden from the timeline is left out of search too`() = runTest {

@@ -118,7 +118,7 @@ import java.time.format.DateTimeFormatter
 
 /** The full-screen photo viewer (PRD GAL-003, DESIGN §4.6). */
 @Composable
-fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimilar: (String) -> Unit = {}) {
+fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimilar: (String) -> Unit = {}, onOpenSettings: () -> Unit = {}) {
     val start by viewModel.start.collectAsStateWithLifecycle()
     val items = viewModel.items.collectAsLazyPagingItems()
     val playing by viewModel.playing.collectAsStateWithLifecycle()
@@ -139,6 +139,20 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
     val writeToCheck by viewModel.writeToCheck.collectAsStateWithLifecycle()
     var writing by remember { mutableStateOf(false) }
     var copying by remember { mutableStateOf(false) }
+    var askingAbout by remember { mutableStateOf<TimelineItem?>(null) }
+    askingAbout?.let { item ->
+        val turns by viewModel.turns.collectAsStateWithLifecycle()
+        AskSheet(
+            turns = turns,
+            isVideo = item.kind == MediaKind.VIDEO,
+            onAsk = { viewModel.askAbout(item, it) },
+            onOpenSettings = onOpenSettings,
+            onDismiss = {
+                askingAbout = null
+                viewModel.closeAsk()
+            },
+        )
+    }
     val fileDetails = ((details as? ViewerViewModel.Details.Shown)?.result as? MediaDetailsResult.Read)?.details
     detailsOf?.let { item ->
         val done = { editing = null }
@@ -292,6 +306,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
                 placeName = placeName,
                 onShare = { item -> context.startActivity(shareIntent(listOf(item))) },
                 onFindSimilar = { onFindSimilar(it.assetId) },
+                onAsk = if (viewModel.canAsk) { item -> askingAbout = item; viewModel.openAsk() } else null,
                 onShowOnMap = { (location as? Detail.Value<GeoPoint>)?.value?.let { context.startActivity(mapIntent(it)) } },
                 onTrash = { item ->
                     trashedUri = Uri.parse(item.contentUri)
@@ -323,6 +338,8 @@ internal fun MediaViewerContent(
     onFindSimilar: (TimelineItem) -> Unit = {},
     onShowOnMap: (TimelineItem) -> Unit = {},
     onTrash: (TimelineItem) -> Unit = {},
+    /** null hides "Ask AI" (#201). */
+    onAsk: ((TimelineItem) -> Unit)? = null,
 ) {
     var current by remember { mutableStateOf<TimelineItem?>(null) }
     LaunchedEffect(current) { onCurrentChanged(current) }
@@ -415,6 +432,7 @@ internal fun MediaViewerContent(
                                 hasLocation = hasLocation,
                                 onShare = { menu = false; onShare(item) },
                                 onFindSimilar = { menu = false; onFindSimilar(item) },
+                                onAsk = onAsk?.let { ask -> { menu = false; ask(item) } },
                                 onShowOnMap = { menu = false; onShowOnMap(item) },
                                 onShowDetails = { menu = false; onShowDetails(item) },
                                 onTrash = { menu = false; onTrash(item) },
@@ -438,7 +456,15 @@ private fun ColumnScope.ViewerActionsMenu(
     onShowOnMap: () -> Unit,
     onShowDetails: () -> Unit,
     onTrash: () -> Unit,
+    onAsk: (() -> Unit)?,
 ) {
+    if (onAsk != null) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.viewer_ask)) },
+            leadingIcon = { Icon(painterResource(IrohacoIcons.SmartToy), contentDescription = null) },
+            onClick = onAsk,
+        )
+    }
     DropdownMenuItem(
         text = { Text(stringResource(R.string.timeline_share)) },
         leadingIcon = { Icon(painterResource(IrohacoIcons.Share), contentDescription = null) },
@@ -626,7 +652,7 @@ private fun MediaViewerPreview() {
 private fun ViewerMenuPreview() {
     IrohacoTheme(dynamicColor = false) {
         Surface {
-            Column { ViewerActionsMenu(hasLocation = true, onShare = {}, onFindSimilar = {}, onShowOnMap = {}, onShowDetails = {}, onTrash = {}) }
+            Column { ViewerActionsMenu(hasLocation = true, onShare = {}, onFindSimilar = {}, onShowOnMap = {}, onShowDetails = {}, onTrash = {}, onAsk = {}) }
         }
     }
 }

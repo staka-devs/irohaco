@@ -301,4 +301,12 @@
     <string name="search_basis_user_stated">メモにある</string>
     <string name="search_basis_inferred">推測</string>
     <string name="search_source_spoken">根拠 %1$d</string>
+    <string name="viewer_ask">AI に聞く</string>
+    <string name="viewer_ask_hint">この写真について質問</string>
+    <string name="viewer_ask_hint_video">この場面について質問</string>
+    <string name="viewer_ask_send">聞く</string>
+    <string name="viewer_asking">この写真や場面を見て答えを作っています</string>
+    <string name="viewer_ask_caution">端末の AI がこの写真や場面だけを見て答えています。間違うことがあります。</string>
+    <string name="ask_title">AI に聞く</string>
+    <string name="ask_hint">写真について質問（例: 去年の夏はどこに行った？）</string>
 </resources>

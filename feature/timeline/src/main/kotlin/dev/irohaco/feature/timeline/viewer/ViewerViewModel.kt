@@ -8,6 +8,8 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import dev.irohaco.core.application.AskLibrary
+import dev.irohaco.core.application.AskResult
 import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.BrowseMap
 import dev.irohaco.core.application.GetTimelinePage
@@ -55,6 +57,8 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.update
 import kotlin.math.max
 
 /**
@@ -79,6 +83,8 @@ class ViewerViewModel(
     private val annotations: ManageAnnotations? = null,
     private val metadata: EditMetadata? = null,
     private val writer: WriteMetadataToFile? = null,
+    /** Answers questions about the page on screen with a local model (#201); null hides "Ask AI". */
+    private val ask: AskLibrary? = null,
 ) : ViewModel() {
     private val currentItem = MutableStateFlow<TimelineItem?>(null)
     private val current = currentItem.map { it?.assetId }.distinctUntilChanged()
@@ -197,7 +203,41 @@ class ViewerViewModel(
     suspend fun memoHistory(annotationId: String): List<AnnotationRevision> = annotations?.history(annotationId).orEmpty()
 
     fun showing(item: TimelineItem?) {
+        if (item?.assetId != currentItem.value?.assetId) closeAsk()
         currentItem.value = item
+    }
+
+    val canAsk = ask != null
+
+    private val _turns = MutableStateFlow<List<AskTurn>>(emptyList())
+    val turns: StateFlow<List<AskTurn>> = _turns.asStateFlow()
+    private var asking: Job? = null
+
+    /** Loads the model while the user types the first question. */
+    fun openAsk() {
+        ask?.warmUp()
+    }
+
+    /** Asks about the photo, or the video's scene playing now; the answered turns before it go along. */
+    fun askAbout(item: TimelineItem, question: String) {
+        val library = ask ?: return
+        if (question.isBlank()) return
+        val frameMs = playing.value?.takeIf { it.first == item.assetId }?.second?.currentPosition
+        val earlier = _turns.value.mapNotNull { turn -> (turn.answer as? AskResult.Answered)?.let { turn.question to it.text } }
+        // A failed turn is asked again rather than kept.
+        _turns.update { turns -> turns.filterNot { it.answer is AskResult.Failed } + AskTurn(question.trim()) }
+        asking?.cancel()
+        asking = viewModelScope.launch {
+            val answer = library.askAbout(
+                question, item, frameMs, memos.value.map { it.current.text }, edits.value.takenAtMs ?: item.sortTimeMs, placeName.value, earlier,
+            ) { text -> _turns.update { it.dropLast(1) + it.last().copy(partial = text) } }
+            _turns.update { it.dropLast(1) + it.last().copy(answer = answer, partial = "") }
+        }
+    }
+
+    fun closeAsk() {
+        asking?.cancel()
+        _turns.value = emptyList()
     }
 
     fun setFavorite(item: TimelineItem, favorite: Boolean) {

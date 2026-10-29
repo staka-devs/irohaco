@@ -54,6 +54,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.listSaver
 import dev.irohaco.feature.timeline.viewer.MediaViewerScreen
 import dev.irohaco.feature.timeline.viewer.ViewerViewModel
+import dev.irohaco.feature.timeline.ask.AskScreen
+import dev.irohaco.feature.timeline.ask.AskViewModel
+import dev.irohaco.core.application.ChatWithLibrary
 import dev.irohaco.ui.IrohacoApp
 import dev.irohaco.ui.ScreenViewModelStores
 import dev.irohaco.ui.TopLevelDestination
@@ -107,6 +110,7 @@ class MainActivity : ComponentActivity() {
                                         onOpenTrash = { open(Route.TRASH) },
                                         onOpenMap = { open(Route.MAP) },
                                         onPlayAt = { assetId, ms -> open(Route.playVideoAt(assetId, ms)) },
+                                        onOpenAsk = { open(Route.ASK) },
                                     )
                                 }
                             } else {
@@ -130,6 +134,7 @@ class MainActivity : ComponentActivity() {
         onOpenTrash: () -> Unit,
         onOpenMap: () -> Unit,
         onPlayAt: (assetId: String, startMs: Long) -> Unit,
+        onOpenAsk: () -> Unit,
     ) {
         IrohacoApp { destination ->
             when (destination) {
@@ -176,6 +181,7 @@ class MainActivity : ComponentActivity() {
                     onOpenMedia = { onOpenMedia(it, null) },
                     onPlayAt = onPlayAt,
                     onOpenSettings = onOpenSettings,
+                    onOpenAsk = onOpenAsk,
                 )
             }
         }
@@ -199,6 +205,12 @@ class MainActivity : ComponentActivity() {
             route == Route.MAP -> MapScreen(
                 viewModel { MapViewModel(container.browseMap) },
                 onOpenArea = { open(Route.list(MediaList.Area(it))) },
+                onBack = onBack,
+            )
+            route == Route.ASK -> AskScreen(
+                viewModel { AskViewModel(ChatWithLibrary(container.searchMedia, container.askLibrary)) },
+                onOpen = { hit -> open(hit.timestampMs?.let { Route.playVideoAt(hit.item.assetId, it) } ?: Route.viewer(hit.item.assetId)) },
+                onOpenSettings = { open(Route.SETTINGS) },
                 onBack = onBack,
             )
             Route.isSimilar(route) -> SearchScreen(
@@ -227,10 +239,12 @@ class MainActivity : ComponentActivity() {
                             page, viewer.assetId, viewer.startMs, container::newVideoPlayer, container.getMediaDetails, query,
                             container.markMedia, container.manageCollections, container.mediaFormatProbe,
                             container.browseMap, container.manageAnnotations, container.editMetadata, container.writeMetadataToFile,
+                            container.askLibrary,
                         )
                     },
                     onBack,
                     onFindSimilar = { open(Route.similar(it)) },
+                    onOpenSettings = { open(Route.SETTINGS) },
                 )
             }
         }
@@ -259,6 +273,7 @@ object Route {
     const val IDENTITY = "identity"
     const val TRASH = "trash"
     const val MAP = "map"
+    const val ASK = "ask"
     private const val VIEWER = "viewer:"
     private const val LIST = "list:"
     private const val SIMILAR = "similar:"

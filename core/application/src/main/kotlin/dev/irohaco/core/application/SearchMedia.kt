@@ -37,7 +37,13 @@ data class SpaceChoice(val space: EmbeddingSpace, val coverage: Float?)
  * What a search found. [searched] lists the spaces that answered by meaning, each with how much of the
  * library it covers (SRCH-006); [meaningUnavailable] is true when no index or model could answer.
  */
-data class SearchResults(val hits: List<SearchHit>, val searched: List<SpaceChoice>, val meaningUnavailable: Boolean)
+data class SearchResults(
+    val hits: List<SearchHit>,
+    val searched: List<SpaceChoice>,
+    val meaningUnavailable: Boolean,
+    /** The place the query names, as the place search found it (#203); null when it names none. */
+    val place: String? = null,
+)
 
 /**
  * The search screen's one entry (SRCH-001, SRCH-002, SRCH-004〜006): by meaning in one space or, when
@@ -74,11 +80,19 @@ class SearchMedia(
         filters: SearchFilters = SearchFilters(),
         /** Places guessed from photos taken near in time count too (`include_inferred`); else only GPS (`confirmed_only`). */
         includeInferredPlaces: Boolean = true,
+        /** Only files at the place the query names, when it names one (#203). */
+        onlyAtPlace: Boolean = false,
     ): SearchResults {
         val meant = if (byMeaning) meaningOrEmpty { if (compare) meaning.compare(query) else listOfNotNull(meaning(query, spaceId)) } else emptyList()
         val texts = if (byText || byMemo) text(query).filter { if (it.fromMemo) byMemo else byText } else emptyList()
         val atPlaces = places?.invoke(query, includeInferredPlaces).orEmpty()
-        return fuse(meant.map { it.copy(hits = it.hits.filter { hit -> byMemo || !hit.fromMemo }) }, texts, kind, filters, meaningAsked = byMeaning, atPlaces)
+        // shortcut: the place search keeps its first 200 files, so a place with more loses the rest; page it if that shows.
+        val atPlace = atPlaces.map { it.assetId }.toSet().takeIf { onlyAtPlace && it.isNotEmpty() }
+        val results = fuse(meant.map { it.copy(hits = it.hits.filter { hit -> byMemo || !hit.fromMemo }) }, texts, kind, filters, meaningAsked = byMeaning, atPlaces)
+        return results.copy(
+            hits = results.hits.filter { atPlace == null || it.item.assetId in atPlace },
+            place = atPlaces.firstOrNull()?.placeName?.substringBefore(",")?.trim(),
+        )
     }
 
     /** Photos and video scenes like [assetId] (SRCH-001), under the same conditions as a search. */
