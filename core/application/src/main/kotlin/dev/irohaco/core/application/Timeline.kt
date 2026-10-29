@@ -5,6 +5,8 @@ import dev.irohaco.core.contracts.FileOperationResult
 import dev.irohaco.core.contracts.FieldEdit
 import dev.irohaco.core.contracts.MarksStore
 import dev.irohaco.core.contracts.MetadataEditStore
+import dev.irohaco.core.contracts.MetadataField
+import dev.irohaco.core.contracts.toMetadataText
 import dev.irohaco.core.contracts.MediaDetailsReader
 import dev.irohaco.core.contracts.MediaFiles
 import dev.irohaco.core.contracts.MediaLibraryAccessPort
@@ -17,13 +19,17 @@ import dev.irohaco.core.contracts.TimelineReader
 import dev.irohaco.core.contracts.TrashReader
 import dev.irohaco.core.domain.Detail
 import dev.irohaco.core.domain.GeoPoint
+import dev.irohaco.core.domain.MediaDetails
 import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.MediaLibraryAccess
 import dev.irohaco.core.domain.isValidName
 import dev.irohaco.core.domain.renamedFile
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.Instant
+import java.time.ZoneId
 
 /**
  * Reads the timeline a page at a time (PRD GAL-001) in the order and filter the user picked
@@ -114,6 +120,35 @@ class EditMetadata(private val store: MetadataEditStore) {
     suspend fun setLocation(assetId: String, edit: FieldEdit<GeoPoint>?) = store.setLocation(assetId, edit)
 
     suspend fun setDescription(assetId: String, edit: FieldEdit<String>?) = store.setDescription(assetId, edit)
+
+    /**
+     * Checks the file's values just read against the edits (INT-002). Values the file withholds or could not
+     * give are left out, so they are never taken for a change. The edited time is compared in [zone], where it was picked.
+     */
+    suspend fun compareWithFile(assetId: String, file: MediaDetails, zone: ZoneId = ZoneId.systemDefault()) {
+        val edits = store.edits(assetId).first()
+        val read = buildMap {
+            putRead(MetadataField.TAKEN, file.takenAt) { it.toString() }
+            putRead(MetadataField.LOCATION, file.location) { it.toMetadataText() }
+            putRead(MetadataField.DESCRIPTION, file.description) { it }
+        }
+        val edited = buildMap {
+            edits.takenAtMs?.let { put(MetadataField.TAKEN, Instant.ofEpochMilli(it).atZone(zone).toLocalDateTime().toString()) }
+            edits.location?.let { put(MetadataField.LOCATION, (it as? FieldEdit.Set)?.value?.toMetadataText()) }
+            edits.description?.let { put(MetadataField.DESCRIPTION, (it as? FieldEdit.Set)?.value) }
+        }
+        store.compareWithFile(assetId, read, edited)
+    }
+
+    suspend fun keepEdit(assetId: String, field: MetadataField) = store.keepEdit(assetId, field)
+
+    private fun <T> MutableMap<MetadataField, String?>.putRead(field: MetadataField, detail: Detail<T>, format: (T) -> String) {
+        when (detail) {
+            is Detail.Value -> put(field, format(detail.value))
+            Detail.Missing -> put(field, null)
+            else -> Unit
+        }
+    }
 }
 
 /** Tags and user albums (PRD GAL-007). */

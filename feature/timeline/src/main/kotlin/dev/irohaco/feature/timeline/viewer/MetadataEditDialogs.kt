@@ -33,9 +33,6 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 
-/** The fields of the details sheet the user can change in the DB (PRD MET-002). */
-enum class EditableField { TAKEN, LOCATION, DESCRIPTION }
-
 /** A date, then a time; the seconds stay as they were. Times are in the device's time zone, as MediaStore keeps them. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

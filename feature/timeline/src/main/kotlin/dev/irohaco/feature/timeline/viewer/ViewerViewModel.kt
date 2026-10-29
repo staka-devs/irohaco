@@ -21,6 +21,7 @@ import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.application.EditMetadata
 import dev.irohaco.core.contracts.FieldEdit
 import dev.irohaco.core.contracts.MetadataEdits
+import dev.irohaco.core.contracts.MetadataField
 import dev.irohaco.core.application.ManageAnnotations
 import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.contracts.Tag
@@ -37,6 +38,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import dev.irohaco.core.domain.Detail
 import dev.irohaco.core.domain.GeoPoint
+import dev.irohaco.core.domain.MediaDetails
 import dev.irohaco.core.domain.MediaDetailsResult
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.TimelinePagingSource
@@ -100,7 +102,11 @@ class ViewerViewModel(
                         Detail.Missing
                     } else {
                         when (val result = getDetails(item)) {
-                            is MediaDetailsResult.Read -> result.details.location
+                            is MediaDetailsResult.Read -> {
+                                fileRead = item.assetId to result.details
+                                metadata?.compareWithFile(item.assetId, result.details)
+                                result.details.location
+                            }
                             MediaDetailsResult.FileUnavailable -> Detail.Missing
                         }
                     },
@@ -192,18 +198,26 @@ class ViewerViewModel(
         viewModelScope.launch { mark?.setFavorite(listOf(item), favorite) }
     }
 
+    // The page's file as last read, so a new edit records the value it was made against (ADR-0007).
+    private var fileRead: Pair<String, MediaDetails>? = null
+
+    private fun applyEdit(item: TimelineItem, change: suspend EditMetadata.() -> Unit) {
+        val metadata = metadata ?: return
+        viewModelScope.launch {
+            metadata.change()
+            fileRead?.takeIf { it.first == item.assetId }?.let { metadata.compareWithFile(item.assetId, it.second) }
+        }
+    }
+
     /** null goes back to the file's value. */
-    fun setTakenAt(item: TimelineItem, takenAtMs: Long?) {
-        viewModelScope.launch { metadata?.setTakenAt(item.assetId, takenAtMs) }
-    }
+    fun setTakenAt(item: TimelineItem, takenAtMs: Long?) = applyEdit(item) { setTakenAt(item.assetId, takenAtMs) }
 
-    fun setLocation(item: TimelineItem, edit: FieldEdit<GeoPoint>?) {
-        viewModelScope.launch { metadata?.setLocation(item.assetId, edit) }
-    }
+    fun setLocation(item: TimelineItem, edit: FieldEdit<GeoPoint>?) = applyEdit(item) { setLocation(item.assetId, edit) }
 
-    fun setDescription(item: TimelineItem, edit: FieldEdit<String>?) {
-        viewModelScope.launch { metadata?.setDescription(item.assetId, edit) }
-    }
+    fun setDescription(item: TimelineItem, edit: FieldEdit<String>?) = applyEdit(item) { setDescription(item.assetId, edit) }
+
+    /** Keeps the user's value over the one another app wrote into the file since (INT-002). */
+    fun keepEdit(item: TimelineItem, field: MetadataField) = applyEdit(item) { keepEdit(item.assetId, field) }
 
     fun setRating(item: TimelineItem, rating: Int?) {
         viewModelScope.launch { mark?.setRating(item.assetId, rating) }

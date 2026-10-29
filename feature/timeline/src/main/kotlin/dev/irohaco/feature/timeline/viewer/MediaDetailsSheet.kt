@@ -17,6 +17,8 @@ import androidx.compose.material3.InputChip
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import dev.irohaco.core.contracts.FieldEdit
+import dev.irohaco.core.contracts.MetadataField
+import dev.irohaco.core.contracts.geoPointOfMetadataText
 import dev.irohaco.core.contracts.MetadataEdits
 import dev.irohaco.core.contracts.Tag
 import androidx.compose.foundation.layout.Box
@@ -62,14 +64,15 @@ internal fun MediaDetailsSheet(
     onRemoveTag: (String) -> Unit = {},
     memos: @Composable () -> Unit = {},
     edits: MetadataEdits = MetadataEdits(),
-    onEdit: (EditableField) -> Unit = {},
-    onRevert: (EditableField) -> Unit = {},
+    onEdit: (MetadataField) -> Unit = {},
+    onRevert: (MetadataField) -> Unit = {},
+    onKeep: (MetadataField) -> Unit = {},
 ) {
     if (state == ViewerViewModel.Details.Hidden) return
     IrohacoBottomSheet(onDismiss = onDismiss) {
         when (state) {
             ViewerViewModel.Details.Loading -> ExpressiveLoading(Modifier.padding(IrohacoSpacing.xl))
-            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate, tags, onAddTag, onRemoveTag, memos, edits, onEdit, onRevert)
+            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate, tags, onAddTag, onRemoveTag, memos, edits, onEdit, onRevert, onKeep)
             ViewerViewModel.Details.Hidden -> Unit
         }
     }
@@ -87,8 +90,9 @@ internal fun MediaDetailsContent(
     onRemoveTag: (String) -> Unit = {},
     memos: @Composable () -> Unit = {},
     edits: MetadataEdits = MetadataEdits(),
-    onEdit: (EditableField) -> Unit = {},
-    onRevert: (EditableField) -> Unit = {},
+    onEdit: (MetadataField) -> Unit = {},
+    onRevert: (MetadataField) -> Unit = {},
+    onKeep: (MetadataField) -> Unit = {},
 ) {
     Column(
         Modifier
@@ -104,14 +108,25 @@ internal fun MediaDetailsContent(
         memos()
         when (result) {
             MediaDetailsResult.FileUnavailable -> Text(stringResource(R.string.details_file_unavailable), style = MaterialTheme.typography.bodyLarge)
-            is MediaDetailsResult.Read -> DetailRows(result.details, kind, onAllowLocation, edits, onEdit, onRevert)
+            is MediaDetailsResult.Read -> DetailRows(result.details, kind, onAllowLocation, edits, onEdit, onRevert, onKeep)
         }
     }
 }
 
 @Composable
-private fun DetailRows(details: MediaDetails, kind: MediaKind, onAllowLocation: () -> Unit, edits: MetadataEdits, onEdit: (EditableField) -> Unit, onRevert: (EditableField) -> Unit) {
+private fun DetailRows(
+    details: MediaDetails,
+    kind: MediaKind,
+    onAllowLocation: () -> Unit,
+    edits: MetadataEdits,
+    onEdit: (MetadataField) -> Unit,
+    onRevert: (MetadataField) -> Unit,
+    onKeep: (MetadataField) -> Unit,
+) {
     val context = LocalContext.current
+    // The file's value when the field was edited, for a field another app changed since; absent without a conflict.
+    fun <T> base(field: MetadataField, parse: (String) -> T): Detail<T>? =
+        if (field in edits.conflicts) edits.conflicts[field]?.let { Detail.Value(parse(it)) } ?: Detail.Missing else null
     Row(R.string.details_file, Detail.Value(details.fileName)) { it }
     Row(R.string.details_folder, details.folder) { it }
     Row(R.string.details_size, details.sizeBytes) { Formatter.formatShortFileSize(context, it) }
@@ -119,7 +134,7 @@ private fun DetailRows(details: MediaDetails, kind: MediaKind, onAllowLocation: 
     Row(R.string.details_pixels, pixels(details)) { it }
     EditableRow(
         R.string.details_taken, details.takenAt, edits.takenAtMs?.let { FieldEdit.Set(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDateTime()) },
-        { onEdit(EditableField.TAKEN) }, { onRevert(EditableField.TAKEN) },
+        base(MetadataField.TAKEN, LocalDateTime::parse), { onEdit(MetadataField.TAKEN) }, { onRevert(MetadataField.TAKEN) }, { onKeep(MetadataField.TAKEN) },
     ) { DATE_TIME.format(it) }
     if (kind == MediaKind.VIDEO) {
         Row(R.string.details_duration, details.durationMs) { duration(it) }
@@ -131,7 +146,10 @@ private fun DetailRows(details: MediaDetails, kind: MediaKind, onAllowLocation: 
         Row(R.string.details_iso, details.iso) { "ISO $it" }
         Row(R.string.details_focal_length, details.focalLengthMm) { "%.0f mm".format(it) }
     }
-    EditableRow(R.string.details_location, details.location, edits.location, { onEdit(EditableField.LOCATION) }, { onRevert(EditableField.LOCATION) }) {
+    EditableRow(
+        R.string.details_location, details.location, edits.location, base(MetadataField.LOCATION, ::geoPointOfMetadataText),
+        { onEdit(MetadataField.LOCATION) }, { onRevert(MetadataField.LOCATION) }, { onKeep(MetadataField.LOCATION) },
+    ) {
         "%.5f, %.5f".format(it.latitude, it.longitude)
     }
     if (details.location == Detail.NoPermission && edits.location == null) {
@@ -143,21 +161,38 @@ private fun DetailRows(details: MediaDetails, kind: MediaKind, onAllowLocation: 
         Row(R.string.details_creator, details.creator) { it }
         Row(R.string.details_copyright, details.copyright) { it }
     }
-    EditableRow(R.string.details_description, details.description, edits.description, { onEdit(EditableField.DESCRIPTION) }, { onRevert(EditableField.DESCRIPTION) }) { it }
+    EditableRow(
+        R.string.details_description, details.description, edits.description, base(MetadataField.DESCRIPTION) { it },
+        { onEdit(MetadataField.DESCRIPTION) }, { onRevert(MetadataField.DESCRIPTION) }, { onKeep(MetadataField.DESCRIPTION) },
+    ) { it }
 }
 
 /**
  * A row the user can change in the DB (MET-002): the edited value is marked as such over the file's own,
- * which stays one tap away (MET-005).
+ * which stays one tap away (MET-005). When another app changed the file since the edit, the row also shows
+ * the file's value at the edit, and the user keeps one of the two (INT-002).
  */
 @Composable
-private fun <T> EditableRow(label: Int, file: Detail<T>, edit: FieldEdit<T>?, onEdit: () -> Unit, onRevert: () -> Unit, format: (T) -> String) {
+private fun <T> EditableRow(
+    label: Int,
+    file: Detail<T>,
+    edit: FieldEdit<T>?,
+    base: Detail<T>?,
+    onEdit: () -> Unit,
+    onRevert: () -> Unit,
+    onKeep: () -> Unit,
+    format: (T) -> String,
+) {
     Box(Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
             Row(label, if (edit == null) file else (edit as? FieldEdit.Set)?.let { Detail.Value(it.value) } ?: Detail.Missing, format)
             if (edit != null) {
-                val original = detailText(file, format).first
-                Text(stringResource(R.string.details_edited, original), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val note = MaterialTheme.typography.bodySmall
+                Text(stringResource(R.string.details_edited, detailText(file, format).first), style = note, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (base != null) {
+                    Text(stringResource(R.string.details_conflict, detailText(base, format).first), style = note, color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = onKeep) { Text(stringResource(R.string.details_keep_edit)) }
+                }
                 TextButton(onClick = onRevert) { Text(stringResource(R.string.details_revert)) }
             }
         }
