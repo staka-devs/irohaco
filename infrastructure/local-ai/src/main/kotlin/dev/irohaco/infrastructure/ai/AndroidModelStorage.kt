@@ -12,7 +12,8 @@ import java.util.UUID
 
 /**
  * Model files in the app's own external files, removed with the app (M2-02). A file becomes
- * `<id>.litertlm` only after its digest was checked; until then it is a `.partial`.
+ * `<id>.litertlm` only after its digest was checked; until then it is a `.partial`. Deleting or replacing a
+ * model also deletes what the runtime cached for it.
  */
 class AndroidModelStorage(private val context: Context) : ModelStorage {
     private val dir: File get() = File(context.getExternalFilesDir(null), MODELS).apply { mkdirs() }
@@ -51,6 +52,7 @@ class AndroidModelStorage(private val context: Context) : ModelStorage {
     override suspend fun promote(path: String, id: String): String = withContext(Dispatchers.IO) {
         val target = File(dir, "$id.litertlm")
         target.delete()
+        deleteRuntimeCaches(id)
         if (!File(path).renameTo(target)) throw IOException("Cannot move $path into place")
         target.path
     }
@@ -63,7 +65,13 @@ class AndroidModelStorage(private val context: Context) : ModelStorage {
         withContext(Dispatchers.IO) {
             File(dir, "$id.litertlm").delete()
             File(dir, "$id.partial").delete()
+            deleteRuntimeCaches(id)
         }
+    }
+
+    /** LiteRT keeps compiled programs and weights of `<id>.litertlm` in the cache dir; they are of no use without that file. */
+    private fun deleteRuntimeCaches(id: String) {
+        context.cacheDir.listFiles { file -> file.name.startsWith("$id.litertlm") }?.forEach { it.deleteRecursively() }
     }
 
     private companion object {
