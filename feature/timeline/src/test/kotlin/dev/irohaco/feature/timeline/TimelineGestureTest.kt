@@ -35,6 +35,7 @@ class TimelineGestureTest {
     private var items = (0 until 6).map { TimelineItem("a$it", MediaKind.IMAGE, "content://test/$it", 0) }
     private var selection by mutableStateOf(emptyMap<String, TimelineItem>())
     private var opened = 0
+    private var columns by mutableStateOf<Int?>(null)
 
     private fun showGrid() {
         rule.setContent {
@@ -45,6 +46,8 @@ class TimelineGestureTest {
                     onOpenMedia = { opened++ },
                     selection = selection,
                     onSelectRange = { selection = it },
+                    chosenColumns = columns,
+                    onColumns = { columns = it },
                 )
             }
         }

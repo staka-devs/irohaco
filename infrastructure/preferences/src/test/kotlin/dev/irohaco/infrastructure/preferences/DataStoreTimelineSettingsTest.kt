@@ -14,7 +14,7 @@ class DataStoreTimelineSettingsTest {
     @get:Rule val folder = TemporaryFolder()
 
     @Test
-    fun `days by default, keeps the chosen unit and the hint shown once`() = runTest {
+    fun `days by default, keeps the chosen unit, the hint shown once and the columns`() = runTest {
         val store = PreferenceDataStoreFactory.create(scope = TestScope(testScheduler).backgroundScope) {
             folder.newFile("settings.preferences_pb").also { it.delete() }
         }
@@ -25,5 +25,8 @@ class DataStoreTimelineSettingsTest {
         assertEquals(false, settings.pinchHintShown.first())
         settings.setPinchHintShown()
         assertEquals(true, settings.pinchHintShown.first())
+        assertEquals(null, settings.timelineColumns.first())
+        settings.setTimelineColumns(14)
+        assertEquals(14, settings.timelineColumns.first())
     }
 }

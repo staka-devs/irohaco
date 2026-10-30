@@ -65,6 +65,8 @@ data class GridThumbnail(val contentUri: String) {
  * @param contentDescription what TalkBack reads: kind, capture date and, for a video, its length.
  * @param label a short mark in the top end corner, such as "GIF" or a video's length; [contentDescription] already says it.
  * @param labelIcon an icon before [label], such as the play mark of a video; shown alone when [label] is null.
+ * @param dense a cell in an overview of many columns: no corner morph, no scale and no marks, which a cell
+ *   that small cannot show and which cost a layer and an animation per cell on every frame.
  */
 @Composable
 fun MediaThumbnail(
@@ -74,12 +76,17 @@ fun MediaThumbnail(
     modifier: Modifier = Modifier,
     label: String? = null,
     @DrawableRes labelIcon: Int? = null,
+    dense: Boolean = false,
 ) {
-    val progress by animateFloatAsState(
-        targetValue = if (selected) 1f else 0f,
-        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-        label = "thumbnailSelection",
-    )
+    val progress = if (dense) {
+        if (selected) 1f else 0f
+    } else {
+        animateFloatAsState(
+            targetValue = if (selected) 1f else 0f,
+            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+            label = "thumbnailSelection",
+        ).value
+    }
     val shape = LerpCornerShape(MaterialTheme.shapes.extraSmall, MaterialTheme.shapes.medium, progress)
     Box(
         modifier
@@ -95,7 +102,9 @@ fun MediaThumbnail(
             model = model,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier =
+            modifier = if (dense) {
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            } else {
                 Modifier.fillMaxSize()
                     .graphicsLayer {
                         val scale = lerp(1f, SelectedScale, progress)
@@ -103,9 +112,10 @@ fun MediaThumbnail(
                         scaleY = scale
                     }
                     .clip(shape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            },
         )
-        if (label != null || labelIcon != null) {
+        if (!dense && (label != null || labelIcon != null)) {
             // White on a translucent black pill stays readable over both dark and bright photos.
             Row(
                 verticalAlignment = Alignment.CenterVertically,

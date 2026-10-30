@@ -141,6 +141,7 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
     val grouping by viewModel.dateGrouping.collectAsStateWithLifecycle()
     val selectedGroups by viewModel.selectedGroups.collectAsStateWithLifecycle()
     val showPinchHint by viewModel.showPinchHint.collectAsStateWithLifecycle()
+    val chosenColumns by viewModel.columns.collectAsStateWithLifecycle()
     val shareLocationPolicy by viewModel.shareLocationPolicy.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.refreshAccess() }
@@ -288,6 +289,8 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
         selectedGroups = selectedGroups,
         onToggleGroup = viewModel::toggleGroup,
         labelAt = viewModel::labelAt,
+        chosenColumns = chosenColumns,
+        onColumns = viewModel::setColumns,
     )
 }
 
@@ -369,6 +372,9 @@ internal fun TimelineContent(
     selectedGroups: Set<LocalDate> = emptySet(),
     onToggleGroup: (LocalDate) -> Unit = {},
     labelAt: suspend (Int) -> TimelineLabel? = { null },
+    /** The columns the user chose, kept in the settings; null shows the default. */
+    chosenColumns: Int? = null,
+    onColumns: (Int) -> Unit = {},
 ) {
     var sorting by rememberSaveable { mutableStateOf(false) }
     if (sorting) SortSheet(query, onQueryChange, onDismiss = { sorting = false }, grouping = grouping, onGrouping = onGrouping)
@@ -379,8 +385,7 @@ internal fun TimelineContent(
             maxWidth < 840.dp -> listOf(5, 6, 8, 11, 15, 21, 30, 40)
             else -> listOf(6, 8, 10, 13, 18, 25, 34, 45)
         }
-        var chosen by rememberSaveable { mutableIntStateOf(levels[1]) }
-        val columns = stepColumns(levels, chosen, 0)
+        val columns = stepColumns(levels, chosenColumns ?: levels[1], 0)
         val noAccess = access.images == LibraryAccess.NONE && access.videos == LibraryAccess.NONE
         // The bar slides away while scrolling down and comes back on any scroll up (DESIGN §3, M1-27).
         // The selection bar does not take part, so the count and the clear button stay in view.
@@ -426,13 +431,13 @@ internal fun TimelineContent(
                                     text = { Text(stringResource(R.string.timeline_columns_fewer)) },
                                     leadingIcon = { Icon(painterResource(IrohacoIcons.ZoomIn), null) },
                                     enabled = columns > levels.first(),
-                                    onClick = { menu = false; chosen = stepColumns(levels, columns, -1) },
+                                    onClick = { menu = false; onColumns(stepColumns(levels, columns, -1)) },
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.timeline_columns_more)) },
                                     leadingIcon = { Icon(painterResource(IrohacoIcons.ZoomOut), null) },
                                     enabled = columns < levels.last(),
-                                    onClick = { menu = false; chosen = stepColumns(levels, columns, 1) },
+                                    onClick = { menu = false; onColumns(stepColumns(levels, columns, 1)) },
                                 )
                             }
                         }
@@ -450,8 +455,8 @@ internal fun TimelineContent(
                         cells = cells,
                         columns = columns,
                         bottomPadding = padding.calculateBottomPadding(),
-                        onFewerColumns = { chosen = stepColumns(levels, columns, -1) },
-                        onMoreColumns = { chosen = stepColumns(levels, columns, 1) },
+                        onFewerColumns = { onColumns(stepColumns(levels, columns, -1)) },
+                        onMoreColumns = { onColumns(stepColumns(levels, columns, 1)) },
                         onOpenMedia = onOpenMedia,
                         selection = selection,
                         onToggle = onToggle,
@@ -545,6 +550,7 @@ private fun TimelineGrid(
         )
         return
     }
+    val dense = columns >= DENSE_COLUMNS
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
@@ -583,8 +589,10 @@ private fun TimelineGrid(
                             selected = cell.item.assetId in selection,
                             label = cell.item.badge,
                             labelIcon = cell.item.badgeIcon,
+                            dense = dense,
                             modifier = Modifier
-                                .sharedMedia(cell.item.assetId)
+                                // A shared element per cell costs on every frame; a cell this small has nothing to grow from.
+                                .then(if (dense) Modifier else Modifier.sharedMedia(cell.item.assetId))
                                 .clickable { if (selecting) onToggle(cell.item) else onOpenMedia(cell.item.assetId) }
                                 // The long press itself is the grid's gesture; screen readers get it as an action.
                                 .semantics { onLongClick(selectLabel) { onToggle(cell.item); true } },
@@ -847,6 +855,9 @@ private fun Modifier.pinchToChangeColumns(onFewer: () -> Unit, onMore: () -> Uni
         }
     },
 )
+
+/** From this many columns a cell is an overview dot: it drops the marks, the morph and the shared element. */
+private const val DENSE_COLUMNS = 10
 
 /** The step [by] steps away from the one that holds [columns], kept within [levels]. */
 internal fun stepColumns(levels: List<Int>, columns: Int, by: Int): Int {

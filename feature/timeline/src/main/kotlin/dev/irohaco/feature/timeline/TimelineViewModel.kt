@@ -72,6 +72,14 @@ class TimelineViewModel(
     val showPinchHint: StateFlow<Boolean> = (settings?.pinchHintShown?.map { !it } ?: flowOf(false))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    /** The columns the user last chose, kept across launches; null until they first change them. */
+    val columns: StateFlow<Int?> = (settings?.timelineColumns ?: flowOf(null))
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    fun setColumns(columns: Int) {
+        viewModelScope.launch { settings?.setTimelineColumns(columns) }
+    }
+
     fun pinchHintShown() {
         viewModelScope.launch { settings?.setPinchHintShown() }
     }
