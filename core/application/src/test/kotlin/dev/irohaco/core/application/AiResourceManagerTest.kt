@@ -8,6 +8,7 @@ import dev.irohaco.core.contracts.ModelLoadException
 import dev.irohaco.core.contracts.ModelNotInstalledException
 import dev.irohaco.core.contracts.ModelState
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -15,8 +16,11 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -140,6 +144,7 @@ class AiResourceManagerTest {
         val ai = manager()
         ai.withEmbedding(AiPriority.USER_SEARCH) { }
         ai.release()
+        runCurrent()
         assertEquals(listOf(AiBackend.GPU), closed)
         assertEquals(ModelState.READY, ai.state.value)
 
@@ -149,5 +154,29 @@ class AiResourceManagerTest {
         runCurrent()
         assertEquals(2, closed.size)
         assertTrue(ai.backend.value == null)
+    }
+
+    @Test
+    fun `a close that never returns does not hold up the next search`() = runTest {
+        val stuck = CountDownLatch(1)
+        var closeReturned = false
+        val hanging = EmbeddingRuntime { _, backend ->
+            object : EmbeddingSession {
+                override val backend = backend
+                override fun embedText(text: String) = floatArrayOf(1f)
+                override fun embedImage(bytes: ByteArray) = floatArrayOf(1f)
+                // Stands for the native close seen on a device (#215); bounded so a regression fails instead of hanging.
+                override fun close() {
+                    stuck.await(10, TimeUnit.SECONDS)
+                    closeReturned = true
+                }
+            }
+        }
+        val ai = AiResourceManager({ "/models/embedding.litertlm" }, hanging, Dispatchers.IO, backgroundScope)
+        ai.withEmbedding(AiPriority.USER_SEARCH) { }
+        ai.release()
+        assertEquals(1f, ai.withEmbedding(AiPriority.USER_SEARCH) { it.embedText("next") }[0])
+        assertFalse(closeReturned, "the search waited for the close")
+        stuck.countDown()
     }
 }
