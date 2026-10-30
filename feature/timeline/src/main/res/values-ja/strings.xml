@@ -334,4 +334,6 @@
     <plurals name="history_confirm_picked">
         <item quantity="other">%d 件を確定</item>
     </plurals>
+    <string name="library_unlocated">場所のない写真</string>
+    <string name="timeline_place">場所を付ける</string>
 </resources>

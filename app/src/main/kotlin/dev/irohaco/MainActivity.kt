@@ -113,6 +113,7 @@ class MainActivity : ComponentActivity() {
                                         onOpenMap = { open(Route.MAP) },
                                         onPlayAt = { assetId, ms -> open(Route.playVideoAt(assetId, ms)) },
                                         onOpenAsk = { open(Route.ASK) },
+                                        onOpenLocationHistory = { open(Route.locationHistory(it)) },
                                     )
                                 }
                             } else {
@@ -137,6 +138,7 @@ class MainActivity : ComponentActivity() {
         onOpenMap: () -> Unit,
         onPlayAt: (assetId: String, startMs: Long) -> Unit,
         onOpenAsk: () -> Unit,
+        onOpenLocationHistory: (assetIds: List<String>) -> Unit,
     ) {
         IrohacoApp { destination ->
             when (destination) {
@@ -158,6 +160,7 @@ class MainActivity : ComponentActivity() {
                     onOpenMedia = { onOpenMedia(it, null) },
                     onOpenSettings = onOpenSettings,
                     onOpenMap = onOpenMap,
+                    onPlace = onOpenLocationHistory,
                 )
                 TopLevelDestination.ALBUMS -> AlbumsScreen(
                     viewModel { AlbumsViewModel(container.getTimelinePage, container.manageCollections) },
@@ -177,6 +180,7 @@ class MainActivity : ComponentActivity() {
                     onOpenCandidates = onOpenCandidates,
                     onOpenTrash = onOpenTrash,
                     onOpenMap = onOpenMap,
+                    onOpenLocationHistory = { onOpenLocationHistory(emptyList()) },
                 )
                 TopLevelDestination.SEARCH -> SearchScreen(
                     viewModel { SearchViewModel(container.searchMedia, container.manageCollections, askLibrary = container.askLibrary) },
@@ -201,7 +205,7 @@ class MainActivity : ComponentActivity() {
                     ) { IndexingService.start(applicationContext, it) }
                 },
                 onBack,
-                onOpenLocationHistory = { open(Route.LOCATION_HISTORY) },
+                onOpenLocationHistory = { open(Route.locationHistory(emptyList())) },
             )
             route == Route.IDENTITY -> IdentityScreen(viewModel { IdentityViewModel(container.reconcileIdentity) }, onBack)
             route == Route.TRASH -> TrashScreen(viewModel { TrashViewModel(container.browseTrash, container::syncCatalog) }, onBack)
@@ -210,7 +214,10 @@ class MainActivity : ComponentActivity() {
                 onOpenArea = { open(Route.list(MediaList.Area(it))) },
                 onBack = onBack,
             )
-            route == Route.LOCATION_HISTORY -> LocationHistoryScreen(viewModel { LocationHistoryViewModel(container.locationHistory) }, onBack)
+            Route.isLocationHistory(route) -> LocationHistoryScreen(
+                viewModel { LocationHistoryViewModel(container.locationHistory, container.browseMap.allowed, Route.parseLocationHistory(route)) },
+                onBack,
+            )
             route == Route.ASK -> AskScreen(
                 viewModel { AskViewModel(ChatWithLibrary(container.searchMedia, container.askLibrary)) },
                 onOpen = { hit -> open(hit.timestampMs?.let { Route.playVideoAt(hit.item.assetId, it) } ?: Route.viewer(hit.item.assetId)) },
@@ -243,7 +250,7 @@ class MainActivity : ComponentActivity() {
                             page, viewer.assetId, viewer.startMs, container::newVideoPlayer, container.getMediaDetails, query,
                             container.markMedia, container.manageCollections, container.mediaFormatProbe,
                             container.browseMap, container.manageAnnotations, container.editMetadata, container.writeMetadataToFile,
-                            container.askLibrary,
+                            container.askLibrary, container.locationHistory,
                         )
                     },
                     onBack,
@@ -278,7 +285,7 @@ object Route {
     const val TRASH = "trash"
     const val MAP = "map"
     const val ASK = "ask"
-    const val LOCATION_HISTORY = "location_history"
+    private const val LOCATION_HISTORY = "location_history"
     private const val VIEWER = "viewer:"
     private const val LIST = "list:"
     private const val SIMILAR = "similar:"
@@ -306,6 +313,16 @@ object Route {
         val list = parts.getOrNull(1)?.let(::decode)
         return if (at < 0) Viewer(head, null, list) else Viewer(head.substring(0, at), head.substring(at + 1).toLongOrNull(), list)
     }
+
+    /**
+     * The places from the location history, of [assetIds] alone when some are given (#213).
+     * shortcut: the ids ride in the saved route, so picking tens of thousands could exceed the saved-state limit; hand them over another way if that happens.
+     */
+    fun locationHistory(assetIds: List<String>) = LOCATION_HISTORY + assetIds.joinToString("") { "$SEP$it" }
+
+    fun isLocationHistory(route: String) = route.substringBefore(SEP) == LOCATION_HISTORY
+
+    fun parseLocationHistory(route: String): Set<String>? = route.split(SEP).drop(1).toSet().ifEmpty { null }
 
     fun list(list: MediaList) = LIST + encode(list)
 
