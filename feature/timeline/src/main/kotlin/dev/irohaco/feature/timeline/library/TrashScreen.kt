@@ -216,7 +216,6 @@ internal fun TrashContent(
 private fun TrashRow(item: TrashedItem, selected: Boolean, onClick: () -> Unit) {
     val days = daysRemaining(item.expiresAtMs)
     ListItem(
-        headlineContent = { Text(item.displayName, maxLines = 1) },
         supportingContent = {
             Text(
                 if (days != null) pluralStringResource(R.plurals.trash_days_remaining, days, days) else stringResource(R.string.trash_days_unknown),
@@ -227,7 +226,7 @@ private fun TrashRow(item: TrashedItem, selected: Boolean, onClick: () -> Unit) 
         },
         trailingContent = { Checkbox(checked = selected, onCheckedChange = { onClick() }) },
         modifier = Modifier.clickable(onClick = onClick),
-    )
+    ) { Text(item.displayName, maxLines = 1) }
 }
 
 /** Days left before MediaStore removes the item for good; null when it reports no expiry. */

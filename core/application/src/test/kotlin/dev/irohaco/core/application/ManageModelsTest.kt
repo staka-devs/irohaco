@@ -5,6 +5,7 @@ import dev.irohaco.core.contracts.ModelDownloader
 import dev.irohaco.core.contracts.ModelInstallState
 import dev.irohaco.core.contracts.ModelInstallState.Failed.Reason
 import dev.irohaco.core.contracts.ModelStorage
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -14,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /** Model files are usable only once their SHA-256 matches the catalog (M2-02, MOD-001); downloads pause, resume and cancel. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ManageModelsTest {
     private val model = ModelArtifact("m", "Model", "https://example.invalid/m", 10, "good")
     private val files = mutableMapOf<String, String>() // path -> digest

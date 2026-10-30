@@ -1,15 +1,15 @@
 [versions]
-agp = "9.4.1"
+agp = "9.5.0"
 kotlin = "2.4.21"
 composeBom = "2026.09.00"
 # Spike A (AI_SEARCH_SPIKE): on-device EmbeddingGemma 2; test-only until M2-01.
-litertlm = "0.18.1"
+litertlm = "0.19.0"
 # M2-07: bundled on-device OCR (Japanese and Latin); no Play services needed.
 mlkitTextJapanese = "16.0.1"
-material3 = "1.5.0-beta01"
+material3 = "1.5.0-beta02"
 materialAdaptive = "1.3.0"
 activityCompose = "1.13.0"
-roborazzi = "1.76.0"
+roborazzi = "1.77.0"
 robolectric = "4.17"
 composablePreviewScanner = "0.9.3"
 junit = "4.13.2"
@@ -21,14 +21,14 @@ coil = "3.6.3"
 coroutines = "1.11.0"
 paging = "3.5.3"
 lifecycle = "2.11.0"
-datastore = "1.2.1"
+datastore = "1.3.0"
 materialKolor = "5.0.1"
 media3 = "1.11.1"
 exifinterface = "1.4.2"
 room = "2.8.5"
 ksp = "2.3.12"
-androidxCore = "1.17.0"
-maplibre = "13.6.1"
+androidxCore = "1.19.1"
+maplibre = "13.7.1"
 
 [libraries]
 litertlm-android = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlm" }

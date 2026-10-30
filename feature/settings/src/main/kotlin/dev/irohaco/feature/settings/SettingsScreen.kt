@@ -200,11 +200,10 @@ internal fun SettingsContent(
                     Column(Modifier.padding(padding)) {
                         SettingsCategory.entries.forEach { category ->
                             ListItem(
-                                headlineContent = { Text(stringResource(category.title)) },
                                 supportingContent = { Text(stringResource(category.summary), maxLines = 1) },
                                 leadingContent = { Icon(painterResource(category.icon), contentDescription = null) },
                                 modifier = Modifier.clickable { scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, category) } },
-                            )
+                            ) { Text(stringResource(category.title)) }
                         }
                     }
                 }
@@ -265,11 +264,10 @@ internal fun LibrarySettings(excludedFolders: List<FolderRef>, onShow: (FolderRe
     )
     excludedFolders.forEach { folder ->
         ListItem(
-            headlineContent = { Text(folder.relativePath.trimEnd('/').substringAfterLast('/').ifEmpty { folder.volumeId }) },
             supportingContent = { Text(folder.relativePath.ifEmpty { "/" }) },
             leadingContent = { Icon(painterResource(IrohacoIcons.VisibilityOff), contentDescription = null) },
             trailingContent = { TextButton(onClick = { onShow(folder) }) { Text(stringResource(R.string.settings_library_show)) } },
-        )
+        ) { Text(folder.relativePath.trimEnd('/').substringAfterLast('/').ifEmpty { folder.volumeId }) }
     }
 }
 
@@ -316,11 +314,10 @@ internal fun DisplaySettings(
     }
     SectionTitle(R.string.settings_theme_color)
     ListItem(
-        headlineContent = { Text(stringResource(R.string.settings_theme_color_device)) },
         trailingContent = { Switch(checked = useDevice, onCheckedChange = null) },
         // Off falls back to Blue 500, the default seed, until another colour is picked.
         modifier = Modifier.toggleable(useDevice, role = Role.Switch) { on -> onSelect(if (on) ThemeColor.Device else MaterialPalette[BLUE].main.toSeed()) },
-    )
+    ) { Text(stringResource(R.string.settings_theme_color_device)) }
     SecondaryTabRow(selectedTabIndex = tab, modifier = Modifier.alpha(if (useDevice) DISABLED_ALPHA else 1f)) {
         listOf(R.string.settings_theme_color_basic, R.string.settings_theme_color_palette, R.string.settings_theme_color_code).forEachIndexed { index, label ->
             Tab(selected = tab == index, onClick = { tab = index }, enabled = !useDevice, text = { Text(stringResource(label)) })
@@ -444,18 +441,16 @@ internal fun PrivacySettings(
 
     SectionTitle(R.string.settings_map)
     ListItem(
-        headlineContent = { Text(stringResource(R.string.settings_map_allow)) },
         supportingContent = { Text(stringResource(R.string.settings_map_allow_summary)) },
         trailingContent = { Switch(checked = mapAllowed, onCheckedChange = null) },
         modifier = Modifier.toggleable(mapAllowed, role = Role.Switch, onValueChange = onMapAllowed),
-    )
+    ) { Text(stringResource(R.string.settings_map_allow)) }
 
     SectionTitle(R.string.settings_location_history)
     ListItem(
-        headlineContent = { Text(stringResource(R.string.settings_location_history_open)) },
         supportingContent = { Text(stringResource(R.string.settings_location_history_summary)) },
         modifier = Modifier.clickable(onClick = onOpenLocationHistory),
-    )
+    ) { Text(stringResource(R.string.settings_location_history_open)) }
 }
 
 @Composable
@@ -471,10 +466,9 @@ internal fun SectionTitle(text: Int) {
 @Composable
 private fun RadioRow(label: Int, selected: Boolean, onClick: () -> Unit) {
     ListItem(
-        headlineContent = { Text(stringResource(label)) },
         leadingContent = { RadioButton(selected = selected, onClick = null) },
         modifier = Modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
-    )
+    ) { Text(stringResource(label)) }
 }
 
 @IrohacoPreviews

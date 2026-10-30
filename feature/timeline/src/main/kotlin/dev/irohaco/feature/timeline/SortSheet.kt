@@ -121,12 +121,11 @@ internal fun SortContent(
             SORTS.forEach { (key, descending, label) ->
                 val selected = query.sortKey == key && query.descending == descending
                 ListItem(
-                    headlineContent = { Text(stringResource(label)) },
                     leadingContent = { RadioButton(selected = selected, onClick = null) },
                     modifier = Modifier.selectable(selected = selected, role = Role.RadioButton) {
                         onChange(query.copy(sortKey = key, descending = descending))
                     },
-                )
+                ) { Text(stringResource(label)) }
             }
         }
     }

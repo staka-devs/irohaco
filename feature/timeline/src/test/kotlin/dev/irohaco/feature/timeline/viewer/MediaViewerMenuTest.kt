@@ -2,7 +2,7 @@ package dev.irohaco.feature.timeline.viewer
 
 import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -12,7 +12,9 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.domain.MediaKind
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,7 +24,9 @@ import kotlin.test.assertEquals
 /** The viewer's "more" menu (PRD GAL-013). */
 @RunWith(RobolectricTestRunner::class)
 class MediaViewerMenuTest {
-    @get:Rule val rule = createComposeRule()
+    // Paging hands the page over through effects; run them at once, as the v1 rule did, or the page comes late under load.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @get:Rule val rule = createComposeRule(effectContext = UnconfinedTestDispatcher())
 
     private val item = TimelineItem("a1", MediaKind.IMAGE, "content://test/1", 0)
     private var trashed: TimelineItem? = null

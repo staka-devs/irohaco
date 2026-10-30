@@ -43,11 +43,10 @@ internal fun FolderDialog(title: String, folders: List<String>, onPick: (String)
                 LazyColumn(Modifier.heightIn(max = 280.dp)) {
                     items(folders) { folder ->
                         ListItem(
-                            headlineContent = { Text(folder) },
                             leadingContent = { Icon(painterResource(IrohacoIcons.Folder), contentDescription = null) },
                             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                             modifier = Modifier.clickable { onPick(folder) },
-                        )
+                        ) { Text(folder) }
                     }
                 }
                 OutlinedTextField(

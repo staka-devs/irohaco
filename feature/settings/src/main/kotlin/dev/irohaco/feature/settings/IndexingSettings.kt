@@ -305,10 +305,9 @@ private fun FolderChooser(folders: List<LibraryFolder>, onDismiss: () -> Unit, o
                 paths.forEach { path ->
                     val checked = path in chosen
                     ListItem(
-                        headlineContent = { Text(path.ifEmpty { "/" }) },
                         leadingContent = { Checkbox(checked = checked, onCheckedChange = null) },
                         modifier = Modifier.toggleable(checked, role = Role.Checkbox) { chosen = if (it) chosen + path else chosen - path },
-                    )
+                    ) { Text(path.ifEmpty { "/" }) }
                 }
             }
         },

@@ -5,6 +5,7 @@ import dev.irohaco.core.contracts.TrashReader
 import dev.irohaco.core.contracts.TrashedItem
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -15,6 +16,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 
 /** viewModelScope needs a Main dispatcher, which only a real Looper normally provides. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class TrashViewModelTest {
     @Before
     fun setMainDispatcher() = Dispatchers.setMain(UnconfinedTestDispatcher())

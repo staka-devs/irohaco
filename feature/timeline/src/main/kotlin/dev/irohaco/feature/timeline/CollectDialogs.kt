@@ -74,11 +74,10 @@ internal fun AlbumPickerDialog(albums: List<Album>, onPick: (String) -> Unit, on
                 LazyColumn(Modifier.heightIn(max = 280.dp)) {
                     items(albums, key = { it.albumId }) { album ->
                         ListItem(
-                            headlineContent = { Text(album.title) },
                             leadingContent = { Icon(painterResource(IrohacoIcons.PhotoAlbum), contentDescription = null) },
                             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                             modifier = Modifier.clickable { onPick(album.albumId) },
-                        )
+                        ) { Text(album.title) }
                     }
                 }
                 OutlinedTextField(

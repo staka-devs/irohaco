@@ -10,7 +10,9 @@ import dev.irohaco.ui.GridThumbnailFetcher
 class IrohacoApplication : Application(), SingletonImageLoader.Factory {
     val container by lazy { AppContainer(this) }
 
-    // Memory pressure, in the background or not, frees the local model (ARCHITECTURE §10.1).
+    // Memory pressure, in the background or not, frees the local model (ARCHITECTURE §10.1). Android 14 stopped
+    // sending the RUNNING_ levels, but minSdk 33 still gets them, so the deprecated constant stays.
+    @Suppress("DEPRECATION")
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (level >= TRIM_MEMORY_RUNNING_LOW) container.trimMemory()
