@@ -4,7 +4,7 @@ import android.Manifest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasStateDescription
-import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -25,6 +25,8 @@ class VideoPlaybackTest {
     private val context = instrumentation.targetContext
     // The app keeps its database open across tests; the resume-time sync picks this file up without a reset.
     private val video = insertTestVideo(context, instrumentation.context.assets)
+    // The v2 rule runs effects on the test thread, and ExoPlayer allows only the main thread.
+    @Suppress("DEPRECATION")
     private val compose = createAndroidComposeRule<MainActivity>()
 
     @get:Rule val rules: RuleChain = RuleChain
