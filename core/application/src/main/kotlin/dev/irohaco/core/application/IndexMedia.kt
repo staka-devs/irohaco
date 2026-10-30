@@ -128,7 +128,7 @@ class EmbedMediaItem(
         val vector = embed(bytes)
         val text = recognizer?.let { recognize(it, bytes) }
         current(item)
-        if (text != null && recognizer != null) texts?.recordOcr(item.targetId, item.sourceRevisionDigest, text, recognizer.engineRevision)
+        if (text != null) texts?.recordOcr(item.targetId, item.sourceRevisionDigest, text, recognizer.engineRevision)
         return vector
     }
 

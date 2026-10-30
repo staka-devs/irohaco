@@ -75,7 +75,6 @@ internal fun AiSettings(
         models.forEach { model ->
             val state = states[model.id] ?: ModelInstallState.NotInstalled
             ListItem(
-                headlineContent = { Text(model.displayName) },
                 supportingContent = {
                     Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
                         Text(modelStateLabel(state) + " · " + Formatter.formatShortFileSize(context, model.sizeBytes))
@@ -89,7 +88,7 @@ internal fun AiSettings(
                         }
                     }
                 },
-            )
+            ) { Text(model.displayName) }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
                 modifier = Modifier.padding(horizontal = IrohacoSpacing.l),
@@ -123,7 +122,6 @@ internal fun AiSettings(
             modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.m),
         )
         ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_ai_import)) },
             supportingContent = {
                 Text(
                     when (importResult) {
@@ -134,7 +132,7 @@ internal fun AiSettings(
                 )
             },
             trailingContent = { TextButton(onClick = onImport) { Text(stringResource(R.string.settings_ai_import_choose)) } },
-        )
+        ) { Text(stringResource(R.string.settings_ai_import)) }
         SectionTitle(R.string.settings_ai_backend)
         val gpuFails = gpuCheck?.works == false
         val running = if (gpuFails) AiBackend.CPU else backend ?: AiBackend.GPU
@@ -160,7 +158,6 @@ internal fun AiSettings(
             answerModels.forEach { model ->
                 val installed = states[model.id] is ModelInstallState.Installed
                 ListItem(
-                    headlineContent = { Text(model.displayName) },
                     supportingContent = if (installed) null else ({ Text(stringResource(R.string.settings_ai_not_installed)) }),
                     leadingContent = { RadioButton(selected = model.id == answerModel, onClick = null, enabled = installed) },
                     modifier = Modifier.selectable(
@@ -169,7 +166,7 @@ internal fun AiSettings(
                         role = Role.RadioButton,
                         onClick = { onSelectAnswerModel(model.id) },
                     ),
-                )
+                ) { Text(model.displayName) }
             }
         }
     }
@@ -178,11 +175,10 @@ internal fun AiSettings(
 @Composable
 private fun BackendRow(label: Int, selected: Boolean, enabled: Boolean, note: Int?, onClick: () -> Unit) {
     ListItem(
-        headlineContent = { Text(stringResource(label)) },
         supportingContent = note?.let { { Text(stringResource(it)) } },
         leadingContent = { RadioButton(selected = selected, onClick = null, enabled = enabled) },
         modifier = Modifier.selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
-    )
+    ) { Text(stringResource(label)) }
 }
 
 /** One line for the category list: the default model's state. */

@@ -25,6 +25,8 @@ class VideoPlaybackTest {
     private val context = instrumentation.targetContext
     // The app keeps its database open across tests; the resume-time sync picks this file up without a reset.
     private val video = insertTestVideo(context, instrumentation.context.assets)
+    // The v2 rule runs effects on the test thread, and ExoPlayer allows only the main thread.
+    @Suppress("DEPRECATION")
     private val compose = createAndroidComposeRule<MainActivity>()
 
     @get:Rule val rules: RuleChain = RuleChain

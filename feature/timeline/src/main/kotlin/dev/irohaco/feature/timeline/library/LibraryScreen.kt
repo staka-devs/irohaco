@@ -407,20 +407,18 @@ private fun SectionTitle(text: Int) {
 @Composable
 private fun CandidatesItem(candidates: Int, onOpen: () -> Unit) {
     ListItem(
-        headlineContent = { Text(pluralStringResource(R.plurals.identity_found, candidates, candidates)) },
         supportingContent = { Text(stringResource(R.string.identity_check)) },
         leadingContent = { Icon(painterResource(IrohacoIcons.FindReplace), contentDescription = null) },
         modifier = Modifier.clickable(onClick = onOpen),
-    )
+    ) { Text(pluralStringResource(R.plurals.identity_found, candidates, candidates)) }
 }
 
 @Composable
 private fun MapItem(onOpen: () -> Unit) {
     ListItem(
-        headlineContent = { Text(stringResource(R.string.library_map)) },
         leadingContent = { Icon(painterResource(IrohacoIcons.Map), contentDescription = null) },
         modifier = Modifier.clickable(onClick = onOpen),
-    )
+    ) { Text(stringResource(R.string.library_map)) }
 }
 
 @Composable
@@ -435,20 +433,18 @@ private fun UnlocatedItem(onOpen: () -> Unit) {
 @Composable
 private fun TrashItem(onOpen: () -> Unit) {
     ListItem(
-        headlineContent = { Text(stringResource(R.string.library_trash)) },
         leadingContent = { Icon(painterResource(IrohacoIcons.Delete), contentDescription = null) },
         modifier = Modifier.clickable(onClick = onOpen),
-    )
+    ) { Text(stringResource(R.string.library_trash)) }
 }
 
 @Composable
 private fun TagItem(tag: Tag, onOpenTag: (String) -> Unit) {
     ListItem(
-        headlineContent = { Text(tag.name) },
         supportingContent = { Text(pluralStringResource(R.plurals.library_items, tag.itemCount, tag.itemCount)) },
         leadingContent = { Icon(painterResource(IrohacoIcons.Label), contentDescription = null) },
         modifier = Modifier.clickable { onOpenTag(tag.tagId) },
-    )
+    ) { Text(tag.name) }
 }
 
 /** A pinned folder; its menu moves it within the pinned list or unpins it. */
@@ -466,7 +462,6 @@ private fun PinnedItem(
     var menu by remember { mutableStateOf(false) }
     val name = line.name.ifEmpty { volumeLabel(volume.volumeName) }
     ListItem(
-        headlineContent = { Text(name) },
         supportingContent = { Text(volumeLabel(volume.volumeName) + "/" + ref.relativePath) },
         leadingContent = { Icon(painterResource(IrohacoIcons.PushPinFilled), contentDescription = null) },
         trailingContent = {
@@ -502,7 +497,7 @@ private fun PinnedItem(
             }
         },
         modifier = Modifier.clickable { onOpen(ref) },
-    )
+    ) { Text(name) }
 }
 
 @Composable
@@ -526,7 +521,6 @@ private fun VolumeNode(
 ) {
     val label = volumeLabel(volumeName)
     ListItem(
-        headlineContent = { Text(label, style = MaterialTheme.typography.titleMedium) },
         supportingContent = {
             Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s), verticalAlignment = Alignment.CenterVertically) {
                 Text(pluralStringResource(R.plurals.library_items, itemCount, itemCount))
@@ -546,7 +540,7 @@ private fun VolumeNode(
             }
         },
         modifier = Modifier.clickable(onClick = onOpen),
-    )
+    ) { Text(label, style = MaterialTheme.typography.titleMedium) }
 }
 
 /** One folder of the tree; folders with subfolders get a toggle that unfolds them in place. */
@@ -561,7 +555,6 @@ private fun TreeItem(
 ) {
     val name = line.name
     ListItem(
-        headlineContent = { Text(name) },
         supportingContent = {
             val count = pluralStringResource(R.plurals.library_items, line.totalCount, line.totalCount)
             Text(if (excluded) stringResource(R.string.library_excluded, count) else count)
@@ -584,7 +577,7 @@ private fun TreeItem(
         modifier = Modifier
             .padding(start = IrohacoSpacing.l * line.depth) // the volume node is level 0
             .clickable(onClick = onOpen),
-    )
+    ) { Text(name) }
 }
 
 private val previewFolders = listOf(

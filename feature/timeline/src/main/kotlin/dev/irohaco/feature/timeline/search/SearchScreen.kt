@@ -1,5 +1,6 @@
 package dev.irohaco.feature.timeline.search
 
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -291,7 +293,9 @@ internal fun SearchContent(
     onAsk: (() -> Unit)? = null,
     onOpenAsk: (() -> Unit)? = null,
 ) {
-    var text by rememberSaveable { mutableStateOf(ui.query) }
+    val text = rememberTextFieldState(ui.query)
+    // The bar never expands: the results show below it, on this screen.
+    val bar = rememberSearchBarState()
     val labels = spaceLabels(spaces)
     Scaffold { padding ->
         LazyVerticalGrid(
@@ -307,13 +311,12 @@ internal fun SearchContent(
                     return@item
                 }
                 SearchBar(
+                    state = bar,
                     inputField = {
                         SearchBarDefaults.InputField(
-                            query = text,
-                            onQueryChange = { text = it },
+                            textFieldState = text,
+                            searchBarState = bar,
                             onSearch = onSearch,
-                            expanded = false,
-                            onExpandedChange = {},
                             placeholder = { Text(stringResource(R.string.search_placeholder)) },
                             leadingIcon = { Icon(painterResource(IrohacoIcons.Search), null) },
                             trailingIcon = {
@@ -324,10 +327,8 @@ internal fun SearchContent(
                             },
                         )
                     },
-                    expanded = false,
-                    onExpandedChange = {},
                     modifier = Modifier.fillMaxWidth(),
-                ) {}
+                )
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTag, onToggleInferredPlaces, onToggleAtPlace, similar = onBack != null)

@@ -204,11 +204,10 @@ internal fun FolderContent(
             for (child in children) {
                 item(key = "folder-${child.path}", span = { GridItemSpan(maxLineSpan) }) {
                     ListItem(
-                        headlineContent = { Text(child.name) },
                         supportingContent = { Text(pluralStringResource(R.plurals.library_items, child.totalCount, child.totalCount)) },
                         leadingContent = { Icon(painterResource(IrohacoIcons.Folder), contentDescription = null) },
                         modifier = Modifier.clickable { onOpenFolder(FolderRef(folder.volumeId, child.path)) },
-                    )
+                    ) { Text(child.name) }
                 }
             }
         }
