@@ -223,7 +223,7 @@ CREATE INDEX ix_ocr_frame ON ocr_observations(frame_id);
 CREATE TABLE location_evidence (
   evidence_id TEXT NOT NULL PRIMARY KEY,
   asset_id TEXT NOT NULL REFERENCES media_assets(asset_id) ON DELETE RESTRICT,
-  evidence_source TEXT NOT NULL CHECK(evidence_source IN ('EXIF','USER','OCR','NEARBY_MEDIA','AI_INFERENCE')),
+  evidence_source TEXT NOT NULL CHECK(evidence_source IN ('EXIF','USER','OCR','NEARBY_MEDIA','LOCATION_HISTORY','AI_INFERENCE')),
   evidence_status TEXT NOT NULL CHECK(evidence_status IN ('CONFIRMED','CANDIDATE','REJECTED','UNKNOWN')),
   latitude REAL CHECK(latitude IS NULL OR latitude BETWEEN -90 AND 90),
   longitude REAL CHECK(longitude IS NULL OR longitude BETWEEN -180 AND 180),

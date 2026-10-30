@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /** Why a result matched (SRCH-004); shown under it. */
-enum class Evidence { MEANING, TEXT, MEMO, PLACE, PLACE_INFERRED }
+enum class Evidence { MEANING, TEXT, MEMO, PLACE, PLACE_INFERRED, PLACE_HISTORY }
 
 /**
  * One photo, or one scene of a video at [timestampMs] (SRCH-002), with what matched. [ranks] holds
@@ -117,7 +117,7 @@ class SearchMedia(
             }
         }
         atPlaces.forEachIndexed { rank, hit ->
-            fused.getOrPut(hit.assetId to null) { Fused() }.add(rank, if (hit.inferred) Evidence.PLACE_INFERRED else Evidence.PLACE, hit.placeName, null)
+            fused.getOrPut(hit.assetId to null) { Fused() }.add(rank, if (hit.history) Evidence.PLACE_HISTORY else if (hit.inferred) Evidence.PLACE_INFERRED else Evidence.PLACE, hit.placeName, null)
         }
         texts.forEachIndexed { rank, hit ->
             fused.getOrPut(hit.assetId to hit.timestampMs) { Fused() }.add(rank, if (hit.fromMemo) Evidence.MEMO else Evidence.TEXT, hit.text, null)

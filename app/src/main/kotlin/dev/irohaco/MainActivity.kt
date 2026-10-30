@@ -55,6 +55,8 @@ import androidx.compose.runtime.saveable.listSaver
 import dev.irohaco.feature.timeline.viewer.MediaViewerScreen
 import dev.irohaco.feature.timeline.viewer.ViewerViewModel
 import dev.irohaco.feature.timeline.ask.AskScreen
+import dev.irohaco.feature.timeline.library.LocationHistoryScreen
+import dev.irohaco.feature.timeline.library.LocationHistoryViewModel
 import dev.irohaco.feature.timeline.ask.AskViewModel
 import dev.irohaco.core.application.ChatWithLibrary
 import dev.irohaco.ui.IrohacoApp
@@ -199,6 +201,7 @@ class MainActivity : ComponentActivity() {
                     ) { IndexingService.start(applicationContext, it) }
                 },
                 onBack,
+                onOpenLocationHistory = { open(Route.LOCATION_HISTORY) },
             )
             route == Route.IDENTITY -> IdentityScreen(viewModel { IdentityViewModel(container.reconcileIdentity) }, onBack)
             route == Route.TRASH -> TrashScreen(viewModel { TrashViewModel(container.browseTrash, container::syncCatalog) }, onBack)
@@ -207,6 +210,7 @@ class MainActivity : ComponentActivity() {
                 onOpenArea = { open(Route.list(MediaList.Area(it))) },
                 onBack = onBack,
             )
+            route == Route.LOCATION_HISTORY -> LocationHistoryScreen(viewModel { LocationHistoryViewModel(container.locationHistory) }, onBack)
             route == Route.ASK -> AskScreen(
                 viewModel { AskViewModel(ChatWithLibrary(container.searchMedia, container.askLibrary)) },
                 onOpen = { hit -> open(hit.timestampMs?.let { Route.playVideoAt(hit.item.assetId, it) } ?: Route.viewer(hit.item.assetId)) },
@@ -274,6 +278,7 @@ object Route {
     const val TRASH = "trash"
     const val MAP = "map"
     const val ASK = "ask"
+    const val LOCATION_HISTORY = "location_history"
     private const val VIEWER = "viewer:"
     private const val LIST = "list:"
     private const val SIMILAR = "similar:"

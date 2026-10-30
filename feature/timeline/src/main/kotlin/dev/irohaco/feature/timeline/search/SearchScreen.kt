@@ -599,6 +599,7 @@ private fun Evidence.label() = when (this) {
     Evidence.MEMO -> R.string.search_by_memo
     Evidence.PLACE -> R.string.search_place
     Evidence.PLACE_INFERRED -> R.string.search_place_inferred
+    Evidence.PLACE_HISTORY -> R.string.search_place_history
 }
 
 internal fun TimelineItem.kindLabel() = if (kind == MediaKind.VIDEO) R.string.search_video_scene else R.string.search_photo
