@@ -46,6 +46,11 @@ interface TimelineSettings {
     val pinchHintShown: Flow<Boolean>
 
     suspend fun setPinchHintShown()
+
+    /** The grid's columns the user last chose; null until they change it. */
+    val timelineColumns: Flow<Int?>
+
+    suspend fun setTimelineColumns(columns: Int)
 }
 
 /** What to do about a shared photo's GPS when it has one (PRD MET-003). */

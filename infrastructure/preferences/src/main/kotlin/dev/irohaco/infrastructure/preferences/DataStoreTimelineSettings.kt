@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.irohaco.core.contracts.DateGrouping
 import dev.irohaco.core.contracts.TimelineSettings
@@ -26,8 +27,15 @@ class DataStoreTimelineSettings(private val store: DataStore<Preferences>) : Tim
         store.edit { it[PINCH_HINT] = true }
     }
 
+    override val timelineColumns: Flow<Int?> = store.data.map { it[COLUMNS] }.distinctUntilChanged()
+
+    override suspend fun setTimelineColumns(columns: Int) {
+        store.edit { it[COLUMNS] = columns }
+    }
+
     private companion object {
         val GROUPING = stringPreferencesKey("date_grouping")
         val PINCH_HINT = booleanPreferencesKey("pinch_hint_shown")
+        val COLUMNS = intPreferencesKey("timeline_columns")
     }
 }
