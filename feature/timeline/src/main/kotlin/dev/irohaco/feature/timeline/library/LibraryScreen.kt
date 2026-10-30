@@ -130,6 +130,8 @@ fun LibraryScreen(
     onOpenCandidates: () -> Unit = {},
     onOpenTrash: () -> Unit = {},
     onOpenMap: () -> Unit = {},
+    /** Opens the places from the location history, for photos without one (#213). */
+    onOpenLocationHistory: () -> Unit = {},
 ) {
     val candidates by viewModel.candidateCount.collectAsStateWithLifecycle()
     val folders by viewModel.folders.collectAsStateWithLifecycle()
@@ -155,6 +157,7 @@ fun LibraryScreen(
                     onOpenCandidates = onOpenCandidates,
                     onOpenTrash = onOpenTrash,
                     onOpenMap = onOpenMap,
+                    onOpenLocationHistory = onOpenLocationHistory,
                     pinned = pinned,
                     onMovePinned = viewModel::movePinned,
                     onUnpin = viewModel::unpin,
@@ -197,6 +200,7 @@ internal fun LibraryContent(
     onOpenCandidates: () -> Unit = {},
     onOpenTrash: () -> Unit = {},
     onOpenMap: () -> Unit = {},
+    onOpenLocationHistory: () -> Unit = {},
     pinned: List<FolderRef> = emptyList(),
     onMovePinned: (FolderRef, Int) -> Unit = { _, _ -> },
     onUnpin: (FolderRef) -> Unit = {},
@@ -250,7 +254,7 @@ internal fun LibraryContent(
         val contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())
         when (layout) {
             LibraryLayout.TREE -> LazyColumn(Modifier.fillMaxSize(), contentPadding = contentPadding) {
-                header(candidates, onOpenCandidates, onOpenTrash, onOpenMap)
+                header(candidates, onOpenCandidates, onOpenTrash, onOpenMap, onOpenLocationHistory)
                 pinnedSection(pinnedLines, onOpenFolder, onMovePinned, onUnpin)
                 for ((volumeId, entry) in volumes) {
                     val (volume, lines) = entry
@@ -298,6 +302,7 @@ internal fun LibraryContent(
                 fullLine("candidates-and-pinned") {
                     Column {
                         MapItem(onOpenMap)
+                        UnlocatedItem(onOpenLocationHistory)
                         TrashItem(onOpenTrash)
                         if (candidates > 0) CandidatesItem(candidates, onOpenCandidates)
                         pinnedLines.forEachIndexed { index, (ref, volume, line) ->
@@ -358,8 +363,15 @@ private fun LazyGridScope.fullLine(key: String, content: @Composable () -> Unit)
     }
 }
 
-private fun LazyListScope.header(candidates: Int, onOpenCandidates: () -> Unit, onOpenTrash: () -> Unit, onOpenMap: () -> Unit) {
+private fun LazyListScope.header(
+    candidates: Int,
+    onOpenCandidates: () -> Unit,
+    onOpenTrash: () -> Unit,
+    onOpenMap: () -> Unit,
+    onOpenLocationHistory: () -> Unit,
+) {
     item(key = "map") { MapItem(onOpenMap) }
+    item(key = "unlocated") { UnlocatedItem(onOpenLocationHistory) }
     item(key = "trash") { TrashItem(onOpenTrash) }
     if (candidates > 0) item(key = "candidates") { CandidatesItem(candidates, onOpenCandidates) }
 }
@@ -407,6 +419,15 @@ private fun MapItem(onOpen: () -> Unit) {
     ListItem(
         headlineContent = { Text(stringResource(R.string.library_map)) },
         leadingContent = { Icon(painterResource(IrohacoIcons.Map), contentDescription = null) },
+        modifier = Modifier.clickable(onClick = onOpen),
+    )
+}
+
+@Composable
+private fun UnlocatedItem(onOpen: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.library_unlocated)) },
+        leadingContent = { Icon(painterResource(IrohacoIcons.LocationOn), contentDescription = null) },
         modifier = Modifier.clickable(onClick = onOpen),
     )
 }

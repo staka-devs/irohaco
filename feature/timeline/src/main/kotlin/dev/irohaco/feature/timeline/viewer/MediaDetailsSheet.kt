@@ -17,6 +17,7 @@ import androidx.compose.material3.InputChip
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import dev.irohaco.core.contracts.FieldEdit
+import dev.irohaco.core.contracts.HistoryReview
 import dev.irohaco.core.contracts.MetadataField
 import dev.irohaco.core.contracts.geoPointOfMetadataText
 import dev.irohaco.core.contracts.MetadataEdits
@@ -68,12 +69,13 @@ internal fun MediaDetailsSheet(
     onRevert: (MetadataField) -> Unit = {},
     onKeep: (MetadataField) -> Unit = {},
     fileActions: @Composable () -> Unit = {},
+    historyPlace: @Composable () -> Unit = {},
 ) {
     if (state == ViewerViewModel.Details.Hidden) return
     IrohacoBottomSheet(onDismiss = onDismiss) {
         when (state) {
             ViewerViewModel.Details.Loading -> ExpressiveLoading(Modifier.padding(IrohacoSpacing.xl))
-            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate, tags, onAddTag, onRemoveTag, memos, edits, onEdit, onRevert, onKeep, fileActions)
+            is ViewerViewModel.Details.Shown -> MediaDetailsContent(state.result, kind, onAllowLocation, rating, onRate, tags, onAddTag, onRemoveTag, memos, edits, onEdit, onRevert, onKeep, fileActions, historyPlace)
             ViewerViewModel.Details.Hidden -> Unit
         }
     }
@@ -95,6 +97,7 @@ internal fun MediaDetailsContent(
     onRevert: (MetadataField) -> Unit = {},
     onKeep: (MetadataField) -> Unit = {},
     fileActions: @Composable () -> Unit = {},
+    historyPlace: @Composable () -> Unit = {},
 ) {
     Column(
         Modifier
@@ -111,7 +114,7 @@ internal fun MediaDetailsContent(
         when (result) {
             MediaDetailsResult.FileUnavailable -> Text(stringResource(R.string.details_file_unavailable), style = MaterialTheme.typography.bodyLarge)
             is MediaDetailsResult.Read -> {
-                DetailRows(result.details, kind, onAllowLocation, edits, onEdit, onRevert, onKeep)
+                DetailRows(result.details, kind, onAllowLocation, edits, onEdit, onRevert, onKeep, historyPlace)
                 fileActions()
             }
         }
@@ -127,6 +130,7 @@ private fun DetailRows(
     onEdit: (MetadataField) -> Unit,
     onRevert: (MetadataField) -> Unit,
     onKeep: (MetadataField) -> Unit,
+    historyPlace: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     // The file's value when the field was edited, for a field another app changed since; absent without a conflict.
@@ -160,6 +164,7 @@ private fun DetailRows(
     if (details.location == Detail.NoPermission && edits.location == null) {
         TextButton(onClick = onAllowLocation) { Text(stringResource(R.string.details_allow_location)) }
     }
+    historyPlace()
     if (kind == MediaKind.IMAGE) {
         Row(R.string.details_headline, details.headline) { it }
         Row(R.string.details_keywords, details.keywords) { it.joinToString() }
@@ -265,6 +270,18 @@ private fun <T> Row(label: Int, detail: Detail<T>, format: (T) -> String) {
             style = MaterialTheme.typography.bodyLarge,
             color = if (muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
         )
+    }
+}
+
+/** A place from the location history, not yet confirmed (#213, ADR-0029); confirming sets it as an edit. */
+@Composable
+internal fun HistoryPlaceRow(review: HistoryReview, onDecide: (confirmed: Boolean) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(R.string.search_place_history, Detail.Value(review)) { it.placeName ?: "%.5f, %.5f".format(it.point.latitude, it.point.longitude) }
+        androidx.compose.foundation.layout.Row {
+            TextButton(onClick = { onDecide(false) }) { Text(stringResource(R.string.history_reject)) }
+            TextButton(onClick = { onDecide(true) }) { Text(stringResource(R.string.history_confirm)) }
+        }
     }
 }
 

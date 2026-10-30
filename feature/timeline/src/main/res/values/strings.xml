@@ -343,4 +343,6 @@
         <item quantity="one">Confirm %d</item>
         <item quantity="other">Confirm %d</item>
     </plurals>
+    <string name="library_unlocated">Photos without a place</string>
+    <string name="timeline_place">Add places</string>
 </resources>

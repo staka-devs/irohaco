@@ -130,7 +130,14 @@ private val MEDIA_PERMISSIONS: Array<String> =
 
 /** The Photos tab (PRD GAL-001, DESIGN §4.1). */
 @Composable
-fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) -> Unit, onOpenSettings: () -> Unit, onOpenMap: () -> Unit = {}) {
+fun TimelineScreen(
+    viewModel: TimelineViewModel,
+    onOpenMedia: (assetId: String) -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenMap: () -> Unit = {},
+    /** Opens the places from the location history for the picked photos (#213). */
+    onPlace: (assetIds: List<String>) -> Unit = {},
+) {
     val access by viewModel.access.collectAsStateWithLifecycle()
     val cells = viewModel.cells.collectAsLazyPagingItems()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
@@ -245,6 +252,10 @@ fun TimelineScreen(viewModel: TimelineViewModel, onOpenMedia: (assetId: String) 
         onOpenMedia = onOpenMedia,
         onOpenSettings = onOpenSettings,
         onOpenMap = onOpenMap,
+        onPlace = { items ->
+            viewModel.clearSelection()
+            onPlace(items.map { it.assetId })
+        },
         selection = selection,
         onToggle = viewModel::toggle,
         onSelectRange = viewModel::setSelection,
@@ -360,6 +371,7 @@ internal fun TimelineContent(
     onMove: (List<TimelineItem>) -> Unit = {},
     onCopy: (List<TimelineItem>) -> Unit = {},
     onRename: (TimelineItem) -> Unit = {},
+    onPlace: (List<TimelineItem>) -> Unit = {},
     onFavorite: (List<TimelineItem>) -> Unit = {},
     onTag: (List<TimelineItem>) -> Unit = {},
     onAlbum: (List<TimelineItem>) -> Unit = {},
@@ -466,6 +478,7 @@ internal fun TimelineContent(
                         onMove = onMove,
                         onCopy = onCopy,
                         onRename = onRename,
+                        onPlace = onPlace,
                         onFavorite = onFavorite,
                         onTag = onTag,
                         onAlbum = onAlbum,
@@ -498,6 +511,7 @@ private fun TimelineGrid(
     onMove: (List<TimelineItem>) -> Unit,
     onCopy: (List<TimelineItem>) -> Unit,
     onRename: (TimelineItem) -> Unit,
+    onPlace: (List<TimelineItem>) -> Unit,
     onFavorite: (List<TimelineItem>) -> Unit,
     onTag: (List<TimelineItem>) -> Unit,
     onAlbum: (List<TimelineItem>) -> Unit,
@@ -688,6 +702,14 @@ private fun TimelineGrid(
                             onClick = {
                                 more = false
                                 onCopy(selection.values.toList())
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.timeline_place)) },
+                            leadingIcon = { Icon(painterResource(IrohacoIcons.LocationOn), contentDescription = null) },
+                            onClick = {
+                                more = false
+                                onPlace(selection.values.toList())
                             },
                         )
                         if (selection.size == 1) {
