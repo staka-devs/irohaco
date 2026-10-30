@@ -110,7 +110,7 @@
 
 | ID | タイトル | 種類 / 領域 | 要求・設計 | 依存 |
 |---|---|---|---|---|
-| M4-01 | ADR: モデル能力ベースのAPIアダプター | adr / api | ARCH §15 未起票 | M3-07 |
+| M4-01 | ADR: モデル能力ベースのAPIアダプター | adr / api | ADR-0032 | M3-07 |
 | M4-02 | EgressPolicyと用途別許可・送信前確認UI（既定無効、自動フェイルオーバー禁止、Spike Gの検証） | feature / api | API-007, ADR-0002, AC-009 | M4-01 |
 | M4-03 | APIキー保護（Keystore）、エラー可視化、ログ秘匿、予算注意 | feature / api | API-008, PRD §10 | M4-02 |
 | M4-04 | 生成API Adapter（OpenAI Chat Completions / Responses / Anthropic Messages）と契約テスト | feature / api | API-001〜003, API-006 | M4-03 |
