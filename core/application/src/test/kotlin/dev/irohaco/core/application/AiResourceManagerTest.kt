@@ -10,13 +10,16 @@ import dev.irohaco.core.contracts.ModelState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -178,5 +181,30 @@ class AiResourceManagerTest {
         assertEquals(1f, ai.withEmbedding(AiPriority.USER_SEARCH) { it.embedText("next") }[0])
         assertFalse(closeReturned, "the search waited for the close")
         stuck.countDown()
+    }
+
+    @Test
+    fun `two models are never closed at the same time`() = runTest {
+        val open = AtomicInteger()
+        val most = AtomicInteger()
+        val slow = EmbeddingRuntime { _, backend ->
+            object : EmbeddingSession {
+                override val backend = backend
+                override fun embedText(text: String) = floatArrayOf(1f)
+                override fun embedImage(bytes: ByteArray) = floatArrayOf(1f)
+                override fun close() {
+                    most.accumulateAndGet(open.incrementAndGet(), ::maxOf)
+                    Thread.sleep(200)
+                    open.decrementAndGet()
+                }
+            }
+        }
+        val models = List(2) { AiResourceManager({ "/models/embedding.litertlm" }, slow, Dispatchers.IO, this) }
+        models.forEach { it.withEmbedding(AiPriority.USER_SEARCH) { } }
+        models.map { launch { it.release() } }.joinAll()
+        testScheduler.advanceUntilIdle()
+        // The closes run on real threads; wait for both without leaning on the test clock.
+        withContext(Dispatchers.IO) { while (open.get() > 0 || most.get() == 0) Thread.sleep(20) }
+        assertEquals(1, most.get())
     }
 }

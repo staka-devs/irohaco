@@ -144,7 +144,7 @@ class AskLibrary(
 
     /** Called with [lock] held; the native close may never return, so questions do not wait on it (#215). */
     private fun closeLater() {
-        session?.let { scope.launch(io) { it.close() } }
+        session?.let { scope.launch(io) { nativeClose.withLock { it.close() } } }
         session = null
     }
 
