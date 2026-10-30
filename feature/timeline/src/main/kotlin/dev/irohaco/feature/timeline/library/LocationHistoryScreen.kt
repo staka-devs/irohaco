@@ -2,13 +2,18 @@ package dev.irohaco.feature.timeline.library
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,9 +33,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -53,17 +68,31 @@ import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.R
 import dev.irohaco.feature.timeline.rememberDateFormatter
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.maplibre.android.MapLibre
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.Style
+import org.maplibre.android.snapshotter.MapSnapshotter
 import java.time.LocalDate
 
-class LocationHistoryViewModel(private val history: LocationHistory) : ViewModel() {
-    val groups: StateFlow<List<HistoryGroup>> = history.groups().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+class LocationHistoryViewModel(
+    private val history: LocationHistory,
+    /** Whether OpenFreeMap may receive a place, so a card can show it on a map (ADR-0011). */
+    mapAllowed: Flow<Boolean> = flowOf(false),
+    /** The photos picked in the timeline, whose candidates alone are shown; null shows all (#213). */
+    only: Set<String>? = null,
+) : ViewModel() {
+    val groups: StateFlow<List<HistoryGroup>> = history.groups(only).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val mapAllowed: StateFlow<Boolean> = mapAllowed.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /** Photos picked in a group, so its buttons decide just those (ADR-0029). */
     private val _selection = MutableStateFlow<Set<String>>(emptySet())
@@ -100,9 +129,12 @@ fun LocationHistoryScreen(viewModel: LocationHistoryViewModel, onBack: () -> Uni
     val selection by viewModel.selection.collectAsStateWithLifecycle()
     val imported by viewModel.imported.collectAsStateWithLifecycle()
     val importing by viewModel.importing.collectAsStateWithLifecycle()
+    val mapAllowed by viewModel.mapAllowed.collectAsStateWithLifecycle()
     // The export has no fixed type: a phone may label it JSON, text or a plain file.
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { viewModel.import(it.toString()) } }
-    LocationHistoryContent(groups, selection, imported, importing, onBack, onImport = { pick.launch(arrayOf("*/*")) }, viewModel::toggle, viewModel::decide)
+    LocationHistoryContent(groups, selection, imported, importing, onBack, onImport = { pick.launch(arrayOf("*/*")) }, viewModel::toggle, viewModel::decide) { point ->
+        if (mapAllowed) MapPreview(point)
+    }
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -116,6 +148,7 @@ internal fun LocationHistoryContent(
     onImport: () -> Unit,
     onToggle: (String) -> Unit,
     onDecide: (HistoryGroup, Boolean) -> Unit,
+    map: @Composable (GeoPoint) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -140,7 +173,7 @@ internal fun LocationHistoryContent(
                 }
             }
             items(groups, key = { "${it.date}-${it.reviews.first().item.assetId}" }) { group ->
-                HistoryGroupCard(group, selection, onToggle, onDecide)
+                HistoryGroupCard(group, selection, onToggle, onDecide, map)
             }
         }
     }
@@ -159,7 +192,13 @@ private fun importedText(imported: LocationHistory.Imported): String = when (imp
 }
 
 @Composable
-private fun HistoryGroupCard(group: HistoryGroup, selection: Set<String>, onToggle: (String) -> Unit, onDecide: (HistoryGroup, Boolean) -> Unit) {
+private fun HistoryGroupCard(
+    group: HistoryGroup,
+    selection: Set<String>,
+    onToggle: (String) -> Unit,
+    onDecide: (HistoryGroup, Boolean) -> Unit,
+    map: @Composable (GeoPoint) -> Unit,
+) {
     val formatter = rememberDateFormatter()
     val picked = group.reviews.count { it.item.assetId in selection }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.fillMaxWidth()) {
@@ -174,6 +213,7 @@ private fun HistoryGroupCard(group: HistoryGroup, selection: Set<String>, onTogg
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            map(group.point)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
                 items(group.reviews, key = { it.item.assetId }) { review ->
                     MediaThumbnail(
@@ -195,6 +235,47 @@ private fun HistoryGroupCard(group: HistoryGroup, selection: Set<String>, onTogg
         }
     }
 }
+
+/**
+ * The place as a still image of the map, with a pin at its center. A snapshot instead of a live map,
+ * since a list of cards would otherwise hold a map view each; only the shown area goes to OpenFreeMap.
+ */
+@Composable
+private fun MapPreview(point: GeoPoint) {
+    val context = LocalContext.current
+    var image by remember(point) { mutableStateOf<ImageBitmap?>(null) }
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .height(MAP_HEIGHT)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        val width = maxWidth.value.toInt()
+        val density = LocalDensity.current.density
+        DisposableEffect(point, width) {
+            MapLibre.getInstance(context)
+            val options = MapSnapshotter.Options(width, MAP_HEIGHT.value.toInt())
+                .withPixelRatio(density)
+                .withStyleBuilder(Style.Builder().fromUri(OPEN_FREE_MAP_STYLE))
+                .withCameraPosition(CameraPosition.Builder().target(LatLng(point.latitude, point.longitude)).zoom(MAP_ZOOM).build())
+            val snapshotter = MapSnapshotter(context, options)
+            snapshotter.start({ image = it.bitmap.asImageBitmap() }, { /* the card still shows the place name */ })
+            onDispose { snapshotter.cancel() }
+        }
+        image?.let { Image(it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+        Icon(
+            painterResource(IrohacoIcons.LocationOn),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.align(Alignment.Center).offset(y = -PIN_SIZE / 2).size(PIN_SIZE),
+        )
+    }
+}
+
+private val MAP_HEIGHT = 120.dp
+private val PIN_SIZE = 32.dp
+private const val MAP_ZOOM = 14.0
 
 /** How sure the place is, in words: a stay is sure, a point near in time less so. */
 private fun confidenceLabel(confidence: Double) = when {

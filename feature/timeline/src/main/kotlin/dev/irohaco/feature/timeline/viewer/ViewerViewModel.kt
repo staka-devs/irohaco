@@ -13,6 +13,8 @@ import dev.irohaco.core.application.AskResult
 import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.BrowseMap
 import dev.irohaco.core.application.GetTimelinePage
+import dev.irohaco.core.application.LocationHistory
+import dev.irohaco.core.contracts.HistoryReview
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.Annotation
@@ -85,6 +87,8 @@ class ViewerViewModel(
     private val writer: WriteMetadataToFile? = null,
     /** Answers questions about the page on screen with a local model (#201); null hides "Ask AI". */
     private val ask: AskLibrary? = null,
+    /** Places from the location history for files without GPS (#213); null shows none. */
+    private val history: LocationHistory? = null,
 ) : ViewModel() {
     private val currentItem = MutableStateFlow<TimelineItem?>(null)
     private val current = currentItem.map { it?.assetId }.distinctUntilChanged()
@@ -141,6 +145,16 @@ class ViewerViewModel(
             flow { emit(if (item == null || map == null || location !is Detail.Value) null else map.placeName(item.assetId, location.value)) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** The undecided place from the location history of the page on screen (#213). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val historyPlace: StateFlow<HistoryReview?> = current
+        .flatMapLatest { id -> if (id == null || history == null) flowOf(null) else history.candidate(id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun decideHistoryPlace(review: HistoryReview, confirmed: Boolean) {
+        viewModelScope.launch { history?.decide(listOf(review), confirmed) }
+    }
 
     /** Favorite and rating of the page on screen (PRD GAL-007). */
     @OptIn(ExperimentalCoroutinesApi::class)

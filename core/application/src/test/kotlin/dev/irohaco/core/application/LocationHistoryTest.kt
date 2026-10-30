@@ -88,6 +88,9 @@ class LocationHistoryTest {
         assertEquals(listOf(listOf("a", "b"), listOf("c")), groups.map { group -> group.reviews.map { it.item.assetId } })
         assertEquals(LocalDate.of(1970, 1, 2), groups.first().date)
         assertEquals(0.7, groups.first().confidence)
+        assertEquals(listOf(listOf("c")), history.groups(setOf("c")).first().map { group -> group.reviews.map { it.item.assetId } })
+        assertEquals(kyoto, history.candidate("b").first()?.point)
+        assertEquals(null, history.candidate("z").first())
 
         history.decide(groups.first().reviews, confirmed = true)
         history.decide(groups.last().reviews, confirmed = false)

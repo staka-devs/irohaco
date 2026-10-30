@@ -31,4 +31,11 @@ class RouteTest {
             assertEquals(Route.Viewer("a-1", null, list), Route.parseViewer(Route.viewer("a-1", list)))
         }
     }
+
+    @Test
+    fun `the location history route carries the picked photos, or none`() {
+        assertTrue(Route.isLocationHistory(Route.locationHistory(emptyList())))
+        assertEquals(null, Route.parseLocationHistory(Route.locationHistory(emptyList())))
+        assertEquals(setOf("a-1", "b-2"), Route.parseLocationHistory(Route.locationHistory(listOf("a-1", "b-2"))))
+    }
 }

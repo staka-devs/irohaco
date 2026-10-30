@@ -48,12 +48,16 @@ class LocationHistory(
         return Imported.Matched(candidates.size)
     }
 
-    /** The undecided candidates by day and place, newest first. */
-    fun groups(): Flow<List<HistoryGroup>> = store.undecided().map { reviews ->
+    /** The undecided candidates by day and place, newest first; only those of [only] when given (#213). */
+    fun groups(only: Set<String>? = null): Flow<List<HistoryGroup>> = store.undecided().map { all ->
         val zone = zone()
+        val reviews = if (only == null) all else all.filter { it.item.assetId in only }
         reviews.groupBy { Instant.ofEpochMilli(it.item.sortTimeMs).atZone(zone).toLocalDate() to (it.placeName ?: area(it.point)) }
             .map { (key, group) -> HistoryGroup(key.first, group.first().placeName, group.first().point, group.minOf { it.confidence }, group) }
     }
+
+    /** The undecided candidate of one file, for the viewer's details (#213). */
+    fun candidate(assetId: String): Flow<HistoryReview?> = store.undecided().map { all -> all.find { it.item.assetId == assetId } }
 
     /** Confirming sets each file's place in the DB, as the user's edit; the files stay as they are. */
     suspend fun decide(reviews: List<HistoryReview>, confirmed: Boolean) {

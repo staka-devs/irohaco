@@ -164,7 +164,7 @@ internal fun MapContent(
 }
 
 /** OpenFreeMap's style (ADR-0011), kept in one place in case the service changes. */
-private const val OPEN_FREE_MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty"
+internal const val OPEN_FREE_MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty"
 private val MARKER_SIZE = 56.dp
 
 /**

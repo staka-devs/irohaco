@@ -133,6 +133,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
     val memos by viewModel.memos.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
     val edits by viewModel.edits.collectAsStateWithLifecycle()
+    val historyPlace by viewModel.historyPlace.collectAsStateWithLifecycle()
     var tagging by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<MetadataField?>(null) }
     val fileWrite by viewModel.fileWrite.collectAsStateWithLifecycle()
@@ -283,6 +284,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
                 onKeepFile = viewModel::keepFile,
             )
         },
+        historyPlace = { historyPlace?.let { review -> HistoryPlaceRow(review) { viewModel.decideHistoryPlace(review, it) } } },
     )
     Box(Modifier.fillMaxSize()) {
         when (val s = start) {
