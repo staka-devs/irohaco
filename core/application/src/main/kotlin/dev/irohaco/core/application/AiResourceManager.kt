@@ -73,12 +73,15 @@ class AiResourceManager(
 
     /** Frees the model after the running request, if any; the next request loads it again. */
     suspend fun release() {
-        gate.withTurn(AiPriority.USER_SEARCH) {
-            session?.let { withContext(io) { it.close() } }
-            session = null
-            _backend.value = null
-            if (_state.value == ModelState.LOADED) _state.value = ModelState.READY
+        val loaded = gate.withTurn(AiPriority.USER_SEARCH) {
+            session.also {
+                session = null
+                _backend.value = null
+                if (_state.value == ModelState.LOADED) _state.value = ModelState.READY
+            }
         }
+        // Closed outside the turn: the native close has been seen never to return, and later searches must not wait on it (#215).
+        loaded?.let { scope.launch(io) { nativeClose.withLock { it.close() } } }
     }
 
     private suspend fun load(): EmbeddingSession {
@@ -107,6 +110,12 @@ class AiResourceManager(
         const val IDLE_MS = 60_000L
     }
 }
+
+/**
+ * One native close at a time, for the embedding and the answer model alike. A close once never returned on a
+ * device while both models were loaded (#215); closing them together is the suspect, not a proven cause.
+ */
+internal val nativeClose = Mutex()
 
 /**
  * One holder at a time; when it lets go, the waiting request with the highest priority goes next,

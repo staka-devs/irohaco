@@ -137,10 +137,15 @@ class AskLibrary(
 
     suspend fun release() {
         lock.withLock {
-            session?.let { withContext(io) { it.close() } }
-            session = null
+            closeLater()
             loadedPath = null
         }
+    }
+
+    /** Called with [lock] held; the native close may never return, so questions do not wait on it (#215). */
+    private fun closeLater() {
+        session?.let { scope.launch(io) { nativeClose.withLock { it.close() } } }
+        session = null
     }
 
     /** Runs [block] on the model at [path], loading it first if another one or none is loaded. */
@@ -159,8 +164,7 @@ class AskLibrary(
 
     /** Called with [lock] held. */
     private suspend fun load(path: String): AnswerSession {
-        session?.let { withContext(io) { it.close() } }
-        session = null
+        closeLater()
         val chosenBackend = backend()
         return withContext(io) { runtime.load(path, chosenBackend).also { it.warm() } }.also {
             session = it
