@@ -1,5 +1,7 @@
 package dev.irohaco.feature.timeline.search
 
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,11 +29,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
-import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
@@ -42,6 +43,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -294,8 +297,6 @@ internal fun SearchContent(
     onOpenAsk: (() -> Unit)? = null,
 ) {
     val text = rememberTextFieldState(ui.query)
-    // The bar never expands: the results show below it, on this screen.
-    val bar = rememberSearchBarState()
     val labels = spaceLabels(spaces)
     Scaffold { padding ->
         LazyVerticalGrid(
@@ -310,24 +311,30 @@ internal fun SearchContent(
                     SimilarHeader(onBack)
                     return@item
                 }
-                SearchBar(
-                    state = bar,
-                    inputField = {
-                        SearchBarDefaults.InputField(
-                            textFieldState = text,
-                            searchBarState = bar,
-                            onSearch = onSearch,
-                            placeholder = { Text(stringResource(R.string.search_placeholder)) },
-                            leadingIcon = { Icon(painterResource(IrohacoIcons.Search), null) },
-                            trailingIcon = {
-                                Row {
-                                    onOpenAsk?.let { IconButton(onClick = it) { Icon(painterResource(IrohacoIcons.SmartToy), stringResource(R.string.ask_title)) } }
-                                    IconButton(onClick = onOpenSettings) { Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.timeline_settings)) }
-                                }
-                            },
-                        )
-                    },
+                // A field shaped like a search bar, not a SearchBar: the results show below it on this screen, and a
+                // collapsed SearchBar keeps the keyboard away until it expands to a full-screen bar of its own.
+                TextField(
+                    state = text,
                     modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(stringResource(R.string.search_placeholder)) },
+                    leadingIcon = { Icon(painterResource(IrohacoIcons.Search), null) },
+                    trailingIcon = {
+                        Row {
+                            onOpenAsk?.let { IconButton(onClick = it) { Icon(painterResource(IrohacoIcons.SmartToy), stringResource(R.string.ask_title)) } }
+                            IconButton(onClick = onOpenSettings) { Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.timeline_settings)) }
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    onKeyboardAction = { onSearch(text.text.toString()) },
+                    lineLimits = TextFieldLineLimits.SingleLine,
+                    shape = SearchBarDefaults.inputFieldShape,
+                    colors = SearchBarDefaults.inputFieldColors().copy(
+                        focusedContainerColor = SearchBarDefaults.colors().containerColor,
+                        unfocusedContainerColor = SearchBarDefaults.colors().containerColor,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                    ),
                 )
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
