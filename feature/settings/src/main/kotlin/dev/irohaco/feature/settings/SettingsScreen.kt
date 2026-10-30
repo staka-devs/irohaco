@@ -78,7 +78,12 @@ import kotlinx.coroutines.launch
 
 /** Settings, in categories (DESIGN §2.1, §3, APP-001). Opened from the top app bars. */
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel,
+    onBack: () -> Unit,
+    /** Opens the screen that imports the location history and checks its places (#174). */
+    onOpenLocationHistory: () -> Unit = {},
+) {
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val contrast by viewModel.contrast.collectAsStateWithLifecycle()
     val shareLocationPolicy by viewModel.shareLocationPolicy.collectAsStateWithLifecycle()
@@ -148,7 +153,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast) },
         library = { LibrarySettings(excludedFolders, viewModel::showFolder) },
-        privacy = { PrivacySettings(shareLocationPolicy, viewModel::selectShareLocationPolicy, mapAllowed, viewModel::setMapAllowed) },
+        privacy = { PrivacySettings(shareLocationPolicy, viewModel::selectShareLocationPolicy, mapAllowed, viewModel::setMapAllowed, onOpenLocationHistory) },
     )
 }
 
@@ -426,6 +431,7 @@ internal fun PrivacySettings(
     onSelectShareLocationPolicy: (ShareLocationPolicy) -> Unit,
     mapAllowed: Boolean,
     onMapAllowed: (Boolean) -> Unit,
+    onOpenLocationHistory: () -> Unit = {},
 ) {
     SectionTitle(R.string.settings_share_location)
     Column(Modifier.selectableGroup()) {
@@ -442,6 +448,13 @@ internal fun PrivacySettings(
         supportingContent = { Text(stringResource(R.string.settings_map_allow_summary)) },
         trailingContent = { Switch(checked = mapAllowed, onCheckedChange = null) },
         modifier = Modifier.toggleable(mapAllowed, role = Role.Switch, onValueChange = onMapAllowed),
+    )
+
+    SectionTitle(R.string.settings_location_history)
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.settings_location_history_open)) },
+        supportingContent = { Text(stringResource(R.string.settings_location_history_summary)) },
+        modifier = Modifier.clickable(onClick = onOpenLocationHistory),
     )
 }
 

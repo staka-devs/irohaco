@@ -107,4 +107,7 @@
     <string name="settings_index_auto_summary">写真や動画の追加・変更を、アプリを開いたときに索引。最初の索引のあとから有効</string>
     <string name="settings_ai_answer_model">質問に答えるモデル</string>
     <string name="settings_ai_answer_model_hint">検索した写真と動画の場面を見て、質問に答えます。上でダウンロードしたモデルから選べます。</string>
+    <string name="settings_location_history">位置情報の履歴</string>
+    <string name="settings_location_history_open">Google マップのタイムラインから場所を付ける</string>
+    <string name="settings_location_history_summary">書き出した Timeline.json を、端末の中だけで読みます</string>
 </resources>

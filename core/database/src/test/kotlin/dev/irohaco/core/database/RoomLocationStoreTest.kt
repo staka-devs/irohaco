@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.irohaco.core.contracts.CatalogChanges
 import dev.irohaco.core.contracts.CatalogVolume
+import dev.irohaco.core.contracts.HistoryCandidate
 import dev.irohaco.core.contracts.InferredPlace
 import dev.irohaco.core.contracts.LocatedAsset
 import dev.irohaco.core.contracts.PlaceMatch
@@ -14,6 +15,7 @@ import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.domain.GeoBounds
 import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaKind
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Test
@@ -128,5 +130,30 @@ class RoomLocationStoreTest {
         assertEquals(emptyList(), store.unnamedAreas(10))
         assertEquals(null, store.placeName("sea"))
         assertEquals(emptyList(), store.placeNames(includeInferred = true))
+    }
+
+    @Test
+    fun `history candidates replace nearby guesses, a new import keeps decisions, and the search finds them as history`() = runTest {
+        catalog("gps", "a", "b", "c")
+        val kyoto = GeoPoint(35.0116, 135.7681)
+        store.recordExif("gps", kyoto)
+        store.setPlaceName("gps", "京都市")
+        listOf("a", "b", "c").forEach { store.recordExif(it, null) }
+        store.replaceInferred(listOf(InferredPlace("a", kyoto, "京都市", 0.6, "gps"), InferredPlace("c", kyoto, "京都市", 0.6, "gps")))
+
+        store.replaceHistory(listOf(HistoryCandidate("a", kyoto, "京都市", 0.9), HistoryCandidate("b", kyoto, null, 0.7)))
+        assertEquals(listOf("b", "a"), store.undecided().first().map { it.item.assetId })
+        // The history's place wins for "a"; "c" keeps its guess from nearby photos.
+        assertEquals(
+            listOf(PlaceMatch("gps", "京都市", false), PlaceMatch("a", "京都市", true, history = true), PlaceMatch("c", "京都市", true)),
+            store.filesAt(listOf("京都市"), includeInferred = true, limit = 10),
+        )
+        // A guess made later does not replace the history's candidate either.
+        store.replaceInferred(listOf(InferredPlace("a", kyoto, "京都市", 0.6, "gps")))
+        assertEquals(1, store.filesAt(listOf("京都市"), includeInferred = true, limit = 10).count { it.assetId == "a" })
+
+        store.decide(listOf("a"), confirmed = false)
+        store.replaceHistory(listOf(HistoryCandidate("a", kyoto, "京都市", 0.9)))
+        assertEquals(emptyList(), store.undecided().first().map { it.item.assetId })
     }
 }

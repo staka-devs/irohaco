@@ -266,6 +266,7 @@
     <string name="search_inferred_places">Guessed places too</string>
     <string name="search_place">Place</string>
     <string name="search_place_inferred">Place (guessed)</string>
+    <string name="search_place_history">Place (history)</string>
     <string name="details_edited">Edited in Irohaco. In the file: %1$s</string>
     <string name="details_revert">Use the file\'s value</string>
     <string name="details_conflict">Another app changed the file after your edit. In the file when you edited: %1$s</string>
@@ -314,4 +315,32 @@
     <string name="viewer_ask_caution">The AI on this device answered from this photo or scene only. It can be wrong.</string>
     <string name="ask_title">Ask AI</string>
     <string name="ask_hint">Ask about your photos, e.g. Where did I go last summer?</string>
+    <string name="history_title">Location history</string>
+    <string name="history_explain">Pick the Timeline.json you exported from Google Maps. Photos without GPS get the place you were at when you took them. The file stays on this device, and nothing changes in your photos until you confirm and write it to them.</string>
+    <string name="history_import">Choose Timeline.json</string>
+    <string name="history_not_json">This file is not JSON, so nothing was imported.</string>
+    <string name="history_unknown_format">This file is not a location history this app can read, so nothing was imported.</string>
+    <string name="history_empty">This location history has no places in it.</string>
+    <string name="history_none">There are no places to check.</string>
+    <string name="history_reject">Reject</string>
+    <string name="history_confirm">Confirm</string>
+    <string name="history_confidence_high">You stayed there</string>
+    <string name="history_confidence_medium">Passing by</string>
+    <string name="history_confidence_low">Passing by, a while apart</string>
+    <plurals name="history_matched">
+        <item quantity="one">Found a place for %d photo or video.</item>
+        <item quantity="other">Found places for %d photos and videos.</item>
+    </plurals>
+    <plurals name="history_count">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
+    <plurals name="history_reject_picked">
+        <item quantity="one">Reject %d</item>
+        <item quantity="other">Reject %d</item>
+    </plurals>
+    <plurals name="history_confirm_picked">
+        <item quantity="one">Confirm %d</item>
+        <item quantity="other">Confirm %d</item>
+    </plurals>
 </resources>

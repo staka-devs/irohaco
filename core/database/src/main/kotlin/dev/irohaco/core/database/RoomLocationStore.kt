@@ -4,8 +4,11 @@ import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Transaction
 import dev.irohaco.core.contracts.FieldEdit
+import dev.irohaco.core.contracts.HistoryCandidate
+import dev.irohaco.core.contracts.HistoryReview
 import dev.irohaco.core.contracts.InferredPlace
 import dev.irohaco.core.contracts.LocatedAsset
+import dev.irohaco.core.contracts.LocationHistoryStore
 import dev.irohaco.core.contracts.LocationStore
 import dev.irohaco.core.contracts.PlaceEvidenceStore
 import dev.irohaco.core.contracts.PlaceMatch
@@ -74,14 +77,14 @@ interface LocationDao {
 
     @Query(
         """SELECT ROUND(le.latitude, 2) AS latitude, ROUND(le.longitude, 2) AS longitude FROM location_evidence le
-           WHERE $SHOWN AND le.place_text IS NULL
+           WHERE (($SHOWN) OR $HISTORY_CANDIDATE) AND le.place_text IS NULL
            GROUP BY ROUND(le.latitude, 2), ROUND(le.longitude, 2) LIMIT :limit""",
     )
     suspend fun unnamedAreas(limit: Int): List<AreaRow>
 
     @Query(
         """UPDATE location_evidence SET place_text = :name WHERE evidence_id IN
-             (SELECT le.evidence_id FROM location_evidence le WHERE $SHOWN AND le.place_text IS NULL
+             (SELECT le.evidence_id FROM location_evidence le WHERE (($SHOWN) OR $HISTORY_CANDIDATE) AND le.place_text IS NULL
                 AND ROUND(le.latitude, 2) = :latitude AND ROUND(le.longitude, 2) = :longitude)""",
     )
     suspend fun nameArea(latitude: Double, longitude: Double, name: String)
@@ -114,11 +117,15 @@ interface LocationDao {
 
     @Query(
         """INSERT INTO location_evidence(evidence_id, asset_id, evidence_source, evidence_status, latitude, longitude, place_text, confidence, explanation)
-           VALUES ('near:' || :assetId, :assetId, 'NEARBY_MEDIA', 'CANDIDATE', :latitude, :longitude, :placeName, :confidence, 'Taken close in time to a located photo')""",
+           SELECT 'near:' || :assetId, :assetId, 'NEARBY_MEDIA', 'CANDIDATE', :latitude, :longitude, :placeName, :confidence, 'Taken close in time to a located photo'
+           WHERE NOT EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = :assetId AND $HISTORY_CANDIDATE)""",
     )
     suspend fun insertInferred(assetId: String, latitude: Double, longitude: Double, placeName: String?, confidence: Double)
 
-    @Query("INSERT INTO location_evidence_support(evidence_id, supporting_asset_id) VALUES ('near:' || :assetId, :supportAssetId)")
+    @Query(
+        """INSERT INTO location_evidence_support(evidence_id, supporting_asset_id) SELECT 'near:' || :assetId, :supportAssetId
+           WHERE EXISTS (SELECT 1 FROM location_evidence WHERE evidence_id = 'near:' || :assetId)""",
+    )
     suspend fun insertSupport(assetId: String, supportAssetId: String)
 
     @Transaction
@@ -133,7 +140,7 @@ interface LocationDao {
 
     @Query(
         """SELECT DISTINCT le.place_text FROM location_evidence le WHERE le.place_text IS NOT NULL AND le.place_text <> ''
-             AND (($SHOWN) OR (:includeInferred AND le.evidence_source = 'NEARBY_MEDIA' AND le.evidence_status = 'CANDIDATE'))""",
+             AND (($SHOWN) OR (:includeInferred AND $GUESS))""",
     )
     suspend fun placeNames(includeInferred: Boolean): List<String>
 
@@ -165,15 +172,71 @@ interface LocationDao {
     }
 
     @Query(
-        """SELECT le.asset_id AS assetId, le.place_text AS placeName, le.evidence_source <> 'EXIF' AS inferred
+        """SELECT le.asset_id AS assetId, le.place_text AS placeName, le.evidence_source <> 'EXIF' AS inferred, le.evidence_source = 'LOCATION_HISTORY' AS history
            FROM location_evidence le JOIN media_assets a ON a.asset_id = le.asset_id
            WHERE le.place_text IN (:names) AND a.tombstoned_at IS NULL
              AND EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE')
-             AND (($SHOWN) OR (:includeInferred AND le.evidence_source = 'NEARBY_MEDIA' AND le.evidence_status = 'CANDIDATE'))
+             AND (($SHOWN) OR (:includeInferred AND $GUESS))
            ORDER BY inferred, le.confidence DESC LIMIT :limit""",
     )
     suspend fun filesAt(names: List<String>, includeInferred: Boolean, limit: Int): List<PlaceMatch>
+
+    @Query("DELETE FROM location_evidence WHERE evidence_source = 'LOCATION_HISTORY' AND evidence_status = 'CANDIDATE'")
+    suspend fun deleteHistoryCandidates()
+
+    // OR IGNORE: a file the user already confirmed or rejected keeps its row and that decision.
+    @Query(
+        """INSERT OR IGNORE INTO location_evidence(evidence_id, asset_id, evidence_source, evidence_status, latitude, longitude, place_text, confidence, explanation)
+           VALUES ('hist:' || :assetId, :assetId, 'LOCATION_HISTORY', 'CANDIDATE', :latitude, :longitude, :placeName, :confidence, 'From the location history')""",
+    )
+    suspend fun insertHistory(assetId: String, latitude: Double, longitude: Double, placeName: String?, confidence: Double)
+
+    @Query(
+        """DELETE FROM location_evidence_support WHERE evidence_id IN
+             (SELECT 'near:' || le.asset_id FROM location_evidence le WHERE $HISTORY_CANDIDATE)""",
+    )
+    suspend fun deleteSupportUnderHistory()
+
+    @Query(
+        """DELETE FROM location_evidence WHERE evidence_source = 'NEARBY_MEDIA'
+             AND asset_id IN (SELECT le.asset_id FROM location_evidence le WHERE $HISTORY_CANDIDATE)""",
+    )
+    suspend fun deleteInferredUnderHistory()
+
+    /** A history candidate replaces the guess from nearby photos for its file (ADR-0029). */
+    @Transaction
+    suspend fun replaceHistory(candidates: List<HistoryCandidate>) {
+        deleteHistoryCandidates()
+        candidates.forEach { insertHistory(it.assetId, it.point.latitude, it.point.longitude, it.placeName, it.confidence) }
+        deleteSupportUnderHistory()
+        deleteInferredUnderHistory()
+    }
+
+    @Query(
+        """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, MIN(s.content_uri) AS contentUri, $TAKEN AS sortTimeMs,
+             MIN(s.mime_type) AS mimeType, le.latitude AS latitude, le.longitude AS longitude, le.place_text AS placeName, le.confidence AS confidence
+           FROM location_evidence le JOIN media_assets a ON a.asset_id = le.asset_id JOIN media_sources s ON s.asset_id = a.asset_id
+           WHERE $HISTORY_CANDIDATE AND s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL
+           GROUP BY le.asset_id
+           ORDER BY sortTimeMs DESC""",
+    )
+    fun undecided(): Flow<List<HistoryRow>>
+
+    @Query("UPDATE location_evidence SET evidence_status = :status WHERE evidence_source = 'LOCATION_HISTORY' AND asset_id IN (:assetIds)")
+    suspend fun decide(assetIds: List<String>, status: String)
 }
+
+data class HistoryRow(
+    val assetId: String,
+    val mediaKind: String,
+    val contentUri: String,
+    val sortTimeMs: Long,
+    val mimeType: String?,
+    val latitude: Double,
+    val longitude: Double,
+    val placeName: String?,
+    val confidence: Double,
+)
 
 data class LocatedRow(val assetId: String, val latitude: Double, val longitude: Double, val contentUri: String)
 
@@ -191,8 +254,14 @@ internal const val SHOWN =
     "le.evidence_status = 'CONFIRMED' AND (le.evidence_source = 'USER' OR (le.evidence_source = 'EXIF' " +
         "AND NOT EXISTS (SELECT 1 FROM location_evidence u WHERE u.asset_id = le.asset_id AND u.evidence_source = 'USER')))"
 
+/** A place from the location history the user has not decided on yet (ADR-0029). */
+private const val HISTORY_CANDIDATE = "(le.evidence_source = 'LOCATION_HISTORY' AND le.evidence_status = 'CANDIDATE')"
+
+/** A place guessed for a file without GPS: from nearby photos, or from the location history (SRCH-003, #174). */
+private const val GUESS = "(le.evidence_status = 'CANDIDATE' AND le.evidence_source IN ('NEARBY_MEDIA', 'LOCATION_HISTORY'))"
+
 /** EXIF and video GPS in `location_evidence`, source EXIF (PRD GAL-017). A file without GPS is kept as UNKNOWN. */
-class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -> String = { UUID.randomUUID().toString() }) : LocationStore, PlaceEvidenceStore {
+class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -> String = { UUID.randomUUID().toString() }) : LocationStore, PlaceEvidenceStore, LocationHistoryStore {
     private val dao get() = db.locationDao()
 
     override suspend fun unindexed(limit: Int): List<TimelineItem> =
@@ -227,4 +296,15 @@ class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -
 
     override suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int) =
         dao.filesAt(names.toList(), includeInferred, limit)
+
+    override suspend fun replaceHistory(candidates: List<HistoryCandidate>) = dao.replaceHistory(candidates)
+
+    override fun undecided(): Flow<List<HistoryReview>> = dao.undecided().map { rows ->
+        rows.map {
+            val item = TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType)
+            HistoryReview(item, GeoPoint(it.latitude, it.longitude), it.placeName, it.confidence)
+        }
+    }
+
+    override suspend fun decide(assetIds: List<String>, confirmed: Boolean) = dao.decide(assetIds, if (confirmed) "CONFIRMED" else "REJECTED")
 }

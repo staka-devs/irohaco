@@ -55,6 +55,9 @@ import dev.irohaco.core.database.RoomMediaPurge
 import dev.irohaco.core.database.RoomIndexJobStore
 import dev.irohaco.core.database.RoomLibraryReader
 import dev.irohaco.core.database.RoomLocationStore
+import dev.irohaco.core.application.LocationHistory
+import dev.irohaco.core.contracts.FieldEdit
+import dev.irohaco.infrastructure.media.AndroidLocationHistory
 import dev.irohaco.core.database.RoomMarksStore
 import dev.irohaco.core.database.RoomMetadataEditStore
 import dev.irohaco.core.database.RoomModelProfiles
@@ -169,6 +172,10 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     private val metadataEdits by lazy { RoomMetadataEditStore(database) }
 
     val editMetadata by lazy { EditMetadata(metadataEdits) }
+
+    val locationHistory by lazy {
+        LocationHistory(locationStore, AndroidLocationHistory(appContext), { assetId, point -> editMetadata.setLocation(assetId, FieldEdit.Set(point)) })
+    }
 
     val writeMetadataToFile by lazy { WriteMetadataToFile(metadataEdits, metadataEdits, AndroidMetadataFiles(appContext)) }
 

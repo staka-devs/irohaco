@@ -50,8 +50,11 @@ data class TimedPoint(val assetId: String, val timeMs: Long, val point: GeoPoint
 /** A place guessed for a file without GPS, from the located file [supportAssetId] taken near it in time (PRD §6). */
 data class InferredPlace(val assetId: String, val point: GeoPoint, val placeName: String?, val confidence: Double, val supportAssetId: String)
 
-/** A file whose place name matched: from its own GPS, or [inferred] from a photo taken near it in time. */
-data class PlaceMatch(val assetId: String, val placeName: String, val inferred: Boolean)
+/**
+ * A file whose place name matched: from its own GPS, or [inferred] from a photo taken near it in time or,
+ * when [history] is also set, from the user's location history (#174).
+ */
+data class PlaceMatch(val assetId: String, val placeName: String, val inferred: Boolean, val history: Boolean = false)
 
 /**
  * Place names and places guessed for files without GPS, in `location_evidence` (PRD §6, SRCH-003).
@@ -78,4 +81,50 @@ interface PlaceEvidenceStore {
 
     /** Available files at one of [names], confirmed first, then guesses by confidence. */
     suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int): List<PlaceMatch>
+}
+
+/** A stay or a recorded point of the user's location history, from a `Timeline.json` they exported (#174, ADR-0029). */
+sealed interface HistoryEntry {
+    data class Visit(val startMs: Long, val endMs: Long, val point: GeoPoint, val placeName: String?) : HistoryEntry
+
+    data class Point(val timeMs: Long, val point: GeoPoint) : HistoryEntry
+}
+
+/** Why a file could not be read as a location history; nothing of it is kept. */
+class UnreadableHistoryException(val reason: Reason) : Exception(reason.name) {
+    enum class Reason { NOT_JSON, UNKNOWN_FORMAT, EMPTY }
+}
+
+/** Reads a `Timeline.json` on the device; the file is never sent anywhere (ADR-0029). */
+fun interface LocationHistoryReader {
+    /**
+     * The entries of the new format (`semanticSegments`) or the old Takeout ones (`timelineObjects`, `locations`)
+     * that [keep] wants, given each one's time span, so a long history does not fill the memory.
+     * Throws [UnreadableHistoryException] for anything else.
+     */
+    suspend fun read(contentUri: String, keep: (startMs: Long, endMs: Long) -> Boolean): List<HistoryEntry>
+}
+
+/** A place for a file without GPS, matched in the location history; it stays a candidate until the user decides. */
+data class HistoryCandidate(val assetId: String, val point: GeoPoint, val placeName: String?, val confidence: Double)
+
+/** A candidate with its file, for the user to confirm or reject. */
+data class HistoryReview(val item: TimelineItem, val point: GeoPoint, val placeName: String?, val confidence: Double)
+
+/** Candidates from the location history in `location_evidence`, source LOCATION_HISTORY (ADR-0029). */
+interface LocationHistoryStore {
+    /** Available files whose file was read and had no GPS, with their capture time. */
+    suspend fun unlocatedTimes(): List<Pair<String, Long>>
+
+    /**
+     * Replaces the candidates of an earlier import with [candidates]. A file the user already confirmed or
+     * rejected keeps that decision, and a candidate here replaces a guess from nearby photos.
+     */
+    suspend fun replaceHistory(candidates: List<HistoryCandidate>)
+
+    /** The candidates not yet decided, by capture time. */
+    fun undecided(): Flow<List<HistoryReview>>
+
+    /** Marks the candidates of [assetIds] confirmed or rejected; the files themselves stay as they are. */
+    suspend fun decide(assetIds: List<String>, confirmed: Boolean)
 }
