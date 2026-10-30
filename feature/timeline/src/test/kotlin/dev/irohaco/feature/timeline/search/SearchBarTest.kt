@@ -1,7 +1,7 @@
 package dev.irohaco.feature.timeline.search
 
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
@@ -14,6 +14,8 @@ import kotlin.test.assertEquals
 /** The search bar stays in place on this screen: typing and searching run the search, and the field is still there. */
 @RunWith(RobolectricTestRunner::class)
 class SearchBarTest {
+    // Under the v2 rule this test left the next test's paged viewer empty in the same JVM.
+    @Suppress("DEPRECATION")
     @get:Rule val rule = createComposeRule()
 
     @Test
