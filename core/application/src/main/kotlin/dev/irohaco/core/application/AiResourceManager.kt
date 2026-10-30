@@ -73,12 +73,15 @@ class AiResourceManager(
 
     /** Frees the model after the running request, if any; the next request loads it again. */
     suspend fun release() {
-        gate.withTurn(AiPriority.USER_SEARCH) {
-            session?.let { withContext(io) { it.close() } }
-            session = null
-            _backend.value = null
-            if (_state.value == ModelState.LOADED) _state.value = ModelState.READY
+        val loaded = gate.withTurn(AiPriority.USER_SEARCH) {
+            session.also {
+                session = null
+                _backend.value = null
+                if (_state.value == ModelState.LOADED) _state.value = ModelState.READY
+            }
         }
+        // Closed outside the turn: the native close has been seen never to return, and later searches must not wait on it (#215).
+        loaded?.let { scope.launch(io) { it.close() } }
     }
 
     private suspend fun load(): EmbeddingSession {
