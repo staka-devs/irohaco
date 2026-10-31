@@ -23,6 +23,8 @@ data class TimelineItem(
     val displayName: String? = null,
     val sizeBytes: Long? = null,
     val rating: Int = 0,
+    /** Whether the app shows a place for it, from the file's GPS or the user; the grid marks it with a pin. */
+    val hasLocation: Boolean = false,
 )
 
 enum class TimelineSortKey { TAKEN, NAME, SIZE, RATING }

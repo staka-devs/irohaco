@@ -33,9 +33,16 @@ class DataStoreTimelineSettings(private val store: DataStore<Preferences>) : Tim
         store.edit { it[COLUMNS] = columns }
     }
 
+    override val locationPin: Flow<Boolean> = store.data.map { it[LOCATION_PIN] != false }.distinctUntilChanged()
+
+    override suspend fun setLocationPin(shown: Boolean) {
+        store.edit { it[LOCATION_PIN] = shown }
+    }
+
     private companion object {
         val GROUPING = stringPreferencesKey("date_grouping")
         val PINCH_HINT = booleanPreferencesKey("pinch_hint_shown")
         val COLUMNS = intPreferencesKey("timeline_columns")
+        val LOCATION_PIN = booleanPreferencesKey("timeline_location_pin")
     }
 }

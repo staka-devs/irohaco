@@ -148,6 +148,7 @@ fun TimelineScreen(
     val grouping by viewModel.dateGrouping.collectAsStateWithLifecycle()
     val selectedGroups by viewModel.selectedGroups.collectAsStateWithLifecycle()
     val showPinchHint by viewModel.showPinchHint.collectAsStateWithLifecycle()
+    val locationPin by viewModel.locationPin.collectAsStateWithLifecycle()
     val chosenColumns by viewModel.columns.collectAsStateWithLifecycle()
     val shareLocationPolicy by viewModel.shareLocationPolicy.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -297,6 +298,7 @@ fun TimelineScreen(
         scrollToTop = viewModel.scrollToTop,
         grouping = grouping,
         onGrouping = viewModel::setDateGrouping,
+        locationPin = locationPin,
         selectedGroups = selectedGroups,
         onToggleGroup = viewModel::toggleGroup,
         labelAt = viewModel::labelAt,
@@ -381,6 +383,8 @@ internal fun TimelineContent(
     scrollToTop: Flow<Unit> = emptyFlow(),
     grouping: DateGrouping = DateGrouping.DAY,
     onGrouping: (DateGrouping) -> Unit = {},
+    /** Pins the cells that have a place, unless the user turned it off in the settings. */
+    locationPin: Boolean = true,
     selectedGroups: Set<LocalDate> = emptySet(),
     onToggleGroup: (LocalDate) -> Unit = {},
     labelAt: suspend (Int) -> TimelineLabel? = { null },
@@ -484,6 +488,7 @@ internal fun TimelineContent(
                         onAlbum = onAlbum,
                         scrollToTop = scrollToTop,
                         grouping = grouping,
+                        locationPin = locationPin,
                         selectedGroups = selectedGroups,
                         onToggleGroup = onToggleGroup,
                         labelAt = labelAt,
@@ -517,6 +522,7 @@ private fun TimelineGrid(
     onAlbum: (List<TimelineItem>) -> Unit,
     scrollToTop: Flow<Unit>,
     grouping: DateGrouping,
+    locationPin: Boolean,
     selectedGroups: Set<LocalDate>,
     onToggleGroup: (LocalDate) -> Unit,
     labelAt: suspend (Int) -> TimelineLabel? = { null },
@@ -594,7 +600,8 @@ private fun TimelineGrid(
                     is TimelineCell.Group -> GroupHeader(cell.group)
                     is TimelineCell.Media -> {
                         val date = formatter.format(cell.date)
-                        val description = cell.item.description(date)
+                        val located = locationPin && cell.item.hasLocation
+                        val description = cell.item.description(date).let { if (located) stringResource(R.string.timeline_located_description, it) else it }
                         val selecting = selection.isNotEmpty()
                         val selectLabel = stringResource(R.string.timeline_select)
                         MediaThumbnail(
@@ -603,6 +610,7 @@ private fun TimelineGrid(
                             selected = cell.item.assetId in selection,
                             label = cell.item.badge,
                             labelIcon = cell.item.badgeIcon,
+                            located = located,
                             dense = dense,
                             modifier = Modifier
                                 // A shared element per cell costs on every frame; a cell this small has nothing to grow from.
@@ -917,6 +925,7 @@ private val previewItems = (0 until 9).map { i ->
         LocalDate.of(2026, 10, if (i < 4) 20 else 18).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
         // 0:46, 1:01:19, and one whose length is unknown.
         durationMs = listOf(46_000L, 3_679_000L, null).getOrNull(i / 4)?.takeIf { video },
+        hasLocation = i % 3 == 1,
     )
 }
 

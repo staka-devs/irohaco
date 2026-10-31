@@ -51,6 +51,11 @@ interface TimelineSettings {
     val timelineColumns: Flow<Int?>
 
     suspend fun setTimelineColumns(columns: Int)
+
+    /** Whether the grid marks photos and videos that have a place with a pin; on until the user turns it off. */
+    val locationPin: Flow<Boolean>
+
+    suspend fun setLocationPin(shown: Boolean)
 }
 
 /** What to do about a shared photo's GPS when it has one (PRD MET-003). */

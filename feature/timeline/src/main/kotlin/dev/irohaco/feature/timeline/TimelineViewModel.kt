@@ -80,6 +80,10 @@ class TimelineViewModel(
         viewModelScope.launch { settings?.setTimelineColumns(columns) }
     }
 
+    /** Whether the grid pins photos and videos that have a place, from the settings. */
+    val locationPin: StateFlow<Boolean> = (settings?.locationPin ?: flowOf(true))
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     fun pinchHintShown() {
         viewModelScope.launch { settings?.setPinchHintShown() }
     }
