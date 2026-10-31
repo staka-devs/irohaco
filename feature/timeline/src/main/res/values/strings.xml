@@ -324,6 +324,7 @@
     <string name="history_none">There are no places to check.</string>
     <string name="history_reject">Reject</string>
     <string name="history_confirm">Confirm</string>
+    <string name="history_by_day">Split by day</string>
     <string name="history_confidence_high">You stayed there</string>
     <string name="history_confidence_medium">Passing by</string>
     <string name="history_confidence_low">Passing by, a while apart</string>

@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -37,6 +39,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,11 +71,16 @@ import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.R
 import dev.irohaco.feature.timeline.rememberDateFormatter
+import dev.irohaco.feature.timeline.search.DateRangeDialog
+import dev.irohaco.feature.timeline.search.dateRangeLabel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -91,7 +99,18 @@ class LocationHistoryViewModel(
     /** The photos picked in the timeline, whose candidates alone are shown; null shows all (#213). */
     only: Set<String>? = null,
 ) : ViewModel() {
-    val groups: StateFlow<List<HistoryGroup>> = history.groups(only).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /** By place across days unless the user splits them by day (#220). */
+    private val _byDay = MutableStateFlow(false)
+    val byDay: StateFlow<Boolean> = _byDay.asStateFlow()
+
+    /** The days the photos were taken, start and end of whole local days; null shows all (#220). */
+    private val _dates = MutableStateFlow<Pair<Long, Long>?>(null)
+    val dates: StateFlow<Pair<Long, Long>?> = _dates.asStateFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val groups: StateFlow<List<HistoryGroup>> = combine(_byDay, _dates) { byDay, dates -> byDay to dates }
+        .flatMapLatest { (byDay, dates) -> history.groups(only, byDay, dates?.first, dates?.second) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val mapAllowed: StateFlow<Boolean> = mapAllowed.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /** Photos picked in a group, so its buttons decide just those (ADR-0029). */
@@ -114,6 +133,13 @@ class LocationHistoryViewModel(
 
     fun toggle(assetId: String) = _selection.update { if (assetId in it) it - assetId else it + assetId }
 
+    fun toggleByDay() = _byDay.update { !it }
+
+    /** null clears the dates. */
+    fun showDates(fromMs: Long?, untilMs: Long?) {
+        _dates.value = if (fromMs != null && untilMs != null) fromMs to untilMs else null
+    }
+
     /** The photos picked in [group], or all of it when none are. */
     fun decide(group: HistoryGroup, confirmed: Boolean) {
         val picked = group.reviews.filter { it.item.assetId in _selection.value }.ifEmpty { group.reviews }
@@ -122,7 +148,7 @@ class LocationHistoryViewModel(
     }
 }
 
-/** Places from the location history the user exported, confirmed or rejected by day and place (#174, ADR-0029). */
+/** Places from the location history the user exported, confirmed or rejected by place, or by day and place (#174, #220, ADR-0029). */
 @Composable
 fun LocationHistoryScreen(viewModel: LocationHistoryViewModel, onBack: () -> Unit) {
     val groups by viewModel.groups.collectAsStateWithLifecycle()
@@ -130,9 +156,14 @@ fun LocationHistoryScreen(viewModel: LocationHistoryViewModel, onBack: () -> Uni
     val imported by viewModel.imported.collectAsStateWithLifecycle()
     val importing by viewModel.importing.collectAsStateWithLifecycle()
     val mapAllowed by viewModel.mapAllowed.collectAsStateWithLifecycle()
+    val byDay by viewModel.byDay.collectAsStateWithLifecycle()
+    val dates by viewModel.dates.collectAsStateWithLifecycle()
     // The export has no fixed type: a phone may label it JSON, text or a plain file.
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { viewModel.import(it.toString()) } }
-    LocationHistoryContent(groups, selection, imported, importing, onBack, onImport = { pick.launch(arrayOf("*/*")) }, viewModel::toggle, viewModel::decide) { point ->
+    LocationHistoryContent(
+        groups, selection, imported, importing, onBack, onImport = { pick.launch(arrayOf("*/*")) }, viewModel::toggle, viewModel::decide,
+        byDay, dates, viewModel::toggleByDay, viewModel::showDates,
+    ) { point ->
         if (mapAllowed) MapPreview(point)
     }
 }
@@ -148,8 +179,14 @@ internal fun LocationHistoryContent(
     onImport: () -> Unit,
     onToggle: (String) -> Unit,
     onDecide: (HistoryGroup, Boolean) -> Unit,
+    byDay: Boolean = false,
+    dates: Pair<Long, Long>? = null,
+    onToggleByDay: () -> Unit = {},
+    onDates: (Long?, Long?) -> Unit = { _, _ -> },
     map: @Composable (GeoPoint) -> Unit = {},
 ) {
+    var pickingDates by rememberSaveable { mutableStateOf(false) }
+    if (pickingDates) DateRangeDialog(dates?.first, dates?.second, onDismiss = { pickingDates = false }) { from, until -> pickingDates = false; onDates(from, until) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -169,10 +206,15 @@ internal fun LocationHistoryContent(
                     OutlinedButton(onClick = onImport, enabled = !importing) { Text(stringResource(R.string.history_import)) }
                     if (importing) LinearProgressIndicator(Modifier.fillMaxWidth())
                     imported?.let { Text(importedText(it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+                        FilterChip(byDay, onToggleByDay, label = { Text(stringResource(R.string.history_by_day)) })
+                        val label = dates?.let { (from, until) -> dateRangeLabel(from, until) }
+                        FilterChip(label != null, { if (label != null) onDates(null, null) else pickingDates = true }, label = { Text(label ?: stringResource(R.string.search_dates)) })
+                    }
                     if (groups.isEmpty() && !importing) Text(stringResource(R.string.history_none), style = MaterialTheme.typography.bodyMedium)
                 }
             }
-            items(groups, key = { "${it.date}-${it.reviews.first().item.assetId}" }) { group ->
+            items(groups, key = { "${it.from}-${it.reviews.first().item.assetId}" }) { group ->
                 HistoryGroupCard(group, selection, onToggle, onDecide, map)
             }
         }
@@ -206,7 +248,7 @@ private fun HistoryGroupCard(
             Text(group.placeName ?: "%.4f, %.4f".format(group.point.latitude, group.point.longitude), style = MaterialTheme.typography.titleMedium)
             Text(
                 listOf(
-                    formatter.format(group.date),
+                    if (group.from == group.to) formatter.format(group.from) else "${formatter.format(group.from)} – ${formatter.format(group.to)}",
                     pluralStringResource(R.plurals.history_count, group.reviews.size, group.reviews.size),
                     stringResource(confidenceLabel(group.confidence)),
                 ).joinToString(" · "),
@@ -295,8 +337,8 @@ private fun LocationHistoryPreview() {
         Surface {
             LocationHistoryContent(
                 groups = listOf(
-                    HistoryGroup(LocalDate.of(2024, 8, 3), "Kyoto Station", kyoto, 0.9, listOf(review("a", kyoto, "Kyoto Station", 0.9), review("b", kyoto, "Kyoto Station", 0.9))),
-                    HistoryGroup(LocalDate.of(2024, 8, 3), null, road, 0.5, listOf(review("c", road, null, 0.5))),
+                    HistoryGroup(LocalDate.of(2024, 8, 3), LocalDate.of(2024, 8, 5), "Kyoto Station", kyoto, 0.9, listOf(review("a", kyoto, "Kyoto Station", 0.9), review("b", kyoto, "Kyoto Station", 0.9))),
+                    HistoryGroup(LocalDate.of(2024, 8, 3), LocalDate.of(2024, 8, 3), null, road, 0.5, listOf(review("c", road, null, 0.5))),
                 ),
                 selection = setOf("b"),
                 imported = LocationHistory.Imported.Matched(3),

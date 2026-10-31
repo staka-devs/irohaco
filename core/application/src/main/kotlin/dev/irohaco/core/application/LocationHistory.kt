@@ -14,8 +14,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.math.abs
 
-/** Candidates of one day at one place, confirmed or rejected together (ADR-0029). */
-data class HistoryGroup(val date: LocalDate, val placeName: String?, val point: GeoPoint, val confidence: Double, val reviews: List<HistoryReview>)
+/** Candidates at one place, from [from] to [to], confirmed or rejected together (ADR-0029). */
+data class HistoryGroup(val from: LocalDate, val to: LocalDate, val placeName: String?, val point: GeoPoint, val confidence: Double, val reviews: List<HistoryReview>)
 
 /**
  * Places for files without GPS from the location history the user exported (#174, ADR-0029). Only the
@@ -48,13 +48,21 @@ class LocationHistory(
         return Imported.Matched(candidates.size)
     }
 
-    /** The undecided candidates by day and place, newest first; only those of [only] when given (#213). */
-    fun groups(only: Set<String>? = null): Flow<List<HistoryGroup>> = store.undecided().map { all ->
-        val zone = zone()
-        val reviews = if (only == null) all else all.filter { it.item.assetId in only }
-        reviews.groupBy { Instant.ofEpochMilli(it.item.sortTimeMs).atZone(zone).toLocalDate() to (it.placeName ?: area(it.point)) }
-            .map { (key, group) -> HistoryGroup(key.first, group.first().placeName, group.first().point, group.minOf { it.confidence }, group) }
-    }
+    /**
+     * The undecided candidates by place, or by day and place, newest first. Only those of [only] when given
+     * (#213), and only those taken from [fromMs] until [untilMs] when given (#220).
+     */
+    fun groups(only: Set<String>? = null, byDay: Boolean = false, fromMs: Long? = null, untilMs: Long? = null): Flow<List<HistoryGroup>> =
+        store.undecided().map { all ->
+            val zone = zone()
+            fun day(review: HistoryReview) = Instant.ofEpochMilli(review.item.sortTimeMs).atZone(zone).toLocalDate()
+            val reviews = all.filter {
+                (only == null || it.item.assetId in only) &&
+                    (fromMs == null || it.item.sortTimeMs >= fromMs) && (untilMs == null || it.item.sortTimeMs < untilMs)
+            }
+            reviews.groupBy { (if (byDay) day(it) else null) to (it.placeName ?: area(it.point)) }
+                .map { (_, group) -> HistoryGroup(day(group.last()), day(group.first()), group.first().placeName, group.first().point, group.minOf { it.confidence }, group) }
+        }
 
     /** The undecided candidate of one file, for the viewer's details (#213). */
     fun candidate(assetId: String): Flow<HistoryReview?> = store.undecided(assetId)

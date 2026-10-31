@@ -78,6 +78,24 @@ class LocationHistoryTest {
     }
 
     @Test
+    fun `by place, the days of one place come together, and the dates keep only the photos taken then`() = runTest {
+        val day = 86_400_000L
+        undecided.value = listOf(
+            HistoryReview(photo.copy(assetId = "late", sortTimeMs = 3 * day), kyoto, "Kyoto", 0.9),
+            HistoryReview(photo.copy(assetId = "road", sortTimeMs = 2 * day), road, null, 0.5),
+            HistoryReview(photo.copy(assetId = "early", sortTimeMs = day), kyoto, "Kyoto", 0.7),
+        )
+        val history = LocationHistory(store, { _, _ -> emptyList() }, { _, _ -> }) { ZoneOffset.UTC }
+
+        val byPlace = history.groups().first()
+        assertEquals(listOf(listOf("late", "early"), listOf("road")), byPlace.map { group -> group.reviews.map { it.item.assetId } })
+        assertEquals(LocalDate.of(1970, 1, 2) to LocalDate.of(1970, 1, 4), byPlace.first().from to byPlace.first().to)
+
+        val dated = history.groups(fromMs = 2 * day, untilMs = 3 * day).first()
+        assertEquals(listOf(listOf("road")), dated.map { group -> group.reviews.map { it.item.assetId } })
+    }
+
+    @Test
     fun `candidates group by day and place, and confirming sets the place as an edit`() = runTest {
         val day = 86_400_000L
         undecided.value = listOf(
@@ -86,9 +104,9 @@ class LocationHistoryTest {
             HistoryReview(photo.copy(assetId = "c", sortTimeMs = day + 3), road, null, 0.5),
         )
         val history = LocationHistory(store, { _, _ -> emptyList() }, { id, point -> set += id to point }) { ZoneOffset.UTC }
-        val groups = history.groups().first()
+        val groups = history.groups(byDay = true).first()
         assertEquals(listOf(listOf("a", "b"), listOf("c")), groups.map { group -> group.reviews.map { it.item.assetId } })
-        assertEquals(LocalDate.of(1970, 1, 2), groups.first().date)
+        assertEquals(LocalDate.of(1970, 1, 2), groups.first().from)
         assertEquals(0.7, groups.first().confidence)
         assertEquals(listOf(listOf("c")), history.groups(setOf("c")).first().map { group -> group.reviews.map { it.item.assetId } })
         assertEquals(kyoto, history.candidate("b").first()?.point)
