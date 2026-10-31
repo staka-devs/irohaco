@@ -33,7 +33,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,13 +41,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -65,6 +68,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -331,9 +337,9 @@ private fun importedText(imported: LocationHistory.Imported): String = when (imp
 private fun groupKey(group: HistoryGroup) = "${group.from}-${group.reviews.first().item.assetId}"
 
 /**
- * A group as one line: its first photo, the place, the count and the days, and the buttons. Tapping the line
- * opens the rest below it: how sure the place is, the map, and every photo to pick, so the buttons decide just
- * those (#220).
+ * A group as one line: its first photo, the place, the count and the days. Swiping the line right confirms it
+ * and left rejects it. Tapping the line opens the rest below it: the whole place and days, how sure the place
+ * is, the map, every photo to pick, and the buttons, so a swipe or the buttons decide just the picked ones (#220).
  */
 @Composable
 private fun HistoryGroupItem(
@@ -347,11 +353,44 @@ private fun HistoryGroupItem(
 ) {
     val formatter = rememberDateFormatter()
     val picked = group.reviews.count { it.item.assetId in selection }
+    val swipe = rememberSwipeToDismissBoxState()
+    val scope = rememberCoroutineScope()
+    val reject = stringResource(R.string.history_reject)
+    val confirm = stringResource(R.string.history_confirm)
     Column(Modifier.fillMaxWidth().animateContentSize()) {
+        SwipeToDismissBox(
+            swipe,
+            backgroundContent = {
+                val toConfirm = swipe.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+                Row(
+                    Modifier
+                        .fillMaxSize()
+                        .background(if (toConfirm) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer)
+                        .padding(horizontal = IrohacoSpacing.m),
+                    horizontalArrangement = if (toConfirm) Arrangement.Start else Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(painterResource(if (toConfirm) IrohacoIcons.Check else IrohacoIcons.Close), null)
+                }
+            },
+            onDismiss = { direction ->
+                onDecide(group, direction == SwipeToDismissBoxValue.StartToEnd)
+                // A group with photos left stays in the list, so its line comes back.
+                scope.launch { swipe.reset() }
+            },
+        ) {
         Row(
             Modifier
                 .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
                 .clickable(onClickLabel = stringResource(if (expanded) R.string.history_collapse else R.string.history_expand), onClick = onExpand)
+                // A swipe has no button to find, so the same choices are actions for a screen reader.
+                .semantics {
+                    customActions = listOf(
+                        CustomAccessibilityAction(confirm) { onDecide(group, true); true },
+                        CustomAccessibilityAction(reject) { onDecide(group, false); true },
+                    )
+                }
                 .padding(vertical = IrohacoSpacing.xs),
             horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
             verticalAlignment = Alignment.CenterVertically,
@@ -363,7 +402,9 @@ private fun HistoryGroupItem(
                 modifier = Modifier.size(48.dp),
             )
             Column(Modifier.weight(1f)) {
-                Text(group.placeName ?: "%.4f, %.4f".format(group.point.latitude, group.point.longitude), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // Open, the line shows the whole place and days instead of cutting them off.
+                val lines = if (expanded) Int.MAX_VALUE else 1
+                Text(group.placeName ?: "%.4f, %.4f".format(group.point.latitude, group.point.longitude), style = MaterialTheme.typography.titleSmall, maxLines = lines, overflow = TextOverflow.Ellipsis)
                 Text(
                     // The count first, so a long range of days cannot push it off the line.
                     listOf(
@@ -372,14 +413,12 @@ private fun HistoryGroupItem(
                     ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = lines,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
             Icon(painterResource(IrohacoIcons.ExpandMore), null, Modifier.rotate(if (expanded) 180f else 0f), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            // Icons keep the line short enough for the place and the days.
-            IconButton(onClick = { onDecide(group, false) }) { Icon(painterResource(IrohacoIcons.Close), stringResource(R.string.history_reject)) }
-            FilledTonalIconButton(onClick = { onDecide(group, true) }) { Icon(painterResource(IrohacoIcons.Check), stringResource(R.string.history_confirm)) }
+        }
         }
         if (expanded) {
             Column(Modifier.padding(bottom = IrohacoSpacing.s), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
@@ -395,12 +434,10 @@ private fun HistoryGroupItem(
                         )
                     }
                 }
-                // The line's buttons decide the picked photos too; these say how many.
-                if (picked > 0) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = { onDecide(group, false) }) { Text(pluralStringResource(R.plurals.history_reject_picked, picked, picked)) }
-                        FilledTonalButton(onClick = { onDecide(group, true) }) { Text(pluralStringResource(R.plurals.history_confirm_picked, picked, picked)) }
-                    }
+                // With photos picked, the buttons say how many they decide.
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { onDecide(group, false) }) { Text(if (picked > 0) pluralStringResource(R.plurals.history_reject_picked, picked, picked) else reject) }
+                    FilledTonalButton(onClick = { onDecide(group, true) }) { Text(if (picked > 0) pluralStringResource(R.plurals.history_confirm_picked, picked, picked) else confirm) }
                 }
             }
         }
