@@ -385,7 +385,7 @@ private fun Conditions(
 ) {
     val searchable = spaces.count { it.space.state in PICKABLE }
     var pickingDates by rememberSaveable { mutableStateOf(false) }
-    if (pickingDates) DateRangeDialog(ui.filters, onDismiss = { pickingDates = false }) { from, until -> pickingDates = false; onDates(from, until) }
+    if (pickingDates) DateRangeDialog(ui.filters.fromMs, ui.filters.untilMs, onDismiss = { pickingDates = false }) { from, until -> pickingDates = false; onDates(from, until) }
     Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
             if (!similar) {
@@ -447,14 +447,14 @@ private fun TagChip(ui: SearchUi, tags: List<Tag>, onTag: (Tag?) -> Unit) {
     }
 }
 
-/** Picks the days to search; the range covers whole local days, the last one included. */
+/** Picks a range of days, given and returned as the start of the first and the end of the last whole local day. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DateRangeDialog(filters: SearchFilters, onDismiss: () -> Unit, onPick: (Long, Long) -> Unit) {
+internal fun DateRangeDialog(fromMs: Long?, untilMs: Long?, onDismiss: () -> Unit, onPick: (Long, Long) -> Unit) {
     val zone = ZoneId.systemDefault()
     // The picker works in UTC days; the filter in this device's days.
     fun toPicker(ms: Long?) = ms?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }
-    val state = rememberDateRangePickerState(toPicker(filters.fromMs), toPicker(filters.untilMs?.minus(1)))
+    val state = rememberDateRangePickerState(toPicker(fromMs), toPicker(untilMs?.minus(1)))
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
@@ -475,7 +475,7 @@ private fun DateRangeDialog(filters: SearchFilters, onDismiss: () -> Unit, onPic
 }
 
 @Composable
-private fun dateRangeLabel(fromMs: Long, untilMs: Long): String {
+internal fun dateRangeLabel(fromMs: Long, untilMs: Long): String {
     val formatter = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM) }
     val zone = ZoneId.systemDefault()
     val from = Instant.ofEpochMilli(fromMs).atZone(zone).toLocalDate()
