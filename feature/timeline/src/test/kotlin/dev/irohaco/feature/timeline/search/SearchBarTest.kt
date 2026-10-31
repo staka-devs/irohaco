@@ -1,8 +1,10 @@
 package dev.irohaco.feature.timeline.search
 
 import android.os.Looper
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
@@ -33,14 +35,24 @@ class SearchBarTest {
         }
     }.around(rule)
 
+    private val searched = mutableListOf<String>()
+
+    private fun show() = rule.setContent {
+        IrohacoTheme(dynamicColor = false) {
+            SearchContent(SearchUi(), emptyList(), { searched += it }, {}, {}, {}, {}, {}, {}, {}, {})
+        }
+    }
+
+    @Test
+    fun `tapping the bar puts the cursor in it, so the keyboard comes up`() {
+        show()
+        rule.onNode(hasSetTextAction()).performClick()
+        rule.onNode(hasSetTextAction()).assertIsFocused()
+    }
+
     @Test
     fun `searching from the bar runs the search and keeps the bar`() {
-        val searched = mutableListOf<String>()
-        rule.setContent {
-            IrohacoTheme(dynamicColor = false) {
-                SearchContent(SearchUi(), emptyList(), { searched += it }, {}, {}, {}, {}, {}, {}, {}, {})
-            }
-        }
+        show()
         rule.onNode(hasSetTextAction()).performTextInput("station")
         rule.onNode(hasSetTextAction()).performImeAction()
         rule.waitForIdle()
