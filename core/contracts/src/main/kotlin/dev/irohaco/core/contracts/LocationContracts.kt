@@ -125,6 +125,9 @@ interface LocationHistoryStore {
     /** The candidates not yet decided, by capture time. */
     fun undecided(): Flow<List<HistoryReview>>
 
+    /** The candidate of one file while it is not yet decided. */
+    fun undecided(assetId: String): Flow<HistoryReview?>
+
     /** Marks the candidates of [assetIds] confirmed or rejected; the files themselves stay as they are. */
     suspend fun decide(assetIds: List<String>, confirmed: Boolean)
 }

@@ -143,6 +143,8 @@ class RoomLocationStoreTest {
 
         store.replaceHistory(listOf(HistoryCandidate("a", kyoto, "京都市", 0.9), HistoryCandidate("b", kyoto, null, 0.7)))
         assertEquals(listOf("b", "a"), store.undecided().first().map { it.item.assetId })
+        assertEquals(0.7, store.undecided("b").first()?.confidence)
+        assertEquals(null, store.undecided("c").first())
         // The history's place wins for "a"; "c" keeps its guess from nearby photos.
         assertEquals(
             listOf(PlaceMatch("gps", "京都市", false), PlaceMatch("a", "京都市", true, history = true), PlaceMatch("c", "京都市", true)),

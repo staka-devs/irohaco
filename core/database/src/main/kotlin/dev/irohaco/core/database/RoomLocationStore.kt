@@ -212,15 +212,16 @@ interface LocationDao {
         deleteInferredUnderHistory()
     }
 
-    @Query(
-        """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, MIN(s.content_uri) AS contentUri, $TAKEN AS sortTimeMs,
-             MIN(s.mime_type) AS mimeType, le.latitude AS latitude, le.longitude AS longitude, le.place_text AS placeName, le.confidence AS confidence
-           FROM location_evidence le JOIN media_assets a ON a.asset_id = le.asset_id JOIN media_sources s ON s.asset_id = a.asset_id
-           WHERE $HISTORY_CANDIDATE AND s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL
-           GROUP BY le.asset_id
-           ORDER BY sortTimeMs DESC""",
-    )
+    /**
+     * Thousands of rows take more than one cursor window, and a write between two windows once left a row
+     * missing and crashed the read; a transaction keeps all the windows on one snapshot.
+     */
+    @Transaction
+    @Query("$UNDECIDED GROUP BY le.asset_id ORDER BY sortTimeMs DESC")
     fun undecided(): Flow<List<HistoryRow>>
+
+    @Query("$UNDECIDED AND le.asset_id = :assetId GROUP BY le.asset_id")
+    fun undecided(assetId: String): Flow<HistoryRow?>
 
     @Query("UPDATE location_evidence SET evidence_status = :status WHERE evidence_source = 'LOCATION_HISTORY' AND asset_id IN (:assetIds)")
     suspend fun decide(assetIds: List<String>, status: String)
@@ -256,6 +257,12 @@ internal const val SHOWN =
 
 /** A place from the location history the user has not decided on yet (ADR-0029). */
 private const val HISTORY_CANDIDATE = "(le.evidence_source = 'LOCATION_HISTORY' AND le.evidence_status = 'CANDIDATE')"
+
+private const val UNDECIDED =
+    """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, MIN(s.content_uri) AS contentUri, $TAKEN AS sortTimeMs,
+         MIN(s.mime_type) AS mimeType, le.latitude AS latitude, le.longitude AS longitude, le.place_text AS placeName, le.confidence AS confidence
+       FROM location_evidence le JOIN media_assets a ON a.asset_id = le.asset_id JOIN media_sources s ON s.asset_id = a.asset_id
+       WHERE $HISTORY_CANDIDATE AND s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL"""
 
 /** A place guessed for a file without GPS: from nearby photos, or from the location history (SRCH-003, #174). */
 private const val GUESS = "(le.evidence_status = 'CANDIDATE' AND le.evidence_source IN ('NEARBY_MEDIA', 'LOCATION_HISTORY'))"
@@ -299,12 +306,12 @@ class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -
 
     override suspend fun replaceHistory(candidates: List<HistoryCandidate>) = dao.replaceHistory(candidates)
 
-    override fun undecided(): Flow<List<HistoryReview>> = dao.undecided().map { rows ->
-        rows.map {
-            val item = TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType)
-            HistoryReview(item, GeoPoint(it.latitude, it.longitude), it.placeName, it.confidence)
-        }
-    }
+    override fun undecided(): Flow<List<HistoryReview>> = dao.undecided().map { rows -> rows.map { it.review() } }
+
+    override fun undecided(assetId: String): Flow<HistoryReview?> = dao.undecided(assetId).map { it?.review() }
+
+    private fun HistoryRow.review() =
+        HistoryReview(TimelineItem(assetId, MediaKind.valueOf(mediaKind), contentUri, sortTimeMs, mimeType), GeoPoint(latitude, longitude), placeName, confidence)
 
     override suspend fun decide(assetIds: List<String>, confirmed: Boolean) = dao.decide(assetIds, if (confirmed) "CONFIRMED" else "REJECTED")
 }

@@ -10,6 +10,7 @@ import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -58,6 +59,7 @@ class LocationHistoryTest {
             replaced = candidates
         }
         override fun undecided() = undecided
+        override fun undecided(assetId: String) = undecided.map { all -> all.find { it.item.assetId == assetId } }
         override suspend fun decide(assetIds: List<String>, confirmed: Boolean) {
             decided += assetIds to confirmed
         }

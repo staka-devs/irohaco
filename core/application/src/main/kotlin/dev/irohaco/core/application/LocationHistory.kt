@@ -57,7 +57,7 @@ class LocationHistory(
     }
 
     /** The undecided candidate of one file, for the viewer's details (#213). */
-    fun candidate(assetId: String): Flow<HistoryReview?> = store.undecided().map { all -> all.find { it.item.assetId == assetId } }
+    fun candidate(assetId: String): Flow<HistoryReview?> = store.undecided(assetId)
 
     /** Confirming sets each file's place in the DB, as the user's edit; the files stay as they are. */
     suspend fun decide(reviews: List<HistoryReview>, confirmed: Boolean) {
