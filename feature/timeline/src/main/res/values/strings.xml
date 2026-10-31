@@ -325,7 +325,8 @@
     <string name="history_reject">Reject</string>
     <string name="history_confirm">Confirm</string>
     <string name="history_by_day">Split by day</string>
-    <string name="history_compact">One line each</string>
+    <string name="history_expand">Show photos</string>
+    <string name="history_collapse">Hide photos</string>
     <string name="history_tab_candidates">Candidates</string>
     <string name="history_tab_unmatched">No candidate</string>
     <string name="history_no_unmatched">Every photo without a place has a candidate.</string>
