@@ -88,6 +88,7 @@ fun SettingsScreen(
     val contrast by viewModel.contrast.collectAsStateWithLifecycle()
     val shareLocationPolicy by viewModel.shareLocationPolicy.collectAsStateWithLifecycle()
     val mapAllowed by viewModel.mapAllowed.collectAsStateWithLifecycle()
+    val locationPin by viewModel.locationPin.collectAsStateWithLifecycle()
     val aiBackend by viewModel.aiBackend.collectAsStateWithLifecycle()
     val gpuCheck by viewModel.gpuCheck.collectAsStateWithLifecycle()
     val answerModel by viewModel.answerModel.collectAsStateWithLifecycle()
@@ -151,7 +152,7 @@ fun SettingsScreen(
                 onDismissStartFailed = viewModel::dismissStartFailed,
             )
         },
-        display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast) },
+        display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast, locationPin, viewModel::setLocationPin) },
         library = { LibrarySettings(excludedFolders, viewModel::showFolder) },
         privacy = { PrivacySettings(shareLocationPolicy, viewModel::selectShareLocationPolicy, mapAllowed, viewModel::setMapAllowed, onOpenLocationHistory) },
     )
@@ -298,6 +299,8 @@ internal fun DisplaySettings(
     contrast: ThemeContrast,
     onSelect: (ThemeColor) -> Unit,
     onSelectContrast: (ThemeContrast) -> Unit,
+    locationPin: Boolean = true,
+    onLocationPin: (Boolean) -> Unit = {},
 ) {
     val seed = themeColor as? ThemeColor.Seed
     val useDevice = seed == null
@@ -351,6 +354,12 @@ internal fun DisplaySettings(
             ThemeContrast.HIGH to R.string.settings_contrast_high,
         ).forEach { (value, label) -> RadioRow(label, contrast == value) { onSelectContrast(value) } }
     }
+
+    SectionTitle(R.string.settings_timeline)
+    ListItem(
+        trailingContent = { Switch(checked = locationPin, onCheckedChange = null) },
+        modifier = Modifier.toggleable(locationPin, role = Role.Switch, onValueChange = onLocationPin),
+    ) { Text(stringResource(R.string.settings_location_pin)) }
 }
 
 @Composable

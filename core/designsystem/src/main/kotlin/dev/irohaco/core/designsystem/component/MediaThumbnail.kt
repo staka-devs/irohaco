@@ -65,6 +65,7 @@ data class GridThumbnail(val contentUri: String) {
  * @param contentDescription what TalkBack reads: kind, capture date and, for a video, its length.
  * @param label a short mark in the top end corner, such as "GIF" or a video's length; [contentDescription] already says it.
  * @param labelIcon an icon before [label], such as the play mark of a video; shown alone when [label] is null.
+ * @param located a pin in the bottom start corner, for a photo or video with a place; [contentDescription] already says it.
  * @param dense a cell in an overview of many columns: no corner morph, no scale and no marks, which a cell
  *   that small cannot show and which cost a layer and an animation per cell on every frame.
  */
@@ -76,6 +77,7 @@ fun MediaThumbnail(
     modifier: Modifier = Modifier,
     label: String? = null,
     @DrawableRes labelIcon: Int? = null,
+    located: Boolean = false,
     dense: Boolean = false,
 ) {
     val progress = if (dense) {
@@ -141,6 +143,19 @@ fun MediaThumbnail(
                     )
                 }
             }
+        }
+        if (!dense && located) {
+            Icon(
+                painterResource(IrohacoIcons.LocationOn),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(IrohacoSpacing.xs)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    .padding(2.dp)
+                    .size(14.dp),
+            )
         }
         if (selected) {
             Surface(

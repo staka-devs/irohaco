@@ -11,6 +11,8 @@
     <string name="settings_custom_hex_label">Colour code (#RRGGBB)</string>
     <string name="settings_custom_hex_error">Enter as #RRGGBB</string>
     <string name="settings_contrast">Contrast</string>
+    <string name="settings_timeline">Timeline</string>
+    <string name="settings_location_pin">Pin photos and videos that have a place</string>
     <string name="settings_contrast_device">Device setting</string>
     <string name="settings_contrast_standard">Standard</string>
     <string name="settings_contrast_medium">Medium</string>

@@ -19,6 +19,7 @@ import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.ModelArtifact
 import dev.irohaco.core.contracts.ModelInstallState
 import dev.irohaco.core.contracts.ShareLocationPolicy
+import dev.irohaco.core.contracts.TimelineSettings
 import dev.irohaco.core.contracts.SharingSettings
 import dev.irohaco.core.contracts.SpaceState
 import dev.irohaco.core.contracts.VideoQuality
@@ -55,6 +56,7 @@ class SettingsViewModel(
     private val aiBackends: AiBackendChoice? = null,
     /** The model that answers questions from search results (RAG-001); the user picks among those installed. */
     private val ask: AskLibrary? = null,
+    private val timeline: TimelineSettings? = null,
     /** Runs a job in the foreground service, so it carries on after the user leaves this screen. */
     private val runIndexJob: (String) -> Unit = {},
 ) : ViewModel() {
@@ -235,6 +237,13 @@ class SettingsViewModel(
 
     fun setMapAllowed(allowed: Boolean) {
         viewModelScope.launch { map?.setAllowed(allowed) }
+    }
+
+    /** Whether the timeline pins photos and videos that have a place. */
+    val locationPin: StateFlow<Boolean> = (timeline?.locationPin ?: flowOf(true)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    fun setLocationPin(shown: Boolean) {
+        viewModelScope.launch { timeline?.setLocationPin(shown) }
     }
 
     fun selectShareLocationPolicy(policy: ShareLocationPolicy) {

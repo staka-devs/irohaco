@@ -34,12 +34,12 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
         db.timelineDao().page(
             SimpleSQLiteQuery(
                 """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
-                          s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, 0 AS rating
+                          s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, 0 AS rating, $HAS_LOCATION AS hasLocation
                    $FROM WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL AND a.asset_id IN (${ids.joinToString { "?" }})
                      ${if (tagId != null) "AND EXISTS (SELECT 1 FROM media_tags mt WHERE mt.asset_id = a.asset_id AND mt.tag_id = ?)" else ""}""",
                 (ids + listOfNotNull(tagId)).toTypedArray(),
             ),
-        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes) }
+        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, hasLocation = it.hasLocation == true) }
     }.distinctBy { it.assetId }
 
     override suspend fun count(query: TimelineQuery): Int =
@@ -50,11 +50,11 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             SimpleSQLiteQuery(
                 """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
                           s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes,
-                          COALESCE(r.rating, 0) AS rating
+                          COALESCE(r.rating, 0) AS rating, $HAS_LOCATION AS hasLocation
                    ${from(query)} ${where(query)} ORDER BY ${orderBy(query)} LIMIT ? OFFSET ?""",
                 arrayOf(*fromArgs(query), *args(query), limit, offset),
             ),
-        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, it.rating ?: 0) }
+        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, it.rating ?: 0, it.hasLocation == true) }
 
     override suspend fun indexOf(query: TimelineQuery, assetId: String): Int? =
         db.timelineDao().indexOf(
@@ -70,11 +70,11 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             SimpleSQLiteQuery(
                 """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
                           s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes,
-                          COALESCE(r.rating, 0) AS rating
+                          COALESCE(r.rating, 0) AS rating, $HAS_LOCATION AS hasLocation
                    ${from(query)} ${where(query)} AND $TIME >= ? AND $TIME < ? ORDER BY ${orderBy(query)}""",
                 arrayOf(*fromArgs(query), *args(query), fromMs, untilMs),
             ),
-        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, it.rating ?: 0) }
+        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, it.rating ?: 0, it.hasLocation == true) }
 
     override suspend fun labels(query: TimelineQuery): List<TimelineLabel> =
         db.timelineDao().labelRows(
@@ -105,6 +105,9 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
         const val FROM = "FROM media_sources s JOIN media_assets a ON a.asset_id = s.asset_id " +
             "LEFT JOIN media_ratings r ON r.asset_id = a.asset_id"
         const val MAX_ARGS = 500
+
+        /** The pin in the grid: the same place the map and the area filter use. */
+        const val HAS_LOCATION = "EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = a.asset_id AND $SHOWN)"
         const val TIME = "COALESCE($EDITED_TAKEN, s.observed_taken_at, s.observed_modified_at, a.first_seen_at)"
 
         // The volume root has a null relative path in MediaStore; FolderRef calls it "".

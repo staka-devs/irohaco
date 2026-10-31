@@ -11,6 +11,8 @@
     <string name="settings_custom_hex_label">カラーコード（#RRGGBB）</string>
     <string name="settings_custom_hex_error">#RRGGBBの形式で入力</string>
     <string name="settings_contrast">コントラスト</string>
+    <string name="settings_timeline">タイムライン</string>
+    <string name="settings_location_pin">場所のある写真と動画にピンを付ける</string>
     <string name="settings_contrast_device">端末の設定</string>
     <string name="settings_contrast_standard">標準</string>
     <string name="settings_contrast_medium">中</string>

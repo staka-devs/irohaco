@@ -98,6 +98,16 @@ class RoomLocationStoreTest {
     }
 
     @Test
+    fun `the timeline says which files have a place`() = runTest {
+        catalog("tokyo", "nogps")
+        store.recordExif("tokyo", GeoPoint(35.68, 139.76))
+        store.recordExif("nogps", null)
+        val reader = RoomTimelineReader(db)
+        assertEquals(mapOf("tokyo" to true, "nogps" to false), reader.page(TimelineQuery(), 0, 10).associate { it.assetId to it.hasLocation })
+        assertEquals(listOf(true), reader.items(listOf("tokyo"), null).map { it.hasLocation })
+    }
+
+    @Test
     fun `areas are named once, guesses replace the old ones, and a place name finds confirmed files before guesses`() = runTest {
         catalog("gps", "nogps", "unread")
         val tokushima = GeoPoint(34.0703, 134.5548)
