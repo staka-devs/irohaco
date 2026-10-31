@@ -317,7 +317,8 @@
     <string name="history_unknown_format">このアプリが読める位置情報の履歴ではないため、取り込みませんでした。</string>
     <string name="history_empty">この位置情報の履歴には、場所が入っていません。</string>
     <string name="history_by_day">日ごとに分ける</string>
-    <string name="history_compact">1行ずつ表示</string>
+    <string name="history_expand">写真を見る</string>
+    <string name="history_collapse">写真を閉じる</string>
     <string name="history_tab_candidates">候補</string>
     <string name="history_tab_unmatched">候補のない写真</string>
     <string name="history_no_unmatched">場所のない写真には、どれも候補があります。</string>

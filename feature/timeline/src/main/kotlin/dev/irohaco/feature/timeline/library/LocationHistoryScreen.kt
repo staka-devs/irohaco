@@ -3,6 +3,7 @@ package dev.irohaco.feature.timeline.library
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,8 +32,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
@@ -56,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -131,10 +131,6 @@ class LocationHistoryViewModel(
     private val _tab = MutableStateFlow(HistoryTab.CANDIDATES)
     val tab: StateFlow<HistoryTab> = _tab.asStateFlow()
 
-    /** One line per group instead of a card, for a long list (#220). */
-    private val _compact = MutableStateFlow(false)
-    val compact: StateFlow<Boolean> = _compact.asStateFlow()
-
     @OptIn(ExperimentalCoroutinesApi::class)
     val unmatched: StateFlow<List<TimelineItem>> = _dates
         .flatMapLatest { dates -> history.unmatched(dates?.first, dates?.second) }
@@ -165,8 +161,6 @@ class LocationHistoryViewModel(
     fun toggle(assetId: String) = _selection.update { if (assetId in it) it - assetId else it + assetId }
 
     fun toggleByDay() = _byDay.update { !it }
-
-    fun toggleCompact() = _compact.update { !it }
 
     /** A pick in one tab means nothing in the other, so it is dropped. */
     fun showTab(tab: HistoryTab) {
@@ -210,7 +204,6 @@ fun LocationHistoryScreen(viewModel: LocationHistoryViewModel, onBack: () -> Uni
     val byDay by viewModel.byDay.collectAsStateWithLifecycle()
     val dates by viewModel.dates.collectAsStateWithLifecycle()
     val tab by viewModel.tab.collectAsStateWithLifecycle()
-    val compact by viewModel.compact.collectAsStateWithLifecycle()
     val unmatched by viewModel.unmatched.collectAsStateWithLifecycle()
     val places by viewModel.places.collectAsStateWithLifecycle()
     // The export has no fixed type: a phone may label it JSON, text or a plain file.
@@ -218,7 +211,7 @@ fun LocationHistoryScreen(viewModel: LocationHistoryViewModel, onBack: () -> Uni
     LocationHistoryContent(
         groups, selection, imported, importing, onBack, onImport = { pick.launch(arrayOf("*/*")) }, viewModel::toggle, viewModel::decide,
         byDay, dates, viewModel::toggleByDay, viewModel::showDates,
-        tab, viewModel::showTab, compact, viewModel::toggleCompact, unmatched, places, viewModel::place,
+        tab, viewModel::showTab, unmatched, places, viewModel::place,
     ) { point ->
         if (mapAllowed) MapPreview(point)
     }
@@ -241,13 +234,14 @@ internal fun LocationHistoryContent(
     onDates: (Long?, Long?) -> Unit = { _, _ -> },
     tab: HistoryTab = HistoryTab.CANDIDATES,
     onTab: (HistoryTab) -> Unit = {},
-    compact: Boolean = false,
-    onToggleCompact: () -> Unit = {},
     unmatched: List<TimelineItem> = emptyList(),
     places: List<KnownPlace> = emptyList(),
     onPlace: (GeoPoint) -> Unit = {},
+    /** The groups shown open at first, by [groupKey]; a preview opens one. */
+    opened: List<String> = emptyList(),
     map: @Composable (GeoPoint) -> Unit = {},
 ) {
+    var open by rememberSaveable { mutableStateOf(opened) }
     var pickingDates by rememberSaveable { mutableStateOf(false) }
     if (pickingDates) DateRangeDialog(dates?.first, dates?.second, onDismiss = { pickingDates = false }) { from, until -> pickingDates = false; onDates(from, until) }
     var pickingPlace by rememberSaveable { mutableStateOf(false) }
@@ -287,7 +281,6 @@ internal fun LocationHistoryContent(
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
                         if (tab == HistoryTab.CANDIDATES) {
                             FilterChip(byDay, onToggleByDay, label = { Text(stringResource(R.string.history_by_day)) })
-                            FilterChip(compact, onToggleCompact, label = { Text(stringResource(R.string.history_compact)) })
                         }
                         val label = dates?.let { (from, until) -> dateRangeLabel(from, until) }
                         FilterChip(label != null, { if (label != null) onDates(null, null) else pickingDates = true }, label = { Text(label ?: stringResource(R.string.search_dates)) })
@@ -314,14 +307,9 @@ internal fun LocationHistoryContent(
                         repeat(UNMATCHED_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
-                compact -> items(groups, key = { "${it.from}-${it.reviews.first().item.assetId}" }) { group ->
-                    Column {
-                        HistoryGroupRow(group, onDecide)
-                        HorizontalDivider()
-                    }
-                }
-                else -> items(groups, key = { "${it.from}-${it.reviews.first().item.assetId}" }) { group ->
-                    HistoryGroupCard(group, selection, onToggle, onDecide, map)
+                else -> items(groups, key = ::groupKey) { group ->
+                    val key = groupKey(group)
+                    HistoryGroupItem(group, key in open, { open = if (key in open) open - key else open + key }, selection, onToggle, onDecide, map)
                 }
             }
         }
@@ -340,9 +328,18 @@ private fun importedText(imported: LocationHistory.Imported): String = when (imp
     )
 }
 
+private fun groupKey(group: HistoryGroup) = "${group.from}-${group.reviews.first().item.assetId}"
+
+/**
+ * A group as one line: its first photo, the place, the count and the days, and the buttons. Tapping the line
+ * opens the rest below it: how sure the place is, the map, and every photo to pick, so the buttons decide just
+ * those (#220).
+ */
 @Composable
-private fun HistoryGroupCard(
+private fun HistoryGroupItem(
     group: HistoryGroup,
+    expanded: Boolean,
+    onExpand: () -> Unit,
     selection: Set<String>,
     onToggle: (String) -> Unit,
     onDecide: (HistoryGroup, Boolean) -> Unit,
@@ -350,69 +347,64 @@ private fun HistoryGroupCard(
 ) {
     val formatter = rememberDateFormatter()
     val picked = group.reviews.count { it.item.assetId in selection }
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(IrohacoSpacing.l), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-            Text(group.placeName ?: "%.4f, %.4f".format(group.point.latitude, group.point.longitude), style = MaterialTheme.typography.titleMedium)
-            Text(
-                listOf(
-                    if (group.from == group.to) formatter.format(group.from) else "${formatter.format(group.from)} – ${formatter.format(group.to)}",
-                    pluralStringResource(R.plurals.history_count, group.reviews.size, group.reviews.size),
-                    stringResource(confidenceLabel(group.confidence)),
-                ).joinToString(" · "),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Column(Modifier.fillMaxWidth().animateContentSize()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClickLabel = stringResource(if (expanded) R.string.history_collapse else R.string.history_expand), onClick = onExpand)
+                .padding(vertical = IrohacoSpacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MediaThumbnail(
+                model = GridThumbnail(group.reviews.first().item.contentUri),
+                contentDescription = stringResource(R.string.search_photo),
+                selected = false,
+                modifier = Modifier.size(48.dp),
             )
-            map(group.point)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
-                items(group.reviews, key = { it.item.assetId }) { review ->
-                    MediaThumbnail(
-                        model = GridThumbnail(review.item.contentUri),
-                        contentDescription = stringResource(if (review.item.kind == MediaKind.VIDEO) R.string.search_video_scene else R.string.search_photo),
-                        selected = review.item.assetId in selection,
-                        modifier = Modifier.size(72.dp).clickable { onToggle(review.item.assetId) },
-                    )
-                }
+            Column(Modifier.weight(1f)) {
+                Text(group.placeName ?: "%.4f, %.4f".format(group.point.latitude, group.point.longitude), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    // The count first, so a long range of days cannot push it off the line.
+                    listOf(
+                        pluralStringResource(R.plurals.history_count, group.reviews.size, group.reviews.size),
+                        if (group.from == group.to) formatter.format(group.from) else "${formatter.format(group.from)} – ${formatter.format(group.to)}",
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { onDecide(group, false) }) {
-                    Text(if (picked == 0) stringResource(R.string.history_reject) else pluralStringResource(R.plurals.history_reject_picked, picked, picked))
+            Icon(painterResource(IrohacoIcons.ExpandMore), null, Modifier.rotate(if (expanded) 180f else 0f), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Icons keep the line short enough for the place and the days.
+            IconButton(onClick = { onDecide(group, false) }) { Icon(painterResource(IrohacoIcons.Close), stringResource(R.string.history_reject)) }
+            FilledTonalIconButton(onClick = { onDecide(group, true) }) { Icon(painterResource(IrohacoIcons.Check), stringResource(R.string.history_confirm)) }
+        }
+        if (expanded) {
+            Column(Modifier.padding(bottom = IrohacoSpacing.s), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+                Text(stringResource(confidenceLabel(group.confidence)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                map(group.point)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
+                    items(group.reviews, key = { it.item.assetId }) { review ->
+                        MediaThumbnail(
+                            model = GridThumbnail(review.item.contentUri),
+                            contentDescription = stringResource(if (review.item.kind == MediaKind.VIDEO) R.string.search_video_scene else R.string.search_photo),
+                            selected = review.item.assetId in selection,
+                            modifier = Modifier.size(72.dp).clickable { onToggle(review.item.assetId) },
+                        )
+                    }
                 }
-                FilledTonalButton(onClick = { onDecide(group, true) }) {
-                    Text(if (picked == 0) stringResource(R.string.history_confirm) else pluralStringResource(R.plurals.history_confirm_picked, picked, picked))
+                // The line's buttons decide the picked photos too; these say how many.
+                if (picked > 0) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { onDecide(group, false) }) { Text(pluralStringResource(R.plurals.history_reject_picked, picked, picked)) }
+                        FilledTonalButton(onClick = { onDecide(group, true) }) { Text(pluralStringResource(R.plurals.history_confirm_picked, picked, picked)) }
+                    }
                 }
             }
         }
-    }
-}
-
-/** One line for a group: its first photo, the place, the count and the days, and the buttons (#220). */
-@Composable
-private fun HistoryGroupRow(group: HistoryGroup, onDecide: (HistoryGroup, Boolean) -> Unit) {
-    val formatter = rememberDateFormatter()
-    Row(Modifier.fillMaxWidth().padding(vertical = IrohacoSpacing.xs), horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s), verticalAlignment = Alignment.CenterVertically) {
-        MediaThumbnail(
-            model = GridThumbnail(group.reviews.first().item.contentUri),
-            contentDescription = stringResource(R.string.search_photo),
-            selected = false,
-            modifier = Modifier.size(48.dp),
-        )
-        Column(Modifier.weight(1f)) {
-            Text(group.placeName ?: "%.4f, %.4f".format(group.point.latitude, group.point.longitude), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                // The count first, so a long range of days cannot push it off the line.
-                listOf(
-                    pluralStringResource(R.plurals.history_count, group.reviews.size, group.reviews.size),
-                    if (group.from == group.to) formatter.format(group.from) else "${formatter.format(group.from)} – ${formatter.format(group.to)}",
-                ).joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        // Icons keep the line short enough for the place and the days.
-        IconButton(onClick = { onDecide(group, false) }) { Icon(painterResource(IrohacoIcons.Close), stringResource(R.string.history_reject)) }
-        FilledTonalIconButton(onClick = { onDecide(group, true) }) { Icon(painterResource(IrohacoIcons.Check), stringResource(R.string.history_confirm)) }
+        HorizontalDivider()
     }
 }
 
@@ -503,31 +495,6 @@ private fun confidenceLabel(confidence: Double) = when {
 
 @IrohacoPreviews
 @Composable
-private fun LocationHistoryCompactPreview() {
-    val kyoto = GeoPoint(35.0116, 135.7681)
-    val item = TimelineItem("a", MediaKind.IMAGE, "content://a", 0)
-    IrohacoTheme(dynamicColor = false) {
-        Surface {
-            LocationHistoryContent(
-                groups = listOf(
-                    HistoryGroup(LocalDate.of(2024, 8, 3), LocalDate.of(2024, 8, 5), "Kyoto Station", kyoto, 0.9, listOf(HistoryReview(item, kyoto, "Kyoto Station", 0.9))),
-                    HistoryGroup(LocalDate.of(2024, 8, 1), LocalDate.of(2024, 8, 1), "Fushimi Inari Taisha", kyoto, 0.7, listOf(HistoryReview(item.copy(assetId = "b"), kyoto, null, 0.7))),
-                ),
-                selection = emptySet(),
-                imported = null,
-                importing = false,
-                onBack = {},
-                onImport = {},
-                onToggle = {},
-                onDecide = { _, _ -> },
-                compact = true,
-            )
-        }
-    }
-}
-
-@IrohacoPreviews
-@Composable
 private fun LocationHistoryUnmatchedPreview() {
     IrohacoTheme(dynamicColor = false) {
         Surface {
@@ -562,6 +529,7 @@ private fun LocationHistoryPreview() {
                     HistoryGroup(LocalDate.of(2024, 8, 3), LocalDate.of(2024, 8, 3), null, road, 0.5, listOf(review("c", road, null, 0.5))),
                 ),
                 selection = setOf("b"),
+                opened = listOf("2024-08-03-a"),
                 imported = LocationHistory.Imported.Matched(3),
                 importing = false,
                 onBack = {},
