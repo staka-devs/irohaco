@@ -7,6 +7,7 @@ import dev.irohaco.core.contracts.FieldEdit
 import dev.irohaco.core.contracts.HistoryCandidate
 import dev.irohaco.core.contracts.HistoryReview
 import dev.irohaco.core.contracts.InferredPlace
+import dev.irohaco.core.contracts.KnownPlace
 import dev.irohaco.core.contracts.LocatedAsset
 import dev.irohaco.core.contracts.LocationHistoryStore
 import dev.irohaco.core.contracts.LocationStore
@@ -225,6 +226,25 @@ interface LocationDao {
 
     @Query("UPDATE location_evidence SET evidence_status = :status WHERE evidence_source = 'LOCATION_HISTORY' AND asset_id IN (:assetIds)")
     suspend fun decide(assetIds: List<String>, status: String)
+
+    @Transaction
+    @Query(
+        """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, MIN(s.content_uri) AS contentUri, $TAKEN AS sortTimeMs, MIN(s.mime_type) AS mimeType
+           FROM location_evidence le JOIN media_assets a ON a.asset_id = le.asset_id JOIN media_sources s ON s.asset_id = a.asset_id
+           WHERE le.evidence_source = 'EXIF' AND le.evidence_status = 'UNKNOWN' AND s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL
+             AND NOT EXISTS (SELECT 1 FROM location_evidence u WHERE u.asset_id = le.asset_id
+               AND (u.evidence_source = 'USER' OR (u.evidence_source = 'LOCATION_HISTORY' AND u.evidence_status = 'CANDIDATE')))
+           GROUP BY le.asset_id
+           ORDER BY sortTimeMs DESC""",
+    )
+    fun unmatched(): Flow<List<ItemRow>>
+
+    @Query(
+        """SELECT le.place_text AS name, AVG(le.latitude) AS latitude, AVG(le.longitude) AS longitude, COUNT(DISTINCT le.asset_id) AS count
+           FROM location_evidence le WHERE ($SHOWN) AND le.place_text IS NOT NULL AND le.place_text <> ''
+           GROUP BY le.place_text ORDER BY count DESC, name""",
+    )
+    fun knownPlaces(): Flow<List<KnownPlaceRow>>
 }
 
 data class HistoryRow(
@@ -246,6 +266,10 @@ data class AreaRow(val latitude: Double, val longitude: Double)
 data class TimedRow(val assetId: String, val timeMs: Long, val latitude: Double, val longitude: Double, val placeName: String?)
 
 data class AssetTime(val assetId: String, val timeMs: Long)
+
+data class ItemRow(val assetId: String, val mediaKind: String, val contentUri: String, val sortTimeMs: Long, val mimeType: String?)
+
+data class KnownPlaceRow(val name: String, val latitude: Double, val longitude: Double, val count: Int)
 
 /** Capture time, else modified time, else when the catalog first saw the file: the timeline's order. */
 private const val TAKEN = "COALESCE($EDITED_TAKEN, MAX(s.observed_taken_at), MAX(s.observed_modified_at), a.first_seen_at)"
@@ -309,6 +333,12 @@ class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -
     override fun undecided(): Flow<List<HistoryReview>> = dao.undecided().map { rows -> rows.map { it.review() } }
 
     override fun undecided(assetId: String): Flow<HistoryReview?> = dao.undecided(assetId).map { it?.review() }
+
+    override fun unmatched(): Flow<List<TimelineItem>> = dao.unmatched().map { rows ->
+        rows.map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType) }
+    }
+
+    override fun knownPlaces(): Flow<List<KnownPlace>> = dao.knownPlaces().map { rows -> rows.map { KnownPlace(it.name, GeoPoint(it.latitude, it.longitude), it.count) } }
 
     private fun HistoryRow.review() =
         HistoryReview(TimelineItem(assetId, MediaKind.valueOf(mediaKind), contentUri, sortTimeMs, mimeType), GeoPoint(latitude, longitude), placeName, confidence)

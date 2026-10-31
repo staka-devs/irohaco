@@ -3,11 +3,14 @@ package dev.irohaco.core.application
 import dev.irohaco.core.contracts.HistoryCandidate
 import dev.irohaco.core.contracts.HistoryEntry
 import dev.irohaco.core.contracts.HistoryReview
+import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.contracts.KnownPlace
 import dev.irohaco.core.contracts.LocationHistoryReader
 import dev.irohaco.core.contracts.LocationHistoryStore
 import dev.irohaco.core.contracts.UnreadableHistoryException
 import dev.irohaco.core.domain.GeoPoint
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.time.LocalDate
@@ -66,6 +69,26 @@ class LocationHistory(
 
     /** The undecided candidate of one file, for the viewer's details (#213). */
     fun candidate(assetId: String): Flow<HistoryReview?> = store.undecided(assetId)
+
+    /** Files with no place and no candidate, taken from [fromMs] until [untilMs] when given (#220). */
+    fun unmatched(fromMs: Long? = null, untilMs: Long? = null): Flow<List<TimelineItem>> = store.unmatched().map { all ->
+        all.filter { (fromMs == null || it.sortTimeMs >= fromMs) && (untilMs == null || it.sortTimeMs < untilMs) }
+    }
+
+    /**
+     * Places to give a file by hand: those other files have, then the named places of candidates not among
+     * them, each with how many files have it or wait for it (#220).
+     */
+    fun places(): Flow<List<KnownPlace>> = combine(store.knownPlaces(), store.undecided()) { known, undecided ->
+        val names = known.map { it.name }.toSet()
+        known + undecided.filter { it.placeName != null && it.placeName !in names }
+            .groupBy { it.placeName!! }
+            .map { (name, reviews) -> KnownPlace(name, reviews.first().point, reviews.size) }
+            .sortedByDescending { it.count }
+    }
+
+    /** Sets [point] as the place of each file in the DB, as the user's edit; the files stay as they are. */
+    suspend fun place(assetIds: Collection<String>, point: GeoPoint) = assetIds.forEach { setLocation(it, point) }
 
     /** Confirming sets each file's place in the DB, as the user's edit; the files stay as they are. */
     suspend fun decide(reviews: List<HistoryReview>, confirmed: Boolean) {

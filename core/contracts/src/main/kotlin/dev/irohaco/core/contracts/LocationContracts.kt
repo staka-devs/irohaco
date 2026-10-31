@@ -111,6 +111,9 @@ data class HistoryCandidate(val assetId: String, val point: GeoPoint, val placeN
 /** A candidate with its file, for the user to confirm or reject. */
 data class HistoryReview(val item: TimelineItem, val point: GeoPoint, val placeName: String?, val confidence: Double)
 
+/** A place other files already have, with how many files have it, to give to a file without one (#220). */
+data class KnownPlace(val name: String, val point: GeoPoint, val count: Int)
+
 /** Candidates from the location history in `location_evidence`, source LOCATION_HISTORY (ADR-0029). */
 interface LocationHistoryStore {
     /** Available files whose file was read and had no GPS, with their capture time. */
@@ -130,4 +133,10 @@ interface LocationHistoryStore {
 
     /** Marks the candidates of [assetIds] confirmed or rejected; the files themselves stay as they are. */
     suspend fun decide(assetIds: List<String>, confirmed: Boolean)
+
+    /** Available files with no GPS, no place of the user's and no candidate waiting, newest first (#220). */
+    fun unmatched(): Flow<List<TimelineItem>>
+
+    /** The named places of files with a place, most used first (#220). */
+    fun knownPlaces(): Flow<List<KnownPlace>>
 }
