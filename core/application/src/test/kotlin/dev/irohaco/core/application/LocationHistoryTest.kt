@@ -3,6 +3,7 @@ package dev.irohaco.core.application
 import dev.irohaco.core.contracts.HistoryCandidate
 import dev.irohaco.core.contracts.HistoryEntry
 import dev.irohaco.core.contracts.HistoryReview
+import dev.irohaco.core.contracts.KnownPlace
 import dev.irohaco.core.contracts.LocationHistoryStore
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.UnreadableHistoryException
@@ -50,6 +51,8 @@ class LocationHistoryTest {
 
     private val photo = TimelineItem("p", MediaKind.IMAGE, "content://p", 0)
     private val undecided = MutableStateFlow<List<HistoryReview>>(emptyList())
+    private val unmatched = MutableStateFlow<List<TimelineItem>>(emptyList())
+    private val known = MutableStateFlow<List<KnownPlace>>(emptyList())
     private var replaced: List<HistoryCandidate>? = null
     private val decided = mutableListOf<Pair<List<String>, Boolean>>()
     private val set = mutableListOf<Pair<String, GeoPoint>>()
@@ -60,6 +63,8 @@ class LocationHistoryTest {
         }
         override fun undecided() = undecided
         override fun undecided(assetId: String) = undecided.map { all -> all.find { it.item.assetId == assetId } }
+        override fun unmatched() = unmatched
+        override fun knownPlaces() = known
         override suspend fun decide(assetIds: List<String>, confirmed: Boolean) {
             decided += assetIds to confirmed
         }
@@ -93,6 +98,23 @@ class LocationHistoryTest {
 
         val dated = history.groups(fromMs = 2 * day, untilMs = 3 * day).first()
         assertEquals(listOf(listOf("road")), dated.map { group -> group.reviews.map { it.item.assetId } })
+    }
+
+    @Test
+    fun `places to pick are those of other files, then the candidates' others, and picking one sets it as an edit`() = runTest {
+        known.value = listOf(KnownPlace("Kyoto", kyoto, 5))
+        undecided.value = listOf(
+            HistoryReview(photo.copy(assetId = "a"), kyoto, "Kyoto", 0.9),
+            HistoryReview(photo.copy(assetId = "b"), road, "Road", 0.5),
+            HistoryReview(photo.copy(assetId = "c"), road, null, 0.5),
+        )
+        unmatched.value = listOf(photo.copy(assetId = "new", sortTimeMs = 200 * min), photo.copy(assetId = "old", sortTimeMs = 100 * min))
+        val history = LocationHistory(store, { _, _ -> emptyList() }, { id, point -> set += id to point })
+
+        assertEquals(listOf(KnownPlace("Kyoto", kyoto, 5), KnownPlace("Road", road, 1)), history.places().first())
+        assertEquals(listOf("old"), history.unmatched(untilMs = 150 * min).first().map { it.assetId })
+        history.place(listOf("new", "old"), road)
+        assertEquals(listOf("new" to road, "old" to road), set)
     }
 
     @Test

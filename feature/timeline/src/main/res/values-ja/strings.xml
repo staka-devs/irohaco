@@ -317,6 +317,16 @@
     <string name="history_unknown_format">このアプリが読める位置情報の履歴ではないため、取り込みませんでした。</string>
     <string name="history_empty">この位置情報の履歴には、場所が入っていません。</string>
     <string name="history_by_day">日ごとに分ける</string>
+    <string name="history_compact">1行ずつ表示</string>
+    <string name="history_tab_candidates">候補</string>
+    <string name="history_tab_unmatched">候補のない写真</string>
+    <string name="history_no_unmatched">場所のない写真には、どれも候補があります。</string>
+    <string name="history_pick_place">場所を選ぶ</string>
+    <string name="history_place_name">場所の名前</string>
+    <string name="history_no_places">選べる場所がありません。場所は、場所の付いた写真から取ります。</string>
+    <plurals name="history_place_picked">
+        <item quantity="other">%d 件に場所を付ける</item>
+    </plurals>
     <string name="history_none">確かめる候補はありません。</string>
     <string name="history_reject">却下</string>
     <string name="history_confirm">確定</string>

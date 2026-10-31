@@ -6,6 +6,7 @@ import dev.irohaco.core.contracts.CatalogChanges
 import dev.irohaco.core.contracts.CatalogVolume
 import dev.irohaco.core.contracts.HistoryCandidate
 import dev.irohaco.core.contracts.InferredPlace
+import dev.irohaco.core.contracts.KnownPlace
 import dev.irohaco.core.contracts.LocatedAsset
 import dev.irohaco.core.contracts.PlaceMatch
 import dev.irohaco.core.contracts.TimedPoint
@@ -145,6 +146,9 @@ class RoomLocationStoreTest {
         assertEquals(listOf("b", "a"), store.undecided().first().map { it.item.assetId })
         assertEquals(0.7, store.undecided("b").first()?.confidence)
         assertEquals(null, store.undecided("c").first())
+        // "c" has no GPS and no candidate; "a" and "b" wait for theirs.
+        assertEquals(listOf("c"), store.unmatched().first().map { it.assetId })
+        assertEquals(listOf(KnownPlace("京都市", kyoto, 1)), store.knownPlaces().first())
         // The history's place wins for "a"; "c" keeps its guess from nearby photos.
         assertEquals(
             listOf(PlaceMatch("gps", "京都市", false), PlaceMatch("a", "京都市", true, history = true), PlaceMatch("c", "京都市", true)),

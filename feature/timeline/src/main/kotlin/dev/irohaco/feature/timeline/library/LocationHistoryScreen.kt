@@ -6,23 +6,35 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,6 +64,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,6 +72,7 @@ import androidx.lifecycle.viewModelScope
 import dev.irohaco.core.application.HistoryGroup
 import dev.irohaco.core.application.LocationHistory
 import dev.irohaco.core.contracts.HistoryReview
+import dev.irohaco.core.contracts.KnownPlace
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.UnreadableHistoryException.Reason
 import dev.irohaco.core.designsystem.component.GridThumbnail
@@ -81,6 +95,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -111,6 +126,22 @@ class LocationHistoryViewModel(
     val groups: StateFlow<List<HistoryGroup>> = combine(_byDay, _dates) { byDay, dates -> byDay to dates }
         .flatMapLatest { (byDay, dates) -> history.groups(only, byDay, dates?.first, dates?.second) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The candidates, or the photos without a place and without a candidate (#220). */
+    private val _tab = MutableStateFlow(HistoryTab.CANDIDATES)
+    val tab: StateFlow<HistoryTab> = _tab.asStateFlow()
+
+    /** One line per group instead of a card, for a long list (#220). */
+    private val _compact = MutableStateFlow(false)
+    val compact: StateFlow<Boolean> = _compact.asStateFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val unmatched: StateFlow<List<TimelineItem>> = _dates
+        .flatMapLatest { dates -> history.unmatched(dates?.first, dates?.second) }
+        .map { items -> if (only == null) items else items.filter { it.assetId in only } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val places: StateFlow<List<KnownPlace>> = history.places().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val mapAllowed: StateFlow<Boolean> = mapAllowed.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /** Photos picked in a group, so its buttons decide just those (ADR-0029). */
@@ -135,6 +166,21 @@ class LocationHistoryViewModel(
 
     fun toggleByDay() = _byDay.update { !it }
 
+    fun toggleCompact() = _compact.update { !it }
+
+    /** A pick in one tab means nothing in the other, so it is dropped. */
+    fun showTab(tab: HistoryTab) {
+        _tab.value = tab
+        _selection.value = emptySet()
+    }
+
+    /** Gives the picked photos [point] as their place. */
+    fun place(point: GeoPoint) {
+        val picked = _selection.value
+        _selection.value = emptySet()
+        viewModelScope.launch { history.place(picked, point) }
+    }
+
     /** null clears the dates. */
     fun showDates(fromMs: Long?, untilMs: Long?) {
         _dates.value = if (fromMs != null && untilMs != null) fromMs to untilMs else null
@@ -148,7 +194,12 @@ class LocationHistoryViewModel(
     }
 }
 
-/** Places from the location history the user exported, confirmed or rejected by place, or by day and place (#174, #220, ADR-0029). */
+enum class HistoryTab { CANDIDATES, UNMATCHED }
+
+/**
+ * Places from the location history the user exported, confirmed or rejected by place, or by day and place;
+ * and the photos without any, given a place other photos have (#174, #220, ADR-0029).
+ */
 @Composable
 fun LocationHistoryScreen(viewModel: LocationHistoryViewModel, onBack: () -> Unit) {
     val groups by viewModel.groups.collectAsStateWithLifecycle()
@@ -158,11 +209,16 @@ fun LocationHistoryScreen(viewModel: LocationHistoryViewModel, onBack: () -> Uni
     val mapAllowed by viewModel.mapAllowed.collectAsStateWithLifecycle()
     val byDay by viewModel.byDay.collectAsStateWithLifecycle()
     val dates by viewModel.dates.collectAsStateWithLifecycle()
+    val tab by viewModel.tab.collectAsStateWithLifecycle()
+    val compact by viewModel.compact.collectAsStateWithLifecycle()
+    val unmatched by viewModel.unmatched.collectAsStateWithLifecycle()
+    val places by viewModel.places.collectAsStateWithLifecycle()
     // The export has no fixed type: a phone may label it JSON, text or a plain file.
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { viewModel.import(it.toString()) } }
     LocationHistoryContent(
         groups, selection, imported, importing, onBack, onImport = { pick.launch(arrayOf("*/*")) }, viewModel::toggle, viewModel::decide,
         byDay, dates, viewModel::toggleByDay, viewModel::showDates,
+        tab, viewModel::showTab, compact, viewModel::toggleCompact, unmatched, places, viewModel::place,
     ) { point ->
         if (mapAllowed) MapPreview(point)
     }
@@ -183,10 +239,19 @@ internal fun LocationHistoryContent(
     dates: Pair<Long, Long>? = null,
     onToggleByDay: () -> Unit = {},
     onDates: (Long?, Long?) -> Unit = { _, _ -> },
+    tab: HistoryTab = HistoryTab.CANDIDATES,
+    onTab: (HistoryTab) -> Unit = {},
+    compact: Boolean = false,
+    onToggleCompact: () -> Unit = {},
+    unmatched: List<TimelineItem> = emptyList(),
+    places: List<KnownPlace> = emptyList(),
+    onPlace: (GeoPoint) -> Unit = {},
     map: @Composable (GeoPoint) -> Unit = {},
 ) {
     var pickingDates by rememberSaveable { mutableStateOf(false) }
     if (pickingDates) DateRangeDialog(dates?.first, dates?.second, onDismiss = { pickingDates = false }) { from, until -> pickingDates = false; onDates(from, until) }
+    var pickingPlace by rememberSaveable { mutableStateOf(false) }
+    if (pickingPlace) PlacePickerDialog(places, onDismiss = { pickingPlace = false }) { pickingPlace = false; onPlace(it.point) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -194,9 +259,18 @@ internal fun LocationHistoryContent(
                 navigationIcon = { IconButton(onClick = onBack) { Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back)) } },
             )
         },
+        bottomBar = {
+            if (tab == HistoryTab.UNMATCHED && selection.isNotEmpty()) {
+                Surface(tonalElevation = 3.dp, modifier = Modifier.navigationBarsPadding()) {
+                    Button(onClick = { pickingPlace = true }, modifier = Modifier.fillMaxWidth().padding(IrohacoSpacing.l)) {
+                        Text(pluralStringResource(R.plurals.history_place_picked, selection.size, selection.size))
+                    }
+                }
+            }
+        },
     ) { padding ->
         LazyColumn(
-            contentPadding = PaddingValues(start = IrohacoSpacing.l, end = IrohacoSpacing.l, top = padding.calculateTopPadding(), bottom = IrohacoSpacing.l),
+            contentPadding = PaddingValues(start = IrohacoSpacing.l, end = IrohacoSpacing.l, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + IrohacoSpacing.l),
             verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -206,16 +280,49 @@ internal fun LocationHistoryContent(
                     OutlinedButton(onClick = onImport, enabled = !importing) { Text(stringResource(R.string.history_import)) }
                     if (importing) LinearProgressIndicator(Modifier.fillMaxWidth())
                     imported?.let { Text(importedText(it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    SecondaryTabRow(selectedTabIndex = tab.ordinal) {
+                        Tab(selected = tab == HistoryTab.CANDIDATES, onClick = { onTab(HistoryTab.CANDIDATES) }, text = { Text(stringResource(R.string.history_tab_candidates)) })
+                        Tab(selected = tab == HistoryTab.UNMATCHED, onClick = { onTab(HistoryTab.UNMATCHED) }, text = { Text(stringResource(R.string.history_tab_unmatched)) })
+                    }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-                        FilterChip(byDay, onToggleByDay, label = { Text(stringResource(R.string.history_by_day)) })
+                        if (tab == HistoryTab.CANDIDATES) {
+                            FilterChip(byDay, onToggleByDay, label = { Text(stringResource(R.string.history_by_day)) })
+                            FilterChip(compact, onToggleCompact, label = { Text(stringResource(R.string.history_compact)) })
+                        }
                         val label = dates?.let { (from, until) -> dateRangeLabel(from, until) }
                         FilterChip(label != null, { if (label != null) onDates(null, null) else pickingDates = true }, label = { Text(label ?: stringResource(R.string.search_dates)) })
                     }
-                    if (groups.isEmpty() && !importing) Text(stringResource(R.string.history_none), style = MaterialTheme.typography.bodyMedium)
+                    when {
+                        importing -> Unit
+                        tab == HistoryTab.CANDIDATES && groups.isEmpty() -> Text(stringResource(R.string.history_none), style = MaterialTheme.typography.bodyMedium)
+                        tab == HistoryTab.UNMATCHED && unmatched.isEmpty() -> Text(stringResource(R.string.history_no_unmatched), style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
-            items(groups, key = { "${it.from}-${it.reviews.first().item.assetId}" }) { group ->
-                HistoryGroupCard(group, selection, onToggle, onDecide, map)
+            when {
+                tab == HistoryTab.UNMATCHED -> items(unmatched.chunked(UNMATCHED_COLUMNS), key = { it.first().assetId }) { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
+                        row.forEach { item ->
+                            MediaThumbnail(
+                                model = GridThumbnail(item.contentUri),
+                                contentDescription = stringResource(if (item.kind == MediaKind.VIDEO) R.string.search_video_scene else R.string.search_photo),
+                                selected = item.assetId in selection,
+                                modifier = Modifier.weight(1f).aspectRatio(1f).clickable { onToggle(item.assetId) },
+                            )
+                        }
+                        // The last row keeps the cells the same size as the others.
+                        repeat(UNMATCHED_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+                compact -> items(groups, key = { "${it.from}-${it.reviews.first().item.assetId}" }) { group ->
+                    Column {
+                        HistoryGroupRow(group, onDecide)
+                        HorizontalDivider()
+                    }
+                }
+                else -> items(groups, key = { "${it.from}-${it.reviews.first().item.assetId}" }) { group ->
+                    HistoryGroupCard(group, selection, onToggle, onDecide, map)
+                }
             }
         }
     }
@@ -278,6 +385,74 @@ private fun HistoryGroupCard(
     }
 }
 
+/** One line for a group: its first photo, the place, the count and the days, and the buttons (#220). */
+@Composable
+private fun HistoryGroupRow(group: HistoryGroup, onDecide: (HistoryGroup, Boolean) -> Unit) {
+    val formatter = rememberDateFormatter()
+    Row(Modifier.fillMaxWidth().padding(vertical = IrohacoSpacing.xs), horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s), verticalAlignment = Alignment.CenterVertically) {
+        MediaThumbnail(
+            model = GridThumbnail(group.reviews.first().item.contentUri),
+            contentDescription = stringResource(R.string.search_photo),
+            selected = false,
+            modifier = Modifier.size(48.dp),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(group.placeName ?: "%.4f, %.4f".format(group.point.latitude, group.point.longitude), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                // The count first, so a long range of days cannot push it off the line.
+                listOf(
+                    pluralStringResource(R.plurals.history_count, group.reviews.size, group.reviews.size),
+                    if (group.from == group.to) formatter.format(group.from) else "${formatter.format(group.from)} – ${formatter.format(group.to)}",
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        // Icons keep the line short enough for the place and the days.
+        IconButton(onClick = { onDecide(group, false) }) { Icon(painterResource(IrohacoIcons.Close), stringResource(R.string.history_reject)) }
+        FilledTonalIconButton(onClick = { onDecide(group, true) }) { Icon(painterResource(IrohacoIcons.Check), stringResource(R.string.history_confirm)) }
+    }
+}
+
+/** Picks a place other photos have, or a named place of a candidate; typing narrows the list by name (#220). */
+@Composable
+private fun PlacePickerDialog(places: List<KnownPlace>, onDismiss: () -> Unit, onPick: (KnownPlace) -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    val shown = places.filter { it.name.contains(name.trim(), ignoreCase = true) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.history_pick_place)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+                OutlinedTextField(
+                    name, { name = it },
+                    label = { Text(stringResource(R.string.history_place_name)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (shown.isEmpty()) {
+                    Text(stringResource(R.string.history_no_places), style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                        items(shown, key = { it.name }) { place ->
+                            ListItem(
+                                supportingContent = { Text(pluralStringResource(R.plurals.history_count, place.count, place.count)) },
+                                modifier = Modifier.clickable { onPick(place) },
+                            ) { Text(place.name) }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.timeline_cancel)) } },
+    )
+}
+
+private const val UNMATCHED_COLUMNS = 4
+
 /**
  * The place as a still image of the map, with a pin at its center. A snapshot instead of a live map,
  * since a list of cards would otherwise hold a map view each; only the shown area goes to OpenFreeMap.
@@ -324,6 +499,52 @@ private fun confidenceLabel(confidence: Double) = when {
     confidence >= LocationHistory.IN_VISIT -> R.string.history_confidence_high
     confidence >= LocationHistory.NEAR_POINT -> R.string.history_confidence_medium
     else -> R.string.history_confidence_low
+}
+
+@IrohacoPreviews
+@Composable
+private fun LocationHistoryCompactPreview() {
+    val kyoto = GeoPoint(35.0116, 135.7681)
+    val item = TimelineItem("a", MediaKind.IMAGE, "content://a", 0)
+    IrohacoTheme(dynamicColor = false) {
+        Surface {
+            LocationHistoryContent(
+                groups = listOf(
+                    HistoryGroup(LocalDate.of(2024, 8, 3), LocalDate.of(2024, 8, 5), "Kyoto Station", kyoto, 0.9, listOf(HistoryReview(item, kyoto, "Kyoto Station", 0.9))),
+                    HistoryGroup(LocalDate.of(2024, 8, 1), LocalDate.of(2024, 8, 1), "Fushimi Inari Taisha", kyoto, 0.7, listOf(HistoryReview(item.copy(assetId = "b"), kyoto, null, 0.7))),
+                ),
+                selection = emptySet(),
+                imported = null,
+                importing = false,
+                onBack = {},
+                onImport = {},
+                onToggle = {},
+                onDecide = { _, _ -> },
+                compact = true,
+            )
+        }
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun LocationHistoryUnmatchedPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        Surface {
+            LocationHistoryContent(
+                groups = emptyList(),
+                selection = setOf("b", "c"),
+                imported = null,
+                importing = false,
+                onBack = {},
+                onImport = {},
+                onToggle = {},
+                onDecide = { _, _ -> },
+                tab = HistoryTab.UNMATCHED,
+                unmatched = ('a'..'f').map { TimelineItem(it.toString(), MediaKind.IMAGE, "content://$it", 0) },
+            )
+        }
+    }
 }
 
 @IrohacoPreviews

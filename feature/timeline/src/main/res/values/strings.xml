@@ -325,6 +325,17 @@
     <string name="history_reject">Reject</string>
     <string name="history_confirm">Confirm</string>
     <string name="history_by_day">Split by day</string>
+    <string name="history_compact">One line each</string>
+    <string name="history_tab_candidates">Candidates</string>
+    <string name="history_tab_unmatched">No candidate</string>
+    <string name="history_no_unmatched">Every photo without a place has a candidate.</string>
+    <string name="history_pick_place">Choose a place</string>
+    <string name="history_place_name">Place name</string>
+    <string name="history_no_places">No place to choose. Places come from photos that have one.</string>
+    <plurals name="history_place_picked">
+        <item quantity="one">Give %d item a place</item>
+        <item quantity="other">Give %d items a place</item>
+    </plurals>
     <string name="history_confidence_high">You stayed there</string>
     <string name="history_confidence_medium">Passing by</string>
     <string name="history_confidence_low">Passing by, a while apart</string>
