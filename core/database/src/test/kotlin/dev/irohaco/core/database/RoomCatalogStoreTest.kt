@@ -91,6 +91,13 @@ class RoomCatalogStoreTest {
         assertEquals(0, count("SELECT count(*) FROM media_access_events WHERE source_id = 's2'"))
     }
 
+    @Test
+    fun `finds the asset of a MediaStore id another app hands over`() = runTest {
+        store.apply(firstSync())
+        assertEquals("a2", store.assetOf(2))
+        assertNull(store.assetOf(3))
+    }
+
     private fun firstSync() = CatalogChanges(
         observedAtMs = 1,
         newVolumes = listOf(CatalogVolume("v1", "external_primary", null, null)),

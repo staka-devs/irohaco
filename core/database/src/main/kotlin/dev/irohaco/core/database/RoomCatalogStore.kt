@@ -20,6 +20,9 @@ class RoomCatalogStore(private val db: IrohacoDatabase) : CatalogStore {
             KnownSource(it.sourceId, it.mediaStoreId, MediaKind.valueOf(it.mediaKind), AssetAvailability.valueOf(it.accessState))
         }
 
+    /** The asset a MediaStore row belongs to, for a photo another app hands over by its MediaStore URI. */
+    suspend fun assetOf(mediaStoreId: Long): String? = dao.assetOf(mediaStoreId)
+
     /** One transaction, in foreign key order; detaching comes first so a reused MediaStore id can be inserted. */
     override suspend fun apply(changes: CatalogChanges) {
         val at = changes.observedAtMs
