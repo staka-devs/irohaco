@@ -314,7 +314,7 @@
     <string name="history_title">位置情報の履歴</string>
     <string name="history_explain">Timeline.json を選んでください。Timeline.json は、端末の設定の「位置情報」>「位置情報サービス」>「タイムライン」で書き出せます。GPS のない写真に、撮ったときにいた場所を候補として付けます。ファイルは端末の外に送りません。確定して書き込むまで、写真のファイルは変わりません。</string>
     <string name="history_import">Timeline.json を選ぶ</string>
-    <string name="history_open_timeline">タイムラインの設定を開く</string>
+    <string name="history_open_timeline">位置情報サービスを開く</string>
     <string name="history_not_json">JSON のファイルではないため、取り込みませんでした。</string>
     <string name="history_unknown_format">このアプリが読める位置情報の履歴ではないため、取り込みませんでした。</string>
     <string name="history_empty">この位置情報の履歴には、場所が入っていません。</string>

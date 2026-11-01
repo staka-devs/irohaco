@@ -294,7 +294,7 @@ internal fun LocationHistoryContent(
                     Text(stringResource(R.string.history_explain), style = MaterialTheme.typography.bodyMedium)
                     val context = LocalContext.current
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-                        OutlinedButton(onClick = { openTimelineSettings(context) }) { Text(stringResource(R.string.history_open_timeline)) }
+                        OutlinedButton(onClick = { openLocationServices(context) }) { Text(stringResource(R.string.history_open_timeline)) }
                         OutlinedButton(onClick = onImport, enabled = !importing) { Text(stringResource(R.string.history_import)) }
                     }
                     if (importing) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -354,19 +354,20 @@ private fun importedText(imported: LocationHistory.Imported): String = when (imp
 }
 
 /**
- * Opens the Timeline settings of Google Play services, where the history is exported; a device without
- * them gets the location settings, a step before (#174).
- * shortcut: the Timeline action is not a documented one; drop it if a device opens something else.
+ * Opens the system's Location services, which lists Timeline, where the history is exported; a device
+ * without that page gets the location settings, a step before (#174). No app can open Timeline itself:
+ * Play services' LOCATION_HISTORY action goes to the account's activity controls instead.
  */
-private fun openTimelineSettings(context: Context) {
+private fun openLocationServices(context: Context) {
     try {
-        context.startActivity(Intent(TIMELINE_SETTINGS))
+        context.startActivity(Intent(LOCATION_SERVICES))
     } catch (_: ActivityNotFoundException) {
         context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
     }
 }
 
-private const val TIMELINE_SETTINGS = "com.google.android.gms.location.settings.LOCATION_HISTORY"
+/** Settings.ACTION_LOCATION_SCANNING_SETTINGS, hidden in the SDK; the Settings app opens Location services with it. */
+private const val LOCATION_SERVICES = "android.settings.LOCATION_SCANNING_SETTINGS"
 
 private fun groupKey(group: HistoryGroup) = "${group.from}-${group.reviews.first().item.assetId}"
 
