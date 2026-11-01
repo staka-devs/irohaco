@@ -1,5 +1,9 @@
 package dev.irohaco.feature.timeline.library
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -128,9 +132,16 @@ class LocationHistoryViewModel(
     private val _dates = MutableStateFlow<Pair<Long, Long>?>(null)
     val dates: StateFlow<Pair<Long, Long>?> = _dates.asStateFlow()
 
+    /** Photos just confirmed or rejected; they leave the list at once, not when the store has caught up. */
+    private val decided = MutableStateFlow<Set<String>>(emptySet())
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val groups: StateFlow<List<HistoryGroup>> = combine(_byDay, _dates) { byDay, dates -> byDay to dates }
         .flatMapLatest { (byDay, dates) -> history.groups(only, byDay, dates?.first, dates?.second) }
+        .combine(decided) { groups, gone ->
+            if (gone.isEmpty()) groups
+            else groups.mapNotNull { group -> group.reviews.filter { it.item.assetId !in gone }.takeIf { it.isNotEmpty() }?.let { group.copy(reviews = it) } }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** The candidates, or the photos without a place and without a candidate (#220). */
@@ -158,6 +169,8 @@ class LocationHistoryViewModel(
 
     fun import(contentUri: String) {
         _importing.value = true
+        // A new history may bring candidates back for photos decided before.
+        decided.value = emptySet()
         viewModelScope.launch {
             _imported.value = history.import(contentUri)
             _importing.value = false
@@ -189,7 +202,9 @@ class LocationHistoryViewModel(
     /** The photos picked in [group], or all of it when none are. */
     fun decide(group: HistoryGroup, confirmed: Boolean) {
         val picked = group.reviews.filter { it.item.assetId in _selection.value }.ifEmpty { group.reviews }
-        _selection.update { it - picked.map { review -> review.item.assetId }.toSet() }
+        val ids = picked.map { review -> review.item.assetId }.toSet()
+        _selection.update { it - ids }
+        decided.update { it + ids }
         viewModelScope.launch { history.decide(picked, confirmed) }
     }
 }
@@ -277,7 +292,11 @@ internal fun LocationHistoryContent(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
                     Text(stringResource(R.string.history_explain), style = MaterialTheme.typography.bodyMedium)
-                    OutlinedButton(onClick = onImport, enabled = !importing) { Text(stringResource(R.string.history_import)) }
+                    val context = LocalContext.current
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+                        OutlinedButton(onClick = { openTimelineSettings(context) }) { Text(stringResource(R.string.history_open_timeline)) }
+                        OutlinedButton(onClick = onImport, enabled = !importing) { Text(stringResource(R.string.history_import)) }
+                    }
                     if (importing) LinearProgressIndicator(Modifier.fillMaxWidth())
                     imported?.let { Text(importedText(it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     SecondaryTabRow(selectedTabIndex = tab.ordinal) {
@@ -333,6 +352,21 @@ private fun importedText(imported: LocationHistory.Imported): String = when (imp
         },
     )
 }
+
+/**
+ * Opens the Timeline settings of Google Play services, where the history is exported; a device without
+ * them gets the location settings, a step before (#174).
+ * shortcut: the Timeline action is not a documented one; drop it if a device opens something else.
+ */
+private fun openTimelineSettings(context: Context) {
+    try {
+        context.startActivity(Intent(TIMELINE_SETTINGS))
+    } catch (_: ActivityNotFoundException) {
+        context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+    }
+}
+
+private const val TIMELINE_SETTINGS = "com.google.android.gms.location.settings.LOCATION_HISTORY"
 
 private fun groupKey(group: HistoryGroup) = "${group.from}-${group.reviews.first().item.assetId}"
 
