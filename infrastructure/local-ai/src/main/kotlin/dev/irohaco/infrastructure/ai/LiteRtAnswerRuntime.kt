@@ -1,5 +1,6 @@
 package dev.irohaco.infrastructure.ai
 
+import android.graphics.Bitmap
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
@@ -10,6 +11,7 @@ import com.google.ai.edge.litertlm.ThinkingConfig
 import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.AnswerRuntime
 import dev.irohaco.core.contracts.AnswerSession
+import java.io.ByteArrayOutputStream
 
 /**
  * An answer model with image input through LiteRT-LM (RAG-001): Gemma 4 or LFM3-VL. The language model and
@@ -43,8 +45,10 @@ class LiteRtAnswerRuntime(private val cacheDir: String) : AnswerRuntime {
                 reply.toString()
             }
 
+        // With an image: a vision encoder first run after another engine loaded on the GPU never returns,
+        // if the language model ran before it (LiteRT-LM 0.19.0, #237). Run once, it keeps working.
         override suspend fun warm() {
-            conversation("Reply with OK.").use { it.sendMessage("Hi") }
+            conversation("Reply with OK.").use { it.sendMessage(Contents.of(Content.ImageBytes(BLANK), Content.Text("Hi"))) }
         }
 
         // Thinking off: LFM3 thinks by default, and its thoughts would use up the 2,048-token context.
@@ -56,5 +60,9 @@ class LiteRtAnswerRuntime(private val cacheDir: String) : AnswerRuntime {
 
     private companion object {
         const val MAX_IMAGES = 4
+
+        val BLANK: ByteArray = ByteArrayOutputStream().also {
+            Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).compress(Bitmap.CompressFormat.JPEG, 80, it)
+        }.toByteArray()
     }
 }

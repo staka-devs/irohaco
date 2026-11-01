@@ -11,6 +11,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
+import com.google.ai.edge.litertlm.EmbeddingEngine
+import com.google.ai.edge.litertlm.EmbeddingEngineConfig
+import com.google.ai.edge.litertlm.EmbeddingOptions
+import com.google.ai.edge.litertlm.InputData
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
@@ -26,7 +30,8 @@ import java.io.File
  * Where an answer's time goes on the device (#48): loading, the images, the first token and the rest.
  * Runs only where an answer model was downloaded in Settings, so CI skips it.
  *
- * Arguments: `model` = the catalog id (default lfm3-vl-2b), or `path` = a model file elsewhere; `vision` = cpu (default) or gpu; `text` = gpu (default) or cpu.
+ * Arguments: `model` = the catalog id (default lfm3-vl-2b), or `path` = a model file elsewhere; `vision` = cpu (default) or gpu; `text` = gpu (default) or cpu;
+ * `warm`, `embeddings`, `embedding` and `embed` replay the order that stopped the answer at its first image (#237).
  * The results go to logcat under the tag AnswerSpeed.
  */
 @RunWith(AndroidJUnit4::class)
@@ -47,6 +52,32 @@ class AnswerSpeedTest {
         var start = SystemClock.elapsedRealtime()
         val engine = Engine(EngineConfig(model.path, backend(text), backend(vision), null, null, 4, context.cacheDir.path)).also { it.initialize() }
         Log.i(TAG, "${model.name} text=$text vision=$vision load ${SystemClock.elapsedRealtime() - start} ms")
+        // warm=text|image: one exchange first, as the app does right after loading.
+        args.getString("warm")?.let { warm ->
+            engine.createConversation(ConversationConfig(systemInstruction = Contents.of("Reply with OK."), thinkingConfig = ThinkingConfig(false))).use {
+                it.sendMessage(Contents.of(listOfNotNull(Content.ImageBytes(picture(3)).takeIf { warm == "image" }) + Content.Text("Hi")))
+            }
+            Log.i(TAG, "warmed with $warm")
+        }
+        // embedding=gpu|cpu: the embedding model loaded beside it, as the search before a question does; embed=text|image|none uses it.
+        // embeddings=N: the embedding model loaded and closed N - 1 times first, as an idle release and a later search do.
+        repeat(args.getString("embeddings", "1").toInt() - 1) {
+            val path = File(context.getExternalFilesDir(null), "models/embeddinggemma-2-text-vision-440m.litertlm").path
+            EmbeddingEngine(EmbeddingEngineConfig(path, Backend.GPU(), Backend.GPU(), Backend.GPU(), context.cacheDir.path)).apply { initialize(); close() }
+            Log.i(TAG, "embedding model loaded and closed")
+        }
+        val embedding = args.getString("embedding")?.let { name ->
+            val path = File(context.getExternalFilesDir(null), "models/embeddinggemma-2-text-vision-440m.litertlm").path
+            EmbeddingEngine(EmbeddingEngineConfig(path, backend(name), backend(name), backend(name), context.cacheDir.path)).also {
+                it.initialize()
+                Log.i(TAG, "embedding model on $name loaded")
+                when (args.getString("embed", "text")) {
+                    "text" -> it.computeEmbedding(listOf(InputData.Text("a train")), EmbeddingOptions(true))
+                    "image" -> it.computeEmbedding(listOf(InputData.Image(picture(2))), EmbeddingOptions(true))
+                }
+                Log.i(TAG, "embedding model used")
+            }
+        }
         engine.use {
             for (images in listOf(0, 1, 4)) {
                 engine.createConversation(ConversationConfig(systemInstruction = Contents.of("Answer briefly."), thinkingConfig = ThinkingConfig(false))).use { conversation ->
@@ -64,6 +95,7 @@ class AnswerSpeedTest {
                 }
             }
         }
+        embedding?.close()
     }
 
     private fun picture(i: Int): ByteArray {
