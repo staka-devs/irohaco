@@ -24,6 +24,8 @@ class ZoomState {
 
     /** Applies a pinch/pan step; [centroid] is relative to the container center and stays under the fingers. */
     fun transform(zoomChange: Float, pan: Offset, centroid: Offset, size: Size) {
+        // The event that lifts the last finger has no centroid; taken as is, it left the offset NaN and the photo nowhere (#235).
+        if (!centroid.isValid()) return
         val newScale = (scale * zoomChange).coerceIn(1f, MAX_SCALE)
         val anchored = centroid - (centroid - offset) * (newScale / scale)
         scale = newScale
