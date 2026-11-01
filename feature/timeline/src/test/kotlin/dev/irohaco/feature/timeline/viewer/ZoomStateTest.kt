@@ -21,6 +21,16 @@ class ZoomStateTest {
     }
 
     @Test
+    fun `lifting the fingers keeps the zoom where it was`() {
+        val zoom = ZoomState()
+        zoom.transform(2.5f, Offset.Zero, Offset(100f, 0f), size)
+        val offset = zoom.offset
+        zoom.transform(1f, Offset.Zero, Offset.Unspecified - Offset(500f, 1000f), size) // no fingers left, less the center
+        assertEquals(2.5f, zoom.scale)
+        assertEquals(offset, zoom.offset)
+    }
+
+    @Test
     fun `panning stops at the edge of the zoomed photo`() {
         val zoom = ZoomState()
         zoom.transform(2f, Offset(10_000f, -10_000f), Offset.Zero, size)
