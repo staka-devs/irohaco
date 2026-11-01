@@ -49,7 +49,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
@@ -545,13 +547,15 @@ private fun MediaPage(item: TimelineItem?, zoom: ZoomState?, onTap: () -> Unit, 
             modifier = Modifier
                 .fillMaxSize()
                 .sharedMedia(item.assetId)
-                .graphicsLayer {
-                    scaleX = zoom?.scale ?: 1f
-                    scaleY = zoom?.scale ?: 1f
-                    translationX = zoom?.offset?.x ?: 0f
-                    translationY = zoom?.offset?.y ?: 0f
+                // Drawn zoomed within the page rather than as a scaled layer the size of several screens.
+                .drawWithContent {
+                    if (zoom == null || !zoom.isZoomed) return@drawWithContent drawContent()
+                    clipRect {
+                        withTransform({ translate(zoom.offset.x, zoom.offset.y); scale(zoom.scale, zoom.scale) }) { this@drawWithContent.drawContent() }
+                    }
                 },
         )
+        if (zoom != null && !animated && item.kind == MediaKind.IMAGE) ZoomDetail(item.contentUri, zoom, size)
         if (animated && !playing) {
             IconButton(onClick = { playing = true }, modifier = Modifier.size(96.dp)) {
                 Icon(
