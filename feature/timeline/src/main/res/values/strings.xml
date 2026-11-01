@@ -317,8 +317,9 @@
     <string name="ask_title">Ask AI</string>
     <string name="ask_hint">Ask about your photos, e.g. Where did I go last summer?</string>
     <string name="history_title">Location history</string>
-    <string name="history_explain">Pick the Timeline.json you exported from Google Maps. Photos without GPS get the place you were at when you took them. The file stays on this device, and nothing changes in your photos until you confirm and write it to them.</string>
+    <string name="history_explain">Pick your Timeline.json. You can export it in the device settings, under Location > Location services > Timeline. Photos without GPS get the place you were at when you took them. The file stays on this device, and nothing changes in your photos until you confirm and write it to them.</string>
     <string name="history_import">Choose Timeline.json</string>
+    <string name="history_open_timeline">Open Timeline settings</string>
     <string name="history_not_json">This file is not JSON, so nothing was imported.</string>
     <string name="history_unknown_format">This file is not a location history this app can read, so nothing was imported.</string>
     <string name="history_empty">This location history has no places in it.</string>
