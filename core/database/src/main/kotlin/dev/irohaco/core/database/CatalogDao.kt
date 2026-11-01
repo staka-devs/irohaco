@@ -22,6 +22,9 @@ interface CatalogDao {
     )
     suspend fun sources(volumeId: String): List<SourceRow>
 
+    @Query("SELECT asset_id FROM media_sources WHERE media_store_id = :mediaStoreId AND access_state = 'AVAILABLE' LIMIT 1")
+    suspend fun assetOf(mediaStoreId: Long): String?
+
     @Insert suspend fun insertVolumes(volumes: List<StorageVolumesEntity>)
 
     @Query("UPDATE storage_volumes SET state = :state WHERE volume_id IN (:volumeIds)")

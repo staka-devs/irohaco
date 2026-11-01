@@ -1,6 +1,9 @@
 package dev.irohaco
 
+import android.content.ContentUris
+import android.content.Intent
 import android.os.Bundle
+import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -9,6 +12,7 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +53,7 @@ import dev.irohaco.feature.timeline.library.TrashViewModel
 import dev.irohaco.feature.timeline.search.SearchScreen
 import dev.irohaco.feature.timeline.search.SearchViewModel
 import dev.irohaco.core.contracts.FolderRef
+import dev.irohaco.core.database.RoomCatalogStore
 import dev.irohaco.core.domain.GeoBounds
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.listSaver
@@ -62,15 +67,20 @@ import dev.irohaco.core.application.ChatWithLibrary
 import dev.irohaco.ui.IrohacoApp
 import dev.irohaco.ui.ScreenViewModelStores
 import dev.irohaco.ui.TopLevelDestination
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val container get() = (application as IrohacoApplication).container
 
+    /** The viewer of a photo another app asked to show, such as a camera's thumbnail; the stack takes it once. */
+    private val handedOver = MutableStateFlow<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         container.resumeModelDownloads()
+        if (savedInstanceState == null) review(intent)
         // Resume covers launch, returning from the permission dialog and returning from system settings.
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -97,6 +107,11 @@ class MainActivity : ComponentActivity() {
                 }
                 val open = { route: String -> stack = stack + route }
                 val back = { stack = stack.dropLast(1).ifEmpty { listOf(Route.SHELL) } }
+                val review by handedOver.collectAsStateWithLifecycle()
+                LaunchedEffect(review) {
+                    review?.let { stack = listOf(Route.SHELL, it) }
+                    handedOver.value = null
+                }
                 val shellState = rememberSaveableStateHolder()
                 val stores = viewModel { ScreenViewModelStores() }
                 SharedTransitionLayout {
@@ -258,6 +273,21 @@ class MainActivity : ComponentActivity() {
                     onOpenSettings = { open(Route.SETTINGS) },
                 )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        review(intent)
+    }
+
+    /** Opens the photo or video of a MediaStore URI; one the catalog does not know leaves the app as it is. */
+    private fun review(intent: Intent) {
+        val uri = intent.data?.takeIf { it.authority == MediaStore.AUTHORITY } ?: return
+        val id = runCatching { ContentUris.parseId(uri) }.getOrNull()?.takeIf { it >= 0 } ?: return
+        lifecycleScope.launch {
+            container.syncCatalog() // the camera saved it a moment ago, after the last sync
+            RoomCatalogStore(container.database).assetOf(id)?.let { handedOver.value = Route.viewer(it) }
         }
     }
 
