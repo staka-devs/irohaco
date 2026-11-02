@@ -45,8 +45,7 @@ class LiteRtAnswerRuntime(private val cacheDir: String) : AnswerRuntime {
                 reply.toString()
             }
 
-        // With an image: a vision encoder first run after another engine loaded on the GPU never returns,
-        // if the language model ran before it (LiteRT-LM 0.19.0, #237). Run once, it keeps working.
+        // With an image, so the vision encoder is set up too before the first question with photos.
         override suspend fun warm() {
             conversation("Reply with OK.").use { it.sendMessage(Contents.of(Content.ImageBytes(BLANK), Content.Text("Hi"))) }
         }
