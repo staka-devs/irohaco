@@ -67,7 +67,6 @@ import dev.irohaco.core.database.RoomVectorSearchStore
 import dev.irohaco.infrastructure.ai.AndroidResourcePolicy
 import dev.irohaco.infrastructure.ai.AndroidModelStorage
 import dev.irohaco.infrastructure.ai.HttpModelDownloader
-import dev.irohaco.infrastructure.ai.LiteRtAnswerRuntime
 import dev.irohaco.infrastructure.ai.LiteRtEmbeddingRuntime
 import dev.irohaco.infrastructure.ai.MlKitTextRecognizer
 import dev.irohaco.infrastructure.media.AndroidIndexImageReader
@@ -306,7 +305,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
         AskLibrary(
             installed = manageModels::installed,
             settings = DataStoreAiSettings(settingsStore),
-            runtime = LiteRtAnswerRuntime(appContext.cacheDir.path),
+            runtime = AnswerService.Runtime(appContext),
             images = AndroidIndexImageReader(appContext),
             io = Dispatchers.IO,
             scope = scope,

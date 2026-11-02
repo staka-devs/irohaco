@@ -38,6 +38,7 @@ class AskLibraryTest {
         override suspend fun readFrame(contentUri: String, timestampMs: Long) = byteArrayOf(2).also { read += "$contentUri@$timestampMs" }
     }
     private var reply = ""
+    private var failing = false
     private var loads = 0
     private var closed = 0
     private val asked = mutableListOf<Pair<Int, String>>()
@@ -46,6 +47,7 @@ class AskLibraryTest {
         loads++
         object : AnswerSession {
             override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, onText: (String) -> Unit): String {
+                check(!failing) { "The model's process died" }
                 asked += images.size to question
                 // The reply arrives in pieces, as the runtime streams it.
                 reply.chunked(8).runningReduce { so, piece -> so + piece }.forEach(onText)
@@ -131,6 +133,17 @@ class AskLibraryTest {
         advanceTimeBy(AskLibrary.IDLE_MS + 1)
         runCurrent()
         assertEquals(1, closed, "closed when unused")
+    }
+
+    @Test
+    fun `a failed answer frees the model, so the next question loads it again`() = runTest {
+        reply = "ANSWER: A pier [1].\nKNOWN: yes\nSOURCES: 1=OBSERVED"
+        val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id))
+        failing = true
+        assertIs<AskResult.Failed>(library.ask("Where?", listOf(photo)))
+        failing = false
+        assertIs<AskResult.Answered>(library.ask("Where?", listOf(photo)))
+        assertEquals(2, loads)
     }
 
     @Test

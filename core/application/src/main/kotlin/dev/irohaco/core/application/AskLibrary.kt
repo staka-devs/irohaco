@@ -131,6 +131,7 @@ class AskLibrary(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) { // a native library that fails to load is an Error, not an Exception
+            release() // the model's process may have died with it; the next question starts a new one
             AskResult.Failed(e)
         }
     }

@@ -49,6 +49,11 @@
             android:name=".GpuProbeService"
             android:exported="false"
             android:process=":gpu_probe" />
+        <!-- The answer model in its own process: beside the embedding model on the GPU it stops (#237). -->
+        <service
+            android:name=".AnswerService"
+            android:exported="false"
+            android:process=":answer" />
     </application>
 
 </manifest>

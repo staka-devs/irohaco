@@ -68,7 +68,7 @@ class AnswerSpeedTest {
         }
         val embedding = args.getString("embedding")?.let { name ->
             val path = File(context.getExternalFilesDir(null), "models/embeddinggemma-2-text-vision-440m.litertlm").path
-            EmbeddingEngine(EmbeddingEngineConfig(path, backend(name), backend(name), backend(name), context.cacheDir.path)).also {
+            EmbeddingEngine(EmbeddingEngineConfig(path, backend(name), backend(args.getString("embedvision", name)), backend(name), context.cacheDir.path)).also {
                 it.initialize()
                 Log.i(TAG, "embedding model on $name loaded")
                 when (args.getString("embed", "text")) {
@@ -79,7 +79,13 @@ class AnswerSpeedTest {
             }
         }
         engine.use {
-            for (images in listOf(0, 1, 4)) {
+            // rounds=N: N questions with four images, each after a search with the embedding model, as the Ask screen does.
+            val rounds = args.getString("rounds")?.toInt()
+            for ((round, images) in (rounds?.let { List(it) { 4 } } ?: listOf(0, 1, 4)).withIndex()) {
+                if (rounds != null && embedding != null) {
+                    embedding.computeEmbedding(listOf(InputData.Text("a train $round")), EmbeddingOptions(true))
+                    Log.i(TAG, "round ${round + 1}: searched")
+                }
                 engine.createConversation(ConversationConfig(systemInstruction = Contents.of("Answer briefly."), thinkingConfig = ThinkingConfig(false))).use { conversation ->
                     val pictures = List(images) { Content.ImageBytes(picture(it)) }
                     start = SystemClock.elapsedRealtime()
