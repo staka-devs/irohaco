@@ -27,7 +27,9 @@ import dev.irohaco.core.application.IndexLocations
 import dev.irohaco.core.application.InferPlaces
 import dev.irohaco.core.application.ManageAnnotations
 import dev.irohaco.core.application.ManageCollections
+import dev.irohaco.core.application.GrantedEgressPolicy
 import dev.irohaco.core.application.ManageEgress
+import dev.irohaco.core.application.RemoteAnswering
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.application.EditMetadata
@@ -51,6 +53,8 @@ import dev.irohaco.core.database.RoomAnnotationStore
 import dev.irohaco.core.database.RoomCatalogStore
 import dev.irohaco.core.database.RoomCollectionsStore
 import dev.irohaco.core.database.RoomEgressGrantStore
+import dev.irohaco.infrastructure.remote.RemoteAnswerSessions
+import dev.irohaco.infrastructure.remote.RemoteCapabilityProbe
 import dev.irohaco.core.database.RoomIdentityStore
 import dev.irohaco.core.database.RoomMediaIndexStore
 import dev.irohaco.core.database.RoomMediaPurge
@@ -116,10 +120,14 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val themeColorSettings by lazy { ThemeColorSettings(DataStoreAppearanceSettings(settingsStore)) }
 
     val timelineSettings by lazy { DataStoreTimelineSettings(settingsStore) }
+    private val egressStore by lazy { RoomEgressGrantStore(database) }
+    private val credentials by lazy { KeystoreCredentials(appContext) }
     val manageEgress by lazy {
-        val store = RoomEgressGrantStore(database)
-        ManageEgress(store, store, KeystoreCredentials(appContext)) { UUID.randomUUID().toString() }
+        ManageEgress(egressStore, egressStore, credentials, { UUID.randomUUID().toString() }, egressStore, RemoteCapabilityProbe())
     }
+
+    /** Remote models the user registered for questions, each request checked by the egress policy (API-007). */
+    val remoteAnswering by lazy { RemoteAnswering(egressStore, credentials, RemoteAnswerSessions, GrantedEgressPolicy(egressStore)) }
 
     val sharingSettings by lazy { DataStoreSharingSettings(settingsStore) }
 
@@ -320,6 +328,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
             backend = {
                 aiBackendChoice.backend.first() ?: if (aiBackendChoice.gpuCheck.first()?.works == true) AiBackend.GPU else AiBackend.CPU
             },
+            remote = remoteAnswering,
         )
     }
 

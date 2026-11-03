@@ -105,6 +105,9 @@ fun SettingsScreen(
     val startFailed by viewModel.startFailed.collectAsStateWithLifecycle()
     val remoteConnections by viewModel.remoteConnections.collectAsStateWithLifecycle()
     val egressGrants by viewModel.egressGrants.collectAsStateWithLifecycle()
+    val remoteModels by viewModel.remoteModels.collectAsStateWithLifecycle()
+    val modelTest by viewModel.modelTest.collectAsStateWithLifecycle()
+    val remoteAnswerModels by viewModel.remoteAnswerModels.collectAsStateWithLifecycle()
     val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { viewModel.importModel(it.toString()) } }
     SettingsContent(
@@ -127,6 +130,7 @@ fun SettingsScreen(
                 gpuCheck = gpuCheck,
                 onSelectBackend = viewModel::selectAiBackend,
                 answerModels = viewModel.answerModels,
+                remoteAnswerModels = remoteAnswerModels,
                 answerModel = answerModel,
                 onSelectAnswerModel = viewModel::selectAnswerModel,
             )
@@ -158,7 +162,18 @@ fun SettingsScreen(
         library = { LibrarySettings(excludedFolders, viewModel::showFolder) },
         privacy = {
             PrivacySettings(shareLocationPolicy, viewModel::selectShareLocationPolicy, mapAllowed, viewModel::setMapAllowed, onOpenLocationHistory)
-            RemoteSettings(remoteConnections, egressGrants, viewModel::setEgress, viewModel::addConnection, viewModel::removeConnection)
+            RemoteSettings(
+                remoteConnections,
+                egressGrants,
+                viewModel::setEgress,
+                viewModel::addConnection,
+                viewModel::removeConnection,
+                remoteModels,
+                viewModel::addModel,
+                viewModel::removeModel,
+                modelTest,
+                viewModel::dismissModelTest,
+            )
         },
     )
 }

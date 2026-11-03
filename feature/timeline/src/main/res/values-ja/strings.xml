@@ -350,4 +350,6 @@
     </plurals>
     <string name="library_unlocated">場所のない写真</string>
     <string name="timeline_place">場所を付ける</string>
+    <string name="search_ask_consent">この質問は %1$s（%2$s）へ送ります。送るもの: %3$s。</string>
+    <string name="search_ask_consent_send">送って聞く</string>
 </resources>

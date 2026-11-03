@@ -239,7 +239,7 @@ class ViewerViewModel(
         val frameMs = playing.value?.takeIf { it.first == item.assetId }?.second?.currentPosition
         val earlier = _turns.value.mapNotNull { turn -> (turn.answer as? AskResult.Answered)?.let { turn.question to it.text } }
         // A failed turn is asked again rather than kept.
-        _turns.update { turns -> turns.filterNot { it.answer is AskResult.Failed } + AskTurn(question.trim()) }
+        _turns.update { turns -> turns.filterNot { it.answer is AskResult.Failed || it.answer is AskResult.NeedsConsent } + AskTurn(question.trim()) }
         asking?.cancel()
         asking = viewModelScope.launch {
             val answer = library.askAbout(

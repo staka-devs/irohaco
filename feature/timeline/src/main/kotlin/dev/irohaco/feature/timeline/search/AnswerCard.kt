@@ -31,9 +31,13 @@ import dev.irohaco.core.application.Basis
 import dev.irohaco.core.application.Citation
 import dev.irohaco.core.application.Evidence
 import dev.irohaco.core.application.SearchHit
+import dev.irohaco.core.contracts.EgressDeniedException
+import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.designsystem.component.GridThumbnail
 import dev.irohaco.core.designsystem.component.MediaThumbnail
+import dev.irohaco.core.designsystem.component.label
+import dev.irohaco.core.designsystem.component.remoteFailureText
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
@@ -79,8 +83,24 @@ internal fun AnswerCard(
                 }
                 AskResult.NothingFound -> Text(stringResource(R.string.search_ask_nothing), style = MaterialTheme.typography.bodyMedium)
                 is AskResult.Failed -> {
-                    Text(stringResource(R.string.search_ask_failed), style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = onAsk) { Text(stringResource(R.string.search_ask_retry)) }
+                    // A remote model says why; a refusal is not retried until the user changes the grants (AC-009).
+                    val reason = remoteFailureText(answer.cause)
+                    Text(reason ?: stringResource(R.string.search_ask_failed), style = MaterialTheme.typography.bodyMedium)
+                    if (answer.cause is EgressDeniedException) {
+                        TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.search_open_settings)) }
+                    } else {
+                        TextButton(onClick = onAsk) { Text(stringResource(R.string.search_ask_retry)) }
+                    }
+                }
+                is AskResult.NeedsConsent -> {
+                    val what = answer.payloads.map { stringResource(it.label()) }.joinToString(" / ")
+                    Text(stringResource(R.string.search_ask_consent, answer.model, answer.host, what), style = MaterialTheme.typography.bodyMedium)
+                    TextButton(
+                        onClick = {
+                            answer.agree()
+                            onAsk()
+                        },
+                    ) { Text(stringResource(R.string.search_ask_consent_send)) }
                 }
                 is AskResult.Answered -> {
                     Text(answer.text, style = MaterialTheme.typography.bodyLarge)
@@ -156,6 +176,13 @@ private fun AnswerCardPreview() {
                 )
                 AnswerCard(asking = true, answer = null, onAsk = {}, onOpen = {}, onOpenSettings = {}, partial = "It was Grandma's 80th")
                 AnswerCard(asking = false, answer = AskResult.NoModel, onAsk = {}, onOpen = {}, onOpenSettings = {})
+                AnswerCard(
+                    asking = false,
+                    answer = AskResult.NeedsConsent("Claude", "api.anthropic.com", setOf(EgressPayload.QUERY_TEXT, EgressPayload.IMAGE_PIXELS)) {},
+                    onAsk = {},
+                    onOpen = {},
+                    onOpenSettings = {},
+                )
                 AnswerCard(asking = false, answer = null, onAsk = {}, onOpen = {}, onOpenSettings = {})
             }
         }

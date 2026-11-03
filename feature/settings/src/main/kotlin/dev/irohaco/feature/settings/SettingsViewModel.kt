@@ -9,6 +9,7 @@ import dev.irohaco.core.application.IndexJobs
 import dev.irohaco.core.application.ManageEgress
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.PlanMediaIndex
+import dev.irohaco.core.application.RemoteAnswering
 import dev.irohaco.core.application.ThemeColorSettings
 import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.EgressGrant
@@ -20,7 +21,9 @@ import dev.irohaco.core.contracts.LibraryFolder
 import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.ModelArtifact
 import dev.irohaco.core.contracts.ModelInstallState
+import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.ShareLocationPolicy
 import dev.irohaco.core.contracts.TimelineSettings
@@ -199,10 +202,15 @@ class SettingsViewModel(
 
     val answerModels: List<ModelArtifact> = ask?.catalog.orEmpty()
 
-    /** The answer model in use: the picked one while installed, else the first installed one; null without any. */
-    val answerModel: StateFlow<String?> = combine(ask?.chosen ?: flowOf(null), modelStates) { picked, states ->
+    /** Remote models whose connection test found what answering needs (ADR-0032). */
+    val remoteAnswerModels: StateFlow<List<RemoteModel>> = (egress?.models() ?: flowOf(emptyList()))
+        .map { models -> models.filter { it.capabilities.containsAll(RemoteAnswering.NEEDED) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The answer model in use: the picked one while installed or registered, else the first installed one; null without any. */
+    val answerModel: StateFlow<String?> = combine(ask?.chosen ?: flowOf(null), modelStates, remoteAnswerModels) { picked, states, remote ->
         val installed = answerModels.map { it.id }.filter { states[it] is ModelInstallState.Installed }
-        picked?.takeIf { it in installed } ?: installed.firstOrNull()
+        picked?.takeIf { it in installed || remote.any { model -> model.profileId == it } } ?: installed.firstOrNull()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun selectAnswerModel(id: String) {
@@ -269,6 +277,43 @@ class SettingsViewModel(
 
     fun removeConnection(id: String) {
         viewModelScope.launch { egress?.remove(id) }
+    }
+
+    val remoteModels: StateFlow<List<RemoteModel>> =
+        (egress?.models() ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The connection test while it runs, then what it found or why it failed; null when none was run. */
+    private val _modelTest = MutableStateFlow<ModelTest?>(null)
+    val modelTest: StateFlow<ModelTest?> = _modelTest
+
+    sealed interface ModelTest {
+        data object Running : ModelTest
+
+        data class Added(val capabilities: Set<ModelCapability>) : ModelTest
+
+        data class Failed(val cause: Throwable) : ModelTest
+    }
+
+    fun addModel(connectionId: String, modelId: String, displayName: String) {
+        val manage = egress ?: return
+        _modelTest.value = ModelTest.Running
+        viewModelScope.launch {
+            _modelTest.value = try {
+                ModelTest.Added(manage.addModel(connectionId, modelId, displayName))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ModelTest.Failed(e)
+            }
+        }
+    }
+
+    fun dismissModelTest() {
+        _modelTest.value = null
+    }
+
+    fun removeModel(profileId: String) {
+        viewModelScope.launch { egress?.removeModel(profileId) }
     }
 
     fun selectShareLocationPolicy(policy: ShareLocationPolicy) {

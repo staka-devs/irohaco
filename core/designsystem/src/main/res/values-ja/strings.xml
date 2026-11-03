@@ -33,4 +33,18 @@
     <string name="palette_brown">茶</string>
     <string name="palette_grey">グレー</string>
     <string name="palette_blue_grey">ブルーグレー</string>
+    <string name="egress_query_text">入力した言葉</string>
+    <string name="egress_image_pixels">写真（位置情報は除く）</string>
+    <string name="egress_video_frames">動画のフレーム</string>
+    <string name="egress_ocr_text">写真から読んだ文字</string>
+    <string name="egress_user_annotations">メモ</string>
+    <string name="remote_rate_limited">外部のモデルが混み合っています。しばらくしてからもう一度試してください。</string>
+    <string name="remote_rate_limited_after">外部のモデルが混み合っています。%1$d 秒ほどしてからもう一度試してください。</string>
+    <string name="remote_unauthorized">外部の API にキーを拒否されました。設定でキーを確かめてください。</string>
+    <string name="remote_quota">外部のアカウントの利用量が上限に達しています。</string>
+    <string name="remote_timeout">外部のモデルから時間内に答えが返りませんでした。</string>
+    <string name="remote_failed">外部のモデルからエラーが返りました（%1$d）。</string>
+    <string name="remote_denied">送っていません。このモデルには%1$sの送信が許可されていません。設定のプライバシーでオンにできます。</string>
+    <string name="remote_blocked">送っていません。送信しないようにした写真が含まれています。</string>
+    <string name="remote_unreachable">外部のモデルにつながりませんでした。</string>
 </resources>

@@ -1,5 +1,6 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.contracts.CapabilityProbe
 import dev.irohaco.core.contracts.ConnectionStore
 import dev.irohaco.core.contracts.CredentialStore
 import dev.irohaco.core.contracts.EgressDecision
@@ -8,7 +9,10 @@ import dev.irohaco.core.contracts.EgressGrantStore
 import dev.irohaco.core.contracts.EgressPayload.IMAGE_PIXELS
 import dev.irohaco.core.contracts.EgressPayload.QUERY_TEXT
 import dev.irohaco.core.contracts.EgressPayload.USER_ANNOTATIONS
+import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteModel
+import dev.irohaco.core.contracts.RemoteModelStore
 import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.TaskType
 import dev.irohaco.core.contracts.TaskType.IMAGE_INDEX
@@ -58,7 +62,26 @@ class EgressPolicyTest {
             keys.remove(ref)
         }
     }
-    private val manage = ManageEgress(store, connectionStore, credentials) { "c${rows.size}" }
+    private val models = mutableListOf<RemoteModel>()
+    private val modelStore = object : RemoteModelStore {
+        override val models = MutableStateFlow(emptyList<RemoteModel>())
+        override suspend fun model(profileId: String) = this@EgressPolicyTest.models.firstOrNull { it.profileId == profileId }
+        override suspend fun connection(id: String) = rows[id]?.let { RemoteConnection(id, RemoteProtocol.OPENAI_CHAT, "https://api.openai.com/v1") }
+        override suspend fun credentialRef(connectionId: String) = rows[connectionId]
+        override suspend fun addModel(model: RemoteModel) {
+            this@EgressPolicyTest.models += model
+        }
+        override suspend fun removeModel(profileId: String) {
+            this@EgressPolicyTest.models.removeAll { it.profileId == profileId }
+        }
+    }
+    private var probed = emptyList<String>()
+    private val probe = CapabilityProbe { _, key, model ->
+        probed = listOf(key, model)
+        setOf(ModelCapability.INPUT_TEXT, ModelCapability.OUTPUT_TEXT)
+    }
+    private var ids = 0
+    private val manage = ManageEgress(store, connectionStore, credentials, { "c${ids++}" }, modelStore, probe)
 
     @Test
     fun `with no grants nothing is sent`() = runTest {
@@ -120,5 +143,15 @@ class EgressPolicyTest {
         assertEquals(ManageEgress.UrlKind.INVALID, ManageEgress.urlKind("api.openai.com"))
         assertFailsWith<IllegalArgumentException> { manage.add(RemoteProtocol.OPENAI_CHAT, "not a url", "k") }
         assertFailsWith<IllegalArgumentException> { manage.add(RemoteProtocol.OPENAI_CHAT, "https://api.openai.com/v1", " ") }
+    }
+
+    @Test
+    fun `a model is tested with the connection's key and kept with what the test found`() = runTest {
+        manage.add(RemoteProtocol.OPENAI_CHAT, "https://api.openai.com/v1", "secret-key")
+        assertEquals(setOf(ModelCapability.INPUT_TEXT, ModelCapability.OUTPUT_TEXT), manage.addModel("c0", " gpt-x ", ""))
+        assertEquals(listOf("secret-key", "gpt-x"), probed)
+        assertEquals(RemoteModel("c1", "c0", "gpt-x", "gpt-x", setOf(ModelCapability.INPUT_TEXT, ModelCapability.OUTPUT_TEXT)), models.single())
+        manage.removeModel("c1")
+        assertTrue(models.isEmpty())
     }
 }

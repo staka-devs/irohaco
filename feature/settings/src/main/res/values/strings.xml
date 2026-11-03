@@ -121,11 +121,6 @@
     <string name="settings_remote_task_image_index">Indexing photos</string>
     <string name="settings_remote_task_video_index">Indexing videos</string>
     <string name="settings_remote_task_rag">Questions to the AI</string>
-    <string name="settings_remote_query_text">Words you type</string>
-    <string name="settings_remote_image_pixels">Photos, without their location</string>
-    <string name="settings_remote_video_frames">Frames from videos</string>
-    <string name="settings_remote_ocr_text">Text read from photos</string>
-    <string name="settings_remote_user_annotations">Your memos</string>
     <string name="settings_remote_add">Add a connection</string>
     <string name="settings_remote_add_confirm">Add</string>
     <string name="settings_remote_url">URL</string>
@@ -136,4 +131,19 @@
     <string name="settings_remote_remove">Remove the connection</string>
     <string name="settings_remote_remove_title">Remove this connection?</string>
     <string name="settings_remote_remove_body">Its saved API key and what it was allowed to get are removed with it.</string>
+    <string name="settings_remote_model_add">Add a model</string>
+    <string name="settings_remote_model_remove">Remove the model</string>
+    <string name="settings_remote_model_id">Model ID</string>
+    <string name="settings_remote_model_name">Name (optional)</string>
+    <string name="settings_remote_model_test">Test and add</string>
+    <string name="settings_remote_model_test_hint">The test sends a sample sentence and a sample image of the app\'s own to the model. None of your photos are sent.</string>
+    <string name="settings_remote_model_testing">Testing the model…</string>
+    <string name="settings_remote_model_added">Added. It can: %1$s</string>
+    <string name="settings_remote_model_cannot_answer">It cannot read images, so it cannot answer questions about your photos.</string>
+    <string name="settings_remote_model_test_failed">The test failed. Check the model ID.</string>
+    <string name="settings_remote_model_done">Done</string>
+    <string name="settings_remote_cap_image">reads images</string>
+    <string name="settings_remote_cap_streaming">answers as it writes</string>
+    <string name="settings_remote_cap_text_only">text only</string>
+    <string name="settings_ai_answer_model_remote">Remote model: questions and photos are sent out</string>
 </resources>
