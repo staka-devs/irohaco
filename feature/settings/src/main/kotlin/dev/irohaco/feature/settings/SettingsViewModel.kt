@@ -6,10 +6,12 @@ import dev.irohaco.core.application.AiBackendChoice
 import dev.irohaco.core.application.AskLibrary
 import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.IndexJobs
+import dev.irohaco.core.application.ManageEgress
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.PlanMediaIndex
 import dev.irohaco.core.application.ThemeColorSettings
 import dev.irohaco.core.contracts.AiBackend
+import dev.irohaco.core.contracts.EgressGrant
 import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.GpuCheck
@@ -18,6 +20,7 @@ import dev.irohaco.core.contracts.LibraryFolder
 import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.ModelArtifact
 import dev.irohaco.core.contracts.ModelInstallState
+import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.ShareLocationPolicy
 import dev.irohaco.core.contracts.TimelineSettings
 import dev.irohaco.core.contracts.SharingSettings
@@ -57,6 +60,7 @@ class SettingsViewModel(
     /** The model that answers questions from search results (RAG-001); the user picks among those installed. */
     private val ask: AskLibrary? = null,
     private val timeline: TimelineSettings? = null,
+    private val egress: ManageEgress? = null,
     /** Runs a job in the foreground service, so it carries on after the user leaves this screen. */
     private val runIndexJob: (String) -> Unit = {},
 ) : ViewModel() {
@@ -244,6 +248,17 @@ class SettingsViewModel(
 
     fun setLocationPin(shown: Boolean) {
         viewModelScope.launch { timeline?.setLocationPin(shown) }
+    }
+
+    /** The remote connections and what each may get (API-007); all off until the user turns one on. */
+    val remoteConnections: StateFlow<List<RemoteConnection>> =
+        (egress?.connections() ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val egressGrants: StateFlow<Set<EgressGrant>> =
+        (egress?.grants() ?: flowOf(emptySet())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    fun setEgress(grant: EgressGrant, allowed: Boolean) {
+        viewModelScope.launch { egress?.set(grant, allowed) }
     }
 
     fun selectShareLocationPolicy(policy: ShareLocationPolicy) {

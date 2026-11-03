@@ -114,4 +114,16 @@
     <string name="settings_location_history">Location history</string>
     <string name="settings_location_history_open">Add places from Google Maps Timeline</string>
     <string name="settings_location_history_summary">Reads a Timeline.json you exported, on this device only</string>
+    <string name="settings_remote">Remote models</string>
+    <string name="settings_remote_none">No remote model is set up. Photos, videos and memos stay on this device.</string>
+    <string name="settings_remote_hint">Nothing is sent until you turn it on here. When a request is refused, no other model is tried instead.</string>
+    <string name="settings_remote_task_search">Search</string>
+    <string name="settings_remote_task_image_index">Indexing photos</string>
+    <string name="settings_remote_task_video_index">Indexing videos</string>
+    <string name="settings_remote_task_rag">Questions to the AI</string>
+    <string name="settings_remote_query_text">Words you type</string>
+    <string name="settings_remote_image_pixels">Photos, without their location</string>
+    <string name="settings_remote_video_frames">Frames from videos</string>
+    <string name="settings_remote_ocr_text">Text read from photos</string>
+    <string name="settings_remote_user_annotations">Your memos</string>
 </resources>

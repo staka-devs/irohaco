@@ -1,0 +1,55 @@
+package dev.irohaco.core.database
+
+import androidx.room.Dao
+import androidx.room.Query
+import dev.irohaco.core.contracts.EgressGrant
+import dev.irohaco.core.contracts.EgressGrantStore
+import dev.irohaco.core.contracts.EgressPayload
+import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.TaskType
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+@Dao
+interface EgressDao {
+    @Query("SELECT * FROM provider_connections WHERE protocol != 'LOCAL_LITERT' ORDER BY connection_id")
+    fun remoteConnections(): Flow<List<ProviderConnectionsEntity>>
+
+    @Query("SELECT * FROM egress_grants")
+    fun grants(): Flow<List<EgressGrantsEntity>>
+
+    @Query(
+        """SELECT g.payload_type FROM egress_grants g JOIN model_profiles p ON p.connection_id = g.connection_id
+           WHERE p.model_profile_id = :profileId AND g.task_code = :task""",
+    )
+    suspend fun granted(profileId: String, task: String): List<String>
+
+    @Query("SELECT asset_id FROM asset_privacy_rules WHERE allow_remote_send = 0 AND asset_id IN (:assetIds)")
+    suspend fun blocked(assetIds: List<String>): List<String>
+
+    @Query("INSERT OR IGNORE INTO egress_grants(connection_id, task_code, payload_type, granted_at) VALUES (:connectionId, :task, :payload, :now)")
+    suspend fun grant(connectionId: String, task: String, payload: String, now: Long)
+
+    @Query("DELETE FROM egress_grants WHERE connection_id = :connectionId AND task_code = :task AND payload_type = :payload")
+    suspend fun revoke(connectionId: String, task: String, payload: String)
+}
+
+class RoomEgressGrantStore(db: IrohacoDatabase, private val now: () -> Long = System::currentTimeMillis) : EgressGrantStore {
+    private val dao = db.egressDao()
+
+    override val connections: Flow<List<RemoteConnection>> =
+        dao.remoteConnections().map { rows -> rows.map { RemoteConnection(it.connectionId, it.protocol, it.baseUrl) } }
+
+    override val grants: Flow<Set<EgressGrant>> = dao.grants().map { rows ->
+        rows.map { EgressGrant(it.connectionId, TaskType.valueOf(it.taskCode), EgressPayload.valueOf(it.payloadType)) }.toSet()
+    }
+
+    override suspend fun granted(profileId: String, task: TaskType) = dao.granted(profileId, task.name).map(EgressPayload::valueOf).toSet()
+
+    // shortcut: one IN list, so past SQLite's 999 variables it throws; chunk it once a request carries that many assets.
+    override suspend fun blocked(assetIds: Set<String>) = dao.blocked(assetIds.toList()).toSet()
+
+    override suspend fun set(grant: EgressGrant, allowed: Boolean) = with(grant) {
+        if (allowed) dao.grant(connectionId, task.name, payload.name, now()) else dao.revoke(connectionId, task.name, payload.name)
+    }
+}

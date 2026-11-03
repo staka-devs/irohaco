@@ -27,6 +27,7 @@ import dev.irohaco.core.application.IndexLocations
 import dev.irohaco.core.application.InferPlaces
 import dev.irohaco.core.application.ManageAnnotations
 import dev.irohaco.core.application.ManageCollections
+import dev.irohaco.core.application.ManageEgress
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.application.EditMetadata
@@ -49,6 +50,7 @@ import dev.irohaco.core.database.IrohacoDatabaseFactory
 import dev.irohaco.core.database.RoomAnnotationStore
 import dev.irohaco.core.database.RoomCatalogStore
 import dev.irohaco.core.database.RoomCollectionsStore
+import dev.irohaco.core.database.RoomEgressGrantStore
 import dev.irohaco.core.database.RoomIdentityStore
 import dev.irohaco.core.database.RoomMediaIndexStore
 import dev.irohaco.core.database.RoomMediaPurge
@@ -114,6 +116,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val themeColorSettings by lazy { ThemeColorSettings(DataStoreAppearanceSettings(settingsStore)) }
 
     val timelineSettings by lazy { DataStoreTimelineSettings(settingsStore) }
+    val manageEgress by lazy { ManageEgress(RoomEgressGrantStore(database)) }
 
     val sharingSettings by lazy { DataStoreSharingSettings(settingsStore) }
 
