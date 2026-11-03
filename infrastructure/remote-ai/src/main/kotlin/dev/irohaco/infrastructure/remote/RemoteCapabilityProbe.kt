@@ -8,7 +8,10 @@ import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteCallException
 import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.RemoteFailure
+import dev.irohaco.core.contracts.RemoteProtocol
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 
 /**
@@ -18,18 +21,28 @@ import java.io.ByteArrayOutputStream
  */
 class RemoteCapabilityProbe(private val timeoutMs: Int = 30_000) : CapabilityProbe {
     override suspend fun probe(connection: RemoteConnection, apiKey: String, modelId: String): Set<ModelCapability> {
+        if (connection.protocol in EMBEDDING) return embeddings(connection, apiKey, modelId)
         fun session(streaming: Boolean) =
             RemoteAnswerSession(connection.protocol, connection.baseUrl, apiKey, modelId, streaming, { EgressDecision.Allowed }, timeoutMs)
         val found = mutableSetOf(ModelCapability.INPUT_TEXT, ModelCapability.OUTPUT_TEXT)
         check(session(streaming = false).answer(INSTRUCTION, emptyList(), TEXT).isNotBlank()) { "The model sent back no text" }
-        if (works { session(streaming = false).answer(INSTRUCTION, listOf(sampleImage()), IMAGE) }) found += ModelCapability.INPUT_IMAGE
-        if (works { session(streaming = true).answer(INSTRUCTION, emptyList(), TEXT) }) found += ModelCapability.STREAMING
+        if (works { session(streaming = false).answer(INSTRUCTION, listOf(sampleImage()), IMAGE).isNotBlank() }) found += ModelCapability.INPUT_IMAGE
+        if (works { session(streaming = true).answer(INSTRUCTION, emptyList(), TEXT).isNotBlank() }) found += ModelCapability.STREAMING
         return found
     }
 
+    /** The sample sentence, then the sample image where the format can carry one. */
+    private suspend fun embeddings(connection: RemoteConnection, apiKey: String, modelId: String): Set<ModelCapability> = withContext(Dispatchers.IO) {
+        val session = RemoteEmbeddingSession(connection.protocol, connection.baseUrl, apiKey, modelId, { EgressDecision.Allowed }, timeoutMs)
+        session.embedText(TEXT)
+        val found = mutableSetOf(ModelCapability.INPUT_TEXT, ModelCapability.OUTPUT_EMBEDDING)
+        if (connection.protocol == RemoteProtocol.GEMINI_EMBED_CONTENT && works { session.embedImage(sampleImage()).isNotEmpty() }) found += ModelCapability.INPUT_IMAGE
+        found
+    }
+
     /** A refused image or stream only leaves that capability out; a rate limit or a cancel is still thrown. */
-    private suspend fun works(call: suspend () -> String): Boolean = try {
-        call().isNotBlank()
+    private suspend fun works(call: suspend () -> Boolean): Boolean = try {
+        call()
     } catch (e: CancellationException) {
         throw e
     } catch (e: RemoteCallException) {
@@ -37,6 +50,7 @@ class RemoteCapabilityProbe(private val timeoutMs: Int = 30_000) : CapabilityPro
     }
 
     private companion object {
+        val EMBEDDING = setOf(RemoteProtocol.OPENAI_EMBEDDINGS, RemoteProtocol.GEMINI_EMBED_CONTENT)
         const val INSTRUCTION = "Answer in one short line."
         const val TEXT = "Reply with the word OK."
         const val IMAGE = "What color is the left half of this image?"

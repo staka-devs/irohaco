@@ -1,13 +1,10 @@
 package dev.irohaco.infrastructure.remote
 
-import dev.irohaco.core.application.remoteFailure
 import dev.irohaco.core.contracts.AnswerSession
 import dev.irohaco.core.contracts.EgressDecision
 import dev.irohaco.core.contracts.EgressDeniedException
 import dev.irohaco.core.contracts.ModelCapability
-import dev.irohaco.core.contracts.RemoteCallException
 import dev.irohaco.core.contracts.RemoteConnection
-import dev.irohaco.core.contracts.RemoteFailure
 import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.RemoteSessions
@@ -15,10 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.SocketTimeoutException
-import java.net.URL
 
 /**
  * A remote generation model behind the same [AnswerSession] as the local one (ADR-0032). Each question
@@ -46,40 +39,17 @@ class RemoteAnswerSession(
         if (decision is EgressDecision.Denied) throw EgressDeniedException(decision)
         val body = format.body(model, instruction, images.map(::Image), question, streaming)
         return withContext(Dispatchers.IO) {
-            val connection = URL(baseUrl.trimEnd('/') + format.path).openConnection() as HttpURLConnection
-            try {
-                connection.connectTimeout = timeoutMs
-                connection.readTimeout = timeoutMs
-                connection.requestMethod = "POST"
-                connection.doOutput = true
-                connection.setRequestProperty("Content-Type", "application/json")
-                format.headers(apiKey).forEach { (name, value) -> connection.setRequestProperty(name, value) }
-                connection.outputStream.use { it.write(body.toString().toByteArray()) }
-                val status = connection.responseCode
-                if (status !in 200..299) {
-                    val error = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                    throw RemoteCallException(remoteFailure(status, connection.getHeaderField("Retry-After"), error, listOf(apiKey)))
-                }
-                if (!streaming) return@withContext format.text(JSONObject(connection.inputStream.bufferedReader().use { it.readText() }))
+            post(baseUrl.trimEnd('/') + format.path, format.headers(apiKey), body, apiKey, timeoutMs) { reader ->
+                if (!streaming) return@post format.text(JSONObject(reader.readText()))
                 val text = StringBuilder()
-                connection.inputStream.bufferedReader().use { reader ->
-                    readEvents(reader) { event, data ->
-                        ensureActive()
-                        format.delta(event, data)?.let {
-                            text.append(it)
-                            onText(text.toString())
-                        }
+                readEvents(reader) { event, data ->
+                    ensureActive()
+                    format.delta(event, data)?.let {
+                        text.append(it)
+                        onText(text.toString())
                     }
                 }
                 text.toString()
-            } catch (e: SocketTimeoutException) {
-                throw RemoteCallException(RemoteFailure.Timeout)
-            } catch (e: RemoteCallException) {
-                throw e
-            } catch (e: IOException) {
-                throw RemoteCallException(RemoteFailure.Unreachable)
-            } finally {
-                connection.disconnect()
             }
         }
     }
