@@ -110,7 +110,7 @@ internal fun AnswerCard(
                         }
                     }
                     Text(
-                        stringResource(caution),
+                        stringResource(caution, answer.remoteModel ?: stringResource(R.string.ask_on_device_ai)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

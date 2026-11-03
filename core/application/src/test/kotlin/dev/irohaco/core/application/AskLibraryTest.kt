@@ -239,7 +239,7 @@ class AskLibraryTest {
         assertEquals(setOf(EgressPayload.QUERY_TEXT, EgressPayload.IMAGE_PIXELS, EgressPayload.VIDEO_FRAMES, EgressPayload.USER_ANNOTATIONS), consent.payloads)
         assertTrue(read.isEmpty() && remoteAsked.isEmpty()) // nothing read, nothing sent before the user agrees
         consent.agree()
-        assertIs<AskResult.Answered>(library.ask("Whose birthday?", listOf(photo, memo, scene)))
+        assertEquals(claude.displayName, assertIs<AskResult.Answered>(library.ask("Whose birthday?", listOf(photo, memo, scene))).remoteModel)
         assertEquals(1, remoteAsked.size)
         assertEquals(0, loads) // the local model was never loaded
         // The policy saw the same payloads before the photos were read, and again before the request.

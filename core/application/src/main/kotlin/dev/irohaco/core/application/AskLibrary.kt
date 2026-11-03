@@ -41,8 +41,11 @@ enum class Basis { OBSERVED, USER_STATED, INFERRED }
 data class Citation(val hit: SearchHit, val basis: Basis, val number: Int)
 
 sealed interface AskResult {
-    /** [known] is false when the sources do not answer the question; the text then says so (RAG-003). */
-    data class Answered(val text: String, val known: Boolean, val citations: List<Citation>) : AskResult
+    /**
+     * [known] is false when the sources do not answer the question; the text then says so (RAG-003).
+     * [remoteModel] names the remote model that answered, or is null for the model on this device.
+     */
+    data class Answered(val text: String, val known: Boolean, val citations: List<Citation>, val remoteModel: String? = null) : AskResult
 
     /** No answer model is installed; Settings > AI downloads one. */
     data object NoModel : AskResult
@@ -178,7 +181,7 @@ class AskLibrary(
             val reply = remote.open(model, payloads, assets).use { session ->
                 withContext(io) { session.answer(INSTRUCTION, pictures, prompt(question, sources, context)) { onText(visibleAnswer(it)) } }
             }
-            parseAnswer(reply, sources)
+            parseAnswer(reply, sources).copy(remoteModel = model.displayName)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
