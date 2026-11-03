@@ -1,5 +1,7 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.contracts.ConnectionStore
+import dev.irohaco.core.contracts.CredentialStore
 import dev.irohaco.core.contracts.EgressDecision
 import dev.irohaco.core.contracts.EgressGrant
 import dev.irohaco.core.contracts.EgressGrantStore
@@ -7,6 +9,7 @@ import dev.irohaco.core.contracts.EgressPayload.IMAGE_PIXELS
 import dev.irohaco.core.contracts.EgressPayload.QUERY_TEXT
 import dev.irohaco.core.contracts.EgressPayload.USER_ANNOTATIONS
 import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.TaskType
 import dev.irohaco.core.contracts.TaskType.IMAGE_INDEX
 import dev.irohaco.core.contracts.TaskType.RAG
@@ -15,6 +18,8 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 /** Nothing leaves the device unless each kind of content has its own grant for the task (ADR-0002, API-007, AC-009). */
 class EgressPolicyTest {
@@ -34,7 +39,26 @@ class EgressPolicyTest {
         }
     }
     private val policy = GrantedEgressPolicy(store)
-    private val manage = ManageEgress(store)
+    private val rows = mutableMapOf<String, String>() // connection id to key reference
+    private val connectionStore = object : ConnectionStore {
+        var failing = false
+
+        override suspend fun add(id: String, protocol: RemoteProtocol, baseUrl: String, credentialRef: String) {
+            check(!failing)
+            rows[id] = credentialRef
+        }
+
+        override suspend fun remove(id: String) = rows.remove(id)
+    }
+    private val keys = mutableMapOf<String, String>()
+    private val credentials = object : CredentialStore {
+        override fun save(secret: String) = "ref${keys.size}".also { keys[it] = secret }
+        override fun read(ref: String) = keys[ref]
+        override fun delete(ref: String) {
+            keys.remove(ref)
+        }
+    }
+    private val manage = ManageEgress(store, connectionStore, credentials) { "c${rows.size}" }
 
     @Test
     fun `with no grants nothing is sent`() = runTest {
@@ -70,5 +94,31 @@ class EgressPolicyTest {
     fun `another connection's grants do not count`() = runTest {
         manage.set(EgressGrant("anthropic", RAG, QUERY_TEXT), true)
         assertEquals(EgressDecision.Denied(setOf(QUERY_TEXT), emptySet()), policy.authorize(RAG, "gpt", setOf(QUERY_TEXT), emptySet()))
+    }
+
+    @Test
+    fun `a connection keeps only the key's reference, and removing it removes the key`() = runTest {
+        manage.add(RemoteProtocol.ANTHROPIC_MESSAGES, "https://api.anthropic.com/v1/", " secret-key ")
+        assertEquals(mapOf("c0" to "ref0"), rows)
+        assertEquals("secret-key", keys["ref0"])
+        manage.remove("c0")
+        assertTrue(rows.isEmpty() && keys.isEmpty())
+    }
+
+    @Test
+    fun `a connection that cannot be saved leaves no key behind`() = runTest {
+        connectionStore.failing = true
+        assertFailsWith<IllegalStateException> { manage.add(RemoteProtocol.OPENAI_CHAT, "https://api.openai.com/v1", "k") }
+        assertTrue(keys.isEmpty())
+    }
+
+    @Test
+    fun `only http and https URLs with a host are taken, and plain http is told apart`() = runTest {
+        assertEquals(ManageEgress.UrlKind.HTTPS, ManageEgress.urlKind("https://api.openai.com/v1"))
+        assertEquals(ManageEgress.UrlKind.PLAIN_HTTP, ManageEgress.urlKind("http://192.168.1.20:8080/v1"))
+        assertEquals(ManageEgress.UrlKind.INVALID, ManageEgress.urlKind("ftp://example.com"))
+        assertEquals(ManageEgress.UrlKind.INVALID, ManageEgress.urlKind("api.openai.com"))
+        assertFailsWith<IllegalArgumentException> { manage.add(RemoteProtocol.OPENAI_CHAT, "not a url", "k") }
+        assertFailsWith<IllegalArgumentException> { manage.add(RemoteProtocol.OPENAI_CHAT, "https://api.openai.com/v1", " ") }
     }
 }

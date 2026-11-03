@@ -21,6 +21,7 @@ import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.ModelArtifact
 import dev.irohaco.core.contracts.ModelInstallState
 import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.ShareLocationPolicy
 import dev.irohaco.core.contracts.TimelineSettings
 import dev.irohaco.core.contracts.SharingSettings
@@ -259,6 +260,15 @@ class SettingsViewModel(
 
     fun setEgress(grant: EgressGrant, allowed: Boolean) {
         viewModelScope.launch { egress?.set(grant, allowed) }
+    }
+
+    fun addConnection(protocol: RemoteProtocol, baseUrl: String, apiKey: String) {
+        // shortcut: a Keystore failure only leaves the connection unlisted; say so on screen if it ever happens.
+        viewModelScope.launch { runCatching { egress?.add(protocol, baseUrl, apiKey) } }
+    }
+
+    fun removeConnection(id: String) {
+        viewModelScope.launch { egress?.remove(id) }
     }
 
     fun selectShareLocationPolicy(policy: ShareLocationPolicy) {
