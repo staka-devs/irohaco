@@ -83,3 +83,9 @@ sealed interface RemoteFailure {
     /** Any other status; [message] has its secrets taken out. */
     data class Failed(val status: Int, val message: String) : RemoteFailure
 }
+
+/** A remote call that failed; [failure] says why, with no key in it. */
+class RemoteCallException(val failure: RemoteFailure) : java.io.IOException(failure.toString())
+
+/** The policy refused a request, so nothing was sent and nothing else was tried (AC-009). */
+class EgressDeniedException(val decision: EgressDecision.Denied) : IllegalStateException(decision.toString())
