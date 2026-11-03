@@ -116,7 +116,10 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val themeColorSettings by lazy { ThemeColorSettings(DataStoreAppearanceSettings(settingsStore)) }
 
     val timelineSettings by lazy { DataStoreTimelineSettings(settingsStore) }
-    val manageEgress by lazy { ManageEgress(RoomEgressGrantStore(database)) }
+    val manageEgress by lazy {
+        val store = RoomEgressGrantStore(database)
+        ManageEgress(store, store, KeystoreCredentials(appContext)) { UUID.randomUUID().toString() }
+    }
 
     val sharingSettings by lazy { DataStoreSharingSettings(settingsStore) }
 

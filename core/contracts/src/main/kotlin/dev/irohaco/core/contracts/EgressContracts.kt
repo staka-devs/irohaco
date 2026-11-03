@@ -11,8 +11,17 @@ enum class EgressPayload { QUERY_TEXT, IMAGE_PIXELS, VIDEO_FRAMES, VIDEO_BYTES, 
 /** One permission: this connection may get this payload for this task. No row means no (ADR-0002). */
 data class EgressGrant(val connectionId: String, val task: TaskType, val payload: EgressPayload)
 
+/** The API formats a remote connection can speak (ARCHITECTURE §9.1), with the URL each starts from. */
+enum class RemoteProtocol(val displayName: String, val defaultBaseUrl: String) {
+    OPENAI_CHAT("OpenAI Chat Completions", "https://api.openai.com/v1"),
+    OPENAI_RESPONSES("OpenAI Responses", "https://api.openai.com/v1"),
+    ANTHROPIC_MESSAGES("Anthropic Messages", "https://api.anthropic.com/v1"),
+    OPENAI_EMBEDDINGS("OpenAI Embeddings", "https://api.openai.com/v1"),
+    GEMINI_EMBED_CONTENT("Gemini embedContent", "https://generativelanguage.googleapis.com/v1beta"),
+}
+
 /** A connection to a model outside the device; the local runtime is not one. */
-data class RemoteConnection(val id: String, val protocol: String, val baseUrl: String?)
+data class RemoteConnection(val id: String, val protocol: RemoteProtocol, val baseUrl: String)
 
 sealed interface EgressDecision {
     data object Allowed : EgressDecision
@@ -38,4 +47,39 @@ interface EgressGrantStore {
     suspend fun blocked(assetIds: Set<String>): Set<String>
 
     suspend fun set(grant: EgressGrant, allowed: Boolean)
+}
+
+/** Remote connections as rows; the key itself is only ever in [CredentialStore], the row holds its reference. */
+interface ConnectionStore {
+    suspend fun add(id: String, protocol: RemoteProtocol, baseUrl: String, credentialRef: String)
+
+    /** The reference of the removed connection's key; its grants go with it. */
+    suspend fun remove(id: String): String?
+}
+
+/** Secrets encrypted with a key the Android Keystore holds, kept out of backups (API-008, PRD §10). */
+interface CredentialStore {
+    /** Stores [secret] and returns the reference the database keeps instead of it. */
+    fun save(secret: String): String
+
+    fun read(ref: String): String?
+
+    fun delete(ref: String)
+}
+
+/** Why a remote call failed, as the screens tell the user (API-008, ARCHITECTURE §9.2). */
+sealed interface RemoteFailure {
+    /** 429: too many requests for now; [retryAfterSeconds] when the server said when to try again. */
+    data class RateLimited(val retryAfterSeconds: Long?) : RemoteFailure
+
+    /** 401 and 403: the key was refused. */
+    data object Unauthorized : RemoteFailure
+
+    /** The account's usage or spending limit is reached; retrying does not help. */
+    data object QuotaExceeded : RemoteFailure
+
+    data object Timeout : RemoteFailure
+
+    /** Any other status; [message] has its secrets taken out. */
+    data class Failed(val status: Int, val message: String) : RemoteFailure
 }

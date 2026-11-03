@@ -6,6 +6,7 @@ import dev.irohaco.core.contracts.EgressGrant
 import dev.irohaco.core.contracts.EgressPayload.IMAGE_PIXELS
 import dev.irohaco.core.contracts.EgressPayload.QUERY_TEXT
 import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.TaskType.RAG
 import dev.irohaco.core.contracts.TaskType.SEARCH_QUERY
 import kotlinx.coroutines.flow.first
@@ -30,9 +31,9 @@ class RoomEgressGrantStoreTest {
     }
 
     private suspend fun remote() {
+        store.add("openai", RemoteProtocol.OPENAI_RESPONSES, "https://api.example", "ref")
         db.modelProfileDao().ensureLocalConnection() // the local runtime, which is not listed
         db.openHelper.writableDatabase.apply {
-            execSQL("INSERT INTO provider_connections VALUES ('openai', 'OPENAI_RESPONSES', 'https://api.example', 'key')")
             execSQL("INSERT INTO model_profiles VALUES ('gpt', 'openai', 'gpt-x', NULL, 'GPT')")
             execSQL("INSERT INTO model_profiles VALUES ('gpt-mini', 'openai', 'gpt-x-mini', NULL, 'GPT mini')")
         }
@@ -41,7 +42,7 @@ class RoomEgressGrantStoreTest {
     @Test
     fun `only remote connections are listed`() = runTest {
         remote()
-        assertEquals(listOf(RemoteConnection("openai", "OPENAI_RESPONSES", "https://api.example")), store.connections.first())
+        assertEquals(listOf(RemoteConnection("openai", RemoteProtocol.OPENAI_RESPONSES, "https://api.example")), store.connections.first())
     }
 
     @Test
@@ -55,5 +56,14 @@ class RoomEgressGrantStoreTest {
         assertEquals(emptySet(), store.granted("gpt", SEARCH_QUERY))
         store.set(EgressGrant("openai", RAG, IMAGE_PIXELS), false)
         assertEquals(setOf(EgressGrant("openai", RAG, QUERY_TEXT)), store.grants.first())
+    }
+
+    @Test
+    fun `removing a connection takes its grants and hands back its key's reference`() = runTest {
+        store.add("anthropic", RemoteProtocol.ANTHROPIC_MESSAGES, "https://api.example", "ref-a")
+        store.set(EgressGrant("anthropic", RAG, QUERY_TEXT), true)
+        assertEquals("ref-a", store.remove("anthropic"))
+        assertEquals(emptyList(), store.connections.first())
+        assertEquals(emptySet(), store.grants.first())
     }
 }

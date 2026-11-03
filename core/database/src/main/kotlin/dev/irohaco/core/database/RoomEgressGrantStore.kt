@@ -2,10 +2,13 @@ package dev.irohaco.core.database
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.Transaction
+import dev.irohaco.core.contracts.ConnectionStore
 import dev.irohaco.core.contracts.EgressGrant
 import dev.irohaco.core.contracts.EgressGrantStore
 import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.TaskType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -32,13 +35,31 @@ interface EgressDao {
 
     @Query("DELETE FROM egress_grants WHERE connection_id = :connectionId AND task_code = :task AND payload_type = :payload")
     suspend fun revoke(connectionId: String, task: String, payload: String)
+
+    @Query("INSERT INTO provider_connections(connection_id, protocol, base_url, credential_ref) VALUES (:id, :protocol, :baseUrl, :credentialRef)")
+    suspend fun addConnection(id: String, protocol: String, baseUrl: String, credentialRef: String)
+
+    @Query("SELECT credential_ref FROM provider_connections WHERE connection_id = :id")
+    suspend fun credentialRef(id: String): String?
+
+    @Query("DELETE FROM egress_grants WHERE connection_id = :id")
+    suspend fun revokeAll(id: String)
+
+    @Query("DELETE FROM provider_connections WHERE connection_id = :id AND protocol != 'LOCAL_LITERT'")
+    suspend fun deleteConnection(id: String)
+
+    @Transaction
+    suspend fun removeConnection(id: String): String? = credentialRef(id).also {
+        revokeAll(id)
+        deleteConnection(id)
+    }
 }
 
-class RoomEgressGrantStore(db: IrohacoDatabase, private val now: () -> Long = System::currentTimeMillis) : EgressGrantStore {
+class RoomEgressGrantStore(db: IrohacoDatabase, private val now: () -> Long = System::currentTimeMillis) : EgressGrantStore, ConnectionStore {
     private val dao = db.egressDao()
 
     override val connections: Flow<List<RemoteConnection>> =
-        dao.remoteConnections().map { rows -> rows.map { RemoteConnection(it.connectionId, it.protocol, it.baseUrl) } }
+        dao.remoteConnections().map { rows -> rows.map { RemoteConnection(it.connectionId, RemoteProtocol.valueOf(it.protocol), it.baseUrl.orEmpty()) } }
 
     override val grants: Flow<Set<EgressGrant>> = dao.grants().map { rows ->
         rows.map { EgressGrant(it.connectionId, TaskType.valueOf(it.taskCode), EgressPayload.valueOf(it.payloadType)) }.toSet()
@@ -52,4 +73,9 @@ class RoomEgressGrantStore(db: IrohacoDatabase, private val now: () -> Long = Sy
     override suspend fun set(grant: EgressGrant, allowed: Boolean) = with(grant) {
         if (allowed) dao.grant(connectionId, task.name, payload.name, now()) else dao.revoke(connectionId, task.name, payload.name)
     }
+
+    override suspend fun add(id: String, protocol: RemoteProtocol, baseUrl: String, credentialRef: String) =
+        dao.addConnection(id, protocol.name, baseUrl, credentialRef)
+
+    override suspend fun remove(id: String) = dao.removeConnection(id)
 }

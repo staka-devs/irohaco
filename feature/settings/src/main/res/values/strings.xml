@@ -126,4 +126,14 @@
     <string name="settings_remote_video_frames">Frames from videos</string>
     <string name="settings_remote_ocr_text">Text read from photos</string>
     <string name="settings_remote_user_annotations">Your memos</string>
+    <string name="settings_remote_add">Add a connection</string>
+    <string name="settings_remote_add_confirm">Add</string>
+    <string name="settings_remote_url">URL</string>
+    <string name="settings_remote_key">API key</string>
+    <string name="settings_remote_billing">Remote APIs charge for what you use. The estimates this app shows do not cap what the provider bills.</string>
+    <string name="settings_remote_http_warning">This URL is plain http, so the API key and anything sent travel unencrypted.</string>
+    <string name="settings_remote_http_accept">I accept that it is unencrypted</string>
+    <string name="settings_remote_remove">Remove the connection</string>
+    <string name="settings_remote_remove_title">Remove this connection?</string>
+    <string name="settings_remote_remove_body">Its saved API key and what it was allowed to get are removed with it.</string>
 </resources>
