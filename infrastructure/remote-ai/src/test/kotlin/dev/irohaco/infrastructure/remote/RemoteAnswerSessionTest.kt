@@ -49,15 +49,15 @@ class RemoteAnswerSessionTest {
     }
     private val baseUrl = "http://127.0.0.1:${server.address.port}/v1"
     private val jpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1, 2)
-    private var asked = emptySet<EgressPayload>()
+    private var asked = 0
 
     @After
     fun tearDown() = server.stop(0)
 
     private fun session(protocol: RemoteProtocol, streaming: Boolean = false, granted: Boolean = true, timeoutMs: Int = 5_000) =
-        RemoteAnswerSession(protocol, baseUrl, "sk-test-secret-key", "model-x", streaming, { payloads ->
-            asked = payloads
-            if (granted) EgressDecision.Allowed else EgressDecision.Denied(payloads, emptySet())
+        RemoteAnswerSession(protocol, baseUrl, "sk-test-secret-key", "model-x", streaming, {
+            asked++
+            if (granted) EgressDecision.Allowed else EgressDecision.Denied(setOf(EgressPayload.QUERY_TEXT), emptySet())
         }, timeoutMs)
 
     @Test
@@ -72,7 +72,7 @@ class RemoteAnswerSessionTest {
         val content = messages.getJSONObject(1).getJSONArray("content")
         assertTrue(content.getJSONObject(0).getJSONObject("image_url").getString("url").startsWith("data:image/jpeg;base64,/9g"))
         assertEquals("Where?", content.getJSONObject(1).getString("text"))
-        assertEquals(setOf(EgressPayload.QUERY_TEXT, EgressPayload.IMAGE_PIXELS), asked)
+        assertEquals(1, asked)
     }
 
     @Test
@@ -87,7 +87,6 @@ class RemoteAnswerSessionTest {
         assertEquals("A beach", session(RemoteProtocol.OPENAI_CHAT, streaming = true).answer("i", emptyList(), "q") { seen += it })
         assertEquals(listOf("A ", "A beach"), seen)
         assertEquals(true, requests.single().body.getBoolean("stream"))
-        assertEquals(setOf(EgressPayload.QUERY_TEXT), asked)
     }
 
     @Test

@@ -4,8 +4,13 @@ import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.AnswerModelSettings
 import dev.irohaco.core.contracts.AnswerRuntime
 import dev.irohaco.core.contracts.AnswerSession
+import dev.irohaco.core.contracts.EgressDecision
+import dev.irohaco.core.contracts.EgressDeniedException
+import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.IndexImageReader
 import dev.irohaco.core.contracts.ModelArtifact
+import dev.irohaco.core.contracts.RemoteModel
+import dev.irohaco.core.contracts.TaskType
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.CancellationException
@@ -19,10 +24,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.net.URI
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.ConcurrentHashMap
 
 /** Where a cited fact comes from (RAG-003): seen in the image, written by the user, or guessed. */
 enum class Basis { OBSERVED, USER_STATED, INFERRED }
@@ -44,6 +51,12 @@ sealed interface AskResult {
     data object NothingFound : AskResult
 
     data class Failed(val cause: Throwable) : AskResult
+
+    /**
+     * The picked model is remote and has not had a question in this run of the app: nothing is sent until
+     * the user agrees, having seen where it goes and what it carries (API-007). [agree] lets the next ask through.
+     */
+    class NeedsConsent(val model: String, val host: String, val payloads: Set<EgressPayload>, val agree: () -> Unit) : AskResult
 }
 
 /**
@@ -63,6 +76,8 @@ class AskLibrary(
     private val backend: suspend () -> AiBackend,
     val catalog: List<ModelArtifact> = ModelCatalog.ANSWER,
     private val idleMs: Long = IDLE_MS,
+    /** Remote models the user registered; a remote pick never falls back to the local one when refused or failing (AC-009). */
+    private val remote: RemoteAnswering? = null,
 ) {
     val chosen: Flow<String?> = settings.answerModel
 
@@ -82,9 +97,15 @@ class AskLibrary(
         return picked ?: catalog.firstNotNullOfOrNull { installed(it.id) }
     }
 
+    private val consented = ConcurrentHashMap.newKeySet<String>()
+
+    /** The picked model when it is a remote one that can answer. */
+    private suspend fun remoteModel(): RemoteModel? = settings.answerModel.first()?.let { remote?.model(it) }
+
     /** Loads the model in the background, so a question asked soon after does not wait for it. */
     fun warmUp() {
         scope.launch {
+            if (remoteModel() != null) return@launch // nothing to load, and nothing is sent before a question
             val path = modelPath() ?: return@launch
             try {
                 withSession(path) { }
@@ -112,11 +133,13 @@ class AskLibrary(
     ): AskResult {
         val memo = memos.filter { it.isNotBlank() }.joinToString(" / ").ifEmpty { null }
         val hit = SearchHit(item, frameMs ?: 0L.takeIf { item.kind == MediaKind.VIDEO }, setOfNotNull(Evidence.MEMO.takeIf { memo != null }), memo)
-        return ask(question, listOf(hit), context(takenAtMs, place, earlier), onText)
+        // A place name says where the user was; it leaves the device only with a grant R0 does not offer.
+        return ask(question, listOf(hit), context(takenAtMs, place.takeIf { remoteModel() == null }, earlier), onText)
     }
 
     /** [onText] gets the answer's text so far while the model writes it; [context] goes just before the question. */
     suspend fun ask(question: String, hits: List<SearchHit>, context: String = "", onText: (String) -> Unit = {}): AskResult {
+        remoteModel()?.let { return askRemote(it, question, hits, context, onText) }
         val path = modelPath() ?: return AskResult.NoModel
         val sources = hits.take(MAX_SOURCES)
         if (question.isBlank() || sources.isEmpty()) return AskResult.NothingFound
@@ -132,6 +155,33 @@ class AskLibrary(
             throw e
         } catch (e: Throwable) { // a native library that fails to load is an Error, not an Exception
             release() // the model's process may have died with it; the next question starts a new one
+            AskResult.Failed(e)
+        }
+    }
+
+    private suspend fun askRemote(model: RemoteModel, question: String, hits: List<SearchHit>, context: String, onText: (String) -> Unit): AskResult {
+        val remote = checkNotNull(remote)
+        val sources = hits.take(MAX_SOURCES)
+        if (question.isBlank() || sources.isEmpty()) return AskResult.NothingFound
+        val payloads = payloads(sources)
+        val assets = sources.map { it.item.assetId }.toSet()
+        if (model.profileId !in consented) {
+            val host = remote.connection(model)?.baseUrl?.let { runCatching { URI(it).host }.getOrNull() }.orEmpty()
+            return AskResult.NeedsConsent(model.displayName, host, payloads) { consented += model.profileId }
+        }
+        return try {
+            val decision = remote.policy.authorize(TaskType.RAG, model.profileId, payloads, assets)
+            if (decision is EgressDecision.Denied) return AskResult.Failed(EgressDeniedException(decision))
+            val pictures = withContext(io) {
+                sources.map { hit -> hit.timestampMs?.let { images.readFrame(hit.item.contentUri, it) } ?: images.read(hit.item.contentUri) }
+            }
+            val reply = remote.open(model, payloads, assets).use { session ->
+                withContext(io) { session.answer(INSTRUCTION, pictures, prompt(question, sources, context)) { onText(visibleAnswer(it)) } }
+            }
+            parseAnswer(reply, sources)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             AskResult.Failed(e)
         }
     }
@@ -201,6 +251,15 @@ OBSERVED means you can see it in the image. USER_STATED means it comes from the 
                 append(".\n")
             }
             earlier.takeLast(MAX_EARLIER).forEach { (q, a) -> append("Earlier question: ").append(q).append("\nEarlier answer: ").append(a).append('\n') }
+        }
+
+        /** What a question about [sources] carries, matching what [prompt] writes and the images sent with it. */
+        fun payloads(sources: List<SearchHit>): Set<EgressPayload> = buildSet {
+            add(EgressPayload.QUERY_TEXT)
+            if (sources.any { it.timestampMs == null }) add(EgressPayload.IMAGE_PIXELS)
+            if (sources.any { it.timestampMs != null }) add(EgressPayload.VIDEO_FRAMES)
+            if (sources.any { it.text != null && Evidence.MEMO in it.evidence }) add(EgressPayload.USER_ANNOTATIONS)
+            if (sources.any { it.text != null && Evidence.TEXT in it.evidence && Evidence.MEMO !in it.evidence }) add(EgressPayload.OCR_TEXT)
         }
 
         /** The question, one line of notes per source, and [context] before the question. */

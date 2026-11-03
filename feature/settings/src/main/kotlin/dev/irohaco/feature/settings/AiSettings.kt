@@ -30,6 +30,7 @@ import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.GpuCheck
 import dev.irohaco.core.contracts.ModelArtifact
 import dev.irohaco.core.contracts.ModelInstallState
+import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.ModelInstallState.Failed.Reason
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
@@ -55,6 +56,8 @@ internal fun AiSettings(
     gpuCheck: GpuCheck? = null,
     onSelectBackend: (AiBackend) -> Unit = {},
     answerModels: List<ModelArtifact> = emptyList(),
+    /** Remote models whose test found what answering needs; picking one sends questions out (ADR-0032). */
+    remoteAnswerModels: List<RemoteModel> = emptyList(),
     answerModel: String? = null,
     onSelectAnswerModel: (String) -> Unit = {},
 ) {
@@ -147,7 +150,7 @@ internal fun AiSettings(
             },
         ) { onSelectBackend(AiBackend.GPU) }
         BackendRow(R.string.settings_ai_backend_cpu, running == AiBackend.CPU, enabled = true, note = null) { onSelectBackend(AiBackend.CPU) }
-        if (answerModels.isNotEmpty()) {
+        if (answerModels.isNotEmpty() || remoteAnswerModels.isNotEmpty()) {
             SectionTitle(R.string.settings_ai_answer_model)
             Text(
                 stringResource(R.string.settings_ai_answer_model_hint),
@@ -165,6 +168,17 @@ internal fun AiSettings(
                         enabled = installed,
                         role = Role.RadioButton,
                         onClick = { onSelectAnswerModel(model.id) },
+                    ),
+                ) { Text(model.displayName) }
+            }
+            remoteAnswerModels.forEach { model ->
+                ListItem(
+                    supportingContent = { Text(stringResource(R.string.settings_ai_answer_model_remote)) },
+                    leadingContent = { RadioButton(selected = model.profileId == answerModel, onClick = null) },
+                    modifier = Modifier.selectable(
+                        selected = model.profileId == answerModel,
+                        role = Role.RadioButton,
+                        onClick = { onSelectAnswerModel(model.profileId) },
                     ),
                 ) { Text(model.displayName) }
             }

@@ -7,10 +7,14 @@ import dev.irohaco.core.contracts.ConnectionStore
 import dev.irohaco.core.contracts.EgressGrant
 import dev.irohaco.core.contracts.EgressGrantStore
 import dev.irohaco.core.contracts.EgressPayload
+import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteModel
+import dev.irohaco.core.contracts.RemoteModelStore
 import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.TaskType
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 @Dao
@@ -51,11 +55,59 @@ interface EgressDao {
     @Transaction
     suspend fun removeConnection(id: String): String? = credentialRef(id).also {
         revokeAll(id)
+        deleteCapabilitiesOf(id)
+        deleteProfilesOf(id)
         deleteConnection(id)
     }
+
+    @Query(
+        """SELECT p.model_profile_id AS profileId, p.connection_id AS connectionId, p.provider_model_id AS modelId,
+             p.display_name AS displayName, GROUP_CONCAT(c.capability_code) AS capabilities
+           FROM model_profiles p JOIN provider_connections pc ON pc.connection_id = p.connection_id
+           LEFT JOIN model_capabilities c ON c.model_profile_id = p.model_profile_id
+           WHERE pc.protocol != 'LOCAL_LITERT' GROUP BY p.model_profile_id ORDER BY p.display_name""",
+    )
+    fun remoteModels(): Flow<List<RemoteModelRow>>
+
+    @Query("SELECT * FROM provider_connections WHERE connection_id = :id AND protocol != 'LOCAL_LITERT'")
+    suspend fun connection(id: String): ProviderConnectionsEntity?
+
+    @Query("INSERT INTO model_profiles(model_profile_id, connection_id, provider_model_id, artifact_revision, display_name) VALUES (:id, :connectionId, :modelId, NULL, :name)")
+    suspend fun addProfile(id: String, connectionId: String, modelId: String, name: String)
+
+    @Query("INSERT INTO model_capabilities(model_profile_id, capability_code) VALUES (:id, :code)")
+    suspend fun addCapability(id: String, code: String)
+
+    @Transaction
+    suspend fun addModel(id: String, connectionId: String, modelId: String, name: String, capabilities: List<String>) {
+        addProfile(id, connectionId, modelId, name)
+        capabilities.forEach { addCapability(id, it) }
+    }
+
+    @Query("DELETE FROM model_capabilities WHERE model_profile_id = :id")
+    suspend fun deleteCapabilities(id: String)
+
+    @Query("DELETE FROM model_profiles WHERE model_profile_id = :id AND connection_id IN (SELECT connection_id FROM provider_connections WHERE protocol != 'LOCAL_LITERT')")
+    suspend fun deleteProfile(id: String)
+
+    @Transaction
+    suspend fun removeModel(id: String) {
+        deleteCapabilities(id)
+        deleteProfile(id)
+    }
+
+    @Query("DELETE FROM model_capabilities WHERE model_profile_id IN (SELECT model_profile_id FROM model_profiles WHERE connection_id = :id)")
+    suspend fun deleteCapabilitiesOf(id: String)
+
+    @Query("DELETE FROM model_profiles WHERE connection_id = :id")
+    suspend fun deleteProfilesOf(id: String)
 }
 
-class RoomEgressGrantStore(db: IrohacoDatabase, private val now: () -> Long = System::currentTimeMillis) : EgressGrantStore, ConnectionStore {
+data class RemoteModelRow(val profileId: String, val connectionId: String, val modelId: String, val displayName: String, val capabilities: String?) {
+    fun toModel() = RemoteModel(profileId, connectionId, modelId, displayName, capabilities.orEmpty().split(',').filter { it.isNotEmpty() }.map(ModelCapability::valueOf).toSet())
+}
+
+class RoomEgressGrantStore(db: IrohacoDatabase, private val now: () -> Long = System::currentTimeMillis) : EgressGrantStore, ConnectionStore, RemoteModelStore {
     private val dao = db.egressDao()
 
     override val connections: Flow<List<RemoteConnection>> =
@@ -78,4 +130,16 @@ class RoomEgressGrantStore(db: IrohacoDatabase, private val now: () -> Long = Sy
         dao.addConnection(id, protocol.name, baseUrl, credentialRef)
 
     override suspend fun remove(id: String) = dao.removeConnection(id)
+
+    override val models: Flow<List<RemoteModel>> = dao.remoteModels().map { rows -> rows.map { it.toModel() } }
+
+    override suspend fun model(profileId: String) = models.first().firstOrNull { it.profileId == profileId }
+
+    override suspend fun connection(id: String) = dao.connection(id)?.let { RemoteConnection(it.connectionId, RemoteProtocol.valueOf(it.protocol), it.baseUrl.orEmpty()) }
+
+    override suspend fun credentialRef(connectionId: String) = dao.credentialRef(connectionId)
+
+    override suspend fun addModel(model: RemoteModel) = with(model) { dao.addModel(profileId, connectionId, modelId, displayName, capabilities.map { it.name }) }
+
+    override suspend fun removeModel(profileId: String) = dao.removeModel(profileId)
 }

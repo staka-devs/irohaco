@@ -5,7 +5,9 @@ import androidx.test.core.app.ApplicationProvider
 import dev.irohaco.core.contracts.EgressGrant
 import dev.irohaco.core.contracts.EgressPayload.IMAGE_PIXELS
 import dev.irohaco.core.contracts.EgressPayload.QUERY_TEXT
+import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.TaskType.RAG
 import dev.irohaco.core.contracts.TaskType.SEARCH_QUERY
@@ -65,5 +67,24 @@ class RoomEgressGrantStoreTest {
         assertEquals("ref-a", store.remove("anthropic"))
         assertEquals(emptyList(), store.connections.first())
         assertEquals(emptySet(), store.grants.first())
+    }
+
+    @Test
+    fun `a remote model keeps its tested capabilities and goes with its connection`() = runTest {
+        store.add("anthropic", RemoteProtocol.ANTHROPIC_MESSAGES, "https://api.example", "ref-a")
+        val claude = RemoteModel("p1", "anthropic", "claude-x", "Claude", setOf(ModelCapability.INPUT_TEXT, ModelCapability.INPUT_IMAGE, ModelCapability.OUTPUT_TEXT))
+        store.addModel(claude)
+        assertEquals(listOf(claude), store.models.first())
+        assertEquals(claude, store.model("p1"))
+        assertEquals("ref-a", store.remove("anthropic"))
+        assertEquals(emptyList(), store.models.first())
+    }
+
+    @Test
+    fun `a removed model leaves its connection`() = runTest {
+        remote()
+        store.addModel(RemoteModel("p2", "openai", "gpt-y", "GPT y", setOf(ModelCapability.OUTPUT_TEXT)))
+        store.removeModel("p2")
+        assertEquals(listOf("gpt", "gpt-mini"), store.models.first().map { it.profileId }.sorted())
     }
 }

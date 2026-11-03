@@ -80,6 +80,9 @@ sealed interface RemoteFailure {
 
     data object Timeout : RemoteFailure
 
+    /** No answer at all: no network, an unknown host, a refused connection. */
+    data object Unreachable : RemoteFailure
+
     /** Any other status; [message] has its secrets taken out. */
     data class Failed(val status: Int, val message: String) : RemoteFailure
 }
@@ -89,3 +92,40 @@ class RemoteCallException(val failure: RemoteFailure) : java.io.IOException(fail
 
 /** The policy refused a request, so nothing was sent and nothing else was tried (AC-009). */
 class EgressDeniedException(val decision: EgressDecision.Denied) : IllegalStateException(decision.toString())
+
+/** What a model was found to do in its connection test; only these are stored (ADR-0032). */
+enum class ModelCapability { INPUT_TEXT, INPUT_IMAGE, INPUT_VIDEO, OUTPUT_TEXT, OUTPUT_EMBEDDING, STREAMING }
+
+/** A model registered on a remote connection, with the capabilities its test confirmed. */
+data class RemoteModel(
+    val profileId: String,
+    val connectionId: String,
+    val modelId: String,
+    val displayName: String,
+    val capabilities: Set<ModelCapability>,
+)
+
+interface RemoteModelStore {
+    val models: Flow<List<RemoteModel>>
+
+    suspend fun model(profileId: String): RemoteModel?
+
+    suspend fun connection(id: String): RemoteConnection?
+
+    suspend fun credentialRef(connectionId: String): String?
+
+    suspend fun addModel(model: RemoteModel)
+
+    suspend fun removeModel(profileId: String)
+}
+
+/** Sends the app's sample text and image to a model to see what it can do; the user starts it (ADR-0032). */
+fun interface CapabilityProbe {
+    /** Throws [RemoteCallException] when not even a text answer comes back. */
+    suspend fun probe(connection: RemoteConnection, apiKey: String, modelId: String): Set<ModelCapability>
+}
+
+/** Opens a remote model as an [AnswerSession]; [authorize] runs before each request and can stop it. */
+fun interface RemoteSessions {
+    fun open(connection: RemoteConnection, apiKey: String, model: RemoteModel, authorize: suspend () -> EgressDecision): AnswerSession
+}

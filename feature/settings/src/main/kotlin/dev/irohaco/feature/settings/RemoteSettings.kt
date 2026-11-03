@@ -14,6 +14,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -35,12 +36,17 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import dev.irohaco.core.application.ManageEgress
+import dev.irohaco.core.application.RemoteAnswering
 import dev.irohaco.core.application.ManageEgress.UrlKind
 import dev.irohaco.core.contracts.EgressGrant
 import dev.irohaco.core.contracts.EgressPayload
+import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.TaskType
+import dev.irohaco.core.designsystem.component.label
+import dev.irohaco.core.designsystem.component.remoteFailureText
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
@@ -57,9 +63,25 @@ internal fun RemoteSettings(
     onSet: (EgressGrant, Boolean) -> Unit,
     onAdd: (RemoteProtocol, String, String) -> Unit = { _, _, _ -> },
     onRemove: (String) -> Unit = {},
+    models: List<RemoteModel> = emptyList(),
+    onAddModel: (connectionId: String, modelId: String, name: String) -> Unit = { _, _, _ -> },
+    onRemoveModel: (String) -> Unit = {},
+    modelTest: SettingsViewModel.ModelTest? = null,
+    onDismissModelTest: () -> Unit = {},
 ) {
     var adding by rememberSaveable { mutableStateOf(false) }
     var removing by remember { mutableStateOf<RemoteConnection?>(null) }
+    var addingModelTo by rememberSaveable { mutableStateOf<String?>(null) }
+    addingModelTo?.let { connectionId ->
+        AddModelDialog(
+            test = modelTest,
+            onDismiss = {
+                addingModelTo = null
+                onDismissModelTest()
+            },
+            onTest = { modelId, name -> onAddModel(connectionId, modelId, name) },
+        )
+    }
     if (adding) AddConnectionDialog(onDismiss = { adding = false }) { protocol, url, key -> adding = false; onAdd(protocol, url, key) }
     removing?.let { connection ->
         AlertDialog(
@@ -88,6 +110,20 @@ internal fun RemoteSettings(
                 }
             },
         ) { Text(connection.protocol.displayName, style = MaterialTheme.typography.titleMedium) }
+        models.filter { it.connectionId == connection.id }.forEach { model ->
+            ListItem(
+                supportingContent = { Text(capabilitiesText(model.capabilities)) },
+                trailingContent = {
+                    IconButton(onClick = { onRemoveModel(model.profileId) }) {
+                        Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.settings_remote_model_remove))
+                    }
+                },
+            ) { Text(model.displayName) }
+        }
+        ListItem(
+            leadingContent = { Icon(painterResource(IrohacoIcons.Add), contentDescription = null) },
+            modifier = Modifier.selectable(selected = false, role = Role.Button) { addingModelTo = connection.id },
+        ) { Text(stringResource(R.string.settings_remote_model_add)) }
         ManageEgress.offered.forEach { (task, payloads) ->
             Text(
                 stringResource(TASK_LABELS.getValue(task)),
@@ -100,7 +136,7 @@ internal fun RemoteSettings(
                 ListItem(
                     trailingContent = { Switch(checked = on, onCheckedChange = null) },
                     modifier = Modifier.toggleable(on, role = Role.Switch) { onSet(grant, it) },
-                ) { Text(stringResource(PAYLOAD_LABELS.getValue(payload))) }
+                ) { Text(stringResource(payload.label())) }
             }
         }
     }
@@ -108,6 +144,80 @@ internal fun RemoteSettings(
         leadingContent = { Icon(painterResource(IrohacoIcons.Add), contentDescription = null) },
         modifier = Modifier.selectable(selected = false, role = Role.Button) { adding = true },
     ) { Text(stringResource(R.string.settings_remote_add)) }
+}
+
+/** What the connection test found, in a line. */
+@Composable
+private fun capabilitiesText(capabilities: Set<ModelCapability>) = listOfNotNull(
+    stringResource(R.string.settings_remote_cap_image).takeIf { ModelCapability.INPUT_IMAGE in capabilities },
+    stringResource(R.string.settings_remote_cap_streaming).takeIf { ModelCapability.STREAMING in capabilities },
+).ifEmpty { listOf(stringResource(R.string.settings_remote_cap_text_only)) }.joinToString(" · ")
+
+/**
+ * A model ID and a name; adding runs the connection test, which sends the app's sample text and image
+ * to the model, never the user's photos (ADR-0032), and keeps only what it confirmed.
+ */
+@Composable
+private fun AddModelDialog(test: SettingsViewModel.ModelTest?, onDismiss: () -> Unit, onTest: (modelId: String, name: String) -> Unit) {
+    var modelId by rememberSaveable { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }
+    val running = test is SettingsViewModel.ModelTest.Running
+    val editable = test == null || test is SettingsViewModel.ModelTest.Failed
+    AlertDialog(
+        onDismissRequest = { if (!running) onDismiss() },
+        title = { Text(stringResource(R.string.settings_remote_model_add)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+                OutlinedTextField(
+                    value = modelId,
+                    onValueChange = { modelId = it },
+                    label = { Text(stringResource(R.string.settings_remote_model_id)) },
+                    singleLine = true,
+                    enabled = editable,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.settings_remote_model_name)) },
+                    singleLine = true,
+                    enabled = editable,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                when (test) {
+                    null -> Text(stringResource(R.string.settings_remote_model_test_hint), style = MaterialTheme.typography.bodySmall)
+                    SettingsViewModel.ModelTest.Running -> {
+                        Text(stringResource(R.string.settings_remote_model_testing), style = MaterialTheme.typography.bodySmall)
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                    }
+                    is SettingsViewModel.ModelTest.Added -> {
+                        Text(stringResource(R.string.settings_remote_model_added, capabilitiesText(test.capabilities)))
+                        if (!test.capabilities.containsAll(RemoteAnswering.NEEDED)) {
+                            Text(stringResource(R.string.settings_remote_model_cannot_answer), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    is SettingsViewModel.ModelTest.Failed -> Text(
+                        remoteFailureText(test.cause) ?: stringResource(R.string.settings_remote_model_test_failed),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (test is SettingsViewModel.ModelTest.Added) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_remote_model_done)) }
+            } else {
+                TextButton(enabled = modelId.isNotBlank() && !running, onClick = { onTest(modelId, name) }) {
+                    Text(stringResource(R.string.settings_remote_model_test))
+                }
+            }
+        },
+        dismissButton = {
+            if (test !is SettingsViewModel.ModelTest.Added) {
+                TextButton(enabled = !running, onClick = onDismiss) { Text(stringResource(R.string.settings_ai_cancel)) }
+            }
+        },
+    )
 }
 
 /** The format, URL and key of a new connection; plain http is added only once the user accepts it is unencrypted (PRD §10). */
@@ -180,13 +290,6 @@ private val TASK_LABELS = mapOf(
     TaskType.RAG to R.string.settings_remote_task_rag,
 )
 
-private val PAYLOAD_LABELS = mapOf(
-    EgressPayload.QUERY_TEXT to R.string.settings_remote_query_text,
-    EgressPayload.IMAGE_PIXELS to R.string.settings_remote_image_pixels,
-    EgressPayload.VIDEO_FRAMES to R.string.settings_remote_video_frames,
-    EgressPayload.OCR_TEXT to R.string.settings_remote_ocr_text,
-    EgressPayload.USER_ANNOTATIONS to R.string.settings_remote_user_annotations,
-)
 
 @IrohacoPreviews
 @Composable
@@ -198,6 +301,7 @@ private fun RemoteSettingsPreview() {
                     listOf(RemoteConnection("openai", RemoteProtocol.OPENAI_RESPONSES, "https://api.example.com/v1")),
                     setOf(EgressGrant("openai", TaskType.RAG, EgressPayload.QUERY_TEXT)),
                     { _, _ -> },
+                    models = listOf(RemoteModel("p", "openai", "model-x", "Model X", RemoteAnswering.NEEDED + ModelCapability.STREAMING)),
                 )
             }
         }

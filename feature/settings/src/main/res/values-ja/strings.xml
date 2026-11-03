@@ -119,11 +119,6 @@
     <string name="settings_remote_task_image_index">写真の索引</string>
     <string name="settings_remote_task_video_index">動画の索引</string>
     <string name="settings_remote_task_rag">AI への質問</string>
-    <string name="settings_remote_query_text">入力した言葉</string>
-    <string name="settings_remote_image_pixels">写真（位置情報は除く）</string>
-    <string name="settings_remote_video_frames">動画のフレーム</string>
-    <string name="settings_remote_ocr_text">写真から読んだ文字</string>
-    <string name="settings_remote_user_annotations">メモ</string>
     <string name="settings_remote_add">接続先を追加</string>
     <string name="settings_remote_add_confirm">追加</string>
     <string name="settings_remote_url">URL</string>
@@ -134,4 +129,19 @@
     <string name="settings_remote_remove">接続先を削除</string>
     <string name="settings_remote_remove_title">この接続先を削除しますか？</string>
     <string name="settings_remote_remove_body">保存した API キーと、この接続先への送信の許可も消えます。</string>
+    <string name="settings_remote_model_add">モデルを追加</string>
+    <string name="settings_remote_model_remove">モデルを削除</string>
+    <string name="settings_remote_model_id">モデル ID</string>
+    <string name="settings_remote_model_name">表示する名前（省略可）</string>
+    <string name="settings_remote_model_test">テストして追加</string>
+    <string name="settings_remote_model_test_hint">テストでは、アプリが持つサンプルの文と画像をモデルに送ります。あなたの写真は送りません。</string>
+    <string name="settings_remote_model_testing">モデルをテストしています…</string>
+    <string name="settings_remote_model_added">追加しました。できること: %1$s</string>
+    <string name="settings_remote_model_cannot_answer">画像を読めないので、写真についての質問には使えません。</string>
+    <string name="settings_remote_model_test_failed">テストに失敗しました。モデル ID を確かめてください。</string>
+    <string name="settings_remote_model_done">閉じる</string>
+    <string name="settings_remote_cap_image">画像を読める</string>
+    <string name="settings_remote_cap_streaming">書きながら答える</string>
+    <string name="settings_remote_cap_text_only">文だけ</string>
+    <string name="settings_ai_answer_model_remote">外部のモデル：質問と写真を端末の外へ送ります</string>
 </resources>

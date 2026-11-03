@@ -1,5 +1,6 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.contracts.CapabilityProbe
 import dev.irohaco.core.contracts.ConnectionStore
 import dev.irohaco.core.contracts.CredentialStore
 import dev.irohaco.core.contracts.EgressDecision
@@ -7,7 +8,10 @@ import dev.irohaco.core.contracts.EgressGrant
 import dev.irohaco.core.contracts.EgressGrantStore
 import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.EgressPolicy
+import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteModel
+import dev.irohaco.core.contracts.RemoteModelStore
 import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.TaskType
 import kotlinx.coroutines.flow.Flow
@@ -35,6 +39,8 @@ class ManageEgress(
     private val connectionStore: ConnectionStore,
     private val credentials: CredentialStore,
     private val newId: () -> String,
+    private val modelStore: RemoteModelStore,
+    private val probe: CapabilityProbe,
 ) {
     fun connections(): Flow<List<RemoteConnection>> = store.connections
 
@@ -58,6 +64,23 @@ class ManageEgress(
     suspend fun remove(id: String) {
         connectionStore.remove(id)?.let(credentials::delete)
     }
+
+    fun models(): Flow<List<RemoteModel>> = modelStore.models
+
+    /**
+     * Runs the connection test on [modelId] and keeps the model with what the test confirmed (ADR-0032).
+     * The test failing throws, and nothing is kept.
+     */
+    suspend fun addModel(connectionId: String, modelId: String, displayName: String): Set<ModelCapability> {
+        require(modelId.isNotBlank()) { "No model ID" }
+        val connection = checkNotNull(modelStore.connection(connectionId)) { "No such connection" }
+        val key = checkNotNull(modelStore.credentialRef(connectionId)?.let(credentials::read)) { "The API key is gone" }
+        val found = probe.probe(connection, key, modelId.trim())
+        modelStore.addModel(RemoteModel(newId(), connectionId, modelId.trim(), displayName.trim().ifEmpty { modelId.trim() }, found))
+        return found
+    }
+
+    suspend fun removeModel(profileId: String) = modelStore.removeModel(profileId)
 
     enum class UrlKind { HTTPS, PLAIN_HTTP, INVALID }
 

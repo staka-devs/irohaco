@@ -4,11 +4,26 @@ import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.AnswerModelSettings
 import dev.irohaco.core.contracts.AnswerRuntime
 import dev.irohaco.core.contracts.AnswerSession
+import dev.irohaco.core.contracts.CredentialStore
+import dev.irohaco.core.contracts.EgressDecision
+import dev.irohaco.core.contracts.EgressDeniedException
+import dev.irohaco.core.contracts.EgressPayload
+import dev.irohaco.core.contracts.EgressPolicy
+import dev.irohaco.core.contracts.ModelCapability
+import dev.irohaco.core.contracts.RemoteCallException
+import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteFailure
+import dev.irohaco.core.contracts.RemoteModel
+import dev.irohaco.core.contracts.RemoteModelStore
+import dev.irohaco.core.contracts.RemoteProtocol
+import dev.irohaco.core.contracts.RemoteSessions
+import dev.irohaco.core.contracts.TaskType
 import dev.irohaco.core.contracts.IndexImageReader
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -62,6 +77,45 @@ class AskLibraryTest {
         }
     }
 
+    private val claude = RemoteModel("claude", "anthropic", "claude-x", "Claude", RemoteAnswering.NEEDED + ModelCapability.STREAMING)
+    private var granted = true
+    private var remoteFails = false
+    private val policyAsked = mutableListOf<Set<EgressPayload>>()
+    private val remoteAsked = mutableListOf<String>()
+    private val remote = RemoteAnswering(
+        object : RemoteModelStore {
+            override val models = flowOf(listOf(claude))
+            override suspend fun model(profileId: String) = claude.takeIf { it.profileId == profileId }
+            override suspend fun connection(id: String) = RemoteConnection(id, RemoteProtocol.ANTHROPIC_MESSAGES, "https://api.anthropic.com/v1")
+            override suspend fun credentialRef(connectionId: String) = "ref"
+            override suspend fun addModel(model: RemoteModel) = Unit
+            override suspend fun removeModel(profileId: String) = Unit
+        },
+        object : CredentialStore {
+            override fun save(secret: String) = "ref"
+            override fun read(ref: String) = "key"
+            override fun delete(ref: String) = Unit
+        },
+        RemoteSessions { _, _, _, authorize ->
+            object : AnswerSession {
+                override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, onText: (String) -> Unit): String {
+                    check(authorize() == EgressDecision.Allowed)
+                    if (remoteFails) throw RemoteCallException(RemoteFailure.RateLimited(30))
+                    remoteAsked += question
+                    return reply
+                }
+                override suspend fun warm() = Unit
+                override fun close() = Unit
+            }
+        },
+        object : EgressPolicy {
+            override suspend fun authorize(task: TaskType, profileId: String, payloads: Set<EgressPayload>, assetIds: Set<String>): EgressDecision {
+                policyAsked += payloads
+                return if (granted) EgressDecision.Allowed else EgressDecision.Denied(payloads, emptySet())
+            }
+        },
+    )
+
     private fun TestScope.ask(installed: Set<String>) = AskLibrary(
         installed = { id -> "/models/$id".takeIf { id in installed } },
         settings = settings,
@@ -70,6 +124,7 @@ class AskLibraryTest {
         io = StandardTestDispatcher(testScheduler),
         scope = backgroundScope,
         backend = { AiBackend.CPU },
+        remote = remote,
     )
 
     @Test
@@ -172,5 +227,48 @@ class AskLibraryTest {
         assertEquals(Basis.INFERRED, answer.citations.single().basis)
         assertEquals(listOf("content://p"), read)
         assertTrue("was taken" !in asked.single().second)
+    }
+
+    @Test
+    fun `a remote model asks first, then gets exactly what the question carries`() = runTest {
+        reply = "ANSWER: Her birthday [2].\nKNOWN: yes\nSOURCES: 2=USER_STATED"
+        val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id))
+        library.choose("claude")
+        val consent = assertIs<AskResult.NeedsConsent>(library.ask("Whose birthday?", listOf(photo, memo, scene)))
+        assertEquals("api.anthropic.com", consent.host)
+        assertEquals(setOf(EgressPayload.QUERY_TEXT, EgressPayload.IMAGE_PIXELS, EgressPayload.VIDEO_FRAMES, EgressPayload.USER_ANNOTATIONS), consent.payloads)
+        assertTrue(read.isEmpty() && remoteAsked.isEmpty()) // nothing read, nothing sent before the user agrees
+        consent.agree()
+        assertIs<AskResult.Answered>(library.ask("Whose birthday?", listOf(photo, memo, scene)))
+        assertEquals(1, remoteAsked.size)
+        assertEquals(0, loads) // the local model was never loaded
+        // The policy saw the same payloads before the photos were read, and again before the request.
+        assertEquals(List(2) { consent.payloads }, policyAsked)
+    }
+
+    @Test
+    fun `a refused or failing remote model says why and never falls back to the local one`() = runTest {
+        val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id))
+        library.choose("claude")
+        assertIs<AskResult.NeedsConsent>(library.ask("Where?", listOf(photo))).agree()
+        granted = false
+        val denied = assertIs<AskResult.Failed>(library.ask("Where?", listOf(photo)))
+        assertIs<EgressDeniedException>(denied.cause)
+        assertTrue(read.isEmpty())
+        granted = true
+        remoteFails = true
+        val failed = assertIs<AskResult.Failed>(library.ask("Where?", listOf(photo)))
+        assertEquals(RemoteFailure.RateLimited(30), (failed.cause as RemoteCallException).failure)
+        assertEquals(0, loads)
+    }
+
+    @Test
+    fun `a remote model is not told where a photo was taken`() = runTest {
+        reply = "ANSWER: A pier [1].\nKNOWN: yes\nSOURCES: 1=OBSERVED"
+        val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id))
+        library.choose("claude")
+        assertIs<AskResult.NeedsConsent>(library.askAbout("Where?", photo.item, null, emptyList(), 0, "Hakodate", emptyList())).agree()
+        library.askAbout("Where?", photo.item, null, emptyList(), 0, "Hakodate", emptyList())
+        assertTrue("Hakodate" !in remoteAsked.single())
     }
 }

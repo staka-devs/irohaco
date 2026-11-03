@@ -42,7 +42,7 @@ class AskViewModel(private val chat: ChatWithLibrary) : ViewModel() {
     fun ask(question: String) {
         if (question.isBlank()) return
         // A failed turn is asked again rather than kept.
-        val kept = _turns.value.filterNot { it.answer is AskResult.Failed }
+        val kept = _turns.value.filterNot { it.answer is AskResult.Failed || it.answer is AskResult.NeedsConsent }
         val earlier = kept.mapNotNull { turn -> (turn.answer as? AskResult.Answered)?.let { ChatWithLibrary.Turn(turn.question, it) } }
         _turns.value = kept + AskTurn(question.trim())
         asking?.cancel()
