@@ -61,9 +61,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.irohaco.core.application.ManageEgress
+import dev.irohaco.core.contracts.EgressGrant
+import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.ModelInstallState
+import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.ShareLocationPolicy
+import dev.irohaco.core.contracts.TaskType
 import dev.irohaco.core.designsystem.component.ThemeSwatch
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
@@ -103,6 +108,8 @@ fun SettingsScreen(
     val needsRebuild by viewModel.needsRebuild.collectAsStateWithLifecycle()
     val preparing by viewModel.preparing.collectAsStateWithLifecycle()
     val startFailed by viewModel.startFailed.collectAsStateWithLifecycle()
+    val remoteConnections by viewModel.remoteConnections.collectAsStateWithLifecycle()
+    val egressGrants by viewModel.egressGrants.collectAsStateWithLifecycle()
     val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { viewModel.importModel(it.toString()) } }
     SettingsContent(
@@ -154,7 +161,10 @@ fun SettingsScreen(
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast, locationPin, viewModel::setLocationPin) },
         library = { LibrarySettings(excludedFolders, viewModel::showFolder) },
-        privacy = { PrivacySettings(shareLocationPolicy, viewModel::selectShareLocationPolicy, mapAllowed, viewModel::setMapAllowed, onOpenLocationHistory) },
+        privacy = {
+            PrivacySettings(shareLocationPolicy, viewModel::selectShareLocationPolicy, mapAllowed, viewModel::setMapAllowed, onOpenLocationHistory)
+            RemoteSettings(remoteConnections, egressGrants, viewModel::setEgress)
+        },
     )
 }
 
@@ -462,6 +472,60 @@ internal fun PrivacySettings(
     ) { Text(stringResource(R.string.settings_location_history_open)) }
 }
 
+/** Each remote connection, and per task each kind of content it may get; all off at first (API-007, ADR-0002). */
+@Composable
+internal fun RemoteSettings(connections: List<RemoteConnection>, grants: Set<EgressGrant>, onSet: (EgressGrant, Boolean) -> Unit) {
+    SectionTitle(R.string.settings_remote)
+    if (connections.isEmpty()) {
+        ListItem { Text(stringResource(R.string.settings_remote_none)) }
+        return
+    }
+    ListItem { Text(stringResource(R.string.settings_remote_hint), style = MaterialTheme.typography.bodyMedium) }
+    connections.forEach { connection ->
+        ListItem(supportingContent = connection.baseUrl?.let { url -> { Text(url) } }) {
+            Text(PROTOCOL_NAMES[connection.protocol] ?: connection.protocol, style = MaterialTheme.typography.titleMedium)
+        }
+        ManageEgress.offered.forEach { (task, payloads) ->
+            Text(
+                stringResource(TASK_LABELS.getValue(task)),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(start = IrohacoSpacing.l, top = IrohacoSpacing.s),
+            )
+            payloads.forEach { payload ->
+                val grant = EgressGrant(connection.id, task, payload)
+                val on = grant in grants
+                ListItem(
+                    trailingContent = { Switch(checked = on, onCheckedChange = null) },
+                    modifier = Modifier.toggleable(on, role = Role.Switch) { onSet(grant, it) },
+                ) { Text(stringResource(PAYLOAD_LABELS.getValue(payload))) }
+            }
+        }
+    }
+}
+
+private val PROTOCOL_NAMES = mapOf(
+    "OPENAI_CHAT" to "OpenAI Chat Completions",
+    "OPENAI_RESPONSES" to "OpenAI Responses",
+    "ANTHROPIC_MESSAGES" to "Anthropic Messages",
+    "OPENAI_EMBEDDINGS" to "OpenAI Embeddings",
+    "GEMINI_EMBED_CONTENT" to "Gemini embedContent",
+)
+
+private val TASK_LABELS = mapOf(
+    TaskType.SEARCH_QUERY to R.string.settings_remote_task_search,
+    TaskType.IMAGE_INDEX to R.string.settings_remote_task_image_index,
+    TaskType.VIDEO_INDEX to R.string.settings_remote_task_video_index,
+    TaskType.RAG to R.string.settings_remote_task_rag,
+)
+
+private val PAYLOAD_LABELS = mapOf(
+    EgressPayload.QUERY_TEXT to R.string.settings_remote_query_text,
+    EgressPayload.IMAGE_PIXELS to R.string.settings_remote_image_pixels,
+    EgressPayload.VIDEO_FRAMES to R.string.settings_remote_video_frames,
+    EgressPayload.OCR_TEXT to R.string.settings_remote_ocr_text,
+    EgressPayload.USER_ANNOTATIONS to R.string.settings_remote_user_annotations,
+)
+
 @Composable
 internal fun SectionTitle(text: Int) {
     Text(
@@ -509,6 +573,29 @@ private fun SettingsLibraryPreview() {
 private fun SettingsPrivacyPreview() {
     IrohacoTheme(dynamicColor = false) {
         Surface { Column { PrivacySettings(ShareLocationPolicy.STRIP, {}, mapAllowed = true, {}) } }
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun SettingsRemotePreview() {
+    IrohacoTheme(dynamicColor = false) {
+        Surface {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                RemoteSettings(
+                    listOf(RemoteConnection("openai", "OPENAI_RESPONSES", "https://api.example.com/v1")),
+                    setOf(EgressGrant("openai", TaskType.RAG, EgressPayload.QUERY_TEXT)),
+                ) { _, _ -> }
+            }
+        }
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun SettingsRemoteNonePreview() {
+    IrohacoTheme(dynamicColor = false) {
+        Surface { Column { RemoteSettings(emptyList(), emptySet()) { _, _ -> } } }
     }
 }
 

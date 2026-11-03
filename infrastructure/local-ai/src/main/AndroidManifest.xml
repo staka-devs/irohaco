@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <!-- ML Kit queues usage logs for Google's Clearcut; without its backend nothing can send them (ADR-0002, #50). -->
+        <service android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery">
+            <meta-data
+                android:name="backend:com.google.android.datatransport.cct.CctBackendFactory"
+                tools:node="remove" />
+        </service>
+    </application>
+</manifest>

@@ -112,4 +112,16 @@
     <string name="settings_location_history">位置情報の履歴</string>
     <string name="settings_location_history_open">Google マップのタイムラインから場所を付ける</string>
     <string name="settings_location_history_summary">書き出した Timeline.json を、端末の中だけで読みます</string>
+    <string name="settings_remote">外部のモデルへの送信</string>
+    <string name="settings_remote_none">外部のモデルの接続先はありません。写真と動画、メモは端末の外へ送りません。</string>
+    <string name="settings_remote_hint">ここでオンにするまで送りません。送れなかったときに、ほかのモデルへ切り替えることもありません。</string>
+    <string name="settings_remote_task_search">検索</string>
+    <string name="settings_remote_task_image_index">写真の索引</string>
+    <string name="settings_remote_task_video_index">動画の索引</string>
+    <string name="settings_remote_task_rag">AI への質問</string>
+    <string name="settings_remote_query_text">入力した言葉</string>
+    <string name="settings_remote_image_pixels">写真（位置情報は除く）</string>
+    <string name="settings_remote_video_frames">動画のフレーム</string>
+    <string name="settings_remote_ocr_text">写真から読んだ文字</string>
+    <string name="settings_remote_user_annotations">メモ</string>
 </resources>
