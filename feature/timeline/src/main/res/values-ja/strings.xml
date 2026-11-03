@@ -298,7 +298,7 @@
     <string name="search_ask_nothing">答えに使える写真がありません。</string>
     <string name="search_ask_failed">答えを作れませんでした。</string>
     <string name="search_ask_retry">もう一度</string>
-    <string name="search_ask_caution">端末の AI が上位の写真と場面だけを見て答えています。間違うことがあります。</string>
+    <string name="search_ask_caution">%1$s が上位の写真と場面だけを見て答えています。間違うことがあります。</string>
     <string name="search_basis_observed">写っている</string>
     <string name="search_basis_user_stated">メモにある</string>
     <string name="search_basis_inferred">推測</string>
@@ -308,7 +308,7 @@
     <string name="viewer_ask_hint_video">この場面について質問</string>
     <string name="viewer_ask_send">聞く</string>
     <string name="viewer_asking">この写真や場面を見て答えを作っています</string>
-    <string name="viewer_ask_caution">端末の AI がこの写真や場面だけを見て答えています。間違うことがあります。</string>
+    <string name="viewer_ask_caution">%1$s がこの写真や場面だけを見て答えています。間違うことがあります。</string>
     <string name="ask_title">AI に聞く</string>
     <string name="ask_hint">写真について質問（例: 去年の夏はどこに行った？）</string>
     <string name="history_title">位置情報の履歴</string>
@@ -352,4 +352,5 @@
     <string name="timeline_place">場所を付ける</string>
     <string name="search_ask_consent">この質問は %1$s（%2$s）へ送ります。送るもの: %3$s。</string>
     <string name="search_ask_consent_send">送って聞く</string>
+    <string name="ask_on_device_ai">端末の AI</string>
 </resources>

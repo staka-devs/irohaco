@@ -302,7 +302,7 @@
     <string name="search_ask_nothing">There are no photos to answer from.</string>
     <string name="search_ask_failed">The answer could not be made.</string>
     <string name="search_ask_retry">Try again</string>
-    <string name="search_ask_caution">The AI on this device answered from the top photos and scenes only. It can be wrong.</string>
+    <string name="search_ask_caution">%1$s answered from the top photos and scenes only. It can be wrong.</string>
     <string name="search_basis_observed">Seen in it</string>
     <string name="search_basis_user_stated">In your memo</string>
     <string name="search_basis_inferred">Guessed</string>
@@ -313,7 +313,7 @@
     <string name="viewer_ask_hint_video">Ask about this scene</string>
     <string name="viewer_ask_send">Ask</string>
     <string name="viewer_asking">Looking at this photo or scene</string>
-    <string name="viewer_ask_caution">The AI on this device answered from this photo or scene only. It can be wrong.</string>
+    <string name="viewer_ask_caution">%1$s answered from this photo or scene only. It can be wrong.</string>
     <string name="ask_title">Ask AI</string>
     <string name="ask_hint">Ask about your photos, e.g. Where did I go last summer?</string>
     <string name="history_title">Location history</string>
@@ -362,4 +362,5 @@
     <string name="timeline_place">Add places</string>
     <string name="search_ask_consent">This question goes to %1$s (%2$s), with: %3$s.</string>
     <string name="search_ask_consent_send">Send and ask</string>
+    <string name="ask_on_device_ai">The AI on this device</string>
 </resources>
