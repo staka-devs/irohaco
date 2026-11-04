@@ -266,7 +266,7 @@ private fun JobProgress(
             IndexJobState.PAUSED, IndexJobState.FAILED -> Button(onClick = { onResume(indexing.jobId) }) { Text(stringResource(R.string.settings_index_resume)) }
             else -> Unit
         }
-        if (p.state in ACTIVE) OutlinedButton(onClick = { onCancel(indexing.jobId) }) { Text(stringResource(R.string.settings_ai_cancel)) }
+        if (p.state in ACTIVE) OutlinedButton(onClick = { onCancel(indexing.jobId) }) { Text(stringResource(R.string.settings_index_stop)) }
     }
     if (indexing.failedNames.isNotEmpty()) {
         Text(stringResource(R.string.settings_index_failed_list), style = MaterialTheme.typography.titleSmall)

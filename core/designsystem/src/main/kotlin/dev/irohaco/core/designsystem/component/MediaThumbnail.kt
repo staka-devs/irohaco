@@ -1,5 +1,6 @@
 package dev.irohaco.core.designsystem.component
 
+import dev.irohaco.core.designsystem.motion.rememberReducedMotion
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -80,7 +81,7 @@ fun MediaThumbnail(
     located: Boolean = false,
     dense: Boolean = false,
 ) {
-    val progress = if (dense) {
+    val progress = if (dense || rememberReducedMotion()) {
         if (selected) 1f else 0f
     } else {
         animateFloatAsState(
@@ -124,7 +125,7 @@ fun MediaThumbnail(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(IrohacoSpacing.xs)
-                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = OVERLAY_ALPHA), RoundedCornerShape(4.dp))
                     .padding(horizontal = IrohacoSpacing.xs),
             ) {
                 if (labelIcon != null) Icon(painterResource(labelIcon), contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
@@ -152,7 +153,7 @@ fun MediaThumbnail(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(IrohacoSpacing.xs)
-                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    .background(Color.Black.copy(alpha = OVERLAY_ALPHA), CircleShape)
                     .padding(2.dp)
                     .size(14.dp),
             )
@@ -209,3 +210,9 @@ private fun MediaThumbnailPreview() {
         }
     }
 }
+
+/**
+ * Behind white text over a photo. Over a white photo it gives about 5.7:1, above the 4.5:1 small text
+ * needs (DESIGN §7); 50% gave about 3.9:1.
+ */
+private const val OVERLAY_ALPHA = 0.6f

@@ -69,7 +69,17 @@ internal fun RemoteSettings(
     onRemoveModel: (String) -> Unit = {},
     modelTest: SettingsViewModel.ModelTest? = null,
     onDismissModelTest: () -> Unit = {},
+    /** The last connection could not be added. */
+    connectionFailed: Boolean = false,
+    onDismissConnectionFailed: () -> Unit = {},
 ) {
+    if (connectionFailed) {
+        AlertDialog(
+            onDismissRequest = onDismissConnectionFailed,
+            text = { Text(stringResource(R.string.settings_remote_add_failed)) },
+            confirmButton = { TextButton(onClick = onDismissConnectionFailed) { Text(stringResource(R.string.settings_remote_model_done)) } },
+        )
+    }
     var adding by rememberSaveable { mutableStateOf(false) }
     var removing by remember { mutableStateOf<RemoteConnection?>(null) }
     var addingModelTo by rememberSaveable { mutableStateOf<String?>(null) }
@@ -84,6 +94,19 @@ internal fun RemoteSettings(
         )
     }
     if (adding) AddConnectionDialog(onDismiss = { adding = false }) { protocol, url, key -> adding = false; onAdd(protocol, url, key) }
+    // A model removed takes the index it built with it (ADR-0032), so it asks first.
+    var removingModel by remember { mutableStateOf<RemoteModel?>(null) }
+    removingModel?.let { model ->
+        AlertDialog(
+            onDismissRequest = { removingModel = null },
+            title = { Text(stringResource(R.string.settings_remote_model_remove_title, model.displayName)) },
+            text = { Text(stringResource(R.string.settings_remote_model_remove_body)) },
+            confirmButton = {
+                TextButton(onClick = { removingModel = null; onRemoveModel(model.profileId) }) { Text(stringResource(R.string.settings_ai_delete)) }
+            },
+            dismissButton = { TextButton(onClick = { removingModel = null }) { Text(stringResource(R.string.settings_ai_cancel)) } },
+        )
+    }
     removing?.let { connection ->
         AlertDialog(
             onDismissRequest = { removing = null },
@@ -115,7 +138,7 @@ internal fun RemoteSettings(
             ListItem(
                 supportingContent = { Text(capabilitiesText(model.capabilities)) },
                 trailingContent = {
-                    IconButton(onClick = { onRemoveModel(model.profileId) }) {
+                    IconButton(onClick = { removingModel = model }) {
                         Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.settings_remote_model_remove))
                     }
                 },

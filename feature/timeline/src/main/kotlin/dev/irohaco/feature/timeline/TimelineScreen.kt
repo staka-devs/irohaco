@@ -274,7 +274,7 @@ fun TimelineScreen(
             trashed = items.map { Uri.parse(it.contentUri) }
             trash.launch(trashRequest(context, trashed, trashed = true))
         },
-        onFavorite = { viewModel.setFavorite(it, true) },
+        onFavorite = viewModel::setFavorite,
         onTag = { pending = Pending.Tag(it) },
         onAlbum = { pending = Pending.Album(it) },
         onMove = { items ->
@@ -378,7 +378,8 @@ internal fun TimelineContent(
     onCopy: (List<TimelineItem>) -> Unit = {},
     onRename: (TimelineItem) -> Unit = {},
     onPlace: (List<TimelineItem>) -> Unit = {},
-    onFavorite: (List<TimelineItem>) -> Unit = {},
+    /** Adds the items to the favorites, or takes them out with false. */
+    onFavorite: (List<TimelineItem>, Boolean) -> Unit = { _, _ -> },
     onTag: (List<TimelineItem>) -> Unit = {},
     onAlbum: (List<TimelineItem>) -> Unit = {},
     snackbar: SnackbarHostState = remember { SnackbarHostState() },
@@ -526,7 +527,7 @@ private fun TimelineGrid(
     onCopy: (List<TimelineItem>) -> Unit,
     onRename: (TimelineItem) -> Unit,
     onPlace: (List<TimelineItem>) -> Unit,
-    onFavorite: (List<TimelineItem>) -> Unit,
+    onFavorite: (List<TimelineItem>, Boolean) -> Unit,
     onTag: (List<TimelineItem>) -> Unit,
     onAlbum: (List<TimelineItem>) -> Unit,
     scrollToTop: Flow<Unit>,
@@ -686,7 +687,7 @@ private fun TimelineGrid(
                 IconButton(onClick = { onShare(selection.values.toList()) }) {
                     Icon(painterResource(IrohacoIcons.Share), stringResource(R.string.timeline_share))
                 }
-                IconButton(onClick = { onFavorite(selection.values.toList()) }) {
+                IconButton(onClick = { onFavorite(selection.values.toList(), true) }) {
                     Icon(painterResource(IrohacoIcons.Favorite), stringResource(R.string.timeline_favorite))
                 }
                 IconButton(onClick = { onTag(selection.values.toList()) }) {
@@ -705,6 +706,14 @@ private fun TimelineGrid(
                         Icon(painterResource(IrohacoIcons.MoreVert), stringResource(R.string.timeline_more))
                     }
                     DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.viewer_unfavorite)) },
+                            leadingIcon = { Icon(painterResource(IrohacoIcons.Favorite), contentDescription = null) },
+                            onClick = {
+                                more = false
+                                onFavorite(selection.values.toList(), false)
+                            },
+                        )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.timeline_move)) },
                             leadingIcon = { Icon(painterResource(IrohacoIcons.Move), contentDescription = null) },

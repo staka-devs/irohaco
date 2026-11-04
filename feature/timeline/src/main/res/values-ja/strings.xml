@@ -63,14 +63,14 @@
     <string name="timeline_new_folder">新しいフォルダ</string>
     <string name="timeline_new_folder_hint">Picturesの中に作ります</string>
     <string name="timeline_create_folder">新しいフォルダを使う</string>
-    <string name="timeline_no_folders">フォルダがまだありません</string>
+    <string name="timeline_no_folders">フォルダがまだありません。写真を撮るか、ほかのアプリでフォルダを作ると出てきます。</string>
     <string name="timeline_rename_name">名前</string>
     <string name="timeline_invalid_name">「/」を含まない名前を入力してください</string>
     <string name="timeline_cancel">キャンセル</string>
     <string name="timeline_change_denied">変更は許可されませんでした</string>
-    <string name="timeline_not_found">ファイルが見つかりません</string>
+    <string name="timeline_not_found">ファイルが見つかりません。ほかのアプリで移動か削除された可能性があります。</string>
     <string name="timeline_name_taken">同じ名前のファイルがすでにあります</string>
-    <string name="timeline_operation_failed">ファイルを変更できませんでした</string>
+    <string name="timeline_operation_failed">ファイルを変更できませんでした。空き容量と、保存先のフォルダを確かめてください。</string>
     <string name="timeline_renamed">名前を変更しました</string>
     <plurals name="timeline_moved">
         <item quantity="one">%d件を移動しました</item>
@@ -129,7 +129,7 @@
     <string name="albums_add_to">アルバムに追加</string>
     <string name="albums_new">新しいアルバム</string>
     <string name="albums_create_and_add">作成して追加</string>
-    <string name="albums_empty_list">まだ何もありません</string>
+    <string name="albums_empty_list">まだ何もありません。写真タブで写真を長押しして選ぶと、ここに追加できます。</string>
     <string name="identity_title">別の場所で見つかった写真</string>
     <string name="identity_body">見つからなくなった写真や動画と、ファイル名と撮影日時が同じファイルが見つかりました。同じ写真なら、お気に入り、評価、タグ、アルバムを引き継ぎます。</string>
     <string name="identity_was">前の場所: %1$s（見つかりません）</string>
@@ -280,7 +280,7 @@
     <string name="file_write">原本に書き込む</string>
     <string name="file_write_confirm">書き込む</string>
     <string name="file_write_explain">選んだ項目を原本のEXIFに書き込みます。書き込む前のファイルは、書き込んだ内容を確かめ終わるまでアプリの中に残します。</string>
-    <string name="file_write_conflict">ファイルとの競合を先に解決してください。</string>
+    <string name="file_write_conflict">上の項目で「アプリの値を残す」か「ファイルの値に戻す」を選ぶと、書き込めるようになります。</string>
     <string name="file_write_unsupported">この形式の原本には書き込めません。</string>
     <string name="file_write_needs_location">許可がないとファイルの位置情報が書き込みで消えるので、原本に書き込むには位置情報を許可してください。</string>
     <string name="file_write_unchecked">原本に書き込んだあとで、書き込んだ内容を確かめられませんでした。書き込む前のファイルに戻すか、このままにするかを選んでください。</string>
@@ -357,4 +357,10 @@
     <string name="search_ask_consent">この質問は %1$s（%2$s）へ送ります。送るもの: %3$s。</string>
     <string name="search_ask_consent_send">送って聞く</string>
     <string name="ask_on_device_ai">端末の AI</string>
+    <string name="viewer_action_previous">前の写真</string>
+    <string name="viewer_action_next">次の写真</string>
+    <string name="viewer_action_zoom_in">拡大</string>
+    <string name="viewer_action_zoom_out">元の大きさに戻す</string>
+    <string name="details_remove_tag_title">タグ「%1$s」を外しますか？</string>
+    <string name="details_remove_tag_confirm">外す</string>
 </resources>
