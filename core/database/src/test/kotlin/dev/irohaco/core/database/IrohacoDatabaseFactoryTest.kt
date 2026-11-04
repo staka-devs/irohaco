@@ -29,7 +29,7 @@ class IrohacoDatabaseFactoryTest {
     fun `splits every table, index and trigger of schema sql`() {
         val statements = splitStatements(schemaSql)
         assertEquals(54, statements.count { it.startsWith("CREATE TABLE") })
-        assertEquals(24, statements.count { it.matches(Regex("^CREATE (UNIQUE )?INDEX[\\s\\S]*")) })
+        assertEquals(26, statements.count { it.matches(Regex("^CREATE (UNIQUE )?INDEX[\\s\\S]*")) })
         assertEquals(32, statements.count { it.startsWith("CREATE TRIGGER") })
         assertTrue(statements.all { it.endsWith(";") })
     }
@@ -38,7 +38,7 @@ class IrohacoDatabaseFactoryTest {
     fun `creates the reference schema and Room accepts it`() {
         val sql = open().openHelper.writableDatabase
         assertEquals(54, sql.count("table", excludeInternal = true))
-        assertEquals(24, sql.count("index", excludeInternal = true))
+        assertEquals(26, sql.count("index", excludeInternal = true))
         assertEquals(32, sql.count("trigger", excludeInternal = true))
         assertEquals("ok", sql.single("PRAGMA integrity_check"))
         sql.query("PRAGMA foreign_key_check").use { assertEquals(0, it.count) }

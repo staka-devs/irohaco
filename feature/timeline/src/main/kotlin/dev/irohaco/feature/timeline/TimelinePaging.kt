@@ -59,11 +59,14 @@ internal class TimelinePagingSource(
 ) : PagingSource<Int, TimelineItem>() {
     override val jumpingSupported = true
 
+    /** Counted once per source: any change to the library invalidates the source, and the next one counts again. */
+    private var total: Int? = null
+
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, TimelineItem> {
         val key = params.key ?: 0
         val offset = if (params is LoadParams.Prepend) max(0, key - params.loadSize) else key
         val limit = if (params is LoadParams.Prepend) key - offset else params.loadSize
-        val total = getPage.count(query)
+        val total = total ?: getPage.count(query).also { total = it }
         val data = getPage(offset, limit, query)
         val end = offset + data.size
         return LoadResult.Page(

@@ -500,6 +500,8 @@ data class MediaRevisionsEntity(
     indices = [
         Index(value = ["access_state"], name = "ix_media_sources_access", unique = false),
         Index(value = ["asset_id"], name = "ix_media_sources_asset", unique = false),
+        Index(value = ["media_store_id"], name = "ix_media_sources_media_store", unique = false),
+        Index(value = ["display_name", "file_size_bytes"], name = "ix_media_sources_name_size", unique = false),
     ],
 )
 data class MediaSourcesEntity(

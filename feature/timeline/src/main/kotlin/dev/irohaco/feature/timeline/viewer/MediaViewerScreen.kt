@@ -92,6 +92,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.text.style.TextAlign
+import dev.irohaco.feature.timeline.rememberDateFormatter
 import dev.irohaco.core.contracts.FieldEdit
 import dev.irohaco.core.contracts.MetadataField
 import dev.irohaco.core.domain.Detail
@@ -428,7 +429,7 @@ internal fun MediaViewerContent(
                 IconButton(onClick = onBack) {
                     Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back), tint = IrohacoViewerColors.content)
                 }
-                val dateTimeFormatter = rememberDateTimeFormatter()
+                val dateTimeFormatter = rememberDateFormatter("yMMMdEjm")
                 Column(Modifier.weight(1f).padding(horizontal = IrohacoSpacing.s)) {
                     Text(
                         text = current?.let { dateTimeFormatter.format(Instant.ofEpochMilli(it.sortTimeMs).atZone(ZoneId.systemDefault())) } ?: "",
@@ -622,13 +623,6 @@ private suspend fun PointerInputScope.detectZoom(zoom: ZoomState) {
 
 private fun Size.center() = Offset(width / 2f, height / 2f)
 
-/** The device's "Remove animations" switch sets the animator scale to 0. */
-/** The date and time shown in the viewer's bar (PRD GAL-013). */
-@Composable
-private fun rememberDateTimeFormatter(): DateTimeFormatter {
-    val locale = LocalConfiguration.current.locales[0]
-    return remember(locale) { DateTimeFormatter.ofPattern(android.text.format.DateFormat.getBestDateTimePattern(locale, "yMMMdEjm"), locale) }
-}
 
 /** Opens the device's map app at this point (PRD GAL-013); no app data about it is shown first. */
 internal fun mapIntent(point: GeoPoint): Intent =
