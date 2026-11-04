@@ -33,7 +33,7 @@
     <string name="settings_privacy_summary">What leaves your device</string>
     <string name="settings_ai_summary">Search with on-device AI</string>
     <string name="settings_about">About</string>
-    <string name="settings_about_summary">Licenses of the app and its libraries</string>
+    <string name="settings_about_summary">App and library licenses</string>
     <string name="settings_about_license">License</string>
     <string name="settings_about_license_body">Irohaco is open source under the Apache License 2.0.</string>
     <string name="settings_about_libraries">Open source libraries</string>
