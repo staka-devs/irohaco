@@ -1,5 +1,6 @@
 package dev.irohaco
 
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelected
@@ -19,9 +20,13 @@ class AppLaunchTest {
 
     private fun text(id: Int) = InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
 
+    @OptIn(ExperimentalTestApi::class)
     @Test
     fun launchesOnPhotosAndSwitchesTabs() {
-        rule.onNode(hasText(text(R.string.destination_photos)) and isSelected()).assertIsDisplayed()
+        // The screens wait for the database to open off the main thread, which the test clock does not track.
+        val photos = hasText(text(R.string.destination_photos)) and isSelected()
+        rule.waitUntilAtLeastOneExists(photos, timeoutMillis = 10_000)
+        rule.onNode(photos).assertIsDisplayed()
         rule.onNodeWithText(text(R.string.destination_library)).performClick()
         rule.onNode(hasText(text(R.string.destination_library)) and isSelected()).assertIsDisplayed()
     }

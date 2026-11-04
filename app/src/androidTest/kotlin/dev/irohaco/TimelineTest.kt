@@ -86,7 +86,10 @@ class TimelineTest {
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun opensTheFolderFromTheLibraryAndItsPhotoInTheViewer() {
-        compose.onNode(hasText(context.getString(R.string.destination_library))).performClick()
+        // The screens wait for the database to open off the main thread.
+        val library = hasText(context.getString(R.string.destination_library))
+        compose.waitUntilAtLeastOneExists(library, timeoutMillis = 15_000)
+        compose.onNode(library).performClick()
         // insertTestImage puts the file in Pictures/IrohacoTest/; the tree starts folded at the top level.
         val expandPictures = hasContentDescription(context.getString(TimelineR.string.library_expand, "Pictures"))
         compose.waitUntilAtLeastOneExists(expandPictures, timeoutMillis = 15_000)
