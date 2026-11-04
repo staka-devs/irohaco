@@ -6,6 +6,9 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -103,6 +106,7 @@ import android.provider.Settings
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.designsystem.component.VideoPlayer
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
+import dev.irohaco.core.designsystem.motion.rememberReducedMotion
 import dev.irohaco.core.designsystem.motion.sharedMedia
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
@@ -361,11 +365,29 @@ internal fun MediaViewerContent(
                 zoom.reset()
                 onPageChanged(items.peek(pager.settledPage)?.assetId) // playback stays on the page it started on
             }
+            // Swipes and pinches have actions TalkBack and switch access can reach (DESIGN §7, #251).
+            val scope = rememberCoroutineScope()
+            var pageSize by remember { mutableStateOf(Size.Zero) }
+            val previous = stringResource(R.string.viewer_action_previous)
+            val next = stringResource(R.string.viewer_action_next)
+            val zoomIn = stringResource(R.string.viewer_action_zoom_in)
+            val zoomOut = stringResource(R.string.viewer_action_zoom_out)
             HorizontalPager(
                 state = pager,
                 userScrollEnabled = !zoom.isZoomed,
                 key = items.itemKey { it.assetId },
                 beyondViewportPageCount = 1,
+                modifier = Modifier
+                    .onSizeChanged { pageSize = it.toSize() }
+                    .semantics {
+                        customActions = listOfNotNull(
+                            CustomAccessibilityAction(previous) { scope.launch { pager.animateScrollToPage(pager.currentPage - 1) }; true }
+                                .takeIf { pager.currentPage > 0 },
+                            CustomAccessibilityAction(next) { scope.launch { pager.animateScrollToPage(pager.currentPage + 1) }; true }
+                                .takeIf { pager.currentPage < items.itemCount - 1 },
+                            CustomAccessibilityAction(if (zoom.isZoomed) zoomOut else zoomIn) { zoom.toggle(Offset.Zero, pageSize); true },
+                        )
+                    },
             ) { page ->
                 val item = items[page]
                 val player = playing?.takeIf { it.first == item?.assetId }?.second
@@ -524,7 +546,7 @@ private fun MediaPage(item: TimelineItem?, zoom: ZoomState?, onTap: () -> Unit, 
         )
         var failed by remember(item.contentUri) { mutableStateOf(false) }
         // GAL-016: plays on its own unless the device asks for less motion; then it waits for the button.
-        val reduceMotion = remember { reducedMotion(context) }
+        val reduceMotion = rememberReducedMotion()
         var playing by remember(item.contentUri, animated) { mutableStateOf(animated && !reduceMotion) }
         if (failed && item.kind == MediaKind.IMAGE) {
             // Better a reason than a blank page; the details sheet still opens from the bar.
@@ -600,8 +622,6 @@ private suspend fun PointerInputScope.detectZoom(zoom: ZoomState) {
 private fun Size.center() = Offset(width / 2f, height / 2f)
 
 /** The device's "Remove animations" switch sets the animator scale to 0. */
-private fun reducedMotion(context: Context): Boolean =
-    Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
 
 /** Opens the device's map app at this point (PRD GAL-013); no app data about it is shown first. */
 internal fun mapIntent(point: GeoPoint): Intent =
