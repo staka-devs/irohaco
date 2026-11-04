@@ -50,3 +50,27 @@ interface BackupArchive {
     /** Removes a file a failed export left, so only a checked backup stays where the user put it. */
     suspend fun discard(target: String)
 }
+
+/** How many files of a backup were found on this device (AC-011). */
+data class RestoreMatches(val matched: Int, val needsReview: Int, val missing: Int)
+
+/** Where each kind of record went: how many were added, and how many were left out. */
+data class RestoreResult(val added: Map<String, Int>, val skipped: Int)
+
+/**
+ * Restoring in stages (UC-RESTORE-01): a backup is matched against this device's files first, and
+ * only applied after the user saw the counts. Nothing is written to the user's data before [apply].
+ */
+interface RestoreStore {
+    /**
+     * Records the session and matches each file of [contents] here: one file with the same name, size
+     * and capture time is MATCHED, more than one NEEDS_REVIEW, none is missing. Nothing ambiguous is merged.
+     */
+    suspend fun stage(restoreId: String, source: String, contents: BackupContents, startedAt: Long): RestoreMatches
+
+    /**
+     * Adds the records of the MATCHED files in one transaction, never overwriting what is here, checks
+     * the foreign keys and commits; on any failure nothing is kept and the session is ROLLED_BACK.
+     */
+    suspend fun apply(restoreId: String, contents: BackupContents, completedAt: Long): RestoreResult
+}

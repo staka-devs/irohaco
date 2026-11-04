@@ -167,4 +167,16 @@
     <string name="settings_backup_done_body">The file was read back and holds %1$d records.</string>
     <string name="settings_backup_failed">Could not export</string>
     <string name="settings_backup_failed_body">The file was not kept. Check where it was being saved and try again.</string>
+    <string name="settings_restore">Restore</string>
+    <string name="settings_restore_running">Opening and restoring the backup…</string>
+    <string name="settings_restore_passphrase_title">Passphrase of the backup</string>
+    <string name="settings_restore_open">Open</string>
+    <string name="settings_restore_preview_title">Restore this backup?</string>
+    <string name="settings_restore_preview_body">It holds %1$d records.\nPhotos and videos found here: %2$d\nFound more than once, left for you to check: %3$d\nNot found here: %4$d\n\nOnly the records of files found here are added. Nothing here is written over, and API keys and what may be sent out are not restored.</string>
+    <string name="settings_restore_apply">Restore</string>
+    <string name="settings_restore_done">Restored</string>
+    <string name="settings_restore_done_body">Added %1$d records. %2$d were left out: already here, or for files not found here.</string>
+    <string name="settings_restore_failed">Could not restore</string>
+    <string name="settings_restore_unreadable">The passphrase is wrong, or the file is not an intact backup. Nothing was read from it.</string>
+    <string name="settings_restore_rolled_back">Nothing was changed. Try again.</string>
 </resources>

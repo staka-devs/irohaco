@@ -113,6 +113,11 @@ fun SettingsScreen(
     val pendingSend by viewModel.pendingSend.collectAsStateWithLifecycle()
     val exportTarget by viewModel.exportTarget.collectAsStateWithLifecycle()
     val exportState by viewModel.exportState.collectAsStateWithLifecycle()
+    val restoreSource by viewModel.restoreSource.collectAsStateWithLifecycle()
+    val restoreState by viewModel.restoreState.collectAsStateWithLifecycle()
+    val pickRestore = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.pickRestoreSource(it.toString()) }
+    }
     val pickBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         uri?.let { viewModel.pickExportTarget(it.toString()) }
     }
@@ -182,6 +187,12 @@ fun SettingsScreen(
                 onPick = { pickBackup.launch("irohaco-${java.time.LocalDate.now()}.irohaco") },
                 onExport = viewModel::export,
                 onDismiss = viewModel::dismissExport,
+                restore = restoreState,
+                restoreSource = restoreSource,
+                onPickRestore = { pickRestore.launch(arrayOf("*/*")) },
+                onOpenRestore = viewModel::openRestore,
+                onApplyRestore = viewModel::applyRestore,
+                onDismissRestore = viewModel::dismissRestore,
             )
         },
         privacy = {
