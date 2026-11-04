@@ -115,7 +115,11 @@ import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.Style
 import org.maplibre.android.snapshotter.MapSnapshotter
+import dev.irohaco.feature.timeline.description
+import dev.irohaco.feature.timeline.rememberDateFormatter
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 class LocationHistoryViewModel(
     private val history: LocationHistory,
@@ -319,11 +323,13 @@ internal fun LocationHistoryContent(
             }
             when {
                 tab == HistoryTab.UNMATCHED -> items(unmatched.chunked(UNMATCHED_COLUMNS), key = { it.first().assetId }) { row ->
+                    val formatter = rememberDateFormatter()
                     Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
                         row.forEach { item ->
                             MediaThumbnail(
                                 model = GridThumbnail(item.contentUri),
-                                contentDescription = stringResource(if (item.kind == MediaKind.VIDEO) R.string.search_video_scene else R.string.search_photo),
+                                // The kind, a video's length and the date, as on every grid (DESIGN §7).
+                                contentDescription = item.description(formatter.format(Instant.ofEpochMilli(item.sortTimeMs).atZone(ZoneId.systemDefault()))),
                                 selected = item.assetId in selection,
                                 modifier = Modifier.weight(1f).aspectRatio(1f).clickable { onToggle(item.assetId) },
                             )

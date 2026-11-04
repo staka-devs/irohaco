@@ -263,12 +263,12 @@ class AskLibraryTest {
     }
 
     @Test
-    fun `a remote model is not told where a photo was taken`() = runTest {
+    fun `a remote model is not told where or when a photo was taken`() = runTest {
         reply = "ANSWER: A pier [1].\nKNOWN: yes\nSOURCES: 1=OBSERVED"
         val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id))
         library.choose("claude")
         assertIs<AskResult.NeedsConsent>(library.askAbout("Where?", photo.item, null, emptyList(), 0, "Hakodate", emptyList())).agree()
         library.askAbout("Where?", photo.item, null, emptyList(), 0, "Hakodate", emptyList())
-        assertTrue("Hakodate" !in remoteAsked.single())
+        assertTrue("Hakodate" !in remoteAsked.single() && "was taken" !in remoteAsked.single())
     }
 }

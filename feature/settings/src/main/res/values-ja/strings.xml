@@ -151,7 +151,7 @@
     <string name="settings_ai_index_model_local">端末のモデル</string>
     <string name="settings_ai_index_model_remote">外部のモデル：写真、動画の場面、メモを端末の外へ送ります。新しい写真の索引は自動では作りません。</string>
     <string name="settings_index_send_title">外部のモデルへ送りますか？</string>
-    <string name="settings_index_send_body">索引を作るため、次のものを外部のモデルへ送ります。\n写真：%1$d 枚\n動画の場面：%2$d 枚\nメモ：%3$d 件\n\n写真は位置の情報を除いて送ります。メモに地名を書いていると、その地名も送られます。</string>
+    <string name="settings_index_send_body">索引を作るため、次のものを外部のモデルへ送ります。\n写真：%1$d 枚\n動画の場面：%2$d 枚\nメモ：%3$d 件\nデータ量の目安：%4$s\n\n写真は位置の情報を除いて送ります。メモに地名を書いていると、その地名も送られます。費用はプロバイダーの料金で決まり、アプリには請求を止める仕組みはありません。</string>
     <string name="settings_index_send">送る</string>
     <string name="settings_backup">バックアップ</string>
     <string name="settings_backup_summary">タグ、評価、アルバム、メモ、場所、編集の内容を、パスフレーズで暗号化してファイルに保存します。写真と動画、索引、API キー、外部へ送る許可は含めません。</string>

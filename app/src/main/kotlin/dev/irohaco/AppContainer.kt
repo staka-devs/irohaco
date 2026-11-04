@@ -211,7 +211,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
             throw e
         } catch (e: Exception) {
             // The next resume carries on from where this stopped.
-            Log.w("Irohaco", "Location indexing failed", e)
+            Log.w("Irohaco", "Location indexing failed: ${e.javaClass.name}") // the message can hold a content URI or path
         }
     }
 
@@ -395,7 +395,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
             throw e
         } catch (e: Exception) {
             // A failed sync leaves the catalog as it was; the gallery keeps working and the next resume retries.
-            Log.w("Irohaco", "Catalog sync failed", e)
+            Log.w("Irohaco", "Catalog sync failed: ${e.javaClass.name}") // the message can hold a content URI or path
         }
     }
 }

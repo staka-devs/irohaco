@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import androidx.core.view.WindowCompat
@@ -410,9 +411,10 @@ internal fun MediaViewerContent(
                         style = MaterialTheme.typography.titleMedium,
                         color = IrohacoViewerColors.content,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     if (placeName != null) {
-                        Text(placeName, style = MaterialTheme.typography.bodySmall, color = IrohacoViewerColors.content, maxLines = 1)
+                        Text(placeName, style = MaterialTheme.typography.bodySmall, color = IrohacoViewerColors.content, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 current?.let { item ->

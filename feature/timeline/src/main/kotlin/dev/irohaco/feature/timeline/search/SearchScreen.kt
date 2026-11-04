@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -550,7 +551,7 @@ private fun HitCell(hit: SearchHit, compared: List<String>?, labels: Map<String,
             modifier = Modifier.clickable { onOpen(hit) },
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(evidence, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Text(evidence, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         // Each model's own rank and similarity, side by side but never added: they do not compare across models (SRCH-005).
         if (compared != null) {
@@ -565,6 +566,7 @@ private fun HitCell(hit: SearchHit, compared: List<String>?, labels: Map<String,
                 }.joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         hit.text?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2) }
