@@ -621,7 +621,6 @@ private suspend fun PointerInputScope.detectZoom(zoom: ZoomState) {
 
 private fun Size.center() = Offset(width / 2f, height / 2f)
 
-/** The device's "Remove animations" switch sets the animator scale to 0. */
 
 /** Opens the device's map app at this point (PRD GAL-013); no app data about it is shown first. */
 internal fun mapIntent(point: GeoPoint): Intent =
