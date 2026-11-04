@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.irohaco.core.application.AiBackendChoice
 import dev.irohaco.core.application.AskLibrary
 import dev.irohaco.core.application.BrowseLibrary
+import dev.irohaco.core.application.ExportBackup
 import dev.irohaco.core.application.IndexJobs
 import dev.irohaco.core.application.ManageEgress
 import dev.irohaco.core.application.ManageModels
@@ -69,6 +70,8 @@ class SettingsViewModel(
     private val egress: ManageEgress? = null,
     /** The remote model the next index uses; null for the model on this device (ADR-0032). */
     private val embeddingSettings: EmbeddingModelSettings? = null,
+    /** Writes the encrypted backup (UC-BACKUP-01). */
+    private val exportBackup: ExportBackup? = null,
     /** Runs a job in the foreground service, so it carries on after the user leaves this screen. */
     private val runIndexJob: (String) -> Unit = {},
 ) : ViewModel() {
@@ -264,6 +267,41 @@ class SettingsViewModel(
 
     fun selectEmbeddingModel(id: String?) {
         viewModelScope.launch { embeddingSettings?.setEmbeddingModel(id) }
+    }
+
+    private val _exportTarget = MutableStateFlow<String?>(null)
+
+    /** The file the user picked for a backup; the passphrase is asked for next. */
+    val exportTarget: StateFlow<String?> = _exportTarget
+
+    private val _exportState = MutableStateFlow<ExportState>(ExportState.Idle)
+    val exportState: StateFlow<ExportState> = _exportState
+
+    fun pickExportTarget(uri: String) {
+        _exportTarget.value = uri
+    }
+
+    /** Exports to [target]; the passphrase is wiped once the export is over. */
+    fun export(target: String, passphrase: CharArray) {
+        val export = exportBackup ?: return
+        _exportTarget.value = null
+        _exportState.value = ExportState.Running
+        viewModelScope.launch {
+            _exportState.value = try {
+                ExportState.Done(export(target, passphrase).entries.values.sumOf { it.size })
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ExportState.Failed
+            } finally {
+                passphrase.fill('\u0000')
+            }
+        }
+    }
+
+    fun dismissExport() {
+        _exportTarget.value = null
+        if (_exportState.value != ExportState.Running) _exportState.value = ExportState.Idle
     }
 
     /** Folders hidden from the Photos tab, by path, for the Library page (GAL-002). */

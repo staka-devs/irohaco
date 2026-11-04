@@ -217,7 +217,7 @@ class MainActivity : ComponentActivity() {
                         container.themeColorSettings, container.sharingSettings, container.mapSettings, container.browseLibrary,
                         container.manageModels, container::downloadModel, container.indexJobs, container.planMediaIndex,
                         container.indexSettings, container.searchByMeaning.spaces(), container.aiBackendChoice, container.askLibrary, container.timelineSettings,
-                        container.manageEgress, container.embeddingModelSettings,
+                        container.manageEgress, container.embeddingModelSettings, container.exportBackup,
                     ) { IndexingService.start(applicationContext, it) }
                 },
                 onBack,

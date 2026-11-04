@@ -1,6 +1,8 @@
 package dev.irohaco
 
 import android.content.Context
+import android.net.Uri
+import android.provider.DocumentsContract
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
@@ -31,6 +33,9 @@ import dev.irohaco.core.application.GrantedEgressPolicy
 import dev.irohaco.core.application.ManageEgress
 import dev.irohaco.core.application.RemoteAnswering
 import dev.irohaco.core.application.RemoteEmbedding
+import dev.irohaco.core.application.ExportBackup
+import dev.irohaco.core.database.RoomBackupStore
+import dev.irohaco.infrastructure.backup.EncryptedBackupArchive
 import dev.irohaco.core.application.ImageSpaces
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.MarkMedia
@@ -135,6 +140,17 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     /** Remote models the user registered to index and search photos with, each request checked first (API-007). */
     val remoteEmbedding by lazy { RemoteEmbedding(egressStore, credentials, RemoteEmbeddingSessionFactory, GrantedEgressPolicy(egressStore)) }
+
+    /** The encrypted backup, written to and read back from a document the user picked (ADR-0010). */
+    val exportBackup by lazy {
+        val resolver = appContext.contentResolver
+        val archive = EncryptedBackupArchive(
+            openOutput = { uri -> checkNotNull(resolver.openOutputStream(Uri.parse(uri), "wt")) { "Cannot write the backup" } },
+            openInput = { uri -> checkNotNull(resolver.openInputStream(Uri.parse(uri))) { "Cannot read the backup" } },
+            delete = { uri -> DocumentsContract.deleteDocument(resolver, Uri.parse(uri)) },
+        )
+        ExportBackup(RoomBackupStore(database), archive, { UUID.randomUUID().toString() }, System::currentTimeMillis)
+    }
 
     /** The remote model indexing uses now; null for the local model. */
     val embeddingModelSettings: EmbeddingModelSettings by lazy { DataStoreAiSettings(settingsStore) }

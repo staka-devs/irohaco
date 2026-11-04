@@ -153,4 +153,16 @@
     <string name="settings_index_send_title">外部のモデルへ送りますか？</string>
     <string name="settings_index_send_body">索引を作るため、次のものを外部のモデルへ送ります。\n写真：%1$d 枚\n動画の場面：%2$d 枚\nメモ：%3$d 件\n\n写真は位置の情報を除いて送ります。メモに地名を書いていると、その地名も送られます。</string>
     <string name="settings_index_send">送る</string>
+    <string name="settings_backup">バックアップ</string>
+    <string name="settings_backup_summary">タグ、評価、アルバム、メモ、場所、編集の内容を、パスフレーズで暗号化してファイルに保存します。写真と動画、索引、API キー、外部へ送る許可は含めません。</string>
+    <string name="settings_backup_export">エクスポート</string>
+    <string name="settings_backup_running">書き出して、ファイルを確かめています…</string>
+    <string name="settings_backup_passphrase_title">パスフレーズを決める</string>
+    <string name="settings_backup_passphrase_body">%1$d 文字以上で決めてください。アプリには残らないため、忘れるとバックアップを開けません。</string>
+    <string name="settings_backup_passphrase">パスフレーズ</string>
+    <string name="settings_backup_passphrase_again">パスフレーズ（確認）</string>
+    <string name="settings_backup_done">エクスポートしました</string>
+    <string name="settings_backup_done_body">ファイルを読み直して確かめました。%1$d 件の記録が入っています。</string>
+    <string name="settings_backup_failed">エクスポートできませんでした</string>
+    <string name="settings_backup_failed_body">ファイルは残していません。保存先を確かめて、もう一度試してください。</string>
 </resources>
