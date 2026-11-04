@@ -16,6 +16,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.InputChip
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import dev.irohaco.feature.timeline.formatDuration
 import dev.irohaco.core.contracts.FieldEdit
 import dev.irohaco.core.contracts.HistoryReview
 import dev.irohaco.core.contracts.MetadataField
@@ -146,7 +147,7 @@ private fun DetailRows(
         base(MetadataField.TAKEN, LocalDateTime::parse), { onEdit(MetadataField.TAKEN) }, { onRevert(MetadataField.TAKEN) }, { onKeep(MetadataField.TAKEN) },
     ) { DATE_TIME.format(it) }
     if (kind == MediaKind.VIDEO) {
-        Row(R.string.details_duration, details.durationMs) { duration(it) }
+        Row(R.string.details_duration, details.durationMs) { formatDuration(it) }
     } else {
         Row(R.string.details_camera, details.camera) { it }
         Row(R.string.details_lens, details.lens) { it }
@@ -300,15 +301,6 @@ private fun pixels(details: MediaDetails): Detail<String> {
     val w = details.widthPx
     val h = details.heightPx
     return if (w is Detail.Value && h is Detail.Value) Detail.Value("${w.value} × ${h.value}") else Detail.Missing
-}
-
-internal fun duration(ms: Long): String {
-    val seconds = ms / 1000
-    return if (seconds >= 3600) {
-        "%d:%02d:%02d".format(seconds / 3600, seconds % 3600 / 60, seconds % 60)
-    } else {
-        "%d:%02d".format(seconds / 60, seconds % 60)
-    }
 }
 
 /** 1/250 s for short exposures, 2.5 s for long ones. */

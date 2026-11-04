@@ -1,5 +1,6 @@
 package dev.irohaco.feature.timeline.viewer
 
+import dev.irohaco.feature.timeline.formatDuration
 import org.junit.Test
 import kotlin.test.assertEquals
 
@@ -13,8 +14,8 @@ class DetailFormatTest {
 
     @Test
     fun `durations switch to hours past one hour`() {
-        assertEquals("0:05", duration(5_400))
-        assertEquals("12:03", duration(723_000))
-        assertEquals("1:00:07", duration(3_607_000))
+        assertEquals("0:05", formatDuration(5_400))
+        assertEquals("12:03", formatDuration(723_000))
+        assertEquals("1:00:07", formatDuration(3_607_000))
     }
 }
