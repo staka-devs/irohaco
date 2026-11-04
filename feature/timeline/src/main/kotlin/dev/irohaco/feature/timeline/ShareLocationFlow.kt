@@ -11,35 +11,67 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.irohaco.core.application.PrepareShare
+import dev.irohaco.core.contracts.LocationNotRemovedException
 import dev.irohaco.core.contracts.ShareCandidate
+import dev.irohaco.core.contracts.SharingSettings
 import dev.irohaco.core.contracts.ShareLocationPolicy
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+
+/** The user's GPS policy and the checks every screen that shares goes through (PRD GAL-005, MET-003). */
+class ShareSupport(private val share: PrepareShare?, settings: SharingSettings?) {
+    val policy: Flow<ShareLocationPolicy> = settings?.shareLocationPolicy ?: flowOf(ShareLocationPolicy.ASK)
+
+    suspend fun check(items: List<TimelineItem>): List<ShareCandidate> = share?.check(items) ?: items.map { ShareCandidate(it, hasLocation = false) }
+
+    suspend fun prepare(candidates: List<ShareCandidate>, stripLocation: Boolean): List<TimelineItem> =
+        share?.prepare(candidates, stripLocation) ?: candidates.map { it.item }
+}
 
 /**
  * Asks about a shared photo's GPS as the policy says, before handing the final items to [onReady]
  * (PRD GAL-005, MET-003). Returns a plain callback the caller uses in place of an ordinary onShare.
  */
 @Composable
-internal fun rememberShareAction(
-    policy: ShareLocationPolicy,
-    checkShare: suspend (List<TimelineItem>) -> List<ShareCandidate>,
-    prepareShare: suspend (List<ShareCandidate>, Boolean) -> List<TimelineItem>,
-    onReady: (List<TimelineItem>) -> Unit,
-): (List<TimelineItem>) -> Unit {
+internal fun rememberShareAction(sharing: ShareSupport, onReady: (List<TimelineItem>) -> Unit): (List<TimelineItem>) -> Unit {
+    val policy by sharing.policy.collectAsStateWithLifecycle(ShareLocationPolicy.ASK)
     val scope = rememberCoroutineScope()
     var asking by remember { mutableStateOf<List<ShareCandidate>?>(null) }
     var unremovable by remember { mutableStateOf<List<ShareCandidate>?>(null) }
+    var failed by remember { mutableStateOf(false) }
+
+    fun ready(candidates: List<ShareCandidate>, strip: Boolean) {
+        scope.launch {
+            try {
+                onReady(sharing.prepare(candidates, strip))
+            } catch (e: LocationNotRemovedException) {
+                failed = true
+            }
+        }
+    }
 
     fun proceed(candidates: List<ShareCandidate>, strip: Boolean) {
         val cannotStrip = candidates.filter { it.cannotRemoveLocation }
         if (strip && cannotStrip.isNotEmpty()) {
             unremovable = candidates
         } else {
-            scope.launch { onReady(prepareShare(candidates, strip)) }
+            ready(candidates, strip)
         }
+    }
+
+    if (failed) {
+        AlertDialog(
+            onDismissRequest = { failed = false },
+            title = { Text(stringResource(R.string.share_location_failed_title)) },
+            text = { Text(stringResource(R.string.share_location_failed_body)) },
+            confirmButton = { TextButton(onClick = { failed = false }) { Text(stringResource(android.R.string.ok)) } },
+        )
     }
 
     asking?.let { candidates ->
@@ -54,20 +86,19 @@ internal fun rememberShareAction(
         UnremovableLocationDialog(
             count = cannotStrip.size,
             onDismiss = { unremovable = null },
-            onInclude = { unremovable = null; scope.launch { onReady(prepareShare(candidates, true)) } },
+            onInclude = { unremovable = null; ready(candidates, true) },
             onExclude = {
                 unremovable = null
-                val remaining = candidates.filterNot { it.cannotRemoveLocation }
-                scope.launch { onReady(prepareShare(remaining, true)) }
+                ready(candidates.filterNot { it.cannotRemoveLocation }, true)
             },
         )
     }
 
     return { items ->
         scope.launch {
-            val candidates = checkShare(items)
+            val candidates = sharing.check(items)
             when {
-                candidates.none { it.hasLocation } -> onReady(prepareShare(candidates, false))
+                candidates.none { it.hasLocation } -> ready(candidates, false)
                 policy == ShareLocationPolicy.ASK -> asking = candidates
                 policy == ShareLocationPolicy.STRIP -> proceed(candidates, true)
                 policy == ShareLocationPolicy.KEEP -> proceed(candidates, false)

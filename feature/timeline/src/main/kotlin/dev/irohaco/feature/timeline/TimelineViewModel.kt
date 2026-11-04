@@ -173,14 +173,8 @@ class TimelineViewModel(
     /** What the fast scrollbar's bubble names at this position (PRD GAL-014). */
     suspend fun labelAt(index: Int) = getPage.labelAt(index)
 
-    /** The user's default for a shared photo's GPS (PRD MET-003). */
-    val shareLocationPolicy: StateFlow<ShareLocationPolicy> = (sharingSettings?.shareLocationPolicy ?: flowOf(ShareLocationPolicy.ASK))
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ShareLocationPolicy.ASK)
-
-    suspend fun checkShare(items: List<TimelineItem>): List<ShareCandidate> = share?.check(items) ?: items.map { ShareCandidate(it, hasLocation = false) }
-
-    suspend fun prepareShare(candidates: List<ShareCandidate>, stripLocation: Boolean): List<TimelineItem> =
-        share?.prepare(candidates, stripLocation) ?: candidates.map { it.item }
+    /** Shares with the user's GPS policy (PRD MET-003). */
+    val sharing = ShareSupport(share, sharingSettings)
 
     enum class Operation { MOVE, COPY, RENAME }
 

@@ -1,5 +1,13 @@
 package dev.irohaco
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.Modifier
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import dev.irohaco.core.designsystem.motion.rememberReducedMotion
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeOut
@@ -109,6 +117,16 @@ class MainActivity : ComponentActivity() {
                     ThemeContrast.HIGH -> SchemeContrast.HIGH
                 },
             ) {
+                // The first open of the database runs its schema and checks; it must not happen on the main thread
+                // when the first screen builds its ViewModel, so the screens wait for it here.
+                val databaseReady by produceState(false) {
+                    withContext(Dispatchers.IO) { container.database }
+                    value = true
+                }
+                if (!databaseReady) {
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                    return@IrohacoTheme
+                }
                 // Full-screen pages stack over the shell, which keeps its saved state (tab, scroll position) meanwhile.
                 var stack by rememberSaveable(saver = listSaver(save = { it.value }, restore = { mutableStateOf(it) })) {
                     mutableStateOf(listOf(Route.SHELL))
@@ -288,7 +306,7 @@ class MainActivity : ComponentActivity() {
                             page, viewer.assetId, viewer.startMs, container::newVideoPlayer, container.getMediaDetails, query,
                             container.markMedia, container.manageCollections, container.mediaFormatProbe,
                             container.browseMap, container.manageAnnotations, container.editMetadata, container.writeMetadataToFile,
-                            container.askLibrary, container.locationHistory,
+                            container.askLibrary, container.locationHistory, container.prepareShare, container.sharingSettings,
                         )
                     },
                     onBack,

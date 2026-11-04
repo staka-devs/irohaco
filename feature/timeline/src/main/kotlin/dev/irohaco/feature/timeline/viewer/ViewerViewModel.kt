@@ -14,6 +14,9 @@ import dev.irohaco.core.application.GetMediaDetails
 import dev.irohaco.core.application.BrowseMap
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.LocationHistory
+import dev.irohaco.core.application.PrepareShare
+import dev.irohaco.core.contracts.SharingSettings
+import dev.irohaco.feature.timeline.ShareSupport
 import dev.irohaco.core.contracts.HistoryReview
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
@@ -89,7 +92,12 @@ class ViewerViewModel(
     private val ask: AskLibrary? = null,
     /** Places from the location history for files without GPS (#213); null shows none. */
     private val history: LocationHistory? = null,
+    share: PrepareShare? = null,
+    sharingSettings: SharingSettings? = null,
 ) : ViewModel() {
+    /** Shares with the user's GPS policy, as the timeline does (PRD MET-003). */
+    val sharing = ShareSupport(share, sharingSettings)
+
     private val currentItem = MutableStateFlow<TimelineItem?>(null)
     private val current = currentItem.map { it?.assetId }.distinctUntilChanged()
 
