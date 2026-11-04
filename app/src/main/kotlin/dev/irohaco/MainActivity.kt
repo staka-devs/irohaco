@@ -8,6 +8,14 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import dev.irohaco.core.designsystem.motion.rememberReducedMotion
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.EnterTransition
 import android.content.ContentUris
 import android.content.Intent
 import android.os.Bundle
@@ -133,7 +141,20 @@ class MainActivity : ComponentActivity() {
                 val shellState = rememberSaveableStateHolder()
                 val stores = viewModel { ScreenViewModelStores() }
                 SharedTransitionLayout {
-                    AnimatedContent(targetState = stack.last(), label = "route") { target ->
+                    val reducedMotion = rememberReducedMotion()
+                    AnimatedContent(
+                        targetState = stack.last(),
+                        // With animations off a page changes at once (DESIGN §2.4).
+                        // Otherwise the same fade and scale AnimatedContent uses by default.
+                        transitionSpec = {
+                            if (reducedMotion) {
+                                EnterTransition.None togetherWith ExitTransition.None
+                            } else {
+                                (fadeIn(tween(220, delayMillis = 90)) + scaleIn(tween(220, delayMillis = 90), initialScale = 0.92f)) togetherWith fadeOut(tween(90))
+                            }
+                        },
+                        label = "route",
+                    ) { target ->
                         CompositionLocalProvider(LocalSharedMediaScope provides SharedMediaScope(this@SharedTransitionLayout, this)) {
                             if (target == Route.SHELL) {
                                 shellState.SaveableStateProvider(Route.SHELL) {

@@ -29,9 +29,9 @@
     <string name="settings_map_allow">オンライン地図の使用を許可</string>
     <string name="settings_map_allow_summary">地図のタイルと地名を取得するため、位置情報が外部に送信されます</string>
     <string name="settings_display_summary">アプリの色と見やすさ</string>
-    <string name="settings_library_summary">写真タブに表示する範囲</string>
+    <string name="settings_library_summary">表示するフォルダ、バックアップ</string>
     <string name="settings_privacy_summary">端末の外に送る情報</string>
-    <string name="settings_ai_summary">端末内で動くAIによる検索</string>
+    <string name="settings_ai_summary">AI の検索と質問、索引</string>
     <string name="settings_about">このアプリについて</string>
     <string name="settings_about_summary">アプリとライブラリのライセンス</string>
     <string name="settings_about_license">ライセンス</string>
@@ -86,6 +86,8 @@
     <string name="settings_index_partial">索引の作成完了（読み取れない項目あり）</string>
     <string name="settings_index_failed">モデルを読み込めないため停止</string>
     <string name="settings_index_cancelled">キャンセルしました</string>
+    <string name="settings_index_stop">索引作りをやめる</string>
+    <string name="settings_remote_add_failed">接続先を追加できませんでした。API キーを端末に保存できなかった可能性があります。もう一度試してください。</string>
     <string name="settings_index_counts">%2$d件中%1$d件（%3$d%%）</string>
     <string name="settings_index_remaining">残り%1$d件 · 失敗%2$d件</string>
     <string name="settings_index_eta_measuring">残り時間を計算中</string>
@@ -137,6 +139,8 @@
     <string name="settings_remote_remove_body">保存した API キーと、この接続先への送信の許可も消えます。</string>
     <string name="settings_remote_model_add">モデルを追加</string>
     <string name="settings_remote_model_remove">モデルを削除</string>
+    <string name="settings_remote_model_remove_title">「%1$s」を削除しますか？</string>
+    <string name="settings_remote_model_remove_body">このモデルで作った写真の索引も消えます。端末のモデルの索引は残ります。</string>
     <string name="settings_remote_model_id">モデル ID</string>
     <string name="settings_remote_model_name">表示する名前（省略可）</string>
     <string name="settings_remote_model_test">テストして追加</string>
@@ -144,13 +148,13 @@
     <string name="settings_remote_model_testing">モデルをテストしています…</string>
     <string name="settings_remote_model_added">追加しました。できること: %1$s</string>
     <string name="settings_remote_model_cannot_answer">画像を読めないので、写真についての質問には使えません。</string>
-    <string name="settings_remote_model_test_failed">テストに失敗しました。モデル ID を確かめてください。</string>
+    <string name="settings_remote_model_test_failed">テストに失敗しました。モデル ID が接続先の一覧にある名前と同じか、接続先の URL と API キーが正しいかを確かめてください。</string>
     <string name="settings_remote_model_done">閉じる</string>
     <string name="settings_remote_cap_image">画像を読める</string>
     <string name="settings_remote_cap_streaming">書きながら答える</string>
     <string name="settings_remote_cap_text_only">文だけ</string>
     <string name="settings_ai_answer_model_remote">外部のモデル：質問と写真を端末の外へ送ります</string>
-    <string name="settings_remote_cap_embedding">検索用のベクトルを作る</string>
+    <string name="settings_remote_cap_embedding">写真の検索に使える</string>
     <string name="settings_remote_model_cannot_index">画像を読めないため、写真の索引には使えません。</string>
     <string name="settings_ai_index_model">写真の索引を作るモデル</string>
     <string name="settings_ai_index_model_hint">意味で探すための索引を作ります。外部のモデルを選ぶと、そのモデル用に別の索引を作ります。端末で作った索引は残ります。</string>

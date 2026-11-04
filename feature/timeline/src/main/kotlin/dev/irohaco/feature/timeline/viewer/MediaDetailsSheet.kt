@@ -1,6 +1,11 @@
 package dev.irohaco.feature.timeline.viewer
 
 import android.text.format.Formatter
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.material3.AlertDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -239,13 +244,23 @@ private fun RatingRow(rating: Int?, onRate: (Int?) -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TagsRow(tags: List<Tag>, onAdd: () -> Unit, onRemove: (String) -> Unit) {
+    // A tap on a chip is easy to make by mistake, so taking a tag off asks first.
+    var removing by remember { mutableStateOf<Tag?>(null) }
+    removing?.let { tag ->
+        AlertDialog(
+            onDismissRequest = { removing = null },
+            title = { Text(stringResource(R.string.details_remove_tag_title, tag.name)) },
+            confirmButton = { TextButton(onClick = { removing = null; onRemove(tag.tagId) }) { Text(stringResource(R.string.details_remove_tag_confirm)) } },
+            dismissButton = { TextButton(onClick = { removing = null }) { Text(stringResource(R.string.memo_cancel)) } },
+        )
+    }
     Column(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.details_tags), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
             tags.forEach { tag ->
                 InputChip(
                     selected = false,
-                    onClick = { onRemove(tag.tagId) },
+                    onClick = { removing = tag },
                     label = { Text(tag.name) },
                     trailingIcon = { Icon(painterResource(IrohacoIcons.Close), stringResource(R.string.details_remove_tag, tag.name)) },
                 )

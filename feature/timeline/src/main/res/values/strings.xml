@@ -63,14 +63,14 @@
     <string name="timeline_new_folder">New folder</string>
     <string name="timeline_new_folder_hint">Created in Pictures</string>
     <string name="timeline_create_folder">Use new folder</string>
-    <string name="timeline_no_folders">No folders yet</string>
+    <string name="timeline_no_folders">No folders yet. They appear once photos are taken or another app makes a folder.</string>
     <string name="timeline_rename_name">Name</string>
     <string name="timeline_invalid_name">Enter a name without \"/\"</string>
     <string name="timeline_cancel">Cancel</string>
     <string name="timeline_change_denied">The change was not allowed</string>
-    <string name="timeline_not_found">The file is no longer there</string>
+    <string name="timeline_not_found">The file is no longer there. Another app may have moved or deleted it.</string>
     <string name="timeline_name_taken">A file with this name is already there</string>
-    <string name="timeline_operation_failed">The file could not be changed</string>
+    <string name="timeline_operation_failed">The file could not be changed. Check the free space and the folder.</string>
     <string name="timeline_renamed">Renamed</string>
     <plurals name="timeline_moved">
         <item quantity="one">Moved %d item</item>
@@ -81,7 +81,11 @@
         <item quantity="other">Copied %d items</item>
     </plurals>
     <string name="timeline_sort">Sort and filter</string>
-    <string name="timeline_sort_title">Sort and filter</string>
+    <string name="timeline_sort_title">Sort</string>
+    <string name="timeline_filter">Filter</string>
+    <string name="timeline_filter_clear">Clear</string>
+    <string name="timeline_filter_favorites">Favorites</string>
+    <string name="timeline_sort_filtered">Sort and filter (filtered)</string>
     <string name="timeline_sort_newest">Date taken, newest first</string>
     <string name="timeline_sort_oldest">Date taken, oldest first</string>
     <string name="timeline_sort_name_asc">File name, A to Z</string>
@@ -125,7 +129,7 @@
     <string name="albums_add_to">Add to album</string>
     <string name="albums_new">New album</string>
     <string name="albums_create_and_add">Create and add</string>
-    <string name="albums_empty_list">Nothing here yet</string>
+    <string name="albums_empty_list">Nothing here yet. In Photos, long-press photos to select them and add them here.</string>
     <string name="identity_title">Found elsewhere?</string>
     <string name="identity_body">These files turned up where a missing photo or video used to be named the same and taken at the same time. If it is the same one, its favorites, rating, tags and albums carry over.</string>
     <string name="identity_was">Was in %1$s (missing)</string>
@@ -282,7 +286,7 @@
     <string name="file_write">Write to the file</string>
     <string name="file_write_confirm">Write</string>
     <string name="file_write_explain">Writes the chosen fields into the file\'s EXIF. The file as it was stays in the app until the written values are checked.</string>
-    <string name="file_write_conflict">Settle the conflict with the file first.</string>
+    <string name="file_write_conflict">Choose which value to keep in the items above, and writing becomes possible.</string>
     <string name="file_write_unsupported">Files of this type cannot be written to.</string>
     <string name="file_write_needs_location">Without the permission, writing would drop the file\'s location, so allow location access to write to the file.</string>
     <string name="file_write_unchecked">The file could not be checked after the write. Put back the file as it was, or keep it as it is.</string>
@@ -365,4 +369,10 @@
     <string name="search_ask_consent">This question goes to %1$s (%2$s), with: %3$s.</string>
     <string name="search_ask_consent_send">Send and ask</string>
     <string name="ask_on_device_ai">The AI on this device</string>
+    <string name="viewer_action_previous">Previous photo</string>
+    <string name="viewer_action_next">Next photo</string>
+    <string name="viewer_action_zoom_in">Zoom in</string>
+    <string name="viewer_action_zoom_out">Back to full view</string>
+    <string name="details_remove_tag_title">Take off the tag “%1$s”?</string>
+    <string name="details_remove_tag_confirm">Take off</string>
 </resources>

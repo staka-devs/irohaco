@@ -132,6 +132,8 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
                         " AND le.latitude BETWEEN ? AND ? AND le.longitude BETWEEN ? AND ?)",
                 )
             }
+            if (query.takenFromMs != null) append(" AND $TIME >= ?")
+            if (query.takenUntilMs != null) append(" AND $TIME < ?")
         }
 
         /** In the order of the placeholders in [where]. */
@@ -141,6 +143,8 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             query.folder?.let { add(it.volumeId); add(it.relativePath) }
             query.excludedFolders.forEach { add(it.volumeId); add(it.relativePath) }
             query.area?.let { add(it.south); add(it.north); add(it.west); add(it.east) }
+            query.takenFromMs?.let { add(it) }
+            query.takenUntilMs?.let { add(it) }
         }.toTypedArray()
 
         /** The asset id breaks ties in the same direction, so pages never overlap or skip. */

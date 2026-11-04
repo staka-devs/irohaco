@@ -88,6 +88,14 @@ class RoomTimelineReaderTest {
         assertEquals(null, reader.indexOf(videos, "a"))
         val photosByName = TimelineQuery(TimelineSortKey.NAME, descending = false, kind = MediaKind.IMAGE)
         assertEquals(listOf(0, 1), listOf("b", "a").map { reader.indexOf(photosByName, it) })
+
+        // The dates taken: from inclusive, until exclusive, with the other filters.
+        val days = TimelineQuery(TimelineSortKey.TAKEN, descending = false, takenFromMs = 2, takenUntilMs = 3)
+        assertEquals(listOf("b"), order(days))
+        assertEquals(1, reader.count(days))
+        assertEquals(listOf("b", "c"), order(days.copy(takenUntilMs = null)))
+        assertEquals(listOf("b"), order(days.copy(takenUntilMs = null, kind = MediaKind.IMAGE)))
+        assertEquals(TimelineQuery(TimelineSortKey.TAKEN, descending = false), days.unfiltered())
     }
 
     @Test

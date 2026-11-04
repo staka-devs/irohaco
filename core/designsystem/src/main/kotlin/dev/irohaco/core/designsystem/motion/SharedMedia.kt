@@ -12,10 +12,11 @@ class SharedMediaScope(val transition: SharedTransitionScope, val visibility: An
 /** Provided by the screen that switches between the grid and the viewer; absent in previews and tests. */
 val LocalSharedMediaScope = staticCompositionLocalOf<SharedMediaScope?> { null }
 
-/** Marks the same photo or video on both sides of the transition; does nothing without a scope. */
+/** Marks the same photo or video on both sides of the transition; does nothing without a scope or with animations off. */
 @Composable
 fun Modifier.sharedMedia(assetId: String): Modifier {
     val scope = LocalSharedMediaScope.current ?: return this
+    if (rememberReducedMotion()) return this
     return with(scope.transition) {
         this@sharedMedia.sharedElement(rememberSharedContentState("media-$assetId"), scope.visibility)
     }

@@ -420,9 +420,25 @@ class SettingsViewModel(
         viewModelScope.launch { egress?.set(grant, allowed) }
     }
 
+    private val _connectionFailed = MutableStateFlow(false)
+
+    /** The last connection could not be added, such as when the key could not be stored; the screen says so. */
+    val connectionFailed: StateFlow<Boolean> = _connectionFailed
+
     fun addConnection(protocol: RemoteProtocol, baseUrl: String, apiKey: String) {
-        // shortcut: a Keystore failure only leaves the connection unlisted; say so on screen if it ever happens.
-        viewModelScope.launch { runCatching { egress?.add(protocol, baseUrl, apiKey) } }
+        viewModelScope.launch {
+            try {
+                egress?.add(protocol, baseUrl, apiKey)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _connectionFailed.value = true
+            }
+        }
+    }
+
+    fun dismissConnectionFailed() {
+        _connectionFailed.value = false
     }
 
     fun removeConnection(id: String) {
