@@ -51,7 +51,15 @@ class PlanMediaIndex(
     private val spec: suspend () -> EmbeddingSpaceSpec = { ImageSpaces.LOCAL },
 ) {
     /** How many photos, video frames and memos an index would send to a remote model. */
-    data class Outgoing(val photos: Int, val frames: Int, val memos: Int)
+    data class Outgoing(val photos: Int, val frames: Int, val memos: Int) {
+        // shortcut: a fixed size per picture (768 px JPEG, sent as base64), not each file's; measure them if the guess misleads.
+        /** A rough amount of data, for the user to weigh before agreeing (PRD §10). */
+        val estimatedBytes: Long get() = (photos + frames) * BYTES_PER_PICTURE
+
+        companion object {
+            const val BYTES_PER_PICTURE = 200_000L
+        }
+    }
 
     /** Returns the planned job's id; folders are relative paths, null meaning every folder. */
     suspend operator fun invoke(folders: Set<String>? = null, quality: VideoQuality = VideoQuality.BALANCED): String {

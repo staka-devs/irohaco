@@ -136,8 +136,9 @@ class AskLibrary(
     ): AskResult {
         val memo = memos.filter { it.isNotBlank() }.joinToString(" / ").ifEmpty { null }
         val hit = SearchHit(item, frameMs ?: 0L.takeIf { item.kind == MediaKind.VIDEO }, setOfNotNull(Evidence.MEMO.takeIf { memo != null }), memo)
-        // A place name says where the user was; it leaves the device only with a grant R0 does not offer.
-        return ask(question, listOf(hit), context(takenAtMs, place.takeIf { remoteModel() == null }, earlier), onText)
+        // When and where say where the user was and when (EXIF); they leave the device only with a grant R0 does not offer (PRD §10).
+        val local = remoteModel() == null
+        return ask(question, listOf(hit), context(takenAtMs.takeIf { local }, place.takeIf { local }, earlier), onText)
     }
 
     /** [onText] gets the answer's text so far while the model writes it; [context] goes just before the question. */

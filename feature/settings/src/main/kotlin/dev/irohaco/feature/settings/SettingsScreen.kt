@@ -59,6 +59,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.irohaco.core.contracts.FolderRef
@@ -256,7 +257,7 @@ internal fun SettingsContent(
                     Column(Modifier.padding(padding)) {
                         SettingsCategory.entries.forEach { category ->
                             ListItem(
-                                supportingContent = { Text(stringResource(category.summary), maxLines = 1) },
+                                supportingContent = { Text(stringResource(category.summary), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                 leadingContent = { Icon(painterResource(category.icon), contentDescription = null) },
                                 modifier = Modifier.clickable { scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, category) } },
                             ) { Text(stringResource(category.title)) }

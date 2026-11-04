@@ -36,6 +36,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -226,7 +227,7 @@ private fun TrashRow(item: TrashedItem, selected: Boolean, onClick: () -> Unit) 
         },
         trailingContent = { Checkbox(checked = selected, onCheckedChange = { onClick() }) },
         modifier = Modifier.clickable(onClick = onClick),
-    ) { Text(item.displayName, maxLines = 1) }
+    ) { Text(item.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) }
 }
 
 /** Days left before MediaStore removes the item for good; null when it reports no expiry. */

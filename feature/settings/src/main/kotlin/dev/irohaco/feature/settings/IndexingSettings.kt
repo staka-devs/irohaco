@@ -100,7 +100,10 @@ internal fun IndexingSettings(
         AlertDialog(
             onDismissRequest = onDismissSend,
             title = { Text(stringResource(R.string.settings_index_send_title)) },
-            text = { Text(stringResource(R.string.settings_index_send_body, outgoing.photos, outgoing.frames, outgoing.memos)) },
+            text = {
+                val size = Formatter.formatShortFileSize(LocalContext.current, outgoing.estimatedBytes)
+                Text(stringResource(R.string.settings_index_send_body, outgoing.photos, outgoing.frames, outgoing.memos, size))
+            },
             confirmButton = { TextButton(onClick = onConfirmSend) { Text(stringResource(R.string.settings_index_send)) } },
             dismissButton = { TextButton(onClick = onDismissSend) { Text(stringResource(R.string.settings_ai_cancel)) } },
         )

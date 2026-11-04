@@ -153,7 +153,7 @@
     <string name="settings_ai_index_model_local">The model on this device</string>
     <string name="settings_ai_index_model_remote">Remote model: photos, video scenes and memos are sent out. New photos are not indexed by themselves.</string>
     <string name="settings_index_send_title">Send to the remote model?</string>
-    <string name="settings_index_send_body">To build the index, these go to the remote model:\nPhotos: %1$d\nVideo scenes: %2$d\nMemos: %3$d\n\nPhotos are sent without their location. A memo that names a place sends that name too.</string>
+    <string name="settings_index_send_body">To build the index, these go to the remote model:\nPhotos: %1$d\nVideo scenes: %2$d\nMemos: %3$d\nData, roughly: %4$s\n\nPhotos are sent without their location. A memo that names a place sends that name too. What it costs depends on the provider\'s prices, and nothing in the app stops the bill.</string>
     <string name="settings_index_send">Send</string>
     <string name="settings_backup">Backup</string>
     <string name="settings_backup_summary">Saves tags, ratings, albums, memos, places and edits to a file, encrypted with a passphrase. Photos and videos, the index, API keys and what may be sent out are not in it.</string>
