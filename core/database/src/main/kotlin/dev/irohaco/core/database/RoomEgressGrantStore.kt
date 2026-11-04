@@ -55,6 +55,7 @@ interface EgressDao {
     @Transaction
     suspend fun removeConnection(id: String): String? = credentialRef(id).also {
         revokeAll(id)
+        for (profile in profilesOf(id)) deleteSpacesOf(profile)
         deleteCapabilitiesOf(id)
         deleteProfilesOf(id)
         deleteConnection(id)
@@ -62,7 +63,7 @@ interface EgressDao {
 
     @Query(
         """SELECT p.model_profile_id AS profileId, p.connection_id AS connectionId, p.provider_model_id AS modelId,
-             p.display_name AS displayName, GROUP_CONCAT(c.capability_code) AS capabilities
+             p.display_name AS displayName, p.embedding_dimension AS dimension, GROUP_CONCAT(c.capability_code) AS capabilities
            FROM model_profiles p JOIN provider_connections pc ON pc.connection_id = p.connection_id
            LEFT JOIN model_capabilities c ON c.model_profile_id = p.model_profile_id
            WHERE pc.protocol != 'LOCAL_LITERT' GROUP BY p.model_profile_id ORDER BY p.display_name""",
@@ -72,15 +73,18 @@ interface EgressDao {
     @Query("SELECT * FROM provider_connections WHERE connection_id = :id AND protocol != 'LOCAL_LITERT'")
     suspend fun connection(id: String): ProviderConnectionsEntity?
 
-    @Query("INSERT INTO model_profiles(model_profile_id, connection_id, provider_model_id, artifact_revision, display_name) VALUES (:id, :connectionId, :modelId, NULL, :name)")
-    suspend fun addProfile(id: String, connectionId: String, modelId: String, name: String)
+    @Query(
+        """INSERT INTO model_profiles(model_profile_id, connection_id, provider_model_id, artifact_revision, display_name, embedding_dimension)
+           VALUES (:id, :connectionId, :modelId, NULL, :name, :dimension)""",
+    )
+    suspend fun addProfile(id: String, connectionId: String, modelId: String, name: String, dimension: Int?)
 
     @Query("INSERT INTO model_capabilities(model_profile_id, capability_code) VALUES (:id, :code)")
     suspend fun addCapability(id: String, code: String)
 
     @Transaction
-    suspend fun addModel(id: String, connectionId: String, modelId: String, name: String, capabilities: List<String>) {
-        addProfile(id, connectionId, modelId, name)
+    suspend fun addModel(id: String, connectionId: String, modelId: String, name: String, dimension: Int?, capabilities: List<String>) {
+        addProfile(id, connectionId, modelId, name, dimension)
         capabilities.forEach { addCapability(id, it) }
     }
 
@@ -92,6 +96,7 @@ interface EgressDao {
 
     @Transaction
     suspend fun removeModel(id: String) {
+        deleteSpacesOf(id)
         deleteCapabilities(id)
         deleteProfile(id)
     }
@@ -101,10 +106,45 @@ interface EgressDao {
 
     @Query("DELETE FROM model_profiles WHERE connection_id = :id")
     suspend fun deleteProfilesOf(id: String)
+
+    @Query("SELECT model_profile_id FROM model_profiles WHERE connection_id = :id")
+    suspend fun profilesOf(id: String): List<String>
+
+    @Query("DELETE FROM indexing_job_items WHERE job_id IN (SELECT job_id FROM indexing_jobs WHERE space_id IN $REMOTE_SPACES)")
+    suspend fun deleteJobItemsOf(id: String)
+
+    @Query("DELETE FROM indexing_jobs WHERE space_id IN $REMOTE_SPACES")
+    suspend fun deleteJobsOf(id: String)
+
+    @Query("DELETE FROM search_profile_spaces WHERE space_id IN $REMOTE_SPACES")
+    suspend fun deleteProfileSpacesOf(id: String)
+
+    @Query("DELETE FROM embedding_vectors WHERE space_id IN $REMOTE_SPACES")
+    suspend fun deleteVectorsOf(id: String)
+
+    @Query("DELETE FROM embedding_spaces WHERE space_id IN $REMOTE_SPACES")
+    suspend fun deleteSpaceRowsOf(id: String)
+
+    /** The index a remote model built goes with it; its vectors mean nothing to any other model (ADR-0003). */
+    @Transaction
+    suspend fun deleteSpacesOf(id: String) {
+        deleteJobItemsOf(id)
+        deleteJobsOf(id)
+        deleteProfileSpacesOf(id)
+        deleteVectorsOf(id)
+        deleteSpaceRowsOf(id)
+    }
 }
 
-data class RemoteModelRow(val profileId: String, val connectionId: String, val modelId: String, val displayName: String, val capabilities: String?) {
-    fun toModel() = RemoteModel(profileId, connectionId, modelId, displayName, capabilities.orEmpty().split(',').filter { it.isNotEmpty() }.map(ModelCapability::valueOf).toSet())
+// The spaces of remote model :id; never the local model's, whatever id is passed.
+private const val REMOTE_SPACES =
+    """(SELECT s.space_id FROM embedding_spaces s JOIN model_profiles p ON p.model_profile_id = s.model_profile_id
+         JOIN provider_connections pc ON pc.connection_id = p.connection_id
+         WHERE s.model_profile_id = :id AND pc.protocol != 'LOCAL_LITERT')"""
+
+data class RemoteModelRow(val profileId: String, val connectionId: String, val modelId: String, val displayName: String, val dimension: Int?, val capabilities: String?) {
+    fun toModel() =
+        RemoteModel(profileId, connectionId, modelId, displayName, capabilities.orEmpty().split(',').filter { it.isNotEmpty() }.map(ModelCapability::valueOf).toSet(), dimension)
 }
 
 class RoomEgressGrantStore(db: IrohacoDatabase, private val now: () -> Long = System::currentTimeMillis) : EgressGrantStore, ConnectionStore, RemoteModelStore {
@@ -139,7 +179,7 @@ class RoomEgressGrantStore(db: IrohacoDatabase, private val now: () -> Long = Sy
 
     override suspend fun credentialRef(connectionId: String) = dao.credentialRef(connectionId)
 
-    override suspend fun addModel(model: RemoteModel) = with(model) { dao.addModel(profileId, connectionId, modelId, displayName, capabilities.map { it.name }) }
+    override suspend fun addModel(model: RemoteModel) = with(model) { dao.addModel(profileId, connectionId, modelId, displayName, dimension, capabilities.map { it.name }) }
 
     override suspend fun removeModel(profileId: String) = dao.removeModel(profileId)
 }

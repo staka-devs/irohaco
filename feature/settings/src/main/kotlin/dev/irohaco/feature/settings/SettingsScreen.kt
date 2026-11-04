@@ -108,6 +108,9 @@ fun SettingsScreen(
     val remoteModels by viewModel.remoteModels.collectAsStateWithLifecycle()
     val modelTest by viewModel.modelTest.collectAsStateWithLifecycle()
     val remoteAnswerModels by viewModel.remoteAnswerModels.collectAsStateWithLifecycle()
+    val remoteEmbeddingModels by viewModel.remoteEmbeddingModels.collectAsStateWithLifecycle()
+    val embeddingModel by viewModel.embeddingModel.collectAsStateWithLifecycle()
+    val pendingSend by viewModel.pendingSend.collectAsStateWithLifecycle()
     val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { viewModel.importModel(it.toString()) } }
     SettingsContent(
@@ -133,10 +136,14 @@ fun SettingsScreen(
                 remoteAnswerModels = remoteAnswerModels,
                 answerModel = answerModel,
                 onSelectAnswerModel = viewModel::selectAnswerModel,
+                remoteEmbeddingModels = remoteEmbeddingModels,
+                embeddingModel = embeddingModel,
+                onSelectEmbeddingModel = viewModel::selectEmbeddingModel,
             )
             IndexingSettings(
                 indexing = indexing,
-                modelReady = viewModel.modelCatalog.any { modelStates[it.id] is ModelInstallState.Installed },
+                // A remote model needs no file on the device.
+                modelReady = embeddingModel != null || viewModel.modelCatalog.any { modelStates[it.id] is ModelInstallState.Installed },
                 folders = indexFolders,
                 lowCoverageVideos = lowCoverageVideos,
                 pendingCount = pendingCount,
@@ -156,6 +163,9 @@ fun SettingsScreen(
                 onCancelPreparing = viewModel::cancelPreparing,
                 startFailed = startFailed,
                 onDismissStartFailed = viewModel::dismissStartFailed,
+                pendingSend = pendingSend?.outgoing,
+                onConfirmSend = viewModel::confirmSend,
+                onDismissSend = viewModel::dismissSend,
             )
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast, locationPin, viewModel::setLocationPin) },

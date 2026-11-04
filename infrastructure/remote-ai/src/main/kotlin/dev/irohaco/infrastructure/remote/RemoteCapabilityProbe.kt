@@ -5,6 +5,7 @@ import android.graphics.Color
 import dev.irohaco.core.contracts.CapabilityProbe
 import dev.irohaco.core.contracts.EgressDecision
 import dev.irohaco.core.contracts.ModelCapability
+import dev.irohaco.core.contracts.ProbedModel
 import dev.irohaco.core.contracts.RemoteCallException
 import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.RemoteFailure
@@ -20,7 +21,7 @@ import java.io.ByteArrayOutputStream
  * user's goes out, so it needs no grant, only the user's tap that starts it.
  */
 class RemoteCapabilityProbe(private val timeoutMs: Int = 30_000) : CapabilityProbe {
-    override suspend fun probe(connection: RemoteConnection, apiKey: String, modelId: String): Set<ModelCapability> {
+    override suspend fun probe(connection: RemoteConnection, apiKey: String, modelId: String): ProbedModel {
         if (connection.protocol in EMBEDDING) return embeddings(connection, apiKey, modelId)
         fun session(streaming: Boolean) =
             RemoteAnswerSession(connection.protocol, connection.baseUrl, apiKey, modelId, streaming, { EgressDecision.Allowed }, timeoutMs)
@@ -28,16 +29,16 @@ class RemoteCapabilityProbe(private val timeoutMs: Int = 30_000) : CapabilityPro
         check(session(streaming = false).answer(INSTRUCTION, emptyList(), TEXT).isNotBlank()) { "The model sent back no text" }
         if (works { session(streaming = false).answer(INSTRUCTION, listOf(sampleImage()), IMAGE).isNotBlank() }) found += ModelCapability.INPUT_IMAGE
         if (works { session(streaming = true).answer(INSTRUCTION, emptyList(), TEXT).isNotBlank() }) found += ModelCapability.STREAMING
-        return found
+        return ProbedModel(found)
     }
 
-    /** The sample sentence, then the sample image where the format can carry one. */
-    private suspend fun embeddings(connection: RemoteConnection, apiKey: String, modelId: String): Set<ModelCapability> = withContext(Dispatchers.IO) {
+    /** The sample sentence, whose vector gives the length, then the sample image where the format can carry one. */
+    private suspend fun embeddings(connection: RemoteConnection, apiKey: String, modelId: String): ProbedModel = withContext(Dispatchers.IO) {
         val session = RemoteEmbeddingSession(connection.protocol, connection.baseUrl, apiKey, modelId, { EgressDecision.Allowed }, timeoutMs)
-        session.embedText(TEXT)
+        val dimension = session.embedText(TEXT).size
         val found = mutableSetOf(ModelCapability.INPUT_TEXT, ModelCapability.OUTPUT_EMBEDDING)
         if (connection.protocol == RemoteProtocol.GEMINI_EMBED_CONTENT && works { session.embedImage(sampleImage()).isNotEmpty() }) found += ModelCapability.INPUT_IMAGE
-        found
+        ProbedModel(found, dimension)
     }
 
     /** A refused image or stream only leaves that capability out; a rate limit or a cancel is still thrown. */

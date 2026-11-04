@@ -5,6 +5,7 @@ import dev.irohaco.core.contracts.EgressDecision
 import dev.irohaco.core.contracts.EgressDeniedException
 import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.ModelCapability
+import dev.irohaco.core.contracts.ProbedModel
 import dev.irohaco.core.contracts.RemoteCallException
 import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.RemoteFailure
@@ -105,7 +106,7 @@ class RemoteEmbeddingSessionTest {
     fun `the connection test finds images only where the format takes them`() = runTest {
         fun connection(protocol: RemoteProtocol) = RemoteConnection("c", protocol, baseUrl)
         val text = setOf(ModelCapability.INPUT_TEXT, ModelCapability.OUTPUT_EMBEDDING)
-        assertEquals(text, RemoteCapabilityProbe().probe(connection(RemoteProtocol.OPENAI_EMBEDDINGS), "k", "embed-x"))
-        assertEquals(text + ModelCapability.INPUT_IMAGE, RemoteCapabilityProbe().probe(connection(RemoteProtocol.GEMINI_EMBED_CONTENT), "k", "embed-x"))
+        assertEquals(ProbedModel(text, 2), RemoteCapabilityProbe().probe(connection(RemoteProtocol.OPENAI_EMBEDDINGS), "k", "embed-x"))
+        assertEquals(ProbedModel(text + ModelCapability.INPUT_IMAGE, 2), RemoteCapabilityProbe().probe(connection(RemoteProtocol.GEMINI_EMBED_CONTENT), "k", "embed-x"))
     }
 }

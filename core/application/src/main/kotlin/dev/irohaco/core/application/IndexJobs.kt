@@ -1,5 +1,6 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.contracts.EgressDeniedException
 import dev.irohaco.core.contracts.IndexItemProcessor
 import dev.irohaco.core.contracts.IndexItem
 import dev.irohaco.core.contracts.IndexItemSkipped
@@ -19,6 +20,8 @@ import dev.irohaco.core.contracts.IndexJobStore
 import dev.irohaco.core.contracts.ModelLoadException
 import dev.irohaco.core.contracts.ModelNotInstalledException
 import dev.irohaco.core.contracts.PauseReason
+import dev.irohaco.core.contracts.RemoteCallException
+import dev.irohaco.core.contracts.RemoteFailure
 import dev.irohaco.core.contracts.ResourcePolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -64,6 +67,7 @@ class IndexJobs(
         recover()
         if (!store.transition(jobId, setOf(PLANNED, PAUSED, PARTIAL, FAILED), RUNNING)) return checkNotNull(store.state(jobId))
         _pauseReason.value = null
+        var space: String? = null
         try {
             while (true) {
                 policy.hold()?.let { reason ->
@@ -80,9 +84,10 @@ class IndexJobs(
                     else -> Unit
                 }
                 val item = store.nextPending(jobId) ?: break
+                val spaceId = space ?: store.spaceOf(jobId).also { space = it } ?: break
                 store.begin(jobId, item)
                 try {
-                    store.commit(jobId, item, newId(), processor.embed(item), now())
+                    store.commit(jobId, item, newId(), processor.embed(item, spaceId), now())
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: IndexItemSkipped) {
@@ -91,6 +96,12 @@ class IndexJobs(
                     return failJob(jobId)
                 } catch (e: ModelLoadException) {
                     return failJob(jobId)
+                } catch (e: EgressDeniedException) {
+                    return failJob(jobId) // a grant taken back stops the job, not one file
+                } catch (e: RemoteCallException) {
+                    // The key, the limits or the network: every next file would fail the same way, and a
+                    // retry could be charged again (AC-009). A refused file alone fails only itself.
+                    if (e.failure is RemoteFailure.Failed) store.fail(jobId, item) else return failJob(jobId)
                 } catch (e: Exception) {
                     // This item alone could not be read or embedded; it stays in the failure list for a retry.
                     store.fail(jobId, item)

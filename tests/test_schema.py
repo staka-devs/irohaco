@@ -19,7 +19,7 @@ class SchemaTest(unittest.TestCase):
         self.db.execute("INSERT INTO media_revisions VALUES ('ar1','a1','sha-file','sha-visual',100,256,256,NULL)")
         self.db.execute("INSERT INTO media_revisions VALUES ('vr1','vid1','v-file','v-visual',100,1920,1080,30000)")
         self.db.execute("INSERT INTO provider_connections VALUES ('c1','LOCAL_LITERT',NULL,NULL)")
-        self.db.execute("INSERT INTO model_profiles VALUES ('m1','c1','embeddinggemma-2','artifact-sha','EmbeddingGemma 2')")
+        self.db.execute("INSERT INTO model_profiles VALUES ('m1','c1','embeddinggemma-2','artifact-sha','EmbeddingGemma 2',NULL)")
         self.db.execute("INSERT INTO embedding_spaces VALUES ('s1','m1',3,'FLOAT32_LE','L2',NULL,NULL,'pre-sha','space-sha','READY')")
         self.db.execute("INSERT INTO embedding_targets(target_id,asset_id) VALUES ('t1','a1')")
 

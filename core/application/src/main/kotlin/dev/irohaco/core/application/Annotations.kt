@@ -5,10 +5,12 @@ import dev.irohaco.core.contracts.AnnotationAuthor
 import dev.irohaco.core.contracts.AnnotationKind
 import dev.irohaco.core.contracts.AnnotationRevision
 import dev.irohaco.core.contracts.AnnotationStore
+import dev.irohaco.core.contracts.EgressDeniedException
 import dev.irohaco.core.contracts.IndexSource
 import dev.irohaco.core.contracts.MediaIndexStore
 import dev.irohaco.core.contracts.ModelLoadException
 import dev.irohaco.core.contracts.ModelNotInstalledException
+import dev.irohaco.core.contracts.RemoteCallException
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -57,8 +59,9 @@ class ManageAnnotations(
 }
 
 /**
- * Embeds one memo's current text into every space the local model can search, right after it is
- * written (AC-007). Without a model or a space there is nothing to do; the next index catches up.
+ * Embeds one memo's current text into every space that can be searched, each with its own model, right
+ * after it is written (AC-007). Without a model or a space there is nothing to do, and a remote model
+ * that fails or is not allowed skips its space; the next index catches up.
  */
 class EmbedMemo(
     private val media: MediaIndexStore,
@@ -67,14 +70,23 @@ class EmbedMemo(
     private val embedText: suspend (String) -> FloatArray,
     private val newId: () -> String,
     private val now: () -> Long,
+    private val remote: RemoteEmbedding? = null,
 ) {
     suspend operator fun invoke(annotationId: String) {
         val item = media.memoItem(annotationId) ?: return
         val text = (media.source(item.targetId) as? IndexSource.Text)?.text ?: return
-        val vectors = mutableMapOf<String?, FloatArray>()
+        val vectors = mutableMapOf<Pair<String, String?>, FloatArray>()
         try {
             for (space in meaning.searchableSpaces()) {
-                val vector = vectors.getOrPut(space.corpusPrefix) { embedText((space.corpusPrefix ?: "") + text) }
+                val vector = try {
+                    vectors.getOrPut(space.modelProfileId to space.corpusPrefix) {
+                        remote?.embedder(space.modelProfileId)?.memo(text, media.assetOf(item.targetId)) ?: embedText((space.corpusPrefix ?: "") + text)
+                    }
+                } catch (e: RemoteCallException) {
+                    continue
+                } catch (e: EgressDeniedException) {
+                    continue
+                }
                 media.putVector(space.spaceId, item, newId(), vector, now())
             }
         } catch (e: ModelNotInstalledException) {

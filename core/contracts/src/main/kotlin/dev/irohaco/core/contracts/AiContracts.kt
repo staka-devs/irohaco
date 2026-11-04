@@ -57,6 +57,13 @@ interface AnswerModelSettings {
     suspend fun setAnswerModel(id: String)
 }
 
+/** The remote model the user picked to index photos with; null for the model on this device. */
+interface EmbeddingModelSettings {
+    val embeddingModel: Flow<String?>
+
+    suspend fun setEmbeddingModel(id: String?)
+}
+
 /** A loaded model that answers from images and text on this device (RAG-001). */
 interface AnswerSession : AutoCloseable {
     /**

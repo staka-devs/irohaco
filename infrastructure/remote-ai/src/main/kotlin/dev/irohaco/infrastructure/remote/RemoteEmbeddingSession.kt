@@ -5,6 +5,9 @@ import dev.irohaco.core.contracts.EgressDecision
 import dev.irohaco.core.contracts.EgressDeniedException
 import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.EmbeddingSession
+import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteEmbeddingSessions
+import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.RemoteProtocol
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
@@ -56,6 +59,11 @@ class RemoteEmbeddingSession(
     private companion object {
         const val TIMEOUT_MS = 60_000
     }
+}
+
+object RemoteEmbeddingSessionFactory : RemoteEmbeddingSessions {
+    override fun open(connection: RemoteConnection, apiKey: String, model: RemoteModel, authorize: suspend (EgressPayload) -> EgressDecision) =
+        RemoteEmbeddingSession(connection.protocol, connection.baseUrl, apiKey, model.modelId, authorize)
 }
 
 /** How one embedding API format asks and answers (ARCHITECTURE §9.1). */

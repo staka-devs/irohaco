@@ -38,6 +38,8 @@ class IndexMediaTest {
         override suspend fun pendingCount(spaceId: String) = 0
         override suspend fun plan(spaceId: String, folders: Set<String>?, quality: VideoQuality, now: Long) = emptyList<IndexItem>()
         override suspend fun source(targetId: String) = sources[targetId]
+
+        override suspend fun assetOf(targetId: String) = targetId
         override fun lowCoverageVideos() = flowOf(0)
         override suspend fun memoItem(annotationId: String) = IndexItem("memo:$annotationId", "rev:1").takeIf { "memo:$annotationId" in sources }
         override suspend fun putVector(spaceId: String, item: IndexItem, vectorId: String, vector: FloatArray, createdAt: Long) {
@@ -63,17 +65,17 @@ class IndexMediaTest {
         }
         override suspend fun search(query: String, limit: Int) = emptyList<TextMatch>()
     }
-    private val embedMedia = EmbedMediaItem(store, reader, recognizer, texts, embedText = { floatArrayOf(it.length.toFloat()) }) { onEmbed(); floatArrayOf(it[0].toFloat()) }
+    private val embedMedia = EmbedMediaItem(store, reader, recognizer, texts, embedText = { floatArrayOf(it.length.toFloat()) }, embed = { onEmbed(); floatArrayOf(it[0].toFloat()) })
 
     @Test
     fun `an image at its planned revision is read and embedded`() = runTest {
-        assertContentEquals(floatArrayOf(1f), embedMedia.embed(IndexItem("t1", "r1")))
+        assertContentEquals(floatArrayOf(1f), embedMedia.embed(IndexItem("t1", "r1"), "s"))
         assertEquals(listOf("content://1"), read)
     }
 
     @Test
     fun `a memo is embedded from its text, with no file read and no OCR`() = runTest {
-        assertContentEquals(floatArrayOf(4f), embedMedia.embed(IndexItem("memo:n1", "rev:1")))
+        assertContentEquals(floatArrayOf(4f), embedMedia.embed(IndexItem("memo:n1", "rev:1"), "s"))
         assertEquals(emptyList(), read)
         assertEquals(emptyList(), recorded)
     }
@@ -99,41 +101,41 @@ class IndexMediaTest {
 
     @Test
     fun `a video frame is read at its time`() = runTest {
-        assertContentEquals(floatArrayOf(2f), embedMedia.embed(IndexItem("f1", "r1")))
+        assertContentEquals(floatArrayOf(2f), embedMedia.embed(IndexItem("f1", "r1"), "s"))
         assertEquals(listOf("content://v@15000"), read)
     }
 
     @Test
     fun `the text read from the image is kept with its revision`() = runTest {
-        embedMedia.embed(IndexItem("t1", "r1"))
+        embedMedia.embed(IndexItem("t1", "r1"), "s")
         assertEquals(listOf("t1@r1=看板"), recorded)
     }
 
     @Test
     fun `text that cannot be read leaves the vector in place`() = runTest {
         ocr = { error("recognizer failed") }
-        assertContentEquals(floatArrayOf(1f), embedMedia.embed(IndexItem("t1", "r1")))
+        assertContentEquals(floatArrayOf(1f), embedMedia.embed(IndexItem("t1", "r1"), "s"))
         assertEquals(emptyList(), recorded)
     }
 
     @Test
     fun `no text is kept for an image changed while it was read`() = runTest {
         onEmbed = { sources["t1"] = IndexSource.Image("content://1", "r2") }
-        assertFailsWith<IndexItemSkipped> { embedMedia.embed(IndexItem("t1", "r1")) }
+        assertFailsWith<IndexItemSkipped> { embedMedia.embed(IndexItem("t1", "r1"), "s") }
         assertEquals(emptyList(), recorded)
     }
 
     @Test
     fun `a gone or changed image is skipped without reading it`() = runTest {
-        assertFailsWith<IndexItemSkipped> { embedMedia.embed(IndexItem("t2", "r1")) }
-        assertFailsWith<IndexItemSkipped> { embedMedia.embed(IndexItem("t1", "r0")) }
+        assertFailsWith<IndexItemSkipped> { embedMedia.embed(IndexItem("t2", "r1"), "s") }
+        assertFailsWith<IndexItemSkipped> { embedMedia.embed(IndexItem("t1", "r0"), "s") }
         assertEquals(emptyList(), read)
     }
 
     @Test
     fun `an image changed while the model ran is skipped`() = runTest {
         onEmbed = { sources["t1"] = IndexSource.Image("content://1", "r2") }
-        assertFailsWith<IndexItemSkipped> { embedMedia.embed(IndexItem("t1", "r1")) }
+        assertFailsWith<IndexItemSkipped> { embedMedia.embed(IndexItem("t1", "r1"), "s") }
     }
 
     @Test

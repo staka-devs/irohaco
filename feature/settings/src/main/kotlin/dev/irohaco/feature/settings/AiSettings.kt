@@ -60,6 +60,11 @@ internal fun AiSettings(
     remoteAnswerModels: List<RemoteModel> = emptyList(),
     answerModel: String? = null,
     onSelectAnswerModel: (String) -> Unit = {},
+    /** Remote models that can index photos; picking one sends photos, video scenes and memos out (ADR-0032). */
+    remoteEmbeddingModels: List<RemoteModel> = emptyList(),
+    /** Null for the model on this device. */
+    embeddingModel: String? = null,
+    onSelectEmbeddingModel: (String?) -> Unit = {},
 ) {
     var deleting by remember { mutableStateOf<ModelArtifact?>(null) }
     deleting?.let { model ->
@@ -179,6 +184,30 @@ internal fun AiSettings(
                         selected = model.profileId == answerModel,
                         role = Role.RadioButton,
                         onClick = { onSelectAnswerModel(model.profileId) },
+                    ),
+                ) { Text(model.displayName) }
+            }
+        }
+        if (remoteEmbeddingModels.isNotEmpty()) {
+            SectionTitle(R.string.settings_ai_index_model)
+            Text(
+                stringResource(R.string.settings_ai_index_model_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = IrohacoSpacing.l),
+            )
+            ListItem(
+                leadingContent = { RadioButton(selected = embeddingModel == null, onClick = null) },
+                modifier = Modifier.selectable(selected = embeddingModel == null, role = Role.RadioButton, onClick = { onSelectEmbeddingModel(null) }),
+            ) { Text(stringResource(R.string.settings_ai_index_model_local)) }
+            remoteEmbeddingModels.forEach { model ->
+                ListItem(
+                    supportingContent = { Text(stringResource(R.string.settings_ai_index_model_remote)) },
+                    leadingContent = { RadioButton(selected = model.profileId == embeddingModel, onClick = null) },
+                    modifier = Modifier.selectable(
+                        selected = model.profileId == embeddingModel,
+                        role = Role.RadioButton,
+                        onClick = { onSelectEmbeddingModel(model.profileId) },
                     ),
                 ) { Text(model.displayName) }
             }

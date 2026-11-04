@@ -41,17 +41,21 @@ object ImageSpaces {
 /**
  * Plans an index the user asked for (IDX-001, IDX-003, IDX-004): every available image, and frames of
  * every available video at [VideoQuality], in the chosen folders, that have no vector of their current
- * revision yet. The first job of a space is INITIAL.
+ * revision yet. The first job of a space is INITIAL. The space is the one of the model the user picked.
  */
 class PlanMediaIndex(
     private val store: MediaIndexStore,
     private val jobs: IndexJobs,
     private val newId: () -> String,
     private val now: () -> Long,
-    private val spec: EmbeddingSpaceSpec = ImageSpaces.LOCAL,
+    private val spec: suspend () -> EmbeddingSpaceSpec = { ImageSpaces.LOCAL },
 ) {
+    /** How many photos, video frames and memos an index would send to a remote model. */
+    data class Outgoing(val photos: Int, val frames: Int, val memos: Int)
+
     /** Returns the planned job's id; folders are relative paths, null meaning every folder. */
     suspend operator fun invoke(folders: Set<String>? = null, quality: VideoQuality = VideoQuality.BALANCED): String {
+        val spec = spec()
         val signature = ImageSpaces.signature(spec)
         val spaceId = store.ensureSpace(newId(), spec, signature)
         val kind = if (store.hasVectors(spaceId)) IndexJobKind.INCREMENTAL else IndexJobKind.INITIAL
@@ -61,16 +65,32 @@ class PlanMediaIndex(
     /**
      * Plans an index of what changed since the last one (IDX-005): new and edited files and memos of
      * every folder. It never makes the first index, which only the user starts, and plans nothing when
-     * nothing changed; null then.
+     * nothing changed; null then. With a remote model it plans nothing: files leave the device only
+     * after the user has seen how many (ARCHITECTURE §9.2).
      */
     suspend fun changes(): String? {
+        val spec = spec()
+        if (spec.modelProfileId != ImageSpaces.LOCAL.modelProfileId) return null
         val spaceId = store.findSpace(ImageSpaces.signature(spec))?.takeIf { store.hasVectors(it) } ?: return null
         val items = store.plan(spaceId, null, VideoQuality.BALANCED, now()).ifEmpty { return null }
         return jobs.start(spaceId, IndexJobKind.INCREMENTAL, items, requestedByUser = false)
     }
 
     /** How many files and memos the current index lacks or has at an older revision; all of them before the first index. */
-    suspend fun pendingCount(): Int = store.pendingCount(store.findSpace(ImageSpaces.signature(spec)).orEmpty())
+    suspend fun pendingCount(): Int = store.pendingCount(store.findSpace(ImageSpaces.signature(spec())).orEmpty())
+
+    /**
+     * What an index of [folders] would send when the picked model is remote, for the user to agree to
+     * first (ARCHITECTURE §9.2); null for the local model, which sends nothing.
+     */
+    suspend fun outgoing(folders: Set<String>? = null, quality: VideoQuality = VideoQuality.BALANCED): Outgoing? {
+        val spec = spec()
+        if (spec.modelProfileId == ImageSpaces.LOCAL.modelProfileId) return null
+        val items = store.plan(store.findSpace(ImageSpaces.signature(spec)).orEmpty(), folders, quality, now())
+        val frames = items.count { it.targetId.startsWith("frame:") }
+        val memos = items.count { it.targetId.startsWith("memo:") }
+        return Outgoing(items.size - frames - memos, frames, memos)
+    }
 
     /** Videos not covered to their end, for the low coverage notice. */
     fun lowCoverageVideos(): Flow<Int> = store.lowCoverageVideos()
@@ -107,7 +127,8 @@ class IndexChanges(
 /**
  * Embeds one image or video frame and reads its text (INDEX_STATE_MACHINE.md §4 steps 3–4, IDX-003).
  * A file that is gone or changed is skipped, both before and after the model runs, so a vector or text
- * never lands on a newer revision. Text that cannot be read leaves the vector in place.
+ * never lands on a newer revision. Text that cannot be read leaves the vector in place. A space of a
+ * remote model is filled by that model, and text is read on this device either way.
  */
 class EmbedMediaItem(
     private val store: MediaIndexStore,
@@ -118,14 +139,23 @@ class EmbedMediaItem(
     private val embedText: suspend (String) -> FloatArray,
     /** Runs the model at background priority; searches by the user go first. */
     private val embed: suspend (ByteArray) -> FloatArray,
+    /** The model of each space: the remote model it was built with, or null for the local one. */
+    private val remote: suspend (spaceId: String) -> RemoteEmbedding.Embedder? = { null },
 ) : IndexItemProcessor {
-    override suspend fun embed(item: IndexItem): FloatArray {
-        val bytes = when (val source = current(item)) {
+    override suspend fun embed(item: IndexItem, spaceId: String): FloatArray {
+        val model = remote(spaceId)
+        val source = current(item)
+        val assetId = if (model != null) store.assetOf(item.targetId) else null
+        val bytes = when (source) {
             is IndexSource.Image -> reader.read(source.contentUri)
             is IndexSource.Frame -> reader.readFrame(source.contentUri, source.timestampMs)
-            is IndexSource.Text -> return embedText(source.text).also { current(item) }
+            is IndexSource.Text -> return (model?.memo(source.text, assetId) ?: embedText(source.text)).also { current(item) }
         }
-        val vector = embed(bytes)
+        val vector = when {
+            model == null -> embed(bytes)
+            source is IndexSource.Frame -> model.frame(bytes, assetId)
+            else -> model.image(bytes, assetId)
+        }
         val text = recognizer?.let { recognize(it, bytes) }
         current(item)
         if (text != null) texts?.recordOcr(item.targetId, item.sourceRevisionDigest, text, recognizer.engineRevision)

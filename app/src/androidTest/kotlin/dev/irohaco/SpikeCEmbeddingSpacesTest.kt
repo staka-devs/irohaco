@@ -68,14 +68,14 @@ class SpikeCEmbeddingSpacesTest {
 
     private fun jobs(model: ModelArtifact) = IndexJobs(
         RoomIndexJobStore(container.database),
-        { item -> vector(model, item.targetId) },
+        { item, _ -> vector(model, item.targetId) },
         { null },
         { UUID.randomUUID().toString() },
         System::currentTimeMillis,
     )
 
     private fun plan(model: ModelArtifact, jobs: IndexJobs) =
-        PlanMediaIndex(RoomMediaIndexStore(container.database), jobs, { UUID.randomUUID().toString() }, System::currentTimeMillis, spec(model))
+        PlanMediaIndex(RoomMediaIndexStore(container.database), jobs, { UUID.randomUUID().toString() }, System::currentTimeMillis, { spec(model) })
 
     @Test
     fun twoSpacesLiveSideBySideAndSwitchWithoutARebuild() = runBlocking {

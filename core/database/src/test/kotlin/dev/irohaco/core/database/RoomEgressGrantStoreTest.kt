@@ -36,8 +36,8 @@ class RoomEgressGrantStoreTest {
         store.add("openai", RemoteProtocol.OPENAI_RESPONSES, "https://api.example", "ref")
         db.modelProfileDao().ensureLocalConnection() // the local runtime, which is not listed
         db.openHelper.writableDatabase.apply {
-            execSQL("INSERT INTO model_profiles VALUES ('gpt', 'openai', 'gpt-x', NULL, 'GPT')")
-            execSQL("INSERT INTO model_profiles VALUES ('gpt-mini', 'openai', 'gpt-x-mini', NULL, 'GPT mini')")
+            execSQL("INSERT INTO model_profiles VALUES ('gpt', 'openai', 'gpt-x', NULL, 'GPT', NULL)")
+            execSQL("INSERT INTO model_profiles VALUES ('gpt-mini', 'openai', 'gpt-x-mini', NULL, 'GPT mini', NULL)")
         }
     }
 
@@ -86,5 +86,27 @@ class RoomEgressGrantStoreTest {
         store.addModel(RemoteModel("p2", "openai", "gpt-y", "GPT y", setOf(ModelCapability.OUTPUT_TEXT)))
         store.removeModel("p2")
         assertEquals(listOf("gpt", "gpt-mini"), store.models.first().map { it.profileId }.sorted())
+    }
+
+    @Test
+    fun `an embedding model keeps its length, and its index goes with it while the local one stays`() = runTest {
+        remote()
+        val gemini = RemoteModel("gem", "openai", "gemini-embedding", "Gemini", setOf(ModelCapability.INPUT_TEXT, ModelCapability.OUTPUT_EMBEDDING), dimension = 3)
+        store.addModel(gemini)
+        assertEquals(gemini, store.model("gem"))
+        db.openHelper.writableDatabase.apply {
+            execSQL("INSERT INTO model_profiles VALUES ('local', 'local-litert', 'local', 'sha', 'Local', NULL)")
+            for ((space, profile) in listOf("remote" to "gem", "local-space" to "local")) {
+                execSQL("INSERT INTO embedding_spaces VALUES ('$space', '$profile', 3, 'FLOAT32_LE', 'L2', NULL, NULL, 'p', '$space-sig', 'READY')")
+                execSQL("INSERT INTO indexing_jobs(job_id, space_id, job_kind, state, requested_by_user, requested_at) VALUES ('$space-job', '$space', 'INITIAL', 'SUCCEEDED', 1, 0)")
+            }
+        }
+        store.removeModel("gem")
+        store.removeModel("local") // never the local model's index, whatever id comes in
+        val left = db.openHelper.readableDatabase.query("SELECT space_id FROM embedding_spaces UNION ALL SELECT job_id FROM indexing_jobs").use { c ->
+            buildList { while (c.moveToNext()) add(c.getString(0)) }
+        }
+        assertEquals(listOf("local-space", "local-space-job"), left.sorted())
+        assertEquals(null, store.model("gem"))
     }
 }

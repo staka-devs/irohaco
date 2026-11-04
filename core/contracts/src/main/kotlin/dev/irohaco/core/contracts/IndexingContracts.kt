@@ -66,6 +66,9 @@ interface IndexJobStore {
      */
     suspend fun markSpaceReady(jobId: String)
 
+    /** The space [jobId] fills; null when there is no such job. */
+    suspend fun spaceOf(jobId: String): String?
+
     fun progress(jobId: String): Flow<IndexJobProgress?>
 
     /** The job requested last, or null before the first one. */
@@ -78,7 +81,7 @@ interface IndexJobStore {
 /** Turns one item into its vector, outside any database transaction (INDEX_STATE_MACHINE.md §4). */
 fun interface IndexItemProcessor {
     /** Throws [IndexItemSkipped] when the item no longer applies, such as a file that is gone or changed. */
-    suspend fun embed(item: IndexItem): FloatArray
+    suspend fun embed(item: IndexItem, spaceId: String): FloatArray
 }
 
 /** The item is not a failure: its file is gone, offline, or has a newer revision that a later job indexes. */
@@ -136,6 +139,9 @@ interface MediaIndexStore {
 
     /** What [targetId] reads from, or null when it is gone or not available. */
     suspend fun source(targetId: String): IndexSource?
+
+    /** The file [targetId] belongs to, for a frame or memo too; the egress policy checks it. */
+    suspend fun assetOf(targetId: String): String?
 
     /** The target of a search memo at its current revision, made if needed; null when the memo is not searchable. */
     suspend fun memoItem(annotationId: String): IndexItem?

@@ -1,11 +1,13 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.contracts.EgressDeniedException
 import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.MediaAccessCheck
 import dev.irohaco.core.contracts.MediaItems
 import dev.irohaco.core.contracts.ModelLoadException
 import dev.irohaco.core.contracts.ModelNotInstalledException
 import dev.irohaco.core.contracts.PlaceMatch
+import dev.irohaco.core.contracts.RemoteCallException
 import dev.irohaco.core.contracts.SpaceState
 import dev.irohaco.core.contracts.TextMatch
 import dev.irohaco.core.contracts.TimelineItem
@@ -141,6 +143,10 @@ class SearchMedia(
         emptyList()
     } catch (e: ModelLoadException) {
         emptyList() // the gallery and the text search keep working without the model (IST-010)
+    } catch (e: RemoteCallException) {
+        emptyList()
+    } catch (e: EgressDeniedException) {
+        emptyList()
     }
 
     private class Fused {

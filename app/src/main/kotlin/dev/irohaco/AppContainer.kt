@@ -30,6 +30,8 @@ import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.application.GrantedEgressPolicy
 import dev.irohaco.core.application.ManageEgress
 import dev.irohaco.core.application.RemoteAnswering
+import dev.irohaco.core.application.RemoteEmbedding
+import dev.irohaco.core.application.ImageSpaces
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.MarkMedia
 import dev.irohaco.core.application.EditMetadata
@@ -47,6 +49,7 @@ import dev.irohaco.core.application.SyncMediaCatalog
 import dev.irohaco.core.application.ThemeColorSettings
 import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.AiPriority
+import dev.irohaco.core.contracts.EmbeddingModelSettings
 import dev.irohaco.core.database.IrohacoDatabase
 import dev.irohaco.core.database.IrohacoDatabaseFactory
 import dev.irohaco.core.database.RoomAnnotationStore
@@ -55,6 +58,7 @@ import dev.irohaco.core.database.RoomCollectionsStore
 import dev.irohaco.core.database.RoomEgressGrantStore
 import dev.irohaco.infrastructure.remote.RemoteAnswerSessions
 import dev.irohaco.infrastructure.remote.RemoteCapabilityProbe
+import dev.irohaco.infrastructure.remote.RemoteEmbeddingSessionFactory
 import dev.irohaco.core.database.RoomIdentityStore
 import dev.irohaco.core.database.RoomMediaIndexStore
 import dev.irohaco.core.database.RoomMediaPurge
@@ -128,6 +132,18 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     /** Remote models the user registered for questions, each request checked by the egress policy (API-007). */
     val remoteAnswering by lazy { RemoteAnswering(egressStore, credentials, RemoteAnswerSessions, GrantedEgressPolicy(egressStore)) }
+
+    /** Remote models the user registered to index and search photos with, each request checked first (API-007). */
+    val remoteEmbedding by lazy { RemoteEmbedding(egressStore, credentials, RemoteEmbeddingSessionFactory, GrantedEgressPolicy(egressStore)) }
+
+    /** The remote model indexing uses now; null for the local model. */
+    val embeddingModelSettings: EmbeddingModelSettings by lazy { DataStoreAiSettings(settingsStore) }
+
+    /** The space the next index fills: the picked remote model's, or the local model's when none is picked or it is gone. */
+    private suspend fun indexSpec() = embeddingModelSettings.embeddingModel.first()?.let { remoteEmbedding.spec(it) } ?: ImageSpaces.LOCAL
+
+    /** The remote model a space was built with; null for the local model's. */
+    private suspend fun spaceModel(spaceId: String) = vectorSearchStore.space(spaceId)?.let { remoteEmbedding.embedder(it.modelProfileId) }
 
     val sharingSettings by lazy { DataStoreSharingSettings(settingsStore) }
 
@@ -271,9 +287,11 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     /** Files in the folders hidden from the timeline; search and the map leave them out too (GAL-002). */
     private suspend fun hiddenMedia(): Set<String> = RoomTimelineReader(database).onlyIn(browseLibrary.excludedFolders().first())
 
+    private val vectorSearchStore by lazy { RoomVectorSearchStore(database) }
+
     /** Searches by meaning in one embedding space at a time (M2-08); the query runs before any indexing. */
     val searchByMeaning by lazy {
-        SearchByMeaning(RoomVectorSearchStore(database), embedText = { text -> aiResourceManager.withEmbedding(AiPriority.USER_SEARCH) { it.embedText(text) } })
+        SearchByMeaning(vectorSearchStore, embedText = { text -> aiResourceManager.withEmbedding(AiPriority.USER_SEARCH) { it.embedText(text) } }, remote = remoteEmbedding)
     }
 
     private val embedMemo by lazy {
@@ -283,6 +301,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
             embedText = { text -> aiResourceManager.withEmbedding(AiPriority.INTERACTIVE_EDIT) { it.embedText(text) } },
             newId = { UUID.randomUUID().toString() },
             now = System::currentTimeMillis,
+            remote = remoteEmbedding,
         )
     }
 
@@ -303,9 +322,9 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
                 MlKitTextRecognizer(),
                 textIndexStore,
                 embedText = { text -> aiResourceManager.withEmbedding(AiPriority.BACKGROUND_INDEX) { it.embedText(text) } },
-            ) { bytes ->
-                aiResourceManager.withEmbedding(AiPriority.BACKGROUND_INDEX) { it.embedImage(bytes) }
-            },
+                embed = { bytes -> aiResourceManager.withEmbedding(AiPriority.BACKGROUND_INDEX) { it.embedImage(bytes) } },
+                remote = ::spaceModel,
+            ),
             policy = AndroidResourcePolicy(appContext),
             newId = { UUID.randomUUID().toString() },
             now = System::currentTimeMillis,
@@ -313,7 +332,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     }
 
     /** Plans an index of images and video frames the user asked for (M2-05, M2-06); the indexing screen (M2-04) starts the job. */
-    val planMediaIndex by lazy { PlanMediaIndex(mediaIndexStore, indexJobs, { UUID.randomUUID().toString() }, System::currentTimeMillis) }
+    val planMediaIndex by lazy { PlanMediaIndex(mediaIndexStore, indexJobs, { UUID.randomUUID().toString() }, System::currentTimeMillis, ::indexSpec) }
 
     private val askLazy: Lazy<AskLibrary> = lazy {
         AskLibrary(

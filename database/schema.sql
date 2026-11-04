@@ -257,7 +257,8 @@ CREATE TABLE model_profiles (
   connection_id TEXT NOT NULL REFERENCES provider_connections(connection_id) ON DELETE RESTRICT,
   provider_model_id TEXT NOT NULL,
   artifact_revision TEXT,
-  display_name TEXT NOT NULL
+  display_name TEXT NOT NULL,
+  embedding_dimension INTEGER CHECK(embedding_dimension > 0)
 );
 
 -- table: model_capabilities
