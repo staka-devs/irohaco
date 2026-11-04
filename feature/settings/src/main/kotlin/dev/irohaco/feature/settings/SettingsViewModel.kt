@@ -6,6 +6,7 @@ import dev.irohaco.core.application.AiBackendChoice
 import dev.irohaco.core.application.AskLibrary
 import dev.irohaco.core.application.BrowseLibrary
 import dev.irohaco.core.application.ExportBackup
+import dev.irohaco.core.application.RestoreBackup
 import dev.irohaco.core.application.IndexJobs
 import dev.irohaco.core.application.ManageEgress
 import dev.irohaco.core.application.ManageModels
@@ -14,6 +15,7 @@ import dev.irohaco.core.application.RemoteAnswering
 import dev.irohaco.core.application.RemoteEmbedding
 import dev.irohaco.core.application.ThemeColorSettings
 import dev.irohaco.core.contracts.AiBackend
+import dev.irohaco.core.contracts.BackupUnreadableException
 import dev.irohaco.core.contracts.EgressGrant
 import dev.irohaco.core.contracts.EmbeddingModelSettings
 import dev.irohaco.core.contracts.EmbeddingSpace
@@ -72,6 +74,8 @@ class SettingsViewModel(
     private val embeddingSettings: EmbeddingModelSettings? = null,
     /** Writes the encrypted backup (UC-BACKUP-01). */
     private val exportBackup: ExportBackup? = null,
+    /** Opens a backup, matches its files here and applies it once the user agrees (UC-RESTORE-01). */
+    private val restoreBackup: RestoreBackup? = null,
     /** Runs a job in the foreground service, so it carries on after the user leaves this screen. */
     private val runIndexJob: (String) -> Unit = {},
 ) : ViewModel() {
@@ -302,6 +306,65 @@ class SettingsViewModel(
     fun dismissExport() {
         _exportTarget.value = null
         if (_exportState.value != ExportState.Running) _exportState.value = ExportState.Idle
+    }
+
+    private val _restoreSource = MutableStateFlow<String?>(null)
+
+    /** The backup the user picked; its passphrase is asked for next. */
+    val restoreSource: StateFlow<String?> = _restoreSource
+
+    private val _restoreState = MutableStateFlow<RestoreState>(RestoreState.Idle)
+    val restoreState: StateFlow<RestoreState> = _restoreState
+
+    /** Held between the preview and the user's answer; dropped on dismiss. */
+    private var preview: RestoreBackup.Preview? = null
+
+    fun pickRestoreSource(uri: String) {
+        _restoreSource.value = uri
+    }
+
+    /** Opens and checks [source] and matches its files; the passphrase is wiped once that is over. */
+    fun openRestore(source: String, passphrase: CharArray) {
+        val restore = restoreBackup ?: return
+        _restoreSource.value = null
+        _restoreState.value = RestoreState.Opening
+        viewModelScope.launch {
+            _restoreState.value = try {
+                val opened = restore.preview(source, passphrase)
+                preview = opened
+                with(opened.matches) { RestoreState.Preview(opened.records, matched, needsReview, missing) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: BackupUnreadableException) {
+                RestoreState.Failed(unreadable = true)
+            } catch (e: Exception) {
+                RestoreState.Failed(unreadable = false)
+            } finally {
+                passphrase.fill('\u0000')
+            }
+        }
+    }
+
+    fun applyRestore() {
+        val restore = restoreBackup ?: return
+        val opened = preview ?: return
+        preview = null
+        _restoreState.value = RestoreState.Applying
+        viewModelScope.launch {
+            _restoreState.value = try {
+                restore.apply(opened).let { RestoreState.Done(it.added.values.sum(), it.skipped) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RestoreState.Failed(unreadable = false)
+            }
+        }
+    }
+
+    fun dismissRestore() {
+        _restoreSource.value = null
+        preview = null
+        if (_restoreState.value != RestoreState.Opening && _restoreState.value != RestoreState.Applying) _restoreState.value = RestoreState.Idle
     }
 
     /** Folders hidden from the Photos tab, by path, for the Library page (GAL-002). */

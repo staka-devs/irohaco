@@ -165,4 +165,16 @@
     <string name="settings_backup_done_body">ファイルを読み直して確かめました。%1$d 件の記録が入っています。</string>
     <string name="settings_backup_failed">エクスポートできませんでした</string>
     <string name="settings_backup_failed_body">ファイルは残していません。保存先を確かめて、もう一度試してください。</string>
+    <string name="settings_restore">復元</string>
+    <string name="settings_restore_running">バックアップを開いて復元しています…</string>
+    <string name="settings_restore_passphrase_title">バックアップのパスフレーズ</string>
+    <string name="settings_restore_open">開く</string>
+    <string name="settings_restore_preview_title">このバックアップを復元しますか？</string>
+    <string name="settings_restore_preview_body">%1$d 件の記録が入っています。\nこの端末で見つかった写真と動画：%2$d 件\n候補が複数あり、確認が必要なもの：%3$d 件\nこの端末で見つからなかったもの：%4$d 件\n\n見つかったファイルの記録だけを追加します。この端末の内容は上書きしません。API キーと外部へ送る許可は復元しません。</string>
+    <string name="settings_restore_apply">復元する</string>
+    <string name="settings_restore_done">復元しました</string>
+    <string name="settings_restore_done_body">%1$d 件の記録を追加しました。すでにあったものと、見つからなかったファイルの記録の %2$d 件は追加していません。</string>
+    <string name="settings_restore_failed">復元できませんでした</string>
+    <string name="settings_restore_unreadable">パスフレーズが違うか、バックアップのファイルが壊れています。何も読み込んでいません。</string>
+    <string name="settings_restore_rolled_back">何も変えていません。もう一度試してください。</string>
 </resources>
