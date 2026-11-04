@@ -238,6 +238,9 @@ interface CollectionsStore {
 
     suspend fun removeTag(assetId: String, tagId: String)
 
+    /** Takes the tag off every item and forgets it; the photos themselves stay. */
+    suspend fun deleteTag(tagId: String)
+
     /** Counts and covers come from available media only. */
     fun albums(): Flow<List<Album>>
 

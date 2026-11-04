@@ -117,7 +117,20 @@
     <string name="details_clear_rating">評価を消す</string>
     <string name="timeline_more">その他</string>
     <string name="tags_add">タグを追加</string>
-    <string name="tags_name">タグ</string>
+    <string name="tags_search">タグを検索、または新しい名前を入力</string>
+    <string name="tags_none">タグはまだありません。名前を入力すると作れます。</string>
+    <string name="tags_create_and_add">「%1$s」を作って追加</string>
+    <plurals name="tags_count">
+        <item quantity="one">%d件</item>
+        <item quantity="other">%d件</item>
+    </plurals>
+    <string name="tags_delete">タグを削除</string>
+    <string name="tags_delete_title">タグ「%1$s」を削除しますか？</string>
+    <plurals name="tags_delete_body">
+        <item quantity="one">%d件の写真と動画から外れます。写真と動画そのものは消えません。</item>
+        <item quantity="other">%d件の写真と動画から外れます。写真と動画そのものは消えません。</item>
+    </plurals>
+    <string name="tags_delete_confirm">削除</string>
     <string name="details_tags">タグ</string>
     <string name="details_remove_tag">%1$sを外す</string>
     <string name="library_tags">タグ</string>

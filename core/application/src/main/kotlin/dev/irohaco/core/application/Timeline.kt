@@ -270,6 +270,8 @@ class ManageCollections(private val store: CollectionsStore) {
 
     suspend fun removeTag(assetId: String, tagId: String) = store.removeTag(assetId, tagId)
 
+    suspend fun deleteTag(tagId: String) = store.deleteTag(tagId)
+
     fun albums() = store.albums()
 
     suspend fun createAlbum(title: String) = store.createAlbum(title)
