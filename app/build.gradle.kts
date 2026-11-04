@@ -83,6 +83,7 @@ dependencies {
     implementation(project(":infrastructure:preferences"))
     implementation(project(":infrastructure:local-ai"))
     implementation(project(":infrastructure:remote-ai"))
+    implementation(project(":infrastructure:backup"))
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.coil.compose)

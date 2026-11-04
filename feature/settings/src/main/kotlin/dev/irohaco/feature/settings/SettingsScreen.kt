@@ -111,6 +111,11 @@ fun SettingsScreen(
     val remoteEmbeddingModels by viewModel.remoteEmbeddingModels.collectAsStateWithLifecycle()
     val embeddingModel by viewModel.embeddingModel.collectAsStateWithLifecycle()
     val pendingSend by viewModel.pendingSend.collectAsStateWithLifecycle()
+    val exportTarget by viewModel.exportTarget.collectAsStateWithLifecycle()
+    val exportState by viewModel.exportState.collectAsStateWithLifecycle()
+    val pickBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        uri?.let { viewModel.pickExportTarget(it.toString()) }
+    }
     val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     val pickModel = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { viewModel.importModel(it.toString()) } }
     SettingsContent(
@@ -169,7 +174,16 @@ fun SettingsScreen(
             )
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast, locationPin, viewModel::setLocationPin) },
-        library = { LibrarySettings(excludedFolders, viewModel::showFolder) },
+        library = {
+            LibrarySettings(excludedFolders, viewModel::showFolder)
+            BackupSettings(
+                state = exportState,
+                target = exportTarget,
+                onPick = { pickBackup.launch("irohaco-${java.time.LocalDate.now()}.irohaco") },
+                onExport = viewModel::export,
+                onDismiss = viewModel::dismissExport,
+            )
+        },
         privacy = {
             PrivacySettings(shareLocationPolicy, viewModel::selectShareLocationPolicy, mapAllowed, viewModel::setMapAllowed, onOpenLocationHistory)
             RemoteSettings(
