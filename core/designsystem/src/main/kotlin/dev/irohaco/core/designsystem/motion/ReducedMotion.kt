@@ -1,5 +1,6 @@
 package dev.irohaco.core.designsystem.motion
 
+import android.content.ContentResolver
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -12,5 +13,8 @@ import androidx.compose.ui.platform.LocalContext
 @Composable
 fun rememberReducedMotion(): Boolean {
     val resolver = LocalContext.current.contentResolver
-    return remember(resolver) { Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }
+    return remember(resolver) { isReducedMotion(resolver) }
 }
+
+internal fun isReducedMotion(resolver: ContentResolver): Boolean =
+    Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f

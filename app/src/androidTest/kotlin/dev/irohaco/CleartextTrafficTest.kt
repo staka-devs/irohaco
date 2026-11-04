@@ -23,7 +23,7 @@ class CleartextTrafficTest {
 
     @Test
     fun anHttpRequestGetsItsAnswer() {
-        ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
+        ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { server ->
             thread {
                 server.accept().use { socket ->
                     socket.getInputStream().bufferedReader().let { reader -> while (reader.readLine().orEmpty().isNotEmpty()) Unit }
