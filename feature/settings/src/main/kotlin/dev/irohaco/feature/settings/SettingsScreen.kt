@@ -115,6 +115,7 @@ fun SettingsScreen(
     val remoteModels by viewModel.remoteModels.collectAsStateWithLifecycle()
     val modelTest by viewModel.modelTest.collectAsStateWithLifecycle()
     val remoteAnswerModels by viewModel.remoteAnswerModels.collectAsStateWithLifecycle()
+    val connectionFailed by viewModel.connectionFailed.collectAsStateWithLifecycle()
     val remoteEmbeddingModels by viewModel.remoteEmbeddingModels.collectAsStateWithLifecycle()
     val embeddingModel by viewModel.embeddingModel.collectAsStateWithLifecycle()
     val pendingSend by viewModel.pendingSend.collectAsStateWithLifecycle()
@@ -133,30 +134,7 @@ fun SettingsScreen(
     SettingsContent(
         onBack = onBack,
         ai = {
-            AiSettings(
-                models = viewModel.modelCatalog,
-                states = modelStates,
-                importResult = importResult,
-                onDownload = { id ->
-                    // The download runs either way; without the permission only its progress notification is hidden.
-                    notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    viewModel.downloadModel(id)
-                },
-                onImport = { pickModel.launch(arrayOf("application/octet-stream", "*/*")) },
-                onDelete = viewModel::deleteModel,
-                onPause = viewModel::pauseDownload,
-                onCancel = viewModel::cancelDownload,
-                backend = aiBackend,
-                gpuCheck = gpuCheck,
-                onSelectBackend = viewModel::selectAiBackend,
-                answerModels = viewModel.answerModels,
-                remoteAnswerModels = remoteAnswerModels,
-                answerModel = answerModel,
-                onSelectAnswerModel = viewModel::selectAnswerModel,
-                remoteEmbeddingModels = remoteEmbeddingModels,
-                embeddingModel = embeddingModel,
-                onSelectEmbeddingModel = viewModel::selectEmbeddingModel,
-            )
+            // Building the index is what this page is opened for most; the model choices come after it.
             IndexingSettings(
                 indexing = indexing,
                 // A remote model needs no file on the device.
@@ -183,6 +161,30 @@ fun SettingsScreen(
                 pendingSend = pendingSend?.outgoing,
                 onConfirmSend = viewModel::confirmSend,
                 onDismissSend = viewModel::dismissSend,
+            )
+            AiSettings(
+                models = viewModel.modelCatalog,
+                states = modelStates,
+                importResult = importResult,
+                onDownload = { id ->
+                    // The download runs either way; without the permission only its progress notification is hidden.
+                    notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    viewModel.downloadModel(id)
+                },
+                onImport = { pickModel.launch(arrayOf("application/octet-stream", "*/*")) },
+                onDelete = viewModel::deleteModel,
+                onPause = viewModel::pauseDownload,
+                onCancel = viewModel::cancelDownload,
+                backend = aiBackend,
+                gpuCheck = gpuCheck,
+                onSelectBackend = viewModel::selectAiBackend,
+                answerModels = viewModel.answerModels,
+                remoteAnswerModels = remoteAnswerModels,
+                answerModel = answerModel,
+                onSelectAnswerModel = viewModel::selectAnswerModel,
+                remoteEmbeddingModels = remoteEmbeddingModels,
+                embeddingModel = embeddingModel,
+                onSelectEmbeddingModel = viewModel::selectEmbeddingModel,
             )
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast, locationPin, viewModel::setLocationPin) },
@@ -216,6 +218,8 @@ fun SettingsScreen(
                 viewModel::removeModel,
                 modelTest,
                 viewModel::dismissModelTest,
+                connectionFailed,
+                viewModel::dismissConnectionFailed,
             )
         },
     )
