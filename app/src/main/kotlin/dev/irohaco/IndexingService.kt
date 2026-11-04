@@ -35,7 +35,11 @@ class IndexingService : Service() {
         startForeground(NOTIFICATION_ID, notification(null), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         val jobId = intent?.getStringExtra(EXTRA_JOB_ID)
         // One job at a time: a second start while one runs is ignored.
-        if (jobId == null || running?.isActive == true) return START_NOT_STICKY
+        if (running?.isActive == true) return START_NOT_STICKY
+        if (jobId == null) {
+            stopSelf(startId) // nothing to run; the notification shown above goes with the service
+            return START_NOT_STICKY
+        }
         val container = (application as IrohacoApplication).container
         val jobs = container.indexJobs
         running = scope.launch {

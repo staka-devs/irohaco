@@ -49,7 +49,7 @@ internal fun ZoomDetail(contentUri: String, zoom: ZoomState, container: Size) {
     val source by produceState<DetailSource?>(null, contentUri) {
         value = withContext(Dispatchers.IO) { DetailSource.open(context, contentUri) }
     }
-    DisposableEffect(source) { onDispose { source?.decoder?.recycle() } }
+    DisposableEffect(source) { onDispose { source?.close() } }
     var detail by remember(contentUri) { mutableStateOf<Detail?>(null) }
     LaunchedEffect(source, container) {
         val src = source ?: return@LaunchedEffect
@@ -78,13 +78,19 @@ internal fun ZoomDetail(contentUri: String, zoom: ZoomState, container: Size) {
 
 private class Detail(val bitmap: ImageBitmap, val region: Rect)
 
-private class DetailSource(val decoder: BitmapRegionDecoder, private val degrees: Int) {
+private class DetailSource(private val decoder: BitmapRegionDecoder, private val degrees: Int) {
     private val raw = IntSize(decoder.width, decoder.height)
+
+    /** A read may still be running on another thread when the screen leaves; the decoder is freed after it. */
+    @Synchronized
+    fun close() = decoder.recycle()
 
     /** The photo's size as it is shown, turned by its EXIF orientation. */
     val image = if (degrees % 180 == 0) raw else IntSize(raw.height, raw.width)
 
+    @Synchronized
     fun read(region: Rect, sample: Int): Bitmap? {
+        if (decoder.isRecycled) return null
         val r = rawRect(region, raw, degrees)
         val rect = android.graphics.Rect(r.left.toInt(), r.top.toInt(), r.right.toInt(), r.bottom.toInt())
         if (rect.isEmpty) return null

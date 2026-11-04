@@ -150,7 +150,6 @@ fun TimelineScreen(
     val showPinchHint by viewModel.showPinchHint.collectAsStateWithLifecycle()
     val locationPin by viewModel.locationPin.collectAsStateWithLifecycle()
     val chosenColumns by viewModel.columns.collectAsStateWithLifecycle()
-    val shareLocationPolicy by viewModel.shareLocationPolicy.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.refreshAccess() }
     LifecycleResumeEffect(Unit) {
@@ -261,12 +260,7 @@ fun TimelineScreen(
         onToggle = viewModel::toggle,
         onSelectRange = viewModel::setSelection,
         onClearSelection = viewModel::clearSelection,
-        onShare = rememberShareAction(
-            policy = shareLocationPolicy,
-            checkShare = viewModel::checkShare,
-            prepareShare = viewModel::prepareShare,
-            onReady = { context.startActivity(shareIntent(it)) },
-        ),
+        onShare = rememberShareAction(viewModel.sharing) { context.startActivity(shareIntent(it)) },
         onTrash = { items ->
             trashed = items.map { Uri.parse(it.contentUri) }
             trash.launch(trashRequest(context, trashed, trashed = true))

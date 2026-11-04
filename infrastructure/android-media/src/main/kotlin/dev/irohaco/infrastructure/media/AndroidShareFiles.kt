@@ -45,6 +45,9 @@ class AndroidShareFiles(private val context: Context) : ShareFiles {
         } catch (e: SecurityException) {
             file.delete()
             null
+        } catch (e: RuntimeException) {
+            file.delete() // ExifInterface throws these on a malformed file; the copy is unusable then
+            null
         }
     }
 

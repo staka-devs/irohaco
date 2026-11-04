@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -104,7 +105,11 @@ internal fun RemoteSettings(
     }
     connections.forEach { connection ->
         ListItem(
-            supportingContent = { Text(connection.baseUrl) },
+            supportingContent = {
+                // Every send to a plain-http address goes out unencrypted, so the list keeps saying so (PRD §10).
+                val plain = ManageEgress.urlKind(connection.baseUrl) == UrlKind.PLAIN_HTTP
+                Text(if (plain) stringResource(R.string.settings_remote_http_label, connection.baseUrl) else connection.baseUrl, color = if (plain) MaterialTheme.colorScheme.error else Color.Unspecified)
+            },
             trailingContent = {
                 IconButton(onClick = { removing = connection }) {
                     Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.settings_remote_remove))

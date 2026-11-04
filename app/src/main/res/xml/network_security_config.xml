@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Plain HTTP is allowed so that a model server on the user's own network can be reached (PRD §10, #249).
+  The app warns before such a connection is added and marks it in the list; every address the app itself
+  uses (model downloads, map tiles) is HTTPS, and the system's certificates are the only ones trusted.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

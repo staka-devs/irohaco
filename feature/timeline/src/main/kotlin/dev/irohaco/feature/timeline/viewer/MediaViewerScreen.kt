@@ -110,6 +110,7 @@ import dev.irohaco.core.designsystem.tokens.IrohacoViewerColors
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.R
 import dev.irohaco.feature.timeline.TagDialog
+import dev.irohaco.feature.timeline.rememberShareAction
 import dev.irohaco.feature.timeline.shareIntent
 import dev.irohaco.feature.timeline.trashRequest
 import dev.irohaco.feature.timeline.writeRequest
@@ -198,6 +199,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.pause() }
     val context = LocalContext.current
+    val share = rememberShareAction(viewModel.sharing) { context.startActivity(shareIntent(it)) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var trashedUri by remember { mutableStateOf<Uri?>(null) }
@@ -309,7 +311,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
                 format = format,
                 hasLocation = location is Detail.Value<GeoPoint>,
                 placeName = placeName,
-                onShare = { item -> context.startActivity(shareIntent(listOf(item))) },
+                onShare = { item -> share(listOf(item)) },
                 onFindSimilar = { onFindSimilar(it.assetId) },
                 onAsk = if (viewModel.canAsk) { item -> askingAbout = item; viewModel.openAsk() } else null,
                 onShowOnMap = { (location as? Detail.Value<GeoPoint>)?.value?.let { context.startActivity(mapIntent(it)) } },

@@ -316,3 +316,6 @@ interface ShareFiles {
     /** Deletes copies past the app's retention window; the caller runs this once per app start. */
     suspend fun cleanUp()
 }
+
+/** The copy without GPS could not be made, so nothing was shared (PRD MET-003). */
+class LocationNotRemovedException : IllegalStateException("The copy without the location could not be made")

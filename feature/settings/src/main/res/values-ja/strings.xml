@@ -131,6 +131,7 @@
     <string name="settings_remote_billing">外部の API は、使った量に応じて課金されます。アプリで示す目安は、プロバイダーの請求の上限にはなりません。</string>
     <string name="settings_remote_http_warning">この URL は http なので、API キーと送る内容が暗号化されずに送られます。</string>
     <string name="settings_remote_http_accept">暗号化されないことを了承する</string>
+    <string name="settings_remote_http_label">暗号化なし（http）：%1$s</string>
     <string name="settings_remote_remove">接続先を削除</string>
     <string name="settings_remote_remove_title">この接続先を削除しますか？</string>
     <string name="settings_remote_remove_body">保存した API キーと、この接続先への送信の許可も消えます。</string>

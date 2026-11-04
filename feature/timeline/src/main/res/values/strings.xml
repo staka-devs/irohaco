@@ -168,6 +168,8 @@
     <string name="timeline_unselect_group">Unselect all of %1$s</string>
     <string name="timeline_pinch_hint">Pinch with two fingers to change the number of columns</string>
     <string name="share_location_title">Share the location too?</string>
+    <string name="share_location_failed_title">Not shared</string>
+    <string name="share_location_failed_body">A copy without the location could not be made, so nothing was sent. Check the free space and try again.</string>
     <string name="share_location_body">The photos you are sharing have the place they were taken.</string>
     <string name="share_location_strip">Remove location</string>
     <string name="share_location_keep">Share with location</string>

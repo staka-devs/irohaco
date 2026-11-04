@@ -168,6 +168,8 @@
     <string name="timeline_unselect_group">%1$sの選択を外す</string>
     <string name="timeline_pinch_hint">2本の指でつまむと、並べる列の数を変えられます</string>
     <string name="share_location_title">位置情報も共有しますか？</string>
+    <string name="share_location_failed_title">共有をやめました</string>
+    <string name="share_location_failed_body">位置情報を外したコピーを作れなかったため、写真は送っていません。端末の空き容量を確かめて、もう一度試してください。</string>
     <string name="share_location_body">共有する写真には、撮影した場所の情報があります。</string>
     <string name="share_location_strip">位置情報を外す</string>
     <string name="share_location_keep">含めて共有</string>
