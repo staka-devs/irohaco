@@ -135,6 +135,7 @@
     <string name="settings_remote_billing">Remote APIs charge for what you use. The estimates this app shows do not cap what the provider bills.</string>
     <string name="settings_remote_http_warning">This URL is plain http, so the API key and anything sent travel unencrypted.</string>
     <string name="settings_remote_http_accept">I accept that it is unencrypted</string>
+    <string name="settings_remote_http_label">Unencrypted (http): %1$s</string>
     <string name="settings_remote_remove">Remove the connection</string>
     <string name="settings_remote_remove_title">Remove this connection?</string>
     <string name="settings_remote_remove_body">Its saved API key and what it was allowed to get are removed with it.</string>

@@ -12,6 +12,7 @@ import dev.irohaco.core.contracts.MetadataFiles
 import dev.irohaco.core.contracts.MetadataWriteJournal
 import dev.irohaco.core.contracts.MetadataWriteState
 import dev.irohaco.core.contracts.toMetadataText
+import dev.irohaco.core.contracts.LocationNotRemovedException
 import dev.irohaco.core.contracts.MediaDetailsReader
 import dev.irohaco.core.contracts.MediaFiles
 import dev.irohaco.core.contracts.MediaLibraryAccessPort
@@ -290,11 +291,17 @@ class PrepareShare(private val detailsReader: MediaDetailsReader, private val sh
 
     /**
      * A photo with GPS gets a cache copy, with or without it as asked; everything else (nothing to
-     * redact, or a video, whose GPS this does not touch) shares its own file untouched.
+     * redact, or a video, whose GPS this does not touch) shares its own file untouched. When the copy
+     * without GPS cannot be made, nothing is shared rather than the original with its GPS.
      */
     suspend fun prepare(candidates: List<ShareCandidate>, stripLocation: Boolean): List<TimelineItem> = candidates.map { candidate ->
         if (!candidate.hasLocation || !candidate.locationRemovable) return@map candidate.item
-        shareFiles.prepareCopy(candidate.item.contentUri, keepLocation = !stripLocation)?.let { candidate.item.copy(contentUri = it) } ?: candidate.item
+        val copy = shareFiles.prepareCopy(candidate.item.contentUri, keepLocation = !stripLocation)
+        when {
+            copy != null -> candidate.item.copy(contentUri = copy)
+            stripLocation -> throw LocationNotRemovedException()
+            else -> candidate.item
+        }
     }
 
     suspend fun cleanUp() = shareFiles.cleanUp()

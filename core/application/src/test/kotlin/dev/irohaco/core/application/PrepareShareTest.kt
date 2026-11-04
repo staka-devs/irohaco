@@ -1,5 +1,6 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.contracts.LocationNotRemovedException
 import dev.irohaco.core.contracts.MediaDetailsReader
 import dev.irohaco.core.contracts.ShareFiles
 import dev.irohaco.core.contracts.TimelineItem
@@ -11,6 +12,7 @@ import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class PrepareShareTest {
     private fun details(location: Detail<GeoPoint> = Detail.Missing) = MediaDetails(
@@ -29,7 +31,9 @@ class PrepareShareTest {
         val stripped = mutableListOf<String>()
         val kept = mutableListOf<String>()
         var cleanedUp = false
+        var failing = false
         override suspend fun prepareCopy(contentUri: String, keepLocation: Boolean): String? {
+            if (failing) return null
             if (keepLocation) kept += contentUri else stripped += contentUri
             return "content://copy/$contentUri"
         }
@@ -88,5 +92,14 @@ class PrepareShareTest {
         val files = FakeShareFiles()
         PrepareShare(FakeReader(emptyMap()), files).cleanUp()
         assertEquals(true, files.cleanedUp)
+    }
+
+    @Test
+    fun `a copy without the location that cannot be made shares nothing, never the original`() = runTest {
+        val files = FakeShareFiles().apply { failing = true }
+        val share = PrepareShare(FakeReader(mapOf("content://a" to GeoPoint(1.0, 2.0))), files)
+        val candidates = share.check(listOf(item("a")))
+        assertFailsWith<LocationNotRemovedException> { share.prepare(candidates, stripLocation = true) }
+        assertEquals(listOf("content://a"), share.prepare(candidates, stripLocation = false).map { it.contentUri }) // kept anyway
     }
 }

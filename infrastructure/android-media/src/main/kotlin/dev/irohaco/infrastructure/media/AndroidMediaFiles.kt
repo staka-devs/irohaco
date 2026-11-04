@@ -79,7 +79,8 @@ class AndroidMediaFiles(private val context: Context) : MediaFiles {
         } ?: return FileOperationResult.FAILED
         return try {
             val input = open() ?: throw IOException("cannot open the source of ${row.name}")
-            input.use { i -> resolver.openOutputStream(copy)!!.use { o -> i.copyTo(o) } }
+            val output = resolver.openOutputStream(copy) ?: throw IOException("cannot write the copy of ${row.name}")
+            input.use { i -> output.use { o -> i.copyTo(o) } }
             resolver.update(copy, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
             FileOperationResult.DONE
         } catch (e: IOException) {
