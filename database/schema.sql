@@ -42,6 +42,14 @@ CREATE INDEX ix_media_sources_asset ON media_sources(asset_id);
 -- index: ix_media_sources_access
 CREATE INDEX ix_media_sources_access ON media_sources(access_state);
 
+-- index: ix_media_sources_name_size
+-- A restore finds a file again by its name, size and capture time (UC-RESTORE-01).
+CREATE INDEX ix_media_sources_name_size ON media_sources(display_name,file_size_bytes);
+
+-- index: ix_media_sources_media_store
+-- A camera's thumbnail hands over a MediaStore id without its volume.
+CREATE INDEX ix_media_sources_media_store ON media_sources(media_store_id);
+
 -- table: media_revisions
 CREATE TABLE media_revisions (
   revision_id TEXT NOT NULL PRIMARY KEY,

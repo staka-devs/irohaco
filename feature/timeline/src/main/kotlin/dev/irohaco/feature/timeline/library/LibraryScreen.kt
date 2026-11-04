@@ -247,7 +247,8 @@ internal fun LibraryContent(
             return@Scaffold
         }
         val all = folders.orEmpty()
-        val volumes = all.groupBy { it.folder.volumeId }.mapValues { (_, list) -> list.first() to folderTree(list) }
+        // Building the tree walks every folder, so it is redone only when the folders change, not on every frame.
+        val volumes = remember(all) { all.groupBy { it.folder.volumeId }.mapValues { (_, list) -> list.first() to folderTree(list) } }
         val pinnedLines = pinned.mapNotNull { ref ->
             volumes[ref.volumeId]?.let { (volume, lines) -> lines.firstOrNull { it.path == ref.relativePath }?.let { Triple(ref, volume, it) } }
         }
