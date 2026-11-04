@@ -222,6 +222,7 @@ class MainActivity : ComponentActivity() {
                 },
                 onBack,
                 onOpenLocationHistory = { open(Route.locationHistory(emptyList())) },
+                licenses = { resources.openRawResource(R.raw.aboutlibraries).bufferedReader().use { it.readText() } },
             )
             route == Route.IDENTITY -> IdentityScreen(viewModel { IdentityViewModel(container.reconcileIdentity) }, onBack)
             route == Route.TRASH -> TrashScreen(viewModel { TrashViewModel(container.browseTrash, container::syncCatalog) }, onBack)

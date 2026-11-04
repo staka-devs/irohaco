@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -75,7 +76,9 @@ import dev.irohaco.core.designsystem.tokens.PaletteHue
 import dev.irohaco.core.designsystem.tokens.PaletteShade
 import dev.irohaco.core.domain.ThemeColor
 import dev.irohaco.core.domain.ThemeContrast
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Settings, in categories (DESIGN §2.1, §3, APP-001). Opened from the top app bars. */
 @Composable
@@ -84,7 +87,10 @@ fun SettingsScreen(
     onBack: () -> Unit,
     /** Opens the screen that imports the location history and checks its places (#174). */
     onOpenLocationHistory: () -> Unit = {},
+    /** The license list the app build recorded (ADR-0033), as JSON. */
+    licenses: suspend () -> String = { "" },
 ) {
+    val libraries by produceState(emptyList<LibraryLicense>()) { value = withContext(Dispatchers.IO) { parseLicenses(licenses()) } }
     val themeColor by viewModel.themeColor.collectAsStateWithLifecycle()
     val contrast by viewModel.contrast.collectAsStateWithLifecycle()
     val shareLocationPolicy by viewModel.shareLocationPolicy.collectAsStateWithLifecycle()
@@ -180,6 +186,7 @@ fun SettingsScreen(
             )
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast, locationPin, viewModel::setLocationPin) },
+        about = { AboutSettings(libraries) },
         library = {
             LibrarySettings(excludedFolders, viewModel::showFolder)
             BackupSettings(
@@ -220,6 +227,7 @@ enum class SettingsCategory(@StringRes val title: Int, @StringRes val summary: I
     LIBRARY(R.string.settings_library, R.string.settings_library_summary, IrohacoIcons.Folder),
     PRIVACY(R.string.settings_privacy, R.string.settings_privacy_summary, IrohacoIcons.Lock),
     AI(R.string.settings_ai, R.string.settings_ai_summary, IrohacoIcons.SmartToy),
+    ABOUT(R.string.settings_about, R.string.settings_about_summary, IrohacoIcons.Info),
 }
 
 /**
@@ -235,6 +243,7 @@ internal fun SettingsContent(
     privacy: @Composable () -> Unit,
     initial: SettingsCategory? = null,
     ai: @Composable () -> Unit = {},
+    about: @Composable () -> Unit = {},
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator(initialDestinationHistory = initialHistory(initial))
     val scope = rememberCoroutineScope()
@@ -288,6 +297,7 @@ internal fun SettingsContent(
                             SettingsCategory.DISPLAY -> display()
                             SettingsCategory.LIBRARY -> library()
                             SettingsCategory.PRIVACY -> privacy()
+                            SettingsCategory.ABOUT -> about()
                             SettingsCategory.AI -> ai()
                             null -> Text(
                                 stringResource(R.string.settings_pick_category),

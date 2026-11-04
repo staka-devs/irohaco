@@ -13,3 +13,7 @@
 | [docs/plan/ROADMAP.md](./docs/plan/ROADMAP.md) | マイルストーンとIssue計画 |
 | [database/DATABASE_DESIGN.md](./database/DATABASE_DESIGN.md) | データモデル（3NF） |
 | [adr/](./adr/) | アーキテクチャ決定記録 |
+
+## ライセンス
+
+[Apache License 2.0](./LICENSE)。アプリが使うライブラリのライセンスは、アプリの「設定 > このアプリについて」で見られます（ADR-0033）。
