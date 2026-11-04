@@ -61,7 +61,17 @@ data class TimelineQuery(
     val albumId: String? = null,
     /** Only items whose file puts them inside this area, as a map's group does (GAL-017). */
     val area: GeoBounds? = null,
-)
+    /** Only items taken from this instant on; null has no lower bound. */
+    val takenFromMs: Long? = null,
+    /** Only items taken before this instant; null has no upper bound. */
+    val takenUntilMs: Long? = null,
+) {
+    /** The user narrowed what is shown, beyond the order and the hidden folders. */
+    val filtered: Boolean get() = kind != null || favoritesOnly || tagId != null || takenFromMs != null || takenUntilMs != null
+
+    /** The same order, with every filter the user can set in the sheet taken off. */
+    fun unfiltered() = copy(kind = null, favoritesOnly = false, tagId = null, takenFromMs = null, takenUntilMs = null)
+}
 
 /**
  * Offset paging over a stable order: the sort key, then the asset id in the same direction. Offsets

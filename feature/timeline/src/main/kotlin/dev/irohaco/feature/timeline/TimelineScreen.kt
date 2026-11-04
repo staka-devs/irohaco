@@ -39,6 +39,8 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -98,6 +100,7 @@ import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import dev.irohaco.core.contracts.DateGrouping
 import dev.irohaco.core.contracts.FileOperationResult
+import dev.irohaco.core.contracts.Tag
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
@@ -294,6 +297,7 @@ fun TimelineScreen(
         },
         snackbar = snackbar,
         query = query,
+        tags = tags,
         onQueryChange = viewModel::setQuery,
         scrollToTop = viewModel.scrollToTop,
         grouping = grouping,
@@ -391,9 +395,11 @@ internal fun TimelineContent(
     /** The columns the user chose, kept in the settings; null shows the default. */
     chosenColumns: Int? = null,
     onColumns: (Int) -> Unit = {},
+    /** Tags the sort sheet offers as filters. */
+    tags: List<Tag> = emptyList(),
 ) {
     var sorting by rememberSaveable { mutableStateOf(false) }
-    if (sorting) SortSheet(query, onQueryChange, onDismiss = { sorting = false }, grouping = grouping, onGrouping = onGrouping)
+    if (sorting) SortSheet(query, onQueryChange, onDismiss = { sorting = false }, grouping = grouping, onGrouping = onGrouping, tags = tags)
     BoxWithConstraints {
         // Column steps per width class (DESIGN §4.1); the steps widen as the cells shrink, so a few pinches reach an overview.
         val levels = when {
@@ -430,7 +436,10 @@ internal fun TimelineContent(
                         }
                         if (!noAccess) {
                             IconButton(onClick = { sorting = true }) {
-                                Icon(painterResource(IrohacoIcons.Sort), stringResource(R.string.timeline_sort))
+                                // A dot says the grid is narrowed, so missing photos are not a surprise.
+                                BadgedBox(badge = { if (query.filtered) Badge() }) {
+                                    Icon(painterResource(IrohacoIcons.Sort), stringResource(if (query.filtered) R.string.timeline_sort_filtered else R.string.timeline_sort))
+                                }
                             }
                             // Pinch changes the columns; the menu keeps a way without gestures, as for TalkBack (M1-30).
                             var menu by remember { mutableStateOf(false) }
