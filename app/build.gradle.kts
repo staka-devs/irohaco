@@ -7,6 +7,17 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.roborazzi)
+    alias(libs.plugins.aboutlibraries.android)
+}
+
+// The licenses of every library in the app, as res/raw/aboutlibraries (ADR-0033). The build fetches the SPDX texts
+// of those licenses; the app itself fetches nothing.
+aboutLibraries {
+    offlineMode = false
+    collect {
+        // Texts SPDX does not have, such as the Bouncy Castle licence the library asks to ship along.
+        configPath = file("aboutlibraries")
+    }
 }
 
 android {

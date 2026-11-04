@@ -46,6 +46,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.aboutlibraries.core) // reads the license list the app build records (ADR-0033)
 
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.junit)

@@ -32,6 +32,11 @@
     <string name="settings_library_summary">写真タブに表示する範囲</string>
     <string name="settings_privacy_summary">端末の外に送る情報</string>
     <string name="settings_ai_summary">端末内で動くAIによる検索</string>
+    <string name="settings_about">このアプリについて</string>
+    <string name="settings_about_summary">アプリとライブラリのライセンス</string>
+    <string name="settings_about_license">ライセンス</string>
+    <string name="settings_about_license_body">Irohaco は Apache License 2.0 のオープンソースソフトウェアです。</string>
+    <string name="settings_about_libraries">使っているオープンソースのライブラリ</string>
     <string name="settings_library_hidden_hint">ライブラリでフォルダを開き、目のアイコンで切り替え</string>
     <string name="settings_library_hidden_title">写真タブで非表示のフォルダ</string>
     <string name="settings_library_none_hidden">非表示フォルダなし</string>
