@@ -81,7 +81,11 @@
         <item quantity="other">Copied %d items</item>
     </plurals>
     <string name="timeline_sort">Sort and filter</string>
-    <string name="timeline_sort_title">Sort and filter</string>
+    <string name="timeline_sort_title">Sort</string>
+    <string name="timeline_filter">Filter</string>
+    <string name="timeline_filter_clear">Clear</string>
+    <string name="timeline_filter_favorites">Favorites</string>
+    <string name="timeline_sort_filtered">Sort and filter (filtered)</string>
     <string name="timeline_sort_newest">Date taken, newest first</string>
     <string name="timeline_sort_oldest">Date taken, oldest first</string>
     <string name="timeline_sort_name_asc">File name, A to Z</string>

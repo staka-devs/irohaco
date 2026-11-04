@@ -81,7 +81,11 @@
         <item quantity="other">%d件をコピーしました</item>
     </plurals>
     <string name="timeline_sort">並べ替えと絞り込み</string>
-    <string name="timeline_sort_title">並べ替えと絞り込み</string>
+    <string name="timeline_sort_title">並べ替え</string>
+    <string name="timeline_filter">絞り込み</string>
+    <string name="timeline_filter_clear">解除</string>
+    <string name="timeline_filter_favorites">お気に入り</string>
+    <string name="timeline_sort_filtered">並べ替えと絞り込み（絞り込み中）</string>
     <string name="timeline_sort_newest">撮影日時（新しい順）</string>
     <string name="timeline_sort_oldest">撮影日時（古い順）</string>
     <string name="timeline_sort_name_asc">ファイル名（A→Z）</string>
