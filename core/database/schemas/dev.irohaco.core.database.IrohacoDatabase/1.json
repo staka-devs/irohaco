@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "7f0d730efae1f549dc171dbb55b3ed6d",
+    "identityHash": "be9728e69952db15b5a7e41c1b572af3",
     "entities": [
       {
         "tableName": "album_items",
@@ -1686,6 +1686,25 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `ix_media_sources_asset` ON `${TABLE_NAME}` (`asset_id`)"
+          },
+          {
+            "name": "ix_media_sources_media_store",
+            "unique": false,
+            "columnNames": [
+              "media_store_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_media_sources_media_store` ON `${TABLE_NAME}` (`media_store_id`)"
+          },
+          {
+            "name": "ix_media_sources_name_size",
+            "unique": false,
+            "columnNames": [
+              "display_name",
+              "file_size_bytes"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `ix_media_sources_name_size` ON `${TABLE_NAME}` (`display_name`, `file_size_bytes`)"
           }
         ],
         "foreignKeys": [
@@ -3366,7 +3385,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7f0d730efae1f549dc171dbb55b3ed6d')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'be9728e69952db15b5a7e41c1b572af3')"
     ]
   }
 }
