@@ -122,6 +122,9 @@ interface IndexingDao {
         defaultIfNone(jobId)
     }
 
+    @Query("SELECT space_id FROM indexing_jobs WHERE job_id = :jobId")
+    suspend fun spaceOf(jobId: String): String?
+
     @Query("SELECT job_id FROM indexing_jobs ORDER BY requested_at DESC, rowid DESC LIMIT 1")
     fun latest(): Flow<String?>
 
@@ -173,6 +176,8 @@ class RoomIndexJobStore(private val db: IrohacoDatabase) : IndexJobStore {
     override suspend fun pauseInterrupted() = dao.pauseInterrupted()
 
     override suspend fun markSpaceReady(jobId: String) = dao.markSpaceReady(jobId)
+
+    override suspend fun spaceOf(jobId: String) = dao.spaceOf(jobId)
 
     override fun progress(jobId: String): Flow<IndexJobProgress?> = dao.progress(jobId).map { row ->
         row?.let { IndexJobProgress(IndexJobState.valueOf(it.state), it.pending, it.committed, it.failed, it.skipped, it.frames) }

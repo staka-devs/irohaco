@@ -103,6 +103,8 @@ data class RemoteModel(
     val modelId: String,
     val displayName: String,
     val capabilities: Set<ModelCapability>,
+    /** The length of its vectors, for an embedding model; its connection test measured it. */
+    val dimension: Int? = null,
 )
 
 interface RemoteModelStore {
@@ -119,13 +121,21 @@ interface RemoteModelStore {
     suspend fun removeModel(profileId: String)
 }
 
+/** What a connection test found: the capabilities, and for an embedding model the length of its vectors. */
+data class ProbedModel(val capabilities: Set<ModelCapability>, val dimension: Int? = null)
+
 /** Sends the app's sample text and image to a model to see what it can do; the user starts it (ADR-0032). */
 fun interface CapabilityProbe {
     /** Throws [RemoteCallException] when not even a text answer comes back. */
-    suspend fun probe(connection: RemoteConnection, apiKey: String, modelId: String): Set<ModelCapability>
+    suspend fun probe(connection: RemoteConnection, apiKey: String, modelId: String): ProbedModel
 }
 
 /** Opens a remote model as an [AnswerSession]; [authorize] runs before each request and can stop it. */
 fun interface RemoteSessions {
     fun open(connection: RemoteConnection, apiKey: String, model: RemoteModel, authorize: suspend () -> EgressDecision): AnswerSession
+}
+
+/** Opens a remote embedding model; [authorize] runs before each request with what it carries and can stop it. */
+fun interface RemoteEmbeddingSessions {
+    fun open(connection: RemoteConnection, apiKey: String, model: RemoteModel, authorize: suspend (EgressPayload) -> EgressDecision): EmbeddingSession
 }

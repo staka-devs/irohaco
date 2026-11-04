@@ -146,4 +146,13 @@
     <string name="settings_remote_cap_streaming">answers as it writes</string>
     <string name="settings_remote_cap_text_only">text only</string>
     <string name="settings_ai_answer_model_remote">Remote model: questions and photos are sent out</string>
+    <string name="settings_remote_cap_embedding">makes vectors for search</string>
+    <string name="settings_remote_model_cannot_index">It cannot read images, so it cannot index your photos.</string>
+    <string name="settings_ai_index_model">Model that indexes photos</string>
+    <string name="settings_ai_index_model_hint">Builds the index that search by meaning uses. A remote model gets an index of its own, and the one built on this device is kept.</string>
+    <string name="settings_ai_index_model_local">The model on this device</string>
+    <string name="settings_ai_index_model_remote">Remote model: photos, video scenes and memos are sent out. New photos are not indexed by themselves.</string>
+    <string name="settings_index_send_title">Send to the remote model?</string>
+    <string name="settings_index_send_body">To build the index, these go to the remote model:\nPhotos: %1$d\nVideo scenes: %2$d\nMemos: %3$d\n\nPhotos are sent without their location. A memo that names a place sends that name too.</string>
+    <string name="settings_index_send">Send</string>
 </resources>

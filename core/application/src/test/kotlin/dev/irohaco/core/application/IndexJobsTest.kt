@@ -2,11 +2,16 @@ package dev.irohaco.core.application
 
 import dev.irohaco.core.contracts.IndexItem
 import dev.irohaco.core.contracts.IndexJobKind
+import dev.irohaco.core.contracts.EgressDecision
+import dev.irohaco.core.contracts.EgressDeniedException
+import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.IndexJobProgress
 import dev.irohaco.core.contracts.IndexJobState
 import dev.irohaco.core.contracts.IndexJobStore
 import dev.irohaco.core.contracts.ModelNotInstalledException
 import dev.irohaco.core.contracts.PauseReason
+import dev.irohaco.core.contracts.RemoteCallException
+import dev.irohaco.core.contracts.RemoteFailure
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
@@ -59,6 +64,7 @@ class IndexJobsTest {
         override suspend fun retryFailed(jobId: String) {
             jobs.getValue(jobId).items.replaceAll { _, s -> if (s == "FAILED") "PENDING" else s }
         }
+        override suspend fun spaceOf(jobId: String) = "s"
         override suspend fun markSpaceReady(jobId: String) {
             readySpaces += jobId
         }
@@ -77,7 +83,7 @@ class IndexJobsTest {
     private var hold: PauseReason? = null
     private var embed: suspend (IndexItem) -> FloatArray = { floatArrayOf(1f) }
     private var ids = 0
-    private val indexJobs = IndexJobs(store, { embed(it) }, { hold }, { "id${ids++}" }, { 0 })
+    private val indexJobs = IndexJobs(store, { item, _ -> embed(item) }, { hold }, { "id${ids++}" }, { 0 })
 
     @Test
     fun `the first index needs the user's request`() = runTest {
@@ -171,6 +177,21 @@ class IndexJobsTest {
         embed = { throw ModelNotInstalledException() }
         assertEquals(IndexJobState.FAILED, indexJobs.run(id))
         assertEquals(setOf("PENDING"), jobs.getValue(id).items.values.toSet())
+    }
+
+    @Test
+    fun `a refused key or a grant taken back stops a remote job, and a refused file fails only itself`() = runTest {
+        val id = indexJobs.start("s", IndexJobKind.INITIAL, items, requestedByUser = true)
+        embed = { throw RemoteCallException(RemoteFailure.Unauthorized) }
+        assertEquals(IndexJobState.FAILED, indexJobs.run(id))
+        assertEquals(setOf("PENDING"), jobs.getValue(id).items.values.toSet())
+        embed = { throw EgressDeniedException(EgressDecision.Denied(setOf(EgressPayload.IMAGE_PIXELS), emptySet())) }
+        assertEquals(IndexJobState.FAILED, indexJobs.run(id))
+        assertEquals(setOf("PENDING"), jobs.getValue(id).items.values.toSet())
+        embed = { if (it == items[0]) throw RemoteCallException(RemoteFailure.Failed(400, "too large")) else floatArrayOf(1f) }
+        indexJobs.run(id)
+        assertEquals("FAILED", jobs.getValue(id).items[items[0]])
+        assertEquals(items.drop(1), vectors)
     }
 
     @Test

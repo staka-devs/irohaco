@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "5ac5d3efc1ec8fa8f2ea4f834acfe2aa",
+    "identityHash": "7f0d730efae1f549dc171dbb55b3ed6d",
     "entities": [
       {
         "tableName": "album_items",
@@ -2321,7 +2321,7 @@
       },
       {
         "tableName": "model_profiles",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`model_profile_id` TEXT NOT NULL, `connection_id` TEXT NOT NULL, `provider_model_id` TEXT NOT NULL, `artifact_revision` TEXT, `display_name` TEXT NOT NULL, PRIMARY KEY(`model_profile_id`), FOREIGN KEY(`connection_id`) REFERENCES `provider_connections`(`connection_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`model_profile_id` TEXT NOT NULL, `connection_id` TEXT NOT NULL, `provider_model_id` TEXT NOT NULL, `artifact_revision` TEXT, `display_name` TEXT NOT NULL, `embedding_dimension` INTEGER, PRIMARY KEY(`model_profile_id`), FOREIGN KEY(`connection_id`) REFERENCES `provider_connections`(`connection_id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
         "fields": [
           {
             "fieldPath": "modelProfileId",
@@ -2351,6 +2351,11 @@
             "columnName": "display_name",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "embeddingDimension",
+            "columnName": "embedding_dimension",
+            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -3361,7 +3366,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5ac5d3efc1ec8fa8f2ea4f834acfe2aa')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7f0d730efae1f549dc171dbb55b3ed6d')"
     ]
   }
 }

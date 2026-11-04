@@ -76,8 +76,8 @@ class ManageEgress(
         val connection = checkNotNull(modelStore.connection(connectionId)) { "No such connection" }
         val key = checkNotNull(modelStore.credentialRef(connectionId)?.let(credentials::read)) { "The API key is gone" }
         val found = probe.probe(connection, key, modelId.trim())
-        modelStore.addModel(RemoteModel(newId(), connectionId, modelId.trim(), displayName.trim().ifEmpty { modelId.trim() }, found))
-        return found
+        modelStore.addModel(RemoteModel(newId(), connectionId, modelId.trim(), displayName.trim().ifEmpty { modelId.trim() }, found.capabilities, found.dimension))
+        return found.capabilities
     }
 
     suspend fun removeModel(profileId: String) = modelStore.removeModel(profileId)

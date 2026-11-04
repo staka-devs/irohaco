@@ -47,14 +47,14 @@ class RemoteCapabilityProbeTest {
 
     @Test
     fun `a model that reads images and streams has both kept`() = runTest {
-        assertEquals(ModelCapability.entries.toSet() - ModelCapability.INPUT_VIDEO - ModelCapability.OUTPUT_EMBEDDING, RemoteCapabilityProbe().probe(connection, "k", "m"))
+        assertEquals(ModelCapability.entries.toSet() - ModelCapability.INPUT_VIDEO - ModelCapability.OUTPUT_EMBEDDING, RemoteCapabilityProbe().probe(connection, "k", "m").capabilities)
     }
 
     @Test
     fun `what the model refuses is left out`() = runTest {
         imageStatus = 400
         streams = false
-        assertEquals(setOf(ModelCapability.INPUT_TEXT, ModelCapability.OUTPUT_TEXT), RemoteCapabilityProbe().probe(connection, "k", "m"))
+        assertEquals(setOf(ModelCapability.INPUT_TEXT, ModelCapability.OUTPUT_TEXT), RemoteCapabilityProbe().probe(connection, "k", "m").capabilities)
     }
 
     @Test

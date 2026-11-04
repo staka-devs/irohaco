@@ -47,6 +47,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.irohaco.core.application.ImageSpaces
+import dev.irohaco.core.application.PlanMediaIndex
 import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.IndexJobProgress
 import dev.irohaco.core.contracts.IndexJobState
@@ -90,7 +91,20 @@ internal fun IndexingSettings(
     /** The last start could not list the files or start the job. */
     startFailed: Boolean = false,
     onDismissStartFailed: () -> Unit = {},
+    /** What an index would send to the remote model; nothing is sent until the user agrees (ARCHITECTURE §9.2). */
+    pendingSend: PlanMediaIndex.Outgoing? = null,
+    onConfirmSend: () -> Unit = {},
+    onDismissSend: () -> Unit = {},
 ) {
+    pendingSend?.let { outgoing ->
+        AlertDialog(
+            onDismissRequest = onDismissSend,
+            title = { Text(stringResource(R.string.settings_index_send_title)) },
+            text = { Text(stringResource(R.string.settings_index_send_body, outgoing.photos, outgoing.frames, outgoing.memos)) },
+            confirmButton = { TextButton(onClick = onConfirmSend) { Text(stringResource(R.string.settings_index_send)) } },
+            dismissButton = { TextButton(onClick = onDismissSend) { Text(stringResource(R.string.settings_ai_cancel)) } },
+        )
+    }
     // Wrapped so that "every folder" (null) differs from "nothing to confirm".
     var confirming by remember { mutableStateOf<Target?>(null) }
     var choosing by remember { mutableStateOf(false) }

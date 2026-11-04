@@ -8,12 +8,19 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.AiSettings
 import dev.irohaco.core.contracts.AnswerModelSettings
+import dev.irohaco.core.contracts.EmbeddingModelSettings
 import dev.irohaco.core.contracts.GpuCheck
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
-class DataStoreAiSettings(private val store: DataStore<Preferences>) : AiSettings, AnswerModelSettings {
+class DataStoreAiSettings(private val store: DataStore<Preferences>) : AiSettings, AnswerModelSettings, EmbeddingModelSettings {
+    override val embeddingModel: Flow<String?> = store.data.map { it[EMBEDDING_MODEL] }.distinctUntilChanged()
+
+    override suspend fun setEmbeddingModel(id: String?) {
+        store.edit { if (id == null) it.remove(EMBEDDING_MODEL) else it[EMBEDDING_MODEL] = id }
+    }
+
     override val answerModel: Flow<String?> = store.data.map { it[ANSWER_MODEL] }.distinctUntilChanged()
 
     override suspend fun setAnswerModel(id: String) {
@@ -44,5 +51,6 @@ class DataStoreAiSettings(private val store: DataStore<Preferences>) : AiSetting
         val GPU_MODEL = stringPreferencesKey("ai_gpu_checked_model")
         val GPU_WORKS = booleanPreferencesKey("ai_gpu_works")
         val ANSWER_MODEL = stringPreferencesKey("ai_answer_model")
+        val EMBEDDING_MODEL = stringPreferencesKey("ai_embedding_model")
     }
 }

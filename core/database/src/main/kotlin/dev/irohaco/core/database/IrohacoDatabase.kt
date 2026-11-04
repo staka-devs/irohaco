@@ -680,6 +680,7 @@ data class ModelProfilesEntity(
     @ColumnInfo(name = "provider_model_id") val providerModelId: String,
     @ColumnInfo(name = "artifact_revision") val artifactRevision: String?,
     @ColumnInfo(name = "display_name") val displayName: String,
+    @ColumnInfo(name = "embedding_dimension") val embeddingDimension: Long?,
 )
 
 @Entity(

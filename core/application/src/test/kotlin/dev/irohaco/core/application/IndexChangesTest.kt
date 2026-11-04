@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /** Changes are indexed by themselves only when turned on, after the first index, and never over an open job (M2-12). */
 class IndexChangesTest {
@@ -36,6 +37,8 @@ class IndexChangesTest {
         override suspend fun hasVectors(spaceId: String) = hasVectors
         override suspend fun plan(spaceId: String, folders: Set<String>?, quality: VideoQuality, now: Long) = changed
         override suspend fun source(targetId: String) = null
+
+        override suspend fun assetOf(targetId: String) = null
         override fun lowCoverageVideos() = flowOf(0)
         override suspend fun memoItem(annotationId: String) = null
         override suspend fun pendingCount(spaceId: String) = changed.size
@@ -61,6 +64,8 @@ class IndexChangesTest {
         override suspend fun retryFailed(jobId: String) {}
         override suspend fun pauseInterrupted() {}
         override suspend fun markSpaceReady(jobId: String) {}
+
+        override suspend fun spaceOf(jobId: String) = "s"
         override fun progress(jobId: String): Flow<IndexJobProgress?> = flowOf(jobs[jobId]?.let { IndexJobProgress(it.state, it.items.size, 0, 0, 0) })
         override fun latest(): Flow<String?> = flowOf(jobs.keys.lastOrNull())
         override fun failedNames(jobId: String, limit: Int) = flowOf(emptyList<String>())
@@ -77,7 +82,7 @@ class IndexChangesTest {
     }
 
     private var ids = 0
-    private val indexJobs = IndexJobs(jobStore, { floatArrayOf() }, { null }, { "job${ids++}" }, { 0 })
+    private val indexJobs = IndexJobs(jobStore, { _, _ -> floatArrayOf() }, { null }, { "job${ids++}" }, { 0 })
     private val plan = PlanMediaIndex(media, indexJobs, { "id" }, { 0 })
     private val settings = object : IndexSettings {
         override val autoIndex = auto
@@ -126,5 +131,15 @@ class IndexChangesTest {
     @Test
     fun `the count covers what is missing`() = runTest {
         assertEquals(1, plan.pendingCount())
+    }
+
+    @Test
+    fun `with a remote model the user sees what goes out first, and nothing is indexed by itself`() = runTest {
+        val remote = PlanMediaIndex(media, indexJobs, { "id" }, { 0 }) { ImageSpaces.LOCAL.copy(modelProfileId = "gem", modelDigest = "gemini-embedding") }
+        changed = listOf(IndexItem("asset:a", "r"), IndexItem("asset:b", "r"), IndexItem("frame:f", "r"), IndexItem("memo:n", "rev:1"))
+        assertEquals(PlanMediaIndex.Outgoing(photos = 2, frames = 1, memos = 1), remote.outgoing())
+        assertNull(remote.changes())
+        assertNull(plan.outgoing())
+        assertEquals(emptyMap(), jobs.mapValues { it.value.state })
     }
 }

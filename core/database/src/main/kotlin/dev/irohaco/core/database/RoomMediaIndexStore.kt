@@ -226,6 +226,20 @@ interface MediaIndexDao {
     suspend fun frameSource(targetId: String): FrameSourceRow?
 
     @Query(
+        """SELECT COALESCE(t.asset_id, r.asset_id, sub.asset_id, sr.asset_id)
+           FROM embedding_targets t
+             LEFT JOIN sampled_frames f ON f.frame_id = t.frame_id
+             LEFT JOIN video_segments g ON g.segment_id = f.segment_id
+             LEFT JOIN media_revisions r ON r.revision_id = g.revision_id
+             LEFT JOIN semantic_annotations n ON n.annotation_id = t.annotation_id
+             LEFT JOIN annotation_subjects sub ON sub.subject_id = n.subject_id
+             LEFT JOIN video_segments sg ON sg.segment_id = sub.segment_id
+             LEFT JOIN media_revisions sr ON sr.revision_id = sg.revision_id
+           WHERE t.target_id = :targetId""",
+    )
+    suspend fun assetOf(targetId: String): String?
+
+    @Query(
         """SELECT COUNT(*) FROM (
              SELECT r.revision_id FROM video_segments g JOIN media_revisions r ON r.revision_id = g.revision_id
                JOIN media_assets a ON a.asset_id = r.asset_id
@@ -263,6 +277,8 @@ class RoomMediaIndexStore(private val db: IrohacoDatabase) : MediaIndexStore {
     } else {
         dao.imageSource(targetId)?.let { IndexSource.Image(it.contentUri ?: return null, it.revisionDigest ?: return null) }
     }
+
+    override suspend fun assetOf(targetId: String) = dao.assetOf(targetId)
 
     override fun lowCoverageVideos() = dao.lowCoverageVideos()
 

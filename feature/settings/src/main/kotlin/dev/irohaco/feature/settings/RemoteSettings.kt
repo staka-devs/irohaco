@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import dev.irohaco.core.application.ManageEgress
 import dev.irohaco.core.application.RemoteAnswering
+import dev.irohaco.core.application.RemoteEmbedding
 import dev.irohaco.core.application.ManageEgress.UrlKind
 import dev.irohaco.core.contracts.EgressGrant
 import dev.irohaco.core.contracts.EgressPayload
@@ -151,6 +152,7 @@ internal fun RemoteSettings(
 private fun capabilitiesText(capabilities: Set<ModelCapability>) = listOfNotNull(
     stringResource(R.string.settings_remote_cap_image).takeIf { ModelCapability.INPUT_IMAGE in capabilities },
     stringResource(R.string.settings_remote_cap_streaming).takeIf { ModelCapability.STREAMING in capabilities },
+    stringResource(R.string.settings_remote_cap_embedding).takeIf { ModelCapability.OUTPUT_EMBEDDING in capabilities },
 ).ifEmpty { listOf(stringResource(R.string.settings_remote_cap_text_only)) }.joinToString(" · ")
 
 /**
@@ -192,7 +194,11 @@ private fun AddModelDialog(test: SettingsViewModel.ModelTest?, onDismiss: () -> 
                     }
                     is SettingsViewModel.ModelTest.Added -> {
                         Text(stringResource(R.string.settings_remote_model_added, capabilitiesText(test.capabilities)))
-                        if (!test.capabilities.containsAll(RemoteAnswering.NEEDED)) {
+                        if (ModelCapability.OUTPUT_EMBEDDING in test.capabilities) {
+                            if (!test.capabilities.containsAll(RemoteEmbedding.NEEDED)) {
+                                Text(stringResource(R.string.settings_remote_model_cannot_index), style = MaterialTheme.typography.bodySmall)
+                            }
+                        } else if (!test.capabilities.containsAll(RemoteAnswering.NEEDED)) {
                             Text(stringResource(R.string.settings_remote_model_cannot_answer), style = MaterialTheme.typography.bodySmall)
                         }
                     }

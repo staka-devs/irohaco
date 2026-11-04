@@ -10,6 +10,7 @@ import dev.irohaco.core.contracts.EgressPayload.IMAGE_PIXELS
 import dev.irohaco.core.contracts.EgressPayload.QUERY_TEXT
 import dev.irohaco.core.contracts.EgressPayload.USER_ANNOTATIONS
 import dev.irohaco.core.contracts.ModelCapability
+import dev.irohaco.core.contracts.ProbedModel
 import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.RemoteModelStore
@@ -78,7 +79,7 @@ class EgressPolicyTest {
     private var probed = emptyList<String>()
     private val probe = CapabilityProbe { _, key, model ->
         probed = listOf(key, model)
-        setOf(ModelCapability.INPUT_TEXT, ModelCapability.OUTPUT_TEXT)
+        ProbedModel(setOf(ModelCapability.INPUT_TEXT, ModelCapability.OUTPUT_TEXT))
     }
     private var ids = 0
     private val manage = ManageEgress(store, connectionStore, credentials, { "c${ids++}" }, modelStore, probe)

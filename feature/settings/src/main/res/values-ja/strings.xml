@@ -144,4 +144,13 @@
     <string name="settings_remote_cap_streaming">書きながら答える</string>
     <string name="settings_remote_cap_text_only">文だけ</string>
     <string name="settings_ai_answer_model_remote">外部のモデル：質問と写真を端末の外へ送ります</string>
+    <string name="settings_remote_cap_embedding">検索用のベクトルを作る</string>
+    <string name="settings_remote_model_cannot_index">画像を読めないため、写真の索引には使えません。</string>
+    <string name="settings_ai_index_model">写真の索引を作るモデル</string>
+    <string name="settings_ai_index_model_hint">意味で探すための索引を作ります。外部のモデルを選ぶと、そのモデル用に別の索引を作ります。端末で作った索引は残ります。</string>
+    <string name="settings_ai_index_model_local">端末のモデル</string>
+    <string name="settings_ai_index_model_remote">外部のモデル：写真、動画の場面、メモを端末の外へ送ります。新しい写真の索引は自動では作りません。</string>
+    <string name="settings_index_send_title">外部のモデルへ送りますか？</string>
+    <string name="settings_index_send_body">索引を作るため、次のものを外部のモデルへ送ります。\n写真：%1$d 枚\n動画の場面：%2$d 枚\nメモ：%3$d 件\n\n写真は位置の情報を除いて送ります。メモに地名を書いていると、その地名も送られます。</string>
+    <string name="settings_index_send">送る</string>
 </resources>

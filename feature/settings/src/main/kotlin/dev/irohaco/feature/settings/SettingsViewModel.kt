@@ -10,9 +10,11 @@ import dev.irohaco.core.application.ManageEgress
 import dev.irohaco.core.application.ManageModels
 import dev.irohaco.core.application.PlanMediaIndex
 import dev.irohaco.core.application.RemoteAnswering
+import dev.irohaco.core.application.RemoteEmbedding
 import dev.irohaco.core.application.ThemeColorSettings
 import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.EgressGrant
+import dev.irohaco.core.contracts.EmbeddingModelSettings
 import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.GpuCheck
@@ -65,6 +67,8 @@ class SettingsViewModel(
     private val ask: AskLibrary? = null,
     private val timeline: TimelineSettings? = null,
     private val egress: ManageEgress? = null,
+    /** The remote model the next index uses; null for the model on this device (ADR-0032). */
+    private val embeddingSettings: EmbeddingModelSettings? = null,
     /** Runs a job in the foreground service, so it carries on after the user leaves this screen. */
     private val runIndexJob: (String) -> Unit = {},
 ) : ViewModel() {
@@ -119,14 +123,45 @@ class SettingsViewModel(
     /** The last start could not list the files or start the job; the user can try again. */
     val startFailed: StateFlow<Boolean> = _startFailed
 
-    /** Plans an index of [folders] (relative paths; null for every folder), videos at [quality], and runs it. */
-    fun startIndex(folders: Set<String>?, quality: VideoQuality) {
+    /** An index waiting for the user to agree to what it sends to a remote model (ARCHITECTURE §9.2). */
+    data class PendingSend(val folders: Set<String>?, val quality: VideoQuality, val outgoing: PlanMediaIndex.Outgoing)
+
+    private val _pendingSend = MutableStateFlow<PendingSend?>(null)
+
+    /** Shown as a confirmation; nothing leaves the device until the user agrees. Not kept anywhere. */
+    val pendingSend: StateFlow<PendingSend?> = _pendingSend
+
+    /**
+     * Plans an index of [folders] (relative paths; null for every folder), videos at [quality], and runs
+     * it. With a remote model it first counts what would be sent and waits for [confirmSend].
+     */
+    fun startIndex(folders: Set<String>?, quality: VideoQuality) = plan {
+        val outgoing = planMediaIndex?.outgoing(folders, quality)
+        if (outgoing != null) {
+            _pendingSend.value = PendingSend(folders, quality, outgoing)
+        } else {
+            planMediaIndex?.invoke(folders, quality)?.let(runIndexJob)
+        }
+    }
+
+    /** The user agreed to send what [pendingSend] showed. */
+    fun confirmSend() {
+        val pending = _pendingSend.value ?: return
+        _pendingSend.value = null
+        plan { planMediaIndex?.invoke(pending.folders, pending.quality)?.let(runIndexJob) }
+    }
+
+    fun dismissSend() {
+        _pendingSend.value = null
+    }
+
+    private fun plan(block: suspend () -> Unit) {
         if (planning?.isActive == true) return
         _startFailed.value = false
         planning = viewModelScope.launch {
             _preparing.value = true
             try {
-                planMediaIndex?.invoke(folders, quality)?.let(runIndexJob)
+                block()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -215,6 +250,20 @@ class SettingsViewModel(
 
     fun selectAnswerModel(id: String) {
         viewModelScope.launch { ask?.choose(id) }
+    }
+
+    /** Remote models that can index photos and search them by text (ADR-0032). */
+    val remoteEmbeddingModels: StateFlow<List<RemoteModel>> = (egress?.models() ?: flowOf(emptyList()))
+        .map { models -> models.filter { RemoteEmbedding.usable(it) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The remote model the next index uses while it is registered; null for the model on this device. */
+    val embeddingModel: StateFlow<String?> = combine(embeddingSettings?.embeddingModel ?: flowOf(null), remoteEmbeddingModels) { picked, remote ->
+        picked?.takeIf { id -> remote.any { it.profileId == id } }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun selectEmbeddingModel(id: String?) {
+        viewModelScope.launch { embeddingSettings?.setEmbeddingModel(id) }
     }
 
     /** Folders hidden from the Photos tab, by path, for the Library page (GAL-002). */
