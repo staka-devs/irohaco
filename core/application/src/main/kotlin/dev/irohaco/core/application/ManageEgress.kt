@@ -48,17 +48,19 @@ class ManageEgress(
 
     suspend fun set(grant: EgressGrant, allowed: Boolean) = store.set(grant, allowed)
 
-    /** Keeps [apiKey] in the Keystore-backed store and the connection with only its reference. */
-    suspend fun add(protocol: RemoteProtocol, baseUrl: String, apiKey: String) {
+    /** Keeps [apiKey] in the Keystore-backed store and the connection with only its reference; returns the connection's id. */
+    suspend fun add(protocol: RemoteProtocol, baseUrl: String, apiKey: String): String {
         require(urlKind(baseUrl) != UrlKind.INVALID) { "Not an http or https URL" }
         require(apiKey.isNotBlank()) { "No API key" }
         val ref = credentials.save(apiKey.trim())
+        val id = newId()
         try {
-            connectionStore.add(newId(), protocol, baseUrl.trim().trimEnd('/'), ref)
+            connectionStore.add(id, protocol, baseUrl.trim().trimEnd('/'), ref)
         } catch (e: Exception) {
             credentials.delete(ref) // no key left behind without its connection
             throw e
         }
+        return id
     }
 
     suspend fun remove(id: String) {
