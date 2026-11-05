@@ -56,7 +56,8 @@ data class TimelineQuery(
     /** Folders the user hid from the timeline. */
     val excludedFolders: Set<FolderRef> = emptySet(),
     val favoritesOnly: Boolean = false,
-    val tagId: String? = null,
+    /** Only items that carry every one of these tags. */
+    val tagIds: Set<String> = emptySet(),
     /** An album shows its items in the order they were added, whatever [sortKey] says. */
     val albumId: String? = null,
     /** Only items whose file puts them inside this area, as a map's group does (GAL-017). */
@@ -67,10 +68,10 @@ data class TimelineQuery(
     val takenUntilMs: Long? = null,
 ) {
     /** The user narrowed what is shown, beyond the order and the hidden folders. */
-    val filtered: Boolean get() = kind != null || favoritesOnly || tagId != null || takenFromMs != null || takenUntilMs != null
+    val filtered: Boolean get() = kind != null || favoritesOnly || tagIds.isNotEmpty() || takenFromMs != null || takenUntilMs != null
 
     /** The same order, with every filter the user can set in the sheet taken off. */
-    fun unfiltered() = copy(kind = null, favoritesOnly = false, tagId = null, takenFromMs = null, takenUntilMs = null)
+    fun unfiltered() = copy(kind = null, favoritesOnly = false, tagIds = emptySet(), takenFromMs = null, takenUntilMs = null)
 }
 
 /**

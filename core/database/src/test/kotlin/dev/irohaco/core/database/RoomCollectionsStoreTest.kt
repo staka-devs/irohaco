@@ -54,7 +54,11 @@ class RoomCollectionsStoreTest {
         assertEquals(listOf("beach", "Trip"), store.tagsOf("a").first().map { it.name })
 
         store.removeTag("b", trip)
-        assertEquals(listOf("a", "c"), timeline.page(TimelineQuery(TimelineSortKey.NAME, descending = false, tagId = trip), 0, 10).map { it.assetId })
+        assertEquals(listOf("a", "c"), timeline.page(TimelineQuery(TimelineSortKey.NAME, descending = false, tagIds = setOf(trip)), 0, 10).map { it.assetId })
+        // Two tags narrow to the items that carry both.
+        val beach = store.tags().first().single { it.name == "beach" }.tagId
+        assertEquals(listOf("a"), timeline.page(TimelineQuery(TimelineSortKey.NAME, descending = false, tagIds = setOf(trip, beach)), 0, 10).map { it.assetId })
+        assertEquals(listOf("a"), timeline.items(listOf("a", "b", "c"), setOf(trip, beach)).map { it.assetId })
 
         store.deleteTag(trip)
         assertEquals(listOf("beach" to 1), store.tags().first().map { it.name to it.itemCount })

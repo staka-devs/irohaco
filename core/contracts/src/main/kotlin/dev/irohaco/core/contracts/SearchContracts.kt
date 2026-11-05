@@ -58,9 +58,9 @@ interface VectorSearchStore {
     suspend fun vectorOf(spaceId: String, assetId: String): FloatArray?
 }
 
-/** Looks files up by id for search results; files that are gone, not available or, with [tagId], untagged are left out. */
+/** Looks files up by id for search results; files that are gone, not available or missing one of [tagIds] are left out. */
 fun interface MediaItems {
-    suspend fun items(assetIds: List<String>, tagId: String?): List<TimelineItem>
+    suspend fun items(assetIds: List<String>, tagIds: Set<String>): List<TimelineItem>
 }
 
 /**

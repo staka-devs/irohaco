@@ -26,7 +26,7 @@ sealed interface MediaList {
         return when (this) {
             is Folder -> base.copy(folder = folder)
             is Album -> base.copy(albumId = albumId)
-            is Tag -> base.copy(tagId = tagId)
+            is Tag -> base.copy(tagIds = setOf(tagId))
             Favorites -> base.copy(favoritesOnly = true)
             is Area -> timeline.copy(area = bounds)
         }

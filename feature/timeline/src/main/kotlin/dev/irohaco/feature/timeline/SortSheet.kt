@@ -75,7 +75,7 @@ private val SORTS = listOf(
 private val KINDS = listOf(null to R.string.timeline_kind_all, MediaKind.IMAGE to R.string.timeline_kind_photos, MediaKind.VIDEO to R.string.timeline_kind_videos)
 
 /**
- * Narrows the grid by kind, favorites, a tag and the dates taken, then picks one of the sort orders
+ * Narrows the grid by kind, favorites, tags and the dates taken, then picks one of the sort orders
  * (GAL-006, DESIGN §3). The viewer opened from the grid follows the same filter.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
@@ -136,13 +136,7 @@ internal fun SortContent(
                 onClick = { if (from != null && until != null) onChange(query.copy(takenFromMs = null, takenUntilMs = null)) else pickingDates = true },
                 label = { Text(if (from != null && until != null) dateRangeLabel(from, until) else stringResource(R.string.search_dates)) },
             )
-            tags.forEach { tag ->
-                FilterChip(
-                    selected = query.tagId == tag.tagId,
-                    onClick = { onChange(query.copy(tagId = tag.tagId.takeUnless { it == query.tagId })) },
-                    label = { Text(tag.name) },
-                )
-            }
+            TagFilterChips(tags, query.tagIds) { onChange(query.copy(tagIds = it)) }
         }
         Text(
             stringResource(R.string.timeline_sort_title),
@@ -193,6 +187,6 @@ internal fun SortContent(
 @Composable
 private fun SortContentPreview() {
     IrohacoTheme(dynamicColor = false) {
-        Surface { SortContent(TimelineQuery(kind = MediaKind.IMAGE, favoritesOnly = true), {}, DateGrouping.MONTH, tags = listOf(Tag("t", "海", 3))) }
+        Surface { SortContent(TimelineQuery(kind = MediaKind.IMAGE, favoritesOnly = true, tagIds = setOf("t")), {}, DateGrouping.MONTH, tags = listOf(Tag("t", "海", 3), Tag("u", "山", 1))) }
     }
 }

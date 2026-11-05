@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -40,42 +42,82 @@ import java.text.Normalizer
 @Composable
 internal fun TagDialog(tags: List<Tag>, onAdd: (String) -> Unit, onDismiss: () -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
-    val matches = remember(tags, name) { matchingTags(tags, name) }
-    val same = matches.firstOrNull()?.takeIf { it.name.foldForSearch() == name.foldForSearch() }
+    val same = tags.firstOrNull { it.name.foldForSearch() == name.foldForSearch() }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.tags_add)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-                OutlinedTextField(
-                    name, { name = it },
-                    label = { Text(stringResource(R.string.tags_search)) },
-                    leadingIcon = { Icon(painterResource(IrohacoIcons.Search), contentDescription = null) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (tags.isEmpty()) {
-                    Text(stringResource(R.string.tags_none), style = MaterialTheme.typography.bodyMedium)
-                }
-                LazyColumn(Modifier.heightIn(max = 280.dp)) {
-                    items(matches, key = { it.tagId }) { tag ->
-                        ListItem(
-                            leadingContent = { Icon(painterResource(IrohacoIcons.Label), contentDescription = null) },
-                            supportingContent = { Text(pluralStringResource(R.plurals.tags_count, tag.itemCount, tag.itemCount)) },
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                            modifier = Modifier.clickable { onAdd(tag.name) },
-                        ) { Text(tag.name) }
-                    }
-                }
-            }
-        },
+        text = { TagSearch(tags, name, { name = it }, R.string.tags_search) { onAdd(it.name) } },
         confirmButton = {
             TextButton(onClick = { onAdd(same?.name ?: name.trim()) }, enabled = isValidName(name)) {
-                Text(if (same != null) stringResource(R.string.tags_add) else stringResource(R.string.tags_create_and_add, name.trim()))
+                Text(if (same != null || name.isBlank()) stringResource(R.string.tags_add) else stringResource(R.string.tags_create_and_add, name.trim()))
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.timeline_cancel)) } },
     )
+}
+
+/** Picks one of [tags] by looking it up; nothing is created here. */
+@Composable
+internal fun TagPickDialog(title: String, tags: List<Tag>, onPick: (Tag) -> Unit, onDismiss: () -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { TagSearch(tags, name, { name = it }, R.string.tags_find, onPick) },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.timeline_cancel)) } },
+    )
+}
+
+/** The chosen tags, each of which a tap takes off, then a chip that adds one found by search; items must carry them all. */
+@Composable
+internal fun TagFilterChips(tags: List<Tag>, chosen: Set<String>, onChange: (Set<String>) -> Unit) {
+    if (tags.isEmpty()) return
+    var picking by rememberSaveable { mutableStateOf(false) }
+    if (picking) {
+        TagPickDialog(stringResource(R.string.tags_filter), tags.filter { it.tagId !in chosen }, onPick = { picking = false; onChange(chosen + it.tagId) }) { picking = false }
+    }
+    tags.filter { it.tagId in chosen }.forEach { tag ->
+        InputChip(
+            selected = true,
+            onClick = { onChange(chosen - tag.tagId) },
+            label = { Text(tag.name) },
+            trailingIcon = { Icon(painterResource(IrohacoIcons.Close), stringResource(R.string.details_remove_tag, tag.name)) },
+        )
+    }
+    AssistChip(
+        onClick = { picking = true },
+        label = { Text(stringResource(R.string.search_tag)) },
+        leadingIcon = { Icon(painterResource(IrohacoIcons.Add), contentDescription = null) },
+    )
+}
+
+/** A search field over [tags] and the matches, best first, with their counts. */
+@Composable
+private fun TagSearch(tags: List<Tag>, name: String, onName: (String) -> Unit, label: Int, onPick: (Tag) -> Unit) {
+    val matches = remember(tags, name) { matchingTags(tags, name) }
+    Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+        OutlinedTextField(
+            name, onName,
+            label = { Text(stringResource(label)) },
+            leadingIcon = { Icon(painterResource(IrohacoIcons.Search), contentDescription = null) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (tags.isEmpty()) {
+            Text(stringResource(R.string.tags_none), style = MaterialTheme.typography.bodyMedium)
+        }
+        LazyColumn(Modifier.heightIn(max = 280.dp)) {
+            items(matches, key = { it.tagId }) { tag ->
+                ListItem(
+                    leadingContent = { Icon(painterResource(IrohacoIcons.Label), contentDescription = null) },
+                    supportingContent = { Text(pluralStringResource(R.plurals.tags_count, tag.itemCount, tag.itemCount)) },
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    modifier = Modifier.clickable { onPick(tag) },
+                ) { Text(tag.name) }
+            }
+        }
+    }
 }
 
 /** Tags that match [query]: the same name, then names that start with it, then the rest; the most used first in each. */

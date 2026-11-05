@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -39,6 +41,7 @@ import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.contracts.Album
 import dev.irohaco.core.contracts.TimelineQuery
+import dev.irohaco.core.contracts.Tag
 import dev.irohaco.core.designsystem.component.MediaThumbnail
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
@@ -46,6 +49,7 @@ import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.domain.isValidName
 import dev.irohaco.feature.timeline.R
+import dev.irohaco.feature.timeline.TagPickDialog
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -54,6 +58,8 @@ import kotlinx.coroutines.launch
 
 class AlbumsViewModel(getPage: GetTimelinePage, private val collections: ManageCollections) : ViewModel() {
     val albums: StateFlow<List<Album>> = collections.albums().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val tags: StateFlow<List<Tag>> = collections.tags().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** The favorites as an album card: count and the first item as cover. */
     val favorites: StateFlow<Album?> = getPage.changes().map {
@@ -70,12 +76,13 @@ class AlbumsViewModel(getPage: GetTimelinePage, private val collections: ManageC
     }
 }
 
-/** The Albums tab: the favorites, then the user's albums; new albums come from the FAB (DESIGN §4.2). */
+/** The Albums tab: the favorites, the user's albums, then the most used tags; new albums come from the FAB (DESIGN §4.2). */
 @Composable
 fun AlbumsScreen(viewModel: AlbumsViewModel, onOpen: (MediaList) -> Unit, onOpenSettings: () -> Unit) {
     val albums by viewModel.albums.collectAsStateWithLifecycle()
     val favorites by viewModel.favorites.collectAsStateWithLifecycle()
-    AlbumsContent(favorites, albums, onOpen, onOpenSettings, onCreate = viewModel::create)
+    val tags by viewModel.tags.collectAsStateWithLifecycle()
+    AlbumsContent(favorites, albums, onOpen, onOpenSettings, onCreate = viewModel::create, tags = tags)
 }
 
 @Composable
@@ -85,8 +92,13 @@ internal fun AlbumsContent(
     onOpen: (MediaList) -> Unit,
     onOpenSettings: () -> Unit,
     onCreate: (String) -> Unit,
+    tags: List<Tag> = emptyList(),
 ) {
     var creating by rememberSaveable { mutableStateOf(false) }
+    var findingTag by rememberSaveable { mutableStateOf(false) }
+    if (findingTag) {
+        TagPickDialog(stringResource(R.string.tags_all), tags, onPick = { findingTag = false; onOpen(MediaList.Tag(it.tagId)) }) { findingTag = false }
+    }
     if (creating) {
         NameDialog(
             title = stringResource(R.string.albums_create),
@@ -133,9 +145,27 @@ internal fun AlbumsContent(
             items(albums, key = { it.albumId }) { album ->
                 CoverCard(album.title, album.itemCount, album.coverUri) { onOpen(MediaList.Album(album.albumId)) }
             }
+            if (tags.isNotEmpty()) {
+                fullLine("tags") {
+                    Column {
+                        Row(Modifier.fillMaxWidth().padding(end = IrohacoSpacing.s), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(R.string.library_tags),
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.weight(1f).padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
+                            )
+                            // Only the most used show here; the rest are a search away, however many there are.
+                            if (tags.size > TOP_TAGS) TextButton(onClick = { findingTag = true }) { Text(stringResource(R.string.tags_all)) }
+                        }
+                        tags.sortedByDescending { it.itemCount }.take(TOP_TAGS).forEach { tag -> TagItem(tag) { onOpen(MediaList.Tag(it)) } }
+                    }
+                }
+            }
         }
     }
 }
+
+private const val TOP_TAGS = 5
 
 /** A card with a cover, a title and a count: an album, or a folder in the library's grid view. */
 @Composable
@@ -175,6 +205,7 @@ private fun AlbumsPreview() {
         AlbumsContent(
             favorites = Album("favorites", "", 12, null),
             albums = listOf(Album("a1", "Holiday 2026", 48, null), Album("a2", "Family", 0, null)),
+            tags = listOf(Tag("t1", "Beach", 12), Tag("t2", "Ramen", 30), Tag("t3", "Cat", 4), Tag("t4", "Snow", 1), Tag("t5", "Bike", 7), Tag("t6", "Trip", 20)),
             onOpen = {},
             onOpenSettings = {},
             onCreate = {},

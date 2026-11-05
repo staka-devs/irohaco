@@ -222,14 +222,13 @@ class MainActivity : ComponentActivity() {
                     onOpenSettings = onOpenSettings,
                 )
                 TopLevelDestination.LIBRARY -> LibraryScreen(
-                    viewModel { LibraryViewModel(container.browseLibrary, container.manageCollections, container.reconcileIdentity) },
+                    viewModel { LibraryViewModel(container.browseLibrary, reconcile = container.reconcileIdentity) },
                     folderViewModel = { folder ->
                         viewModel(key = "folder:${Route.list(MediaList.Folder(folder))}") {
                             FolderViewModel(container.getTimelinePage, container.browseLibrary, folder)
                         }
                     },
                     onOpenMedia = { assetId, folder -> onOpenMedia(assetId, MediaList.Folder(folder)) },
-                    onOpenTag = { onOpenList(MediaList.Tag(it)) },
                     onOpenSettings = onOpenSettings,
                     onOpenCandidates = onOpenCandidates,
                     onOpenTrash = onOpenTrash,
