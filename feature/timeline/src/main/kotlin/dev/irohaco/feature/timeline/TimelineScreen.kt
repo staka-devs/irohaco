@@ -471,6 +471,7 @@ internal fun TimelineContent(
                     if (access.images == LibraryAccess.SELECTED || access.videos == LibraryAccess.SELECTED) {
                         PartialAccessBar(onRequestAccess)
                     }
+                    if (selection.isEmpty()) ActiveFilters(query, tags, onQueryChange) { sorting = true }
                     TimelineGrid(
                         cells = cells,
                         columns = columns,

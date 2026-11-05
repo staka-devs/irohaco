@@ -84,6 +84,8 @@
     <string name="timeline_sort_title">Sort</string>
     <string name="timeline_filter">Filter</string>
     <string name="timeline_filter_clear">Clear</string>
+    <string name="timeline_filter_edit">Change</string>
+    <string name="timeline_filter_off">Stop narrowing by %1$s</string>
     <string name="timeline_filter_favorites">Favorites</string>
     <string name="timeline_sort_filtered">Sort and filter (filtered)</string>
     <string name="timeline_sort_newest">Date taken, newest first</string>
@@ -121,6 +123,7 @@
     <string name="tags_find">Search tags</string>
     <string name="tags_filter">Narrow by tag</string>
     <string name="tags_all">All tags</string>
+    <string name="tags_done">Done</string>
     <string name="tags_none">No tags yet. Type a name to make one.</string>
     <string name="tags_create_and_add">Create “%1$s” and add</string>
     <plurals name="tags_count">
