@@ -1,6 +1,10 @@
 package dev.irohaco.feature.timeline
 
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -56,26 +60,13 @@ internal fun TagDialog(tags: List<Tag>, onAdd: (String) -> Unit, onDismiss: () -
     )
 }
 
-/** Picks one of [tags] by looking it up; nothing is created here. */
-@Composable
-internal fun TagPickDialog(title: String, tags: List<Tag>, onPick: (Tag) -> Unit, onDismiss: () -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { TagSearch(tags, name, { name = it }, R.string.tags_find, onPick) },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.timeline_cancel)) } },
-    )
-}
-
 /** The chosen tags, each of which a tap takes off, then a chip that adds one found by search; items must carry them all. */
 @Composable
 internal fun TagFilterChips(tags: List<Tag>, chosen: Set<String>, onChange: (Set<String>) -> Unit) {
     if (tags.isEmpty()) return
     var picking by rememberSaveable { mutableStateOf(false) }
     if (picking) {
-        TagPickDialog(stringResource(R.string.tags_filter), tags.filter { it.tagId !in chosen }, onPick = { picking = false; onChange(chosen + it.tagId) }) { picking = false }
+        TagChooseDialog(stringResource(R.string.tags_filter), tags, chosen, onDone = { picking = false; onChange(it) }) { picking = false }
     }
     tags.filter { it.tagId in chosen }.forEach { tag ->
         InputChip(
@@ -92,9 +83,35 @@ internal fun TagFilterChips(tags: List<Tag>, chosen: Set<String>, onChange: (Set
     )
 }
 
-/** A search field over [tags] and the matches, best first, with their counts. */
+/** Ticks any number of [tags], found by search, and hands back the whole choice at once. */
 @Composable
-private fun TagSearch(tags: List<Tag>, name: String, onName: (String) -> Unit, label: Int, onPick: (Tag) -> Unit) {
+internal fun TagChooseDialog(title: String, tags: List<Tag>, chosen: Set<String>, onDone: (Set<String>) -> Unit, onDismiss: () -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    var ticked by rememberSaveable { mutableStateOf(ArrayList(chosen)) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            TagSearch(tags, name, { name = it }, R.string.tags_find, checked = ticked.toSet()) { tag ->
+                ticked = ArrayList(if (tag.tagId in ticked) ticked - tag.tagId else ticked + tag.tagId)
+            }
+        },
+        confirmButton = { TextButton(onClick = { onDone(ticked.toSet()) }) { Text(stringResource(R.string.tags_done)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.timeline_cancel)) } },
+    )
+}
+
+/** A search field over [tags] and the matches, best first, with their counts; with [checked], each match shows whether it is ticked. */
+@Composable
+internal fun TagSearch(
+    tags: List<Tag>,
+    name: String,
+    onName: (String) -> Unit,
+    label: Int,
+    listModifier: Modifier = Modifier.heightIn(max = 280.dp),
+    checked: Set<String>? = null,
+    onPick: (Tag) -> Unit,
+) {
     val matches = remember(tags, name) { matchingTags(tags, name) }
     Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
         OutlinedTextField(
@@ -107,13 +124,14 @@ private fun TagSearch(tags: List<Tag>, name: String, onName: (String) -> Unit, l
         if (tags.isEmpty()) {
             Text(stringResource(R.string.tags_none), style = MaterialTheme.typography.bodyMedium)
         }
-        LazyColumn(Modifier.heightIn(max = 280.dp)) {
+        LazyColumn(listModifier) {
             items(matches, key = { it.tagId }) { tag ->
                 ListItem(
                     leadingContent = { Icon(painterResource(IrohacoIcons.Label), contentDescription = null) },
                     supportingContent = { Text(pluralStringResource(R.plurals.tags_count, tag.itemCount, tag.itemCount)) },
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.clickable { onPick(tag) },
+                    trailingContent = checked?.let { { Checkbox(checked = tag.tagId in it, onCheckedChange = null) } },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = if (checked == null) Modifier.clickable { onPick(tag) } else Modifier.toggleable(tag.tagId in checked, role = Role.Checkbox) { onPick(tag) },
                 ) { Text(tag.name) }
             }
         }

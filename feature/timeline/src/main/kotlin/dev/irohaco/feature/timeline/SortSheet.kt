@@ -1,6 +1,11 @@
 package dev.irohaco.feature.timeline
 
 import androidx.compose.foundation.layout.Arrangement
+import dev.irohaco.core.designsystem.icon.IrohacoIcons
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
@@ -183,10 +188,53 @@ internal fun SortContent(
     }
 }
 
+/**
+ * What the grid is narrowed by, under the bar, so photos that do not show are never a mystery; each
+ * chip takes its own condition off, and the last button all of them.
+ */
+@Composable
+internal fun ActiveFilters(query: TimelineQuery, tags: List<Tag>, onChange: (TimelineQuery) -> Unit, onEdit: () -> Unit) {
+    if (!query.filtered) return
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = IrohacoSpacing.l),
+        horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        query.kind?.let { kind ->
+            FilterOff(stringResource(KINDS.first { it.first == kind }.second)) { onChange(query.copy(kind = null)) }
+        }
+        if (query.favoritesOnly) FilterOff(stringResource(R.string.timeline_filter_favorites)) { onChange(query.copy(favoritesOnly = false)) }
+        val from = query.takenFromMs
+        val until = query.takenUntilMs
+        if (from != null && until != null) FilterOff(dateRangeLabel(from, until)) { onChange(query.copy(takenFromMs = null, takenUntilMs = null)) }
+        tags.filter { it.tagId in query.tagIds }.forEach { tag -> FilterOff(tag.name) { onChange(query.copy(tagIds = query.tagIds - tag.tagId)) } }
+        TextButton(onClick = onEdit) { Text(stringResource(R.string.timeline_filter_edit)) }
+        TextButton(onClick = { onChange(query.unfiltered()) }) { Text(stringResource(R.string.timeline_filter_clear)) }
+    }
+}
+
+@Composable
+private fun FilterOff(label: String, onOff: () -> Unit) {
+    InputChip(
+        selected = true,
+        onClick = onOff,
+        label = { Text(label) },
+        trailingIcon = { Icon(painterResource(IrohacoIcons.Close), stringResource(R.string.timeline_filter_off, label)) },
+    )
+}
+
 @IrohacoPreviews
 @Composable
 private fun SortContentPreview() {
     IrohacoTheme(dynamicColor = false) {
         Surface { SortContent(TimelineQuery(kind = MediaKind.IMAGE, favoritesOnly = true, tagIds = setOf("t")), {}, DateGrouping.MONTH, tags = listOf(Tag("t", "海", 3), Tag("u", "山", 1))) }
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun ActiveFiltersPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        Surface { ActiveFilters(TimelineQuery(favoritesOnly = true, tagIds = setOf("t", "u")), listOf(Tag("t", "海", 3), Tag("u", "山", 1)), {}, {}) }
     }
 }

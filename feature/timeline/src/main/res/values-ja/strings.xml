@@ -84,6 +84,8 @@
     <string name="timeline_sort_title">並べ替え</string>
     <string name="timeline_filter">絞り込み</string>
     <string name="timeline_filter_clear">解除</string>
+    <string name="timeline_filter_edit">変更</string>
+    <string name="timeline_filter_off">%1$sの絞り込みを外す</string>
     <string name="timeline_filter_favorites">お気に入り</string>
     <string name="timeline_sort_filtered">並べ替えと絞り込み（絞り込み中）</string>
     <string name="timeline_sort_newest">撮影日時（新しい順）</string>
@@ -121,6 +123,7 @@
     <string name="tags_find">タグを検索</string>
     <string name="tags_filter">タグで絞り込む</string>
     <string name="tags_all">すべてのタグ</string>
+    <string name="tags_done">完了</string>
     <string name="tags_none">タグはまだありません。名前を入力すると作れます。</string>
     <string name="tags_create_and_add">「%1$s」を作って追加</string>
     <plurals name="tags_count">
