@@ -117,7 +117,20 @@
     <string name="details_clear_rating">Clear rating</string>
     <string name="timeline_more">More</string>
     <string name="tags_add">Add tag</string>
-    <string name="tags_name">Tag</string>
+    <string name="tags_search">Search tags or name a new one</string>
+    <string name="tags_none">No tags yet. Type a name to make one.</string>
+    <string name="tags_create_and_add">Create “%1$s” and add</string>
+    <plurals name="tags_count">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
+    <string name="tags_delete">Delete tag</string>
+    <string name="tags_delete_title">Delete the tag “%1$s”?</string>
+    <plurals name="tags_delete_body">
+        <item quantity="one">It comes off %d photo or video. The photos and videos themselves stay.</item>
+        <item quantity="other">It comes off %d photos and videos. The photos and videos themselves stay.</item>
+    </plurals>
+    <string name="tags_delete_confirm">Delete</string>
     <string name="details_tags">Tags</string>
     <string name="details_remove_tag">Remove %1$s</string>
     <string name="library_tags">Tags</string>

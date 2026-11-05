@@ -55,6 +55,10 @@ class RoomCollectionsStoreTest {
 
         store.removeTag("b", trip)
         assertEquals(listOf("a", "c"), timeline.page(TimelineQuery(TimelineSortKey.NAME, descending = false, tagId = trip), 0, 10).map { it.assetId })
+
+        store.deleteTag(trip)
+        assertEquals(listOf("beach" to 1), store.tags().first().map { it.name to it.itemCount })
+        assertEquals(listOf("beach"), store.tagsOf("a").first().map { it.name })
     }
 
     @Test

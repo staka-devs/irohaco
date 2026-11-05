@@ -38,6 +38,18 @@ interface CollectionsDao {
     @Query("DELETE FROM media_tags WHERE asset_id = :assetId AND tag_id = :tagId")
     suspend fun untag(assetId: String, tagId: String)
 
+    @Query("DELETE FROM media_tags WHERE tag_id = :tagId")
+    suspend fun untagAll(tagId: String)
+
+    @Query("DELETE FROM tags WHERE tag_id = :tagId")
+    suspend fun deleteTagRow(tagId: String)
+
+    @Transaction
+    suspend fun deleteTag(tagId: String) {
+        untagAll(tagId)
+        deleteTagRow(tagId)
+    }
+
     @Transaction
     suspend fun addTag(assetIds: Collection<String>, name: String, newId: String) {
         val tagId = tagIdByName(name) ?: newId.also { insertTag(it, name) }
@@ -84,6 +96,8 @@ class RoomCollectionsStore(private val db: IrohacoDatabase, private val newId: (
     }
 
     override suspend fun removeTag(assetId: String, tagId: String) = dao.untag(assetId, tagId)
+
+    override suspend fun deleteTag(tagId: String) = dao.deleteTag(tagId)
 
     override fun albums(): Flow<List<Album>> = dao.albums()
 
