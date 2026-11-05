@@ -1,5 +1,8 @@
 package dev.irohaco.feature.timeline.viewer
 
+import dev.irohaco.core.designsystem.icon.IrohacoIcons
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -68,6 +71,8 @@ internal fun AskContent(
     askingLabel: Int,
     caution: Int,
     modifier: Modifier = Modifier,
+    /** Shows the photos a question is about as a grid that can be narrowed further; null hides the button. */
+    onShowPhotos: ((String) -> Unit)? = null,
 ) {
     var question by rememberSaveable { mutableStateOf("") }
     val busy = turns.lastOrNull()?.answer == null && turns.isNotEmpty()
@@ -93,6 +98,12 @@ internal fun AskContent(
                 askingLabel = askingLabel,
                 caution = caution,
             )
+            if (onShowPhotos != null && turn.answer != null) {
+                TextButton(onClick = { onShowPhotos(turn.question) }) {
+                    Icon(painterResource(IrohacoIcons.Photo), contentDescription = null)
+                    Text(stringResource(R.string.ask_show_photos), modifier = Modifier.padding(start = IrohacoSpacing.s))
+                }
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(

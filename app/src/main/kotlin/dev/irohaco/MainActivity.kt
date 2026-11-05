@@ -278,6 +278,16 @@ class MainActivity : ComponentActivity() {
                 onOpen = { hit -> open(hit.timestampMs?.let { Route.playVideoAt(hit.item.assetId, it) } ?: Route.viewer(hit.item.assetId)) },
                 onOpenSettings = { open(Route.SETTINGS) },
                 onBack = onBack,
+                onShowPhotos = { open(Route.photosFor(it)) },
+            )
+            Route.isPhotosFor(route) -> SearchScreen(
+                viewModel(key = route) {
+                    SearchViewModel(container.searchMedia, container.manageCollections, initialQuery = Route.parsePhotosFor(route))
+                },
+                onOpenMedia = { open(Route.viewer(it)) },
+                onPlayAt = { assetId, ms -> open(Route.playVideoAt(assetId, ms)) },
+                onOpenSettings = { open(Route.SETTINGS) },
+                onBackToChat = onBack,
             )
             Route.isSimilar(route) -> SearchScreen(
                 viewModel { SearchViewModel(container.searchMedia, container.manageCollections, similarTo = Route.parseSimilar(route)) },
@@ -359,6 +369,7 @@ object Route {
     private const val VIEWER = "viewer:"
     private const val LIST = "list:"
     private const val SIMILAR = "similar:"
+    private const val PHOTOS_FOR = "photos_for:"
     private const val SEP = '\u0000'
 
     data class Viewer(val assetId: String, val startMs: Long?, val list: MediaList?)
@@ -371,6 +382,13 @@ object Route {
 
     /** Photos and video scenes like [assetId] (SRCH-001). */
     fun similar(assetId: String) = SIMILAR + assetId
+
+    /** The photos a chat's question is about, as a search page opened with that question. */
+    fun photosFor(question: String) = PHOTOS_FOR + question
+
+    fun isPhotosFor(route: String) = route.startsWith(PHOTOS_FOR)
+
+    fun parsePhotosFor(route: String) = route.removePrefix(PHOTOS_FOR)
 
     fun isSimilar(route: String) = route.startsWith(SIMILAR)
 
