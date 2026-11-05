@@ -8,6 +8,7 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import dev.irohaco.core.application.AnswerChoices
 import dev.irohaco.core.application.AskLibrary
 import dev.irohaco.core.application.AskResult
 import dev.irohaco.core.application.GetMediaDetails
@@ -233,6 +234,18 @@ class ViewerViewModel(
 
     private val _turns = MutableStateFlow<List<AskTurn>>(emptyList())
     val turns: StateFlow<List<AskTurn>> = _turns.asStateFlow()
+
+    /** The models that can answer, switched from the question sheet. */
+    val answerModels: StateFlow<AnswerChoices?> =
+        (ask?.choices ?: flowOf(null)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun chooseAnswerModel(id: String) {
+        val library = ask ?: return
+        viewModelScope.launch {
+            library.choose(id)
+            library.warmUp()
+        }
+    }
     private var asking: Job? = null
 
     /** Loads the model while the user types the first question. */

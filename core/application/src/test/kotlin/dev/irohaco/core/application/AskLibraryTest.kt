@@ -23,6 +23,7 @@ import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -126,6 +127,17 @@ class AskLibraryTest {
         backend = { AiBackend.CPU },
         remote = remote,
     )
+
+    @Test
+    fun `the choices are the installed models and the services' answering ones, the pick or else the first local`() = runTest {
+        val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id))
+        val local = AnswerChoice(ModelCatalog.GEMMA_4_E2B.id, ModelCatalog.GEMMA_4_E2B.displayName)
+        assertEquals(AnswerChoices(listOf(local, AnswerChoice("claude", "Claude", "api.anthropic.com")), local.id), library.choices.first())
+        library.choose("claude")
+        assertEquals("claude", library.choices.first().current)
+        library.choose("removed")
+        assertEquals(local.id, library.choices.first().current)
+    }
 
     @Test
     fun `the model sees the photos and frames, and cites them as seen, stated or guessed`() = runTest {

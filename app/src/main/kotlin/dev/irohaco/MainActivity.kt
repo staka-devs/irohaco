@@ -274,7 +274,7 @@ class MainActivity : ComponentActivity() {
                 onBack,
             )
             route == Route.ASK -> AskScreen(
-                viewModel { AskViewModel(ChatWithLibrary(container.searchMedia, container.askLibrary)) },
+                viewModel { AskViewModel(ChatWithLibrary(container.searchMedia, container.askLibrary), container.askLibrary) },
                 onOpen = { hit -> open(hit.timestampMs?.let { Route.playVideoAt(hit.item.assetId, it) } ?: Route.viewer(hit.item.assetId)) },
                 onOpenSettings = { open(Route.SETTINGS) },
                 onBack = onBack,

@@ -16,6 +16,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import dev.irohaco.core.application.AnswerChoices
+import dev.irohaco.core.application.AskLibrary
 import dev.irohaco.core.application.AskResult
 import dev.irohaco.core.application.ChatWithLibrary
 import dev.irohaco.core.application.SearchHit
@@ -25,19 +27,34 @@ import dev.irohaco.feature.timeline.viewer.AskContent
 import dev.irohaco.feature.timeline.viewer.AskTurn
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Free questions about the library, answered from the photos and scenes the AI finds for each (#202). */
-class AskViewModel(private val chat: ChatWithLibrary) : ViewModel() {
+class AskViewModel(private val chat: ChatWithLibrary, private val library: AskLibrary? = null) : ViewModel() {
     private val _turns = MutableStateFlow<List<AskTurn>>(emptyList())
     val turns: StateFlow<List<AskTurn>> = _turns.asStateFlow()
     private var asking: Job? = null
 
     /** Loads the model while the user types the first question. */
     fun warmUp() = chat.warmUp()
+
+    /** The models that can answer, switched above the question field. */
+    val models: StateFlow<AnswerChoices?> =
+        (library?.choices ?: flowOf(null)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun choose(id: String) {
+        val library = library ?: return
+        viewModelScope.launch {
+            library.choose(id)
+            library.warmUp()
+        }
+    }
 
     fun ask(question: String) {
         if (question.isBlank()) return
@@ -57,6 +74,7 @@ class AskViewModel(private val chat: ChatWithLibrary) : ViewModel() {
 @Composable
 fun AskScreen(viewModel: AskViewModel, onOpen: (SearchHit) -> Unit, onOpenSettings: () -> Unit, onBack: () -> Unit) {
     val turns by viewModel.turns.collectAsStateWithLifecycle()
+    val models by viewModel.models.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.warmUp() }
     Scaffold(
         topBar = {
@@ -75,6 +93,8 @@ fun AskScreen(viewModel: AskViewModel, onOpen: (SearchHit) -> Unit, onOpenSettin
             askingLabel = R.string.search_asking,
             caution = R.string.search_ask_caution,
             modifier = Modifier.padding(padding),
+            models = models,
+            onChoose = viewModel::choose,
         )
     }
 }

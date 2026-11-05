@@ -19,6 +19,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -62,6 +65,12 @@ sealed interface AskResult {
     class NeedsConsent(val model: String, val host: String, val payloads: Set<EgressPayload>, val agree: () -> Unit) : AskResult
 }
 
+/** A model that can answer; [host] is the service it runs at, or null for one on this device. */
+data class AnswerChoice(val id: String, val name: String, val host: String? = null)
+
+/** [current] is the model a question goes to, or null when none can answer. */
+data class AnswerChoices(val all: List<AnswerChoice>, val current: String?)
+
 /**
  * Answers a question from the top search results on this device (RAG-001〜003, ARCHITECTURE §7.2). The
  * model sees the actual photos and video frames, the user's memos and the text read in them, and cites
@@ -83,6 +92,19 @@ class AskLibrary(
     private val remote: RemoteAnswering? = null,
 ) {
     val chosen: Flow<String?> = settings.answerModel
+
+    /**
+     * The models that can answer now, on this device or at a service, and the one a question goes to.
+     * shortcut: a model downloaded while a screen shows this is listed once the pick or the services change.
+     */
+    val choices: Flow<AnswerChoices> = combine(settings.answerModel, remote?.models ?: flowOf(emptyList())) { picked, services ->
+        val local = catalog.filter { installed(it.id) != null }.map { AnswerChoice(it.id, it.displayName) }
+        val far = services.filter { it.capabilities.containsAll(RemoteAnswering.NEEDED) }.map { model ->
+            AnswerChoice(model.profileId, model.displayName, remote?.connection(model)?.baseUrl?.let { runCatching { URI(it).host }.getOrNull() }.orEmpty())
+        }
+        val all = local + far
+        AnswerChoices(all, picked?.takeIf { id -> all.any { it.id == id } } ?: local.firstOrNull()?.id)
+    }.flowOn(io)
 
     suspend fun choose(id: String) {
         settings.setAnswerModel(id)

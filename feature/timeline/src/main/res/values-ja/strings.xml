@@ -331,6 +331,9 @@
     <string name="viewer_ask_hint">この写真について質問</string>
     <string name="viewer_ask_hint_video">この場面について質問</string>
     <string name="viewer_ask_send">聞く</string>
+    <string name="ask_model_choose">回答するモデルを選ぶ</string>
+    <string name="ask_model_on_device">この端末</string>
+    <string name="ask_model_at">%1$s で動きます</string>
     <string name="viewer_asking">この写真や場面を見て答えを作っています</string>
     <string name="viewer_ask_caution">%1$s がこの写真や場面だけを見て答えています。間違うことがあります。</string>
     <string name="ask_title">AI に聞く</string>
