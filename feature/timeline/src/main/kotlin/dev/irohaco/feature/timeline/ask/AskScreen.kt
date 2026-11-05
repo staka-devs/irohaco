@@ -72,7 +72,7 @@ class AskViewModel(private val chat: ChatWithLibrary, private val library: AskLi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AskScreen(viewModel: AskViewModel, onOpen: (SearchHit) -> Unit, onOpenSettings: () -> Unit, onBack: () -> Unit) {
+fun AskScreen(viewModel: AskViewModel, onOpen: (SearchHit) -> Unit, onOpenSettings: () -> Unit, onBack: () -> Unit, onShowPhotos: ((String) -> Unit)? = null) {
     val turns by viewModel.turns.collectAsStateWithLifecycle()
     val models by viewModel.models.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.warmUp() }
@@ -95,6 +95,7 @@ fun AskScreen(viewModel: AskViewModel, onOpen: (SearchHit) -> Unit, onOpenSettin
             modifier = Modifier.padding(padding),
             models = models,
             onChoose = viewModel::choose,
+            onShowPhotos = onShowPhotos,
         )
     }
 }

@@ -33,6 +33,14 @@ class RouteTest {
     }
 
     @Test
+    fun `a chat question's photos route keeps the question whole`() {
+        val question = "去年の夏の花火の写真: viewer:a-1"
+        assertTrue(Route.isPhotosFor(Route.photosFor(question)))
+        assertFalse(Route.isSimilar(Route.photosFor(question)))
+        assertEquals(question, Route.parsePhotosFor(Route.photosFor(question)))
+    }
+
+    @Test
     fun `the location history route carries the picked photos, or none`() {
         assertTrue(Route.isLocationHistory(Route.locationHistory(emptyList())))
         assertEquals(null, Route.parseLocationHistory(Route.locationHistory(emptyList())))

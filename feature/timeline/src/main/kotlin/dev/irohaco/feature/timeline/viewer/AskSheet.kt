@@ -91,6 +91,8 @@ internal fun AskContent(
     modifier: Modifier = Modifier,
     models: AnswerChoices? = null,
     onChoose: (String) -> Unit = {},
+    /** Shows the photos a question is about as a grid that can be narrowed further; null hides the button. */
+    onShowPhotos: ((String) -> Unit)? = null,
 ) {
     var question by rememberSaveable { mutableStateOf("") }
     val busy = turns.lastOrNull()?.answer == null && turns.isNotEmpty()
@@ -116,6 +118,12 @@ internal fun AskContent(
                 askingLabel = askingLabel,
                 caution = caution,
             )
+            if (onShowPhotos != null && turn.answer != null) {
+                TextButton(onClick = { onShowPhotos(turn.question) }) {
+                    Icon(painterResource(IrohacoIcons.Photo), contentDescription = null)
+                    Text(stringResource(R.string.ask_show_photos), modifier = Modifier.padding(start = IrohacoSpacing.s))
+                }
+            }
         }
         if (models != null && models.all.isNotEmpty()) ModelPicker(models, onChoose)
         Row(verticalAlignment = Alignment.CenterVertically) {

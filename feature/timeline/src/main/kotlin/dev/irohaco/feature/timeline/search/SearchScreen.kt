@@ -1,5 +1,7 @@
 package dev.irohaco.feature.timeline.search
 
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -130,6 +132,8 @@ class SearchViewModel(
     private val similarTo: String? = null,
     /** Answers the query from the results with a local model (RAG-001); null hides the button. */
     private val askLibrary: AskLibrary? = null,
+    /** Opened from a chat's question: it is searched at once, its dates and kind becoming the conditions. */
+    initialQuery: String? = null,
 ) : ViewModel() {
     val canAsk = askLibrary != null && similarTo == null
 
@@ -159,6 +163,7 @@ class SearchViewModel(
 
     init {
         if (similarTo != null) change { it }
+        initialQuery?.let(::search)
     }
 
     /** Capture times from [fromMs] until [untilMs] (exclusive); nulls clear the range. */
@@ -240,6 +245,8 @@ fun SearchScreen(
     onBack: (() -> Unit)? = null,
     /** Opens the screen to ask AI freely (#202); null hides its button. */
     onOpenAsk: (() -> Unit)? = null,
+    /** Set when opened from a chat's question: the bar keeps its search and gets a way back to the chat. */
+    onBackToChat: (() -> Unit)? = null,
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val spaces by viewModel.spaces.collectAsStateWithLifecycle()
@@ -253,6 +260,7 @@ fun SearchScreen(
         onToggleInferredPlaces = viewModel::toggleInferredPlaces,
         onToggleAtPlace = viewModel::toggleAtPlace,
         onBack = onBack,
+        onBackToChat = onBackToChat,
         onSearch = viewModel::search,
         onToggleMeaning = viewModel::toggleMeaning,
         onToggleText = viewModel::toggleText,
@@ -293,8 +301,11 @@ internal fun SearchContent(
     onBack: (() -> Unit)? = null,
     onAsk: (() -> Unit)? = null,
     onOpenAsk: (() -> Unit)? = null,
+    onBackToChat: (() -> Unit)? = null,
 ) {
     val text = rememberTextFieldState(ui.query)
+    // The query arrives after the first frame when the page opens with one, so the field takes it up then.
+    LaunchedEffect(ui.query) { if (text.text.isEmpty() && ui.query.isNotEmpty()) text.setTextAndPlaceCursorAtEnd(ui.query) }
     val labels = spaceLabels(spaces)
     Scaffold { padding ->
         LazyVerticalGrid(
@@ -315,7 +326,13 @@ internal fun SearchContent(
                     state = text,
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text(stringResource(R.string.search_placeholder)) },
-                    leadingIcon = { Icon(painterResource(IrohacoIcons.Search), null) },
+                    leadingIcon = {
+                        if (onBackToChat != null) {
+                            IconButton(onClick = onBackToChat) { Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.search_back_to_chat)) }
+                        } else {
+                            Icon(painterResource(IrohacoIcons.Search), null)
+                        }
+                    },
                     trailingIcon = {
                         Row {
                             onOpenAsk?.let { IconButton(onClick = it) { Icon(painterResource(IrohacoIcons.SmartToy), stringResource(R.string.ask_title)) } }
