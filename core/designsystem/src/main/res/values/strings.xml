@@ -39,6 +39,7 @@
     <string name="egress_ocr_text">Text read from photos</string>
     <string name="egress_user_annotations">Your memos</string>
     <string name="model_mark_change">Change the mark of %1$s</string>
+    <string name="egress_place_name">Town name where it was taken</string>
     <string name="remote_rate_limited">The remote model is busy. Try again in a while.</string>
     <string name="remote_rate_limited_after">The remote model is busy. Try again in %1$d s.</string>
     <string name="remote_unauthorized">The remote API refused the key. Check it in Settings.</string>

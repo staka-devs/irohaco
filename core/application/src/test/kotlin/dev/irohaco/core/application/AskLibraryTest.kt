@@ -80,6 +80,7 @@ class AskLibraryTest {
 
     private val claude = RemoteModel("claude", "anthropic", "claude-x", "Claude", RemoteAnswering.NEEDED + ModelCapability.STREAMING)
     private var granted = true
+    private var placeGranted = true
     private var remoteFails = false
     private val policyAsked = mutableListOf<Set<EgressPayload>>()
     private val remoteAsked = mutableListOf<String>()
@@ -112,7 +113,7 @@ class AskLibraryTest {
         object : EgressPolicy {
             override suspend fun authorize(task: TaskType, profileId: String, payloads: Set<EgressPayload>, assetIds: Set<String>): EgressDecision {
                 policyAsked += payloads
-                return if (granted) EgressDecision.Allowed else EgressDecision.Denied(payloads, emptySet())
+                return if (granted && (placeGranted || EgressPayload.PLACE_NAME !in payloads)) EgressDecision.Allowed else EgressDecision.Denied(payloads, emptySet())
             }
         },
     )
@@ -275,12 +276,22 @@ class AskLibraryTest {
     }
 
     @Test
-    fun `a remote model is not told where or when a photo was taken`() = runTest {
+    fun `a remote model gets the town name under its own grant, never the time`() = runTest {
         reply = "ANSWER: A pier [1].\nKNOWN: yes\nSOURCES: 1=OBSERVED"
         val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id))
         library.choose("claude")
-        assertIs<AskResult.NeedsConsent>(library.askAbout("Where?", photo.item, null, emptyList(), 0, "Hakodate", emptyList())).agree()
+        val consent = assertIs<AskResult.NeedsConsent>(library.askAbout("Where?", photo.item, null, emptyList(), 0, "Hakodate", emptyList()))
+        assertTrue(EgressPayload.PLACE_NAME in consent.payloads)
+        consent.agree()
         library.askAbout("Where?", photo.item, null, emptyList(), 0, "Hakodate", emptyList())
-        assertTrue("Hakodate" !in remoteAsked.single() && "was taken" !in remoteAsked.single())
+        assertTrue("[1] was taken in Hakodate." in remoteAsked.single() && " on " !in remoteAsked.single(), remoteAsked.single())
+        assertTrue(policyAsked.all { EgressPayload.PLACE_NAME in it })
+        // Without a place name nothing about the place is asked for.
+        library.askAbout("Where?", photo.item, null, emptyList(), 0, null, emptyList())
+        assertTrue(EgressPayload.PLACE_NAME !in policyAsked.last() && "was taken" !in remoteAsked.last())
+        // A model granted before place names existed still answers, without the place.
+        placeGranted = false
+        assertIs<AskResult.Answered>(library.askAbout("Where?", photo.item, null, emptyList(), 0, "Hakodate", emptyList()))
+        assertTrue("Hakodate" !in remoteAsked.last())
     }
 }

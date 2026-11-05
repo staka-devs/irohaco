@@ -67,7 +67,7 @@
     <string name="settings_ai_remote_connection">Service</string>
     <string name="settings_ai_remote_new_connection">A new service</string>
     <string name="settings_ai_remote_model">Model</string>
-    <string name="settings_ai_remote_sends_answer">When you ask, your question and the photos and notes the search found go to this service.</string>
+    <string name="settings_ai_remote_sends_answer">When you ask, your question and the photos and notes the search found go to this service. When you ask about an open photo, the town where it was taken goes too.</string>
     <string name="settings_ai_remote_sends_index">While indexing, photos, video scenes and notes go to this service, and so do your search words.</string>
     <string name="settings_ai_remote_test_and_use">Test and use</string>
     <string name="settings_ai_remote_ready">Ready to use.</string>

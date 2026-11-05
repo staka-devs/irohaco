@@ -67,7 +67,7 @@
     <string name="settings_ai_remote_connection">サービス</string>
     <string name="settings_ai_remote_new_connection">新しいサービス</string>
     <string name="settings_ai_remote_model">モデル</string>
-    <string name="settings_ai_remote_sends_answer">質問すると、質問と、検索で見つかった写真やメモをこのサービスに送ります。</string>
+    <string name="settings_ai_remote_sends_answer">質問すると、質問と、検索で見つかった写真やメモをこのサービスに送ります。写真を開いて質問したときは、撮影した市区町村の名前も送ります。</string>
     <string name="settings_ai_remote_sends_index">索引を作るときは、写真、動画の場面、メモをこのサービスに送ります。検索の言葉も送ります。</string>
     <string name="settings_ai_remote_test_and_use">テストして使う</string>
     <string name="settings_ai_remote_ready">使えるようになりました。</string>
