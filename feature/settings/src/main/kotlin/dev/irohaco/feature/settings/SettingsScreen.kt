@@ -185,6 +185,11 @@ fun SettingsScreen(
                 remoteEmbeddingModels = remoteEmbeddingModels,
                 embeddingModel = embeddingModel,
                 onSelectEmbeddingModel = viewModel::selectEmbeddingModel,
+                connections = remoteConnections,
+                modelTest = modelTest,
+                onAddRemote = viewModel::addRemoteModel,
+                onDismissModelTest = viewModel::dismissModelTest,
+                onRemoveRemote = viewModel::removeModel,
             )
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast, locationPin, viewModel::setLocationPin) },

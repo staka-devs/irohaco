@@ -30,6 +30,7 @@ import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.RemoteProtocol
+import dev.irohaco.core.contracts.TaskType
 import dev.irohaco.core.contracts.ShareLocationPolicy
 import dev.irohaco.core.contracts.TimelineSettings
 import dev.irohaco.core.contracts.SharingSettings
@@ -48,6 +49,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -256,7 +258,10 @@ class SettingsViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun selectAnswerModel(id: String) {
-        viewModelScope.launch { ask?.choose(id) }
+        viewModelScope.launch {
+            grantFor(RemoteRole.ANSWER, id)
+            ask?.choose(id)
+        }
     }
 
     /** Remote models that can index photos and search them by text (ADR-0032). */
@@ -270,7 +275,50 @@ class SettingsViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun selectEmbeddingModel(id: String?) {
-        viewModelScope.launch { embeddingSettings?.setEmbeddingModel(id) }
+        viewModelScope.launch {
+            id?.let { grantFor(RemoteRole.INDEX, it) }
+            embeddingSettings?.setEmbeddingModel(id)
+        }
+    }
+
+    /** Picking a remote model is the consent to send it what its job needs (ADR-0032); a model on the device needs none. */
+    private suspend fun grantFor(role: RemoteRole, profileId: String) {
+        val manage = egress ?: return
+        val connectionId = manage.models().first().firstOrNull { it.profileId == profileId }?.connectionId ?: return
+        role.tasks.forEach { task -> ManageEgress.offered.getValue(task).forEach { manage.set(EgressGrant(connectionId, task, it), true) } }
+    }
+
+    /**
+     * Adds a remote model for [role] in one go: the connection when it is new, then the model's test, then
+     * the model is put to use. A new connection is taken back when the test fails, so retrying adds no copies.
+     */
+    fun addRemoteModel(role: RemoteRole, connectionId: String?, newConnection: NewConnection?, modelId: String, displayName: String) {
+        val manage = egress ?: return
+        _modelTest.value = ModelTest.Running
+        viewModelScope.launch {
+            var created: String? = null
+            _modelTest.value = try {
+                val id = connectionId ?: manage.add(newConnection!!.protocol, newConnection.baseUrl, newConnection.apiKey).also { created = it }
+                val capabilities = manage.addModel(id, modelId, displayName)
+                val model = manage.models().first().last { it.connectionId == id && it.modelId == modelId.trim() }
+                val usable = when (role) {
+                    RemoteRole.ANSWER -> capabilities.containsAll(RemoteAnswering.NEEDED)
+                    RemoteRole.INDEX -> RemoteEmbedding.usable(model)
+                }
+                if (usable) {
+                    when (role) {
+                        RemoteRole.ANSWER -> selectAnswerModel(model.profileId)
+                        RemoteRole.INDEX -> selectEmbeddingModel(model.profileId)
+                    }
+                }
+                ModelTest.Added(capabilities, usable)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                created?.let { manage.remove(it) }
+                ModelTest.Failed(e)
+            }
+        }
     }
 
     private val _exportTarget = MutableStateFlow<String?>(null)
@@ -455,7 +503,8 @@ class SettingsViewModel(
     sealed interface ModelTest {
         data object Running : ModelTest
 
-        data class Added(val capabilities: Set<ModelCapability>) : ModelTest
+        /** [usable] says whether the model can do the job it was added for. */
+        data class Added(val capabilities: Set<ModelCapability>, val usable: Boolean = true) : ModelTest
 
         data class Failed(val cause: Throwable) : ModelTest
     }
@@ -488,3 +537,12 @@ class SettingsViewModel(
 }
 
 private val LIVE = setOf(SpaceState.BUILDING, SpaceState.VERIFYING, SpaceState.READY)
+
+/** What a remote model is added for; each job sends its own kinds of content (ManageEgress.offered). */
+enum class RemoteRole(val tasks: List<TaskType>) {
+    ANSWER(listOf(TaskType.RAG)),
+    INDEX(listOf(TaskType.IMAGE_INDEX, TaskType.VIDEO_INDEX, TaskType.SEARCH_QUERY)),
+}
+
+/** A connection typed in while adding a model; the key goes straight to the Keystore. */
+class NewConnection(val protocol: RemoteProtocol, val baseUrl: String, val apiKey: String)

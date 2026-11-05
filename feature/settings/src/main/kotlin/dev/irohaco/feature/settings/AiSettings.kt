@@ -1,18 +1,30 @@
 package dev.irohaco.feature.settings
 
 import android.text.format.Formatter
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,26 +33,43 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import dev.irohaco.core.application.ManageEgress
+import dev.irohaco.core.application.ManageEgress.UrlKind
 import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.GpuCheck
 import dev.irohaco.core.contracts.ModelArtifact
 import dev.irohaco.core.contracts.ModelInstallState
-import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.ModelInstallState.Failed.Reason
+import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.RemoteModel
+import dev.irohaco.core.contracts.RemoteProtocol
+import dev.irohaco.core.designsystem.component.remoteFailureText
+import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
+import java.net.URI
 
 /**
- * Settings > AI (DESIGN §4.5, M2-02): each model with its state, its size, and what can be done with
- * it. Downloads and imports are checked by SHA-256 before the model becomes usable. A download can be
- * paused and resumed from where it stopped, cancelled, or retried after a failure. The model runs on
- * the GPU or the CPU; where the GPU failed its check, only the CPU can be chosen (#169).
+ * Settings > AI (DESIGN §4.5, M2-02), one card per job: the model that builds the photo index and the
+ * one that answers questions. Each card lists the models that can do its job, on the device or remote,
+ * and picking one puts it to use; a model on the device is downloaded, paused or deleted on its own
+ * line. A remote model is added from the card it is for, connection and test included, and picking it
+ * is the consent to send it what that job needs (ADR-0032). The processor and importing a file sit
+ * under "Details".
  */
 @Composable
 internal fun AiSettings(
@@ -56,15 +85,18 @@ internal fun AiSettings(
     gpuCheck: GpuCheck? = null,
     onSelectBackend: (AiBackend) -> Unit = {},
     answerModels: List<ModelArtifact> = emptyList(),
-    /** Remote models whose test found what answering needs; picking one sends questions out (ADR-0032). */
     remoteAnswerModels: List<RemoteModel> = emptyList(),
     answerModel: String? = null,
     onSelectAnswerModel: (String) -> Unit = {},
-    /** Remote models that can index photos; picking one sends photos, video scenes and memos out (ADR-0032). */
     remoteEmbeddingModels: List<RemoteModel> = emptyList(),
     /** Null for the model on this device. */
     embeddingModel: String? = null,
     onSelectEmbeddingModel: (String?) -> Unit = {},
+    connections: List<RemoteConnection> = emptyList(),
+    modelTest: SettingsViewModel.ModelTest? = null,
+    onAddRemote: (RemoteRole, connectionId: String?, NewConnection?, modelId: String, name: String) -> Unit = { _, _, _, _, _ -> },
+    onDismissModelTest: () -> Unit = {},
+    onRemoveRemote: (String) -> Unit = {},
 ) {
     var deleting by remember { mutableStateOf<ModelArtifact?>(null) }
     deleting?.let { model ->
@@ -72,78 +104,177 @@ internal fun AiSettings(
             onDismissRequest = { deleting = null },
             title = { Text(stringResource(R.string.settings_ai_delete_title, model.displayName)) },
             text = { Text(stringResource(R.string.settings_ai_delete_body)) },
-            confirmButton = {
-                TextButton(onClick = { deleting = null; onDelete(model.id) }) { Text(stringResource(R.string.settings_ai_delete)) }
-            },
+            confirmButton = { TextButton(onClick = { deleting = null; onDelete(model.id) }) { Text(stringResource(R.string.settings_ai_delete)) } },
             dismissButton = { TextButton(onClick = { deleting = null }) { Text(stringResource(R.string.settings_ai_cancel)) } },
         )
     }
-    val context = LocalContext.current
-    Column {
-        models.forEach { model ->
-            val state = states[model.id] ?: ModelInstallState.NotInstalled
-            ListItem(
-                supportingContent = {
-                    Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
-                        Text(modelStateLabel(state) + " · " + Formatter.formatShortFileSize(context, model.sizeBytes))
-                        val bytes = when (state) {
-                            is ModelInstallState.Downloading -> state.downloadedBytes to state.totalBytes
-                            is ModelInstallState.Paused -> state.downloadedBytes to state.totalBytes
-                            else -> null
-                        }
-                        bytes?.let { (done, total) ->
-                            LinearProgressIndicator(progress = { if (total > 0) done.toFloat() / total else 0f }, modifier = Modifier.fillMaxWidth())
-                        }
-                    }
-                },
-            ) { Text(model.displayName) }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
+    var removing by remember { mutableStateOf<RemoteModel?>(null) }
+    removing?.let { model ->
+        AlertDialog(
+            onDismissRequest = { removing = null },
+            title = { Text(stringResource(R.string.settings_remote_model_remove_title, model.displayName)) },
+            text = { Text(stringResource(R.string.settings_remote_model_remove_body)) },
+            confirmButton = { TextButton(onClick = { removing = null; onRemoveRemote(model.profileId) }) { Text(stringResource(R.string.settings_ai_delete)) } },
+            dismissButton = { TextButton(onClick = { removing = null }) { Text(stringResource(R.string.settings_ai_cancel)) } },
+        )
+    }
+    var adding by rememberSaveable { mutableStateOf<RemoteRole?>(null) }
+    adding?.let { role ->
+        AddRemoteModelDialog(
+            role = role,
+            connections = connections.filter { it.protocol in role.protocols },
+            test = modelTest,
+            onAdd = { connectionId, new, modelId, name -> onAddRemote(role, connectionId, new, modelId, name) },
+            onDismiss = { adding = null; onDismissModelTest() },
+        )
+    }
+    val hosts = connections.associate { it.id to it.host() }
+    val answerIds = answerModels.map { it.id }.toSet()
+    val local = LocalModels(states, onDownload, onPause, onCancel, onDelete = { deleting = it })
+    Column(Modifier.padding(horizontal = IrohacoSpacing.l), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m)) {
+        RoleCard(R.string.settings_ai_index_card, R.string.settings_ai_index_card_hint, onAdd = { adding = RemoteRole.INDEX }) {
+            models.filter { it.id !in answerIds }.forEach { model ->
+                local.Row(model, selected = embeddingModel == null && states[model.id] is ModelInstallState.Installed) { onSelectEmbeddingModel(null) }
+            }
+            remoteEmbeddingModels.forEach { model ->
+                RemoteRow(model, hosts[model.connectionId], selected = model.profileId == embeddingModel, onSelect = { onSelectEmbeddingModel(model.profileId) }) { removing = model }
+            }
+        }
+        RoleCard(R.string.settings_ai_answer_card, R.string.settings_ai_answer_card_hint, onAdd = { adding = RemoteRole.ANSWER }) {
+            answerModels.forEach { model -> local.Row(model, selected = model.id == answerModel) { onSelectAnswerModel(model.id) } }
+            remoteAnswerModels.forEach { model ->
+                RemoteRow(model, hosts[model.connectionId], selected = model.profileId == answerModel, onSelect = { onSelectAnswerModel(model.profileId) }) { removing = model }
+            }
+        }
+        Details(importResult, onImport, backend, gpuCheck, onSelectBackend)
+    }
+}
+
+/** The protocols that can do a job: chat formats answer, embedding formats index (RemoteAnswerSession, RemoteEmbeddingSession). */
+internal val RemoteRole.protocols: Set<RemoteProtocol>
+    get() = when (this) {
+        RemoteRole.ANSWER -> setOf(RemoteProtocol.OPENAI_CHAT, RemoteProtocol.OPENAI_RESPONSES, RemoteProtocol.ANTHROPIC_MESSAGES)
+        RemoteRole.INDEX -> setOf(RemoteProtocol.OPENAI_EMBEDDINGS, RemoteProtocol.GEMINI_EMBED_CONTENT)
+    }
+
+private fun RemoteConnection.host() = runCatching { URI(baseUrl).host }.getOrNull() ?: baseUrl
+
+@Composable
+private fun RoleCard(title: Int, hint: Int, onAdd: () -> Unit, rows: @Composable () -> Unit) {
+    OutlinedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(vertical = IrohacoSpacing.s)) {
+            Text(stringResource(title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = IrohacoSpacing.l))
+            Text(
+                stringResource(hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = IrohacoSpacing.l),
-            ) {
-                when (state) {
-                    is ModelInstallState.Installed -> OutlinedButton(onClick = { deleting = model }) { Text(stringResource(R.string.settings_ai_delete)) }
-                    is ModelInstallState.Downloading -> {
-                        Button(onClick = { onPause(model.id) }) { Text(stringResource(R.string.settings_ai_pause)) }
-                        OutlinedButton(onClick = { onCancel(model.id) }) { Text(stringResource(R.string.settings_ai_cancel)) }
+            )
+            Column(Modifier.selectableGroup()) { rows() }
+            ListItem(
+                leadingContent = { Icon(painterResource(IrohacoIcons.Add), contentDescription = null) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                modifier = Modifier.selectable(selected = false, role = Role.Button, onClick = onAdd),
+            ) { Text(stringResource(R.string.settings_ai_add_remote), color = MaterialTheme.colorScheme.primary) }
+        }
+    }
+}
+
+/** A model on the device: picking needs it installed, and its line downloads, pauses, resumes or deletes it. */
+private class LocalModels(
+    val states: Map<String, ModelInstallState>,
+    val onDownload: (String) -> Unit,
+    val onPause: (String) -> Unit,
+    val onCancel: (String) -> Unit,
+    val onDelete: (ModelArtifact) -> Unit,
+) {
+    @Composable
+    fun Row(model: ModelArtifact, selected: Boolean, onSelect: () -> Unit) {
+        val state = states[model.id] ?: ModelInstallState.NotInstalled
+        val installed = state is ModelInstallState.Installed
+        val context = LocalContext.current
+        ListItem(
+            leadingContent = { RadioButton(selected = selected, onClick = null, enabled = installed) },
+            supportingContent = {
+                Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
+                    Text(stringResource(R.string.settings_ai_on_device) + " · " + modelStateLabel(state) + " · " + Formatter.formatShortFileSize(context, model.sizeBytes))
+                    val bytes = when (state) {
+                        is ModelInstallState.Downloading -> state.downloadedBytes to state.totalBytes
+                        is ModelInstallState.Paused -> state.downloadedBytes to state.totalBytes
+                        else -> null
                     }
-                    is ModelInstallState.Paused -> {
-                        Button(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_resume)) }
-                        OutlinedButton(onClick = { onCancel(model.id) }) { Text(stringResource(R.string.settings_ai_cancel)) }
+                    bytes?.let { (done, total) ->
+                        LinearProgressIndicator(progress = { if (total > 0) done.toFloat() / total else 0f }, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            },
+            trailingContent = {
+                when (state) {
+                    is ModelInstallState.Installed -> TextButton(onClick = { onDelete(model) }) { Text(stringResource(R.string.settings_ai_delete)) }
+                    is ModelInstallState.Downloading -> Column {
+                        TextButton(onClick = { onPause(model.id) }) { Text(stringResource(R.string.settings_ai_pause)) }
+                        TextButton(onClick = { onCancel(model.id) }) { Text(stringResource(R.string.settings_ai_cancel)) }
+                    }
+                    is ModelInstallState.Paused -> Column {
+                        TextButton(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_resume)) }
+                        TextButton(onClick = { onCancel(model.id) }) { Text(stringResource(R.string.settings_ai_cancel)) }
                     }
                     ModelInstallState.Verifying -> Unit
                     // A failed download keeps what it got, and the retry resumes from there.
-                    is ModelInstallState.Failed -> {
-                        Button(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_retry)) }
-                        if (state.reason == Reason.DOWNLOAD) {
-                            OutlinedButton(onClick = { onCancel(model.id) }) { Text(stringResource(R.string.settings_ai_cancel)) }
-                        }
-                    }
-                    ModelInstallState.NotInstalled -> Button(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_download)) }
+                    is ModelInstallState.Failed -> TextButton(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_retry)) }
+                    ModelInstallState.NotInstalled -> TextButton(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_download)) }
                 }
-            }
-        }
-        Text(
-            stringResource(R.string.settings_ai_download_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.m),
-        )
-        ListItem(
-            supportingContent = {
-                Text(
-                    when (importResult) {
-                        is ModelInstallState.Failed -> modelStateLabel(importResult)
-                        is ModelInstallState.Installed -> stringResource(R.string.settings_ai_import_done)
-                        else -> stringResource(R.string.settings_ai_import_summary)
-                    },
-                )
             },
-            trailingContent = { TextButton(onClick = onImport) { Text(stringResource(R.string.settings_ai_import_choose)) } },
-        ) { Text(stringResource(R.string.settings_ai_import)) }
-        SectionTitle(R.string.settings_ai_backend)
-        val gpuFails = gpuCheck?.works == false
-        val running = if (gpuFails) AiBackend.CPU else backend ?: AiBackend.GPU
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.selectable(selected = selected, enabled = installed, role = Role.RadioButton, onClick = onSelect),
+        ) { BadgedName(model.displayName) }
+    }
+}
+
+@Composable
+private fun RemoteRow(model: RemoteModel, host: String?, selected: Boolean, onSelect: () -> Unit, onRemove: () -> Unit) {
+    ListItem(
+        leadingContent = { RadioButton(selected = selected, onClick = null) },
+        supportingContent = { Text(stringResource(R.string.settings_ai_remote_at, host.orEmpty())) },
+        trailingContent = {
+            IconButton(onClick = onRemove) { Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.settings_remote_model_remove)) }
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
+    ) { BadgedName(model.displayName) }
+}
+
+/** The model's name after a round mark with its first letter, so models tell apart at a glance. */
+@Composable
+private fun BadgedName(name: String) {
+    val colors = MaterialTheme.colorScheme
+    val (fill, ink) = listOf(
+        colors.primaryContainer to colors.onPrimaryContainer,
+        colors.secondaryContainer to colors.onSecondaryContainer,
+        colors.tertiaryContainer to colors.onTertiaryContainer,
+    )[Math.floorMod(name.substringBefore(' ').lowercase().hashCode(), 3)]
+    androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+        Box(Modifier.size(24.dp).background(fill, CircleShape), contentAlignment = Alignment.Center) {
+            Text(name.firstOrNull { it.isLetterOrDigit() }?.uppercase().orEmpty(), style = MaterialTheme.typography.labelMedium, color = ink)
+        }
+        Text(name)
+    }
+}
+
+/** The processor and importing a model file: rarely touched, so folded away. */
+@Composable
+private fun Details(importResult: ModelInstallState?, onImport: () -> Unit, backend: AiBackend?, gpuCheck: GpuCheck?, onSelectBackend: (AiBackend) -> Unit) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    ListItem(
+        supportingContent = { Text(stringResource(R.string.settings_ai_details_summary)) },
+        trailingContent = { Icon(painterResource(IrohacoIcons.ExpandMore), contentDescription = null, modifier = Modifier.rotate(if (open) 180f else 0f)) },
+        modifier = Modifier.toggleable(open, role = Role.Button) { open = it },
+    ) { Text(stringResource(R.string.settings_ai_details)) }
+    if (!open) return
+    SectionTitle(R.string.settings_ai_backend)
+    val gpuFails = gpuCheck?.works == false
+    val running = if (gpuFails) AiBackend.CPU else backend ?: AiBackend.GPU
+    Column(Modifier.selectableGroup()) {
         BackendRow(
             R.string.settings_ai_backend_gpu,
             running == AiBackend.GPU,
@@ -155,64 +286,160 @@ internal fun AiSettings(
             },
         ) { onSelectBackend(AiBackend.GPU) }
         BackendRow(R.string.settings_ai_backend_cpu, running == AiBackend.CPU, enabled = true, note = null) { onSelectBackend(AiBackend.CPU) }
-        if (answerModels.isNotEmpty() || remoteAnswerModels.isNotEmpty()) {
-            SectionTitle(R.string.settings_ai_answer_model)
-            Text(
-                stringResource(R.string.settings_ai_answer_model_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = IrohacoSpacing.l),
-            )
-            answerModels.forEach { model ->
-                val installed = states[model.id] is ModelInstallState.Installed
-                ListItem(
-                    supportingContent = if (installed) null else ({ Text(stringResource(R.string.settings_ai_not_installed)) }),
-                    leadingContent = { RadioButton(selected = model.id == answerModel, onClick = null, enabled = installed) },
-                    modifier = Modifier.selectable(
-                        selected = model.id == answerModel,
-                        enabled = installed,
-                        role = Role.RadioButton,
-                        onClick = { onSelectAnswerModel(model.id) },
-                    ),
-                ) { Text(model.displayName) }
-            }
-            remoteAnswerModels.forEach { model ->
-                ListItem(
-                    supportingContent = { Text(stringResource(R.string.settings_ai_answer_model_remote)) },
-                    leadingContent = { RadioButton(selected = model.profileId == answerModel, onClick = null) },
-                    modifier = Modifier.selectable(
-                        selected = model.profileId == answerModel,
-                        role = Role.RadioButton,
-                        onClick = { onSelectAnswerModel(model.profileId) },
-                    ),
-                ) { Text(model.displayName) }
-            }
-        }
-        if (remoteEmbeddingModels.isNotEmpty()) {
-            SectionTitle(R.string.settings_ai_index_model)
-            Text(
-                stringResource(R.string.settings_ai_index_model_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = IrohacoSpacing.l),
-            )
-            ListItem(
-                leadingContent = { RadioButton(selected = embeddingModel == null, onClick = null) },
-                modifier = Modifier.selectable(selected = embeddingModel == null, role = Role.RadioButton, onClick = { onSelectEmbeddingModel(null) }),
-            ) { Text(stringResource(R.string.settings_ai_index_model_local)) }
-            remoteEmbeddingModels.forEach { model ->
-                ListItem(
-                    supportingContent = { Text(stringResource(R.string.settings_ai_index_model_remote)) },
-                    leadingContent = { RadioButton(selected = model.profileId == embeddingModel, onClick = null) },
-                    modifier = Modifier.selectable(
-                        selected = model.profileId == embeddingModel,
-                        role = Role.RadioButton,
-                        onClick = { onSelectEmbeddingModel(model.profileId) },
-                    ),
-                ) { Text(model.displayName) }
-            }
-        }
     }
+    ListItem(
+        supportingContent = {
+            Text(
+                when (importResult) {
+                    is ModelInstallState.Failed -> modelStateLabel(importResult)
+                    is ModelInstallState.Installed -> stringResource(R.string.settings_ai_import_done)
+                    else -> stringResource(R.string.settings_ai_import_summary)
+                },
+            )
+        },
+        trailingContent = { TextButton(onClick = onImport) { Text(stringResource(R.string.settings_ai_import_choose)) } },
+    ) { Text(stringResource(R.string.settings_ai_import)) }
+}
+
+/**
+ * Adds a remote model for [role] in one dialog: a connection already added or a new one, the model ID,
+ * then the test, which sends the app's sample text and image, never the user's photos (ADR-0032).
+ * What the job will send is said once, plainly, before the button.
+ */
+@Composable
+private fun AddRemoteModelDialog(
+    role: RemoteRole,
+    connections: List<RemoteConnection>,
+    test: SettingsViewModel.ModelTest?,
+    onAdd: (connectionId: String?, NewConnection?, modelId: String, name: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var chosen by rememberSaveable { mutableStateOf(connections.firstOrNull()?.id) }
+    var protocol by rememberSaveable { mutableStateOf(role.protocols.first()) }
+    var url by rememberSaveable { mutableStateOf(protocol.defaultBaseUrl) }
+    // Not saved: the key stays out of the saved instance state.
+    var key by remember { mutableStateOf("") }
+    var plainAccepted by rememberSaveable { mutableStateOf(false) }
+    var modelId by rememberSaveable { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }
+    val running = test is SettingsViewModel.ModelTest.Running
+    val editable = test == null || test is SettingsViewModel.ModelTest.Failed
+    val kind = ManageEgress.urlKind(url)
+    val connectionReady = chosen != null || key.isNotBlank() && (kind == UrlKind.HTTPS || kind == UrlKind.PLAIN_HTTP && plainAccepted)
+    AlertDialog(
+        onDismissRequest = { if (!running) onDismiss() },
+        title = { Text(stringResource(if (role == RemoteRole.ANSWER) R.string.settings_ai_add_remote_answer else R.string.settings_ai_add_remote_index)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+                Text(stringResource(R.string.settings_ai_remote_connection), style = MaterialTheme.typography.labelLarge)
+                Column(Modifier.selectableGroup()) {
+                    connections.forEach { connection ->
+                        ChoiceRow(connection.id == chosen, editable, "${connection.protocol.displayName} · ${connection.host()}") { chosen = connection.id }
+                    }
+                    ChoiceRow(chosen == null, editable, stringResource(R.string.settings_ai_remote_new_connection)) { chosen = null }
+                }
+                if (chosen == null) {
+                    Column(Modifier.selectableGroup()) {
+                        role.protocols.forEach { entry ->
+                            ChoiceRow(entry == protocol, editable, entry.displayName) { protocol = entry; url = entry.defaultBaseUrl }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = url,
+                        onValueChange = { url = it; plainAccepted = false },
+                        label = { Text(stringResource(R.string.settings_remote_url)) },
+                        isError = kind == UrlKind.INVALID,
+                        singleLine = true,
+                        enabled = editable,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (kind == UrlKind.PLAIN_HTTP) {
+                        Text(stringResource(R.string.settings_remote_http_warning), color = MaterialTheme.colorScheme.error)
+                        ListItem(
+                            leadingContent = { Checkbox(checked = plainAccepted, onCheckedChange = null) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            modifier = Modifier.toggleable(plainAccepted, role = Role.Checkbox) { plainAccepted = it },
+                        ) { Text(stringResource(R.string.settings_remote_http_accept)) }
+                    }
+                    OutlinedTextField(
+                        value = key,
+                        onValueChange = { key = it },
+                        label = { Text(stringResource(R.string.settings_remote_key)) },
+                        singleLine = true,
+                        enabled = editable,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Text(stringResource(R.string.settings_ai_remote_model), style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(
+                    value = modelId,
+                    onValueChange = { modelId = it },
+                    label = { Text(stringResource(R.string.settings_remote_model_id)) },
+                    singleLine = true,
+                    enabled = editable,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.settings_remote_model_name)) },
+                    singleLine = true,
+                    enabled = editable,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    stringResource(if (role == RemoteRole.ANSWER) R.string.settings_ai_remote_sends_answer else R.string.settings_ai_remote_sends_index) +
+                        " " + stringResource(R.string.settings_remote_billing),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                when (test) {
+                    null -> Unit
+                    SettingsViewModel.ModelTest.Running -> {
+                        Text(stringResource(R.string.settings_remote_model_testing), style = MaterialTheme.typography.bodySmall)
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                    }
+                    is SettingsViewModel.ModelTest.Added -> Text(
+                        if (test.usable) {
+                            stringResource(R.string.settings_ai_remote_ready)
+                        } else {
+                            stringResource(if (role == RemoteRole.ANSWER) R.string.settings_remote_model_cannot_answer else R.string.settings_remote_model_cannot_index)
+                        },
+                    )
+                    is SettingsViewModel.ModelTest.Failed -> Text(
+                        remoteFailureText(test.cause) ?: stringResource(R.string.settings_remote_model_test_failed),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (test is SettingsViewModel.ModelTest.Added) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_remote_model_done)) }
+            } else {
+                TextButton(enabled = modelId.isNotBlank() && connectionReady && !running, onClick = {
+                    onAdd(chosen, if (chosen == null) NewConnection(protocol, url, key) else null, modelId, name)
+                }) { Text(stringResource(R.string.settings_ai_remote_test_and_use)) }
+            }
+        },
+        dismissButton = {
+            if (test !is SettingsViewModel.ModelTest.Added) {
+                TextButton(enabled = !running, onClick = onDismiss) { Text(stringResource(R.string.settings_ai_cancel)) }
+            }
+        },
+    )
+}
+
+@Composable
+private fun ChoiceRow(selected: Boolean, enabled: Boolean, label: String, onClick: () -> Unit) {
+    ListItem(
+        leadingContent = { RadioButton(selected = selected, onClick = null, enabled = enabled) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
+    ) { Text(label) }
 }
 
 @Composable
@@ -248,42 +475,31 @@ internal fun modelStateLabel(state: ModelInstallState): String = when (state) {
     )
 }
 
-private val previewModel = ModelArtifact("m", "EmbeddingGemma 2 Text-Vision 440M", "https://example.invalid", 387_710_976, "x")
+private val previewEmbedding = ModelArtifact("e", "EmbeddingGemma 2 Text-Vision 440M", "https://example.invalid", 387_710_976, "x")
+private val previewAnswers = listOf(
+    ModelArtifact("a1", "Gemma 4 E2B", "https://example.invalid", 2_600_000_000, "x"),
+    ModelArtifact("a2", "LFM3-VL 2B", "https://example.invalid", 1_600_000_000, "x"),
+)
 
 @IrohacoPreviews
 @Composable
-private fun AiSettingsDownloadingPreview() {
+private fun AiSettingsPreview() {
     IrohacoTheme(dynamicColor = false) {
         Surface {
-            AiSettings(listOf(previewModel), mapOf("m" to ModelInstallState.Downloading(150_000_000, 387_710_976)), null, {}, {}, {})
-        }
-    }
-}
-
-@IrohacoPreviews
-@Composable
-private fun AiSettingsPausedPreview() {
-    IrohacoTheme(dynamicColor = false) {
-        Surface {
-            AiSettings(listOf(previewModel), mapOf("m" to ModelInstallState.Paused(150_000_000, 387_710_976)), null, {}, {}, {})
-        }
-    }
-}
-
-@IrohacoPreviews
-@Composable
-private fun AiSettingsInstalledPreview() {
-    IrohacoTheme(dynamicColor = false) {
-        Surface {
-            AiSettings(
-                listOf(previewModel),
-                mapOf("m" to ModelInstallState.Installed("/m")),
-                ModelInstallState.Failed(Reason.UNKNOWN_MODEL),
-                {},
-                {},
-                {},
-                gpuCheck = GpuCheck("/m", works = false),
-            )
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                AiSettings(
+                    models = listOf(previewEmbedding) + previewAnswers,
+                    states = mapOf("e" to ModelInstallState.Installed("/e"), "a1" to ModelInstallState.Downloading(1_100_000_000, 2_600_000_000)),
+                    importResult = null,
+                    onDownload = {},
+                    onImport = {},
+                    onDelete = {},
+                    answerModels = previewAnswers,
+                    remoteAnswerModels = listOf(RemoteModel("p", "c", "vision-large", "Vision Large", emptySet())),
+                    answerModel = "p",
+                    connections = listOf(RemoteConnection("c", RemoteProtocol.OPENAI_CHAT, "https://api.example.com/v1")),
+                )
+            }
         }
     }
 }
