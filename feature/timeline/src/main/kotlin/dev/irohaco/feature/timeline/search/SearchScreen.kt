@@ -5,7 +5,6 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,8 +19,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -79,6 +76,7 @@ import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.R
+import dev.irohaco.feature.timeline.TagFilterChips
 import dev.irohaco.feature.timeline.badgeIcon
 import dev.irohaco.feature.timeline.formatDuration
 import kotlinx.coroutines.Job
@@ -112,9 +110,8 @@ data class SearchUi(
     val spaceId: String? = null,
     /** Searches every model and shows each one's rank (SRCH-005). */
     val compare: Boolean = false,
-    /** Capture time in [from, until) and a tag (SRCH-004). */
+    /** Capture time in [from, until) and tags (SRCH-004). */
     val filters: SearchFilters = SearchFilters(),
-    val tagName: String? = null,
     /** Places guessed from photos taken near in time count too (`include_inferred`, SRCH-003). */
     val inferredPlaces: Boolean = true,
     val searching: Boolean = false,
@@ -167,7 +164,7 @@ class SearchViewModel(
     /** Capture times from [fromMs] until [untilMs] (exclusive); nulls clear the range. */
     fun showDates(fromMs: Long?, untilMs: Long?) = change { it.copy(filters = it.filters.copy(fromMs = fromMs, untilMs = untilMs)) }
 
-    fun showTag(tag: Tag?) = change { it.copy(filters = it.filters.copy(tagId = tag?.tagId), tagName = tag?.name) }
+    fun showTags(tagIds: Set<String>) = change { it.copy(filters = it.filters.copy(tagIds = tagIds)) }
 
     /** The dates and the kind the query names become the conditions, which the user can still change (#203). */
     fun search(query: String) {
@@ -252,7 +249,7 @@ fun SearchScreen(
         spaces = spaces,
         tags = tags,
         onDates = viewModel::showDates,
-        onTag = viewModel::showTag,
+        onTags = viewModel::showTags,
         onToggleInferredPlaces = viewModel::toggleInferredPlaces,
         onToggleAtPlace = viewModel::toggleAtPlace,
         onBack = onBack,
@@ -290,7 +287,7 @@ internal fun SearchContent(
     onOpenSettings: () -> Unit,
     tags: List<Tag> = emptyList(),
     onDates: (Long?, Long?) -> Unit = { _, _ -> },
-    onTag: (Tag?) -> Unit = {},
+    onTags: (Set<String>) -> Unit = {},
     onToggleInferredPlaces: () -> Unit = {},
     onToggleAtPlace: () -> Unit = {},
     onBack: (() -> Unit)? = null,
@@ -339,7 +336,7 @@ internal fun SearchContent(
                 )
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTag, onToggleInferredPlaces, onToggleAtPlace, similar = onBack != null)
+                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTags, onToggleInferredPlaces, onToggleAtPlace, similar = onBack != null)
             }
             ui.results?.let { results ->
                 item(span = { GridItemSpan(maxLineSpan) }) { Notices(ui, results, labels, onOpenSettings) }
@@ -378,7 +375,7 @@ private fun Conditions(
     onSpace: (EmbeddingSpace) -> Unit,
     tags: List<Tag>,
     onDates: (Long?, Long?) -> Unit,
-    onTag: (Tag?) -> Unit,
+    onTags: (Set<String>) -> Unit,
     onToggleInferredPlaces: () -> Unit,
     onToggleAtPlace: () -> Unit,
     /** The similar photos page: no query, so only conditions on the files apply. */
@@ -399,7 +396,7 @@ private fun Conditions(
             val dates = ui.filters.fromMs?.let { from -> ui.filters.untilMs?.let { until -> dateRangeLabel(from, until) } }
             FilterChip(dates != null, { if (dates != null) onDates(null, null) else pickingDates = true }, label = { Text(dates ?: stringResource(R.string.search_dates)) })
             ui.results?.place?.let { place -> FilterChip(ui.atPlace, onToggleAtPlace, label = { Text(place) }) }
-            TagChip(ui, tags, onTag)
+            TagFilterChips(tags, ui.filters.tagIds, onTags)
             if (!similar) FilterChip(ui.inferredPlaces, onToggleInferredPlaces, label = { Text(stringResource(R.string.search_inferred_places)) })
             // Comparing searches every model at once, so it needs two of them (SRCH-005).
             if (searchable > 1 && !similar) {
@@ -431,20 +428,6 @@ private fun SimilarHeader(onBack: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = IrohacoSpacing.s)) {
         IconButton(onClick = onBack) { Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back)) }
         Text(stringResource(R.string.search_similar_title), style = MaterialTheme.typography.titleLarge)
-    }
-}
-
-/** Narrows by one tag; picking it again, or "any tag", takes the condition off. */
-@Composable
-private fun TagChip(ui: SearchUi, tags: List<Tag>, onTag: (Tag?) -> Unit) {
-    if (tags.isEmpty()) return
-    var open by remember { mutableStateOf(false) }
-    Box {
-        FilterChip(ui.filters.tagId != null, { open = true }, label = { Text(ui.tagName ?: stringResource(R.string.search_tag)) })
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(text = { Text(stringResource(R.string.search_any_tag)) }, onClick = { open = false; onTag(null) })
-            tags.forEach { tag -> DropdownMenuItem(text = { Text(tag.name) }, onClick = { open = false; onTag(tag) }) }
-        }
     }
 }
 

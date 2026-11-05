@@ -118,6 +118,9 @@
     <string name="timeline_more">More</string>
     <string name="tags_add">Add tag</string>
     <string name="tags_search">Search tags or name a new one</string>
+    <string name="tags_find">Search tags</string>
+    <string name="tags_filter">Narrow by tag</string>
+    <string name="tags_all">All tags</string>
     <string name="tags_none">No tags yet. Type a name to make one.</string>
     <string name="tags_create_and_add">Create “%1$s” and add</string>
     <plurals name="tags_count">
@@ -277,7 +280,6 @@
     <string name="search_dates">Dates</string>
     <string name="search_dates_apply">Apply</string>
     <string name="search_tag">Tag</string>
-    <string name="search_any_tag">Any tag</string>
     <string name="search_similar_title">Similar photos</string>
     <string name="viewer_find_similar">Find similar photos</string>
     <string name="memo_at_scene">On the scene playing now</string>

@@ -104,7 +104,7 @@ class RoomLocationStoreTest {
         store.recordExif("nogps", null)
         val reader = RoomTimelineReader(db)
         assertEquals(mapOf("tokyo" to true, "nogps" to false), reader.page(TimelineQuery(), 0, 10).associate { it.assetId to it.hasLocation })
-        assertEquals(listOf(true), reader.items(listOf("tokyo"), null).map { it.hasLocation })
+        assertEquals(listOf(true), reader.items(listOf("tokyo"), emptySet()).map { it.hasLocation })
     }
 
     @Test

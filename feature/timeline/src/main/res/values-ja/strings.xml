@@ -118,6 +118,9 @@
     <string name="timeline_more">その他</string>
     <string name="tags_add">タグを追加</string>
     <string name="tags_search">タグを検索、または新しい名前を入力</string>
+    <string name="tags_find">タグを検索</string>
+    <string name="tags_filter">タグで絞り込む</string>
+    <string name="tags_all">すべてのタグ</string>
     <string name="tags_none">タグはまだありません。名前を入力すると作れます。</string>
     <string name="tags_create_and_add">「%1$s」を作って追加</string>
     <plurals name="tags_count">
@@ -273,7 +276,6 @@
     <string name="search_dates">日付</string>
     <string name="search_dates_apply">適用</string>
     <string name="search_tag">タグ</string>
-    <string name="search_any_tag">すべてのタグ</string>
     <string name="search_similar_title">似た写真</string>
     <string name="viewer_find_similar">似た写真を探す</string>
     <string name="memo_at_scene">再生中の場面に付ける</string>

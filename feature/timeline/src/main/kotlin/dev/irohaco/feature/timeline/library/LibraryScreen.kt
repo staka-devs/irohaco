@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -52,7 +55,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import dev.irohaco.core.application.BrowseLibrary
-import dev.irohaco.core.application.ManageCollections
 import dev.irohaco.core.application.ReconcileIdentity
 import dev.irohaco.core.contracts.FolderRef
 import dev.irohaco.core.contracts.LibraryFolder
@@ -74,14 +76,10 @@ import kotlinx.coroutines.launch
 
 class LibraryViewModel(
     private val browse: BrowseLibrary,
-    collections: ManageCollections? = null,
     reconcile: ReconcileIdentity? = null,
 ) : ViewModel() {
     val candidateCount: StateFlow<Int> = (reconcile?.pending()?.map { it.size } ?: flowOf(0))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
-
-    val tags: StateFlow<List<Tag>> =
-        (collections?.tags() ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Null until the first read, so the screen does not flash "no folders". */
     val folders: StateFlow<List<LibraryFolder>?> =
@@ -125,7 +123,6 @@ fun LibraryScreen(
     viewModel: LibraryViewModel,
     folderViewModel: @Composable (FolderRef) -> FolderViewModel,
     onOpenMedia: (assetId: String, folder: FolderRef) -> Unit,
-    onOpenTag: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCandidates: () -> Unit = {},
     onOpenTrash: () -> Unit = {},
@@ -136,7 +133,6 @@ fun LibraryScreen(
     val candidates by viewModel.candidateCount.collectAsStateWithLifecycle()
     val folders by viewModel.folders.collectAsStateWithLifecycle()
     val excluded by viewModel.excluded.collectAsStateWithLifecycle()
-    val tags by viewModel.tags.collectAsStateWithLifecycle()
     val pinned by viewModel.pinned.collectAsStateWithLifecycle()
     val layout by viewModel.layout.collectAsStateWithLifecycle()
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
@@ -151,8 +147,6 @@ fun LibraryScreen(
                     excluded = excluded,
                     onOpenFolder = openFolder,
                     onOpenSettings = onOpenSettings,
-                    tags = tags,
-                    onOpenTag = onOpenTag,
                     candidates = candidates,
                     onOpenCandidates = onOpenCandidates,
                     onOpenTrash = onOpenTrash,
@@ -194,8 +188,6 @@ internal fun LibraryContent(
     excluded: Set<FolderRef>,
     onOpenFolder: (FolderRef) -> Unit,
     onOpenSettings: () -> Unit,
-    tags: List<Tag> = emptyList(),
-    onOpenTag: (String) -> Unit = {},
     candidates: Int = 0,
     onOpenCandidates: () -> Unit = {},
     onOpenTrash: () -> Unit = {},
@@ -255,7 +247,8 @@ internal fun LibraryContent(
         val contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())
         when (layout) {
             LibraryLayout.TREE -> LazyColumn(Modifier.fillMaxSize(), contentPadding = contentPadding) {
-                header(candidates, onOpenCandidates, onOpenTrash, onOpenMap, onOpenLocationHistory)
+                item(key = "shortcuts") { Shortcuts(onOpenMap, onOpenLocationHistory, onOpenTrash) }
+                if (candidates > 0) item(key = "candidates") { CandidatesItem(candidates, onOpenCandidates) }
                 pinnedSection(pinnedLines, onOpenFolder, onMovePinned, onUnpin)
                 for ((volumeId, entry) in volumes) {
                     val (volume, lines) = entry
@@ -286,7 +279,6 @@ internal fun LibraryContent(
                         )
                     }
                 }
-                tagSection(tags, onOpenTag)
             }
             LibraryLayout.GRID -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(152.dp),
@@ -302,9 +294,7 @@ internal fun LibraryContent(
             ) {
                 fullLine("candidates-and-pinned") {
                     Column {
-                        MapItem(onOpenMap)
-                        UnlocatedItem(onOpenLocationHistory)
-                        TrashItem(onOpenTrash)
+                        Shortcuts(onOpenMap, onOpenLocationHistory, onOpenTrash)
                         if (candidates > 0) CandidatesItem(candidates, onOpenCandidates)
                         pinnedLines.forEachIndexed { index, (ref, volume, line) ->
                             PinnedItem(ref, volume, line, index, pinnedLines.size, onOpenFolder, onMovePinned, onUnpin)
@@ -334,25 +324,13 @@ internal fun LibraryContent(
                         ) { onOpenFolder(FolderRef(volumeId, line.path)) }
                     }
                 }
-                if (tags.isNotEmpty()) {
-                    fullLine("tags") {
-                        Column {
-                            Text(
-                                stringResource(R.string.library_tags),
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
-                            )
-                            tags.forEach { TagItem(it, onOpenTag) }
-                        }
-                    }
-                }
             }
         }
     }
 }
 
 /** A row across the whole grid; it bleeds over the grid's side padding, as list items bring their own. */
-private fun LazyGridScope.fullLine(key: String, content: @Composable () -> Unit) {
+internal fun LazyGridScope.fullLine(key: String, content: @Composable () -> Unit) {
     item(key = key, span = { GridItemSpan(maxLineSpan) }) {
         Box(
             Modifier.layout { measurable, constraints ->
@@ -364,17 +342,20 @@ private fun LazyGridScope.fullLine(key: String, content: @Composable () -> Unit)
     }
 }
 
-private fun LazyListScope.header(
-    candidates: Int,
-    onOpenCandidates: () -> Unit,
-    onOpenTrash: () -> Unit,
-    onOpenMap: () -> Unit,
-    onOpenLocationHistory: () -> Unit,
-) {
-    item(key = "map") { MapItem(onOpenMap) }
-    item(key = "unlocated") { UnlocatedItem(onOpenLocationHistory) }
-    item(key = "trash") { TrashItem(onOpenTrash) }
-    if (candidates > 0) item(key = "candidates") { CandidatesItem(candidates, onOpenCandidates) }
+/** The map, the photos without a place and the trash: tools rather than places, so they sit small above the folders. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Shortcuts(onOpenMap: () -> Unit, onOpenLocationHistory: () -> Unit, onOpenTrash: () -> Unit) {
+    FlowRow(Modifier.fillMaxWidth().padding(horizontal = IrohacoSpacing.l), horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+        Shortcut(IrohacoIcons.Map, R.string.library_map, onOpenMap)
+        Shortcut(IrohacoIcons.LocationOn, R.string.library_unlocated, onOpenLocationHistory)
+        Shortcut(IrohacoIcons.Delete, R.string.library_trash, onOpenTrash)
+    }
+}
+
+@Composable
+private fun Shortcut(icon: Int, label: Int, onClick: () -> Unit) {
+    AssistChip(onClick = onClick, label = { Text(stringResource(label)) }, leadingIcon = { Icon(painterResource(icon), contentDescription = null) })
 }
 
 private fun LazyListScope.pinnedSection(
@@ -388,12 +369,6 @@ private fun LazyListScope.pinnedSection(
     pinned.forEachIndexed { index, (ref, volume, line) ->
         item(key = "pinned-${ref.key()}") { PinnedItem(ref, volume, line, index, pinned.size, onOpen, onMove, onUnpin) }
     }
-}
-
-private fun LazyListScope.tagSection(tags: List<Tag>, onOpenTag: (String) -> Unit) {
-    if (tags.isEmpty()) return
-    item(key = "tags") { SectionTitle(R.string.library_tags) }
-    items(tags, key = { "tag-${it.tagId}" }) { TagItem(it, onOpenTag) }
 }
 
 @Composable
@@ -415,32 +390,7 @@ private fun CandidatesItem(candidates: Int, onOpen: () -> Unit) {
 }
 
 @Composable
-private fun MapItem(onOpen: () -> Unit) {
-    ListItem(
-        leadingContent = { Icon(painterResource(IrohacoIcons.Map), contentDescription = null) },
-        modifier = Modifier.clickable(onClick = onOpen),
-    ) { Text(stringResource(R.string.library_map)) }
-}
-
-@Composable
-private fun UnlocatedItem(onOpen: () -> Unit) {
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.library_unlocated)) },
-        leadingContent = { Icon(painterResource(IrohacoIcons.LocationOn), contentDescription = null) },
-        modifier = Modifier.clickable(onClick = onOpen),
-    )
-}
-
-@Composable
-private fun TrashItem(onOpen: () -> Unit) {
-    ListItem(
-        leadingContent = { Icon(painterResource(IrohacoIcons.Delete), contentDescription = null) },
-        modifier = Modifier.clickable(onClick = onOpen),
-    ) { Text(stringResource(R.string.library_trash)) }
-}
-
-@Composable
-private fun TagItem(tag: Tag, onOpenTag: (String) -> Unit) {
+internal fun TagItem(tag: Tag, onOpenTag: (String) -> Unit) {
     ListItem(
         supportingContent = { Text(pluralStringResource(R.plurals.library_items, tag.itemCount, tag.itemCount)) },
         leadingContent = { Icon(painterResource(IrohacoIcons.Label), contentDescription = null) },
@@ -598,7 +548,6 @@ private fun LibraryPreview() {
             excluded = setOf(FolderRef("in", "Pictures/Screenshots/")),
             onOpenFolder = {},
             onOpenSettings = {},
-            tags = listOf(Tag("t1", "Trip", 24)),
             pinned = listOf(FolderRef("in", "DCIM/Camera/")),
         )
     }

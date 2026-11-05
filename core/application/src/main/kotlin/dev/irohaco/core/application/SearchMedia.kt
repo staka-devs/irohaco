@@ -126,7 +126,7 @@ class SearchMedia(
         }
         val hiddenNow = hidden()
         val ids = fused.keys.map { it.first }.filter { it !in hiddenNow }
-        val found = access.readableNow(items.items(ids, filters.tagId)).associateBy { it.assetId }
+        val found = access.readableNow(items.items(ids, filters.tagIds)).associateBy { it.assetId }
         val hits = fused.entries
             .sortedByDescending { it.value.score }
             .mapNotNull { (key, f) ->
@@ -175,9 +175,9 @@ class SearchMedia(
 }
 
 /**
- * Conditions besides the query (SRCH-004): the capture time in [fromMs, untilMs) and a tag. A file
+ * Conditions besides the query (SRCH-004): the capture time in [fromMs, untilMs) and tags, all of which a file must carry. A file
  * matches them by its capture time, or its modified time when it has none, as the timeline sorts it.
  */
-data class SearchFilters(val fromMs: Long? = null, val untilMs: Long? = null, val tagId: String? = null) {
+data class SearchFilters(val fromMs: Long? = null, val untilMs: Long? = null, val tagIds: Set<String> = emptySet()) {
     fun admits(timeMs: Long) = (fromMs == null || timeMs >= fromMs) && (untilMs == null || timeMs < untilMs)
 }

@@ -52,7 +52,7 @@ class SearchMediaTest {
     private val search = SearchMedia(
         SearchByMeaning(vectors, embedText = { embeds++; if (modelMissing) throw ModelNotInstalledException() else floatArrayOf(1f) }, modelDigest = "d"),
         SearchText(texts),
-        { ids, tag -> catalog.filter { it.assetId in ids && (tag == null || it.assetId in tagged.getValue(tag)) } },
+        { ids, tags -> catalog.filter { it.assetId in ids && tags.all { tag -> it.assetId in tagged.getValue(tag) } } },
         { items -> items.filter { it.assetId !in revoked } },
         hidden = { hidden },
     )
@@ -121,7 +121,7 @@ class SearchMediaTest {
     @Test
     fun `a date range and a tag narrow the results`() = runTest {
         assertEquals(listOf("p1"), search("駅", filters = SearchFilters(fromMs = 1_000, untilMs = 2_000)).hits.map { it.item.assetId })
-        assertEquals(listOf("p2", "v1", "v1"), search("駅", filters = SearchFilters(tagId = "trip")).hits.map { it.item.assetId })
+        assertEquals(listOf("p2", "v1", "v1"), search("駅", filters = SearchFilters(tagIds = setOf("trip"))).hits.map { it.item.assetId })
     }
 
     @Test

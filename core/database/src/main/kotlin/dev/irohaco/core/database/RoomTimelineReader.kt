@@ -30,14 +30,14 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
     }
 
     // A file in two places has two sources; the result keeps one row per asset.
-    override suspend fun items(assetIds: List<String>, tagId: String?): List<TimelineItem> = assetIds.distinct().chunked(MAX_ARGS).flatMap { ids ->
+    override suspend fun items(assetIds: List<String>, tagIds: Set<String>): List<TimelineItem> = assetIds.distinct().chunked(MAX_ARGS).flatMap { ids ->
         db.timelineDao().page(
             SimpleSQLiteQuery(
                 """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
                           s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, 0 AS rating, $HAS_LOCATION AS hasLocation
                    $FROM WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL AND a.asset_id IN (${ids.joinToString { "?" }})
-                     ${if (tagId != null) "AND EXISTS (SELECT 1 FROM media_tags mt WHERE mt.asset_id = a.asset_id AND mt.tag_id = ?)" else ""}""",
-                (ids + listOfNotNull(tagId)).toTypedArray(),
+                     ${HAS_TAG.repeat(tagIds.size)}""",
+                (ids + tagIds).toTypedArray(),
             ),
         ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, hasLocation = it.hasLocation == true) }
     }.distinctBy { it.assetId }
@@ -107,6 +107,9 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
         const val MAX_ARGS = 500
 
         /** The pin in the grid: the same place the map and the area filter use. */
+        /** One per tag the items must all carry. */
+        const val HAS_TAG = " AND EXISTS (SELECT 1 FROM media_tags mt WHERE mt.asset_id = a.asset_id AND mt.tag_id = ?)"
+
         const val HAS_LOCATION = "EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = a.asset_id AND $SHOWN)"
         const val TIME = "COALESCE($EDITED_TAKEN, s.observed_taken_at, s.observed_modified_at, a.first_seen_at)"
 
@@ -123,7 +126,7 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             append("WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL")
             if (query.kind != null) append(" AND a.media_kind = ?")
             if (query.favoritesOnly) append(" AND r.is_favorite = 1")
-            if (query.tagId != null) append(" AND EXISTS (SELECT 1 FROM media_tags mt WHERE mt.asset_id = a.asset_id AND mt.tag_id = ?)")
+            append(HAS_TAG.repeat(query.tagIds.size))
             if (query.folder != null) append(" AND s.volume_id = ? AND $PATH = ?")
             repeat(query.excludedFolders.size) { append(" AND NOT (s.volume_id = ? AND $PATH = ?)") }
             if (query.area != null) {
@@ -139,7 +142,7 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
         /** In the order of the placeholders in [where]. */
         fun args(query: TimelineQuery): Array<Any> = buildList {
             query.kind?.let { add(it.name) }
-            query.tagId?.let { add(it) }
+            addAll(query.tagIds)
             query.folder?.let { add(it.volumeId); add(it.relativePath) }
             query.excludedFolders.forEach { add(it.volumeId); add(it.relativePath) }
             query.area?.let { add(it.south); add(it.north); add(it.west); add(it.east) }
