@@ -336,6 +336,9 @@
     <string name="viewer_ask_hint">Ask about this photo</string>
     <string name="viewer_ask_hint_video">Ask about this scene</string>
     <string name="viewer_ask_send">Ask</string>
+    <string name="ask_model_choose">Choose the model that answers</string>
+    <string name="ask_model_on_device">On this device</string>
+    <string name="ask_model_at">Runs at %1$s</string>
     <string name="viewer_asking">Looking at this photo or scene</string>
     <string name="viewer_ask_caution">%1$s answered from this photo or scene only. It can be wrong.</string>
     <string name="ask_title">Ask AI</string>

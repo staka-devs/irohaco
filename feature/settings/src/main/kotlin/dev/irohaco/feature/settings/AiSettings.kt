@@ -56,6 +56,7 @@ import dev.irohaco.core.contracts.ModelInstallState.Failed.Reason
 import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.RemoteProtocol
+import dev.irohaco.core.designsystem.component.MarkedModelName
 import dev.irohaco.core.designsystem.component.remoteFailureText
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
@@ -227,7 +228,7 @@ private class LocalModels(
             },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.selectable(selected = selected, enabled = installed, role = Role.RadioButton, onClick = onSelect),
-        ) { BadgedName(model.displayName) }
+        ) { MarkedModelName(model.displayName) }
     }
 }
 
@@ -241,24 +242,7 @@ private fun RemoteRow(model: RemoteModel, host: String?, selected: Boolean, onSe
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
-    ) { BadgedName(model.displayName) }
-}
-
-/** The model's name after a round mark with its first letter, so models tell apart at a glance. */
-@Composable
-private fun BadgedName(name: String) {
-    val colors = MaterialTheme.colorScheme
-    val (fill, ink) = listOf(
-        colors.primaryContainer to colors.onPrimaryContainer,
-        colors.secondaryContainer to colors.onSecondaryContainer,
-        colors.tertiaryContainer to colors.onTertiaryContainer,
-    )[Math.floorMod(name.substringBefore(' ').lowercase().hashCode(), 3)]
-    androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-        Box(Modifier.size(24.dp).background(fill, CircleShape), contentAlignment = Alignment.Center) {
-            Text(name.firstOrNull { it.isLetterOrDigit() }?.uppercase().orEmpty(), style = MaterialTheme.typography.labelMedium, color = ink)
-        }
-        Text(name)
-    }
+    ) { MarkedModelName(model.displayName) }
 }
 
 /** The processor and importing a model file: rarely touched, so folded away. */

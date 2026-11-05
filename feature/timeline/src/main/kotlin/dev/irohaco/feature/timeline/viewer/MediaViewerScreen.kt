@@ -152,9 +152,12 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
     var askingAbout by remember { mutableStateOf<TimelineItem?>(null) }
     askingAbout?.let { item ->
         val turns by viewModel.turns.collectAsStateWithLifecycle()
+        val answerModels by viewModel.answerModels.collectAsStateWithLifecycle()
         AskSheet(
             turns = turns,
             isVideo = item.kind == MediaKind.VIDEO,
+            models = answerModels,
+            onChoose = viewModel::chooseAnswerModel,
             onAsk = { viewModel.askAbout(item, it) },
             onOpenSettings = onOpenSettings,
             onDismiss = {
