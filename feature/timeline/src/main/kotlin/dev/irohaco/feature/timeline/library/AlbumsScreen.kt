@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +35,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -49,7 +52,7 @@ import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.domain.isValidName
 import dev.irohaco.feature.timeline.R
-import dev.irohaco.feature.timeline.TagPickDialog
+import dev.irohaco.feature.timeline.TagSearch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -97,7 +100,7 @@ internal fun AlbumsContent(
     var creating by rememberSaveable { mutableStateOf(false) }
     var findingTag by rememberSaveable { mutableStateOf(false) }
     if (findingTag) {
-        TagPickDialog(stringResource(R.string.tags_all), tags, onPick = { findingTag = false; onOpen(MediaList.Tag(it.tagId)) }) { findingTag = false }
+        AllTags(tags, onOpen = { findingTag = false; onOpen(MediaList.Tag(it)) }) { findingTag = false }
     }
     if (creating) {
         NameDialog(
@@ -154,8 +157,8 @@ internal fun AlbumsContent(
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.weight(1f).padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
                             )
-                            // Only the most used show here; the rest are a search away, however many there are.
-                            if (tags.size > TOP_TAGS) TextButton(onClick = { findingTag = true }) { Text(stringResource(R.string.tags_all)) }
+                            // Only the most used show here; every tag is a search away, however many there are.
+                            TextButton(onClick = { findingTag = true }) { Text(stringResource(R.string.tags_all)) }
                         }
                         tags.sortedByDescending { it.itemCount }.take(TOP_TAGS).forEach { tag -> TagItem(tag) { onOpen(MediaList.Tag(it)) } }
                     }
@@ -166,6 +169,27 @@ internal fun AlbumsContent(
 }
 
 private const val TOP_TAGS = 5
+
+/** Every tag on a page of its own, most used first, narrowed by what is typed. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AllTags(tags: List<Tag>, onOpen: (String) -> Unit, onClose: () -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.tags_all)) },
+                    navigationIcon = { IconButton(onClick = onClose) { Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back)) } },
+                )
+            },
+        ) { padding ->
+            Column(Modifier.padding(padding).padding(horizontal = IrohacoSpacing.l)) {
+                TagSearch(tags, name, { name = it }, R.string.tags_find, listModifier = Modifier.fillMaxSize()) { onOpen(it.tagId) }
+            }
+        }
+    }
+}
 
 /** A card with a cover, a title and a count: an album, or a folder in the library's grid view. */
 @Composable
