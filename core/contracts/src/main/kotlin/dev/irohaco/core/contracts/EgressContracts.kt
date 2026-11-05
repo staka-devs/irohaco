@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 enum class TaskType { SEARCH_QUERY, IMAGE_INDEX, VIDEO_INDEX, CAPTION, RAG, OCR_ASSIST }
 
 /** A kind of content that could leave the device (ARCHITECTURE §9.2). */
-enum class EgressPayload { QUERY_TEXT, IMAGE_PIXELS, VIDEO_FRAMES, VIDEO_BYTES, OCR_TEXT, USER_ANNOTATIONS, GPS_EXIF }
+enum class EgressPayload { QUERY_TEXT, IMAGE_PIXELS, VIDEO_FRAMES, VIDEO_BYTES, OCR_TEXT, USER_ANNOTATIONS, GPS_EXIF, PLACE_NAME }
 
 /** One permission: this connection may get this payload for this task. No row means no (ADR-0002). */
 data class EgressGrant(val connectionId: String, val task: TaskType, val payload: EgressPayload)
