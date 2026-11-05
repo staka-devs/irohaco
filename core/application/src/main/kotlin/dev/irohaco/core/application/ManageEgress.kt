@@ -97,7 +97,7 @@ class ManageEgress(
             }
         }
 
-        /** What each task in R0 could send; location never leaves with an image (ARCHITECTURE §9.2). */
+        /** What each task could send; a place leaves only as its town name, never as coordinates. */
         val offered: Map<TaskType, List<EgressPayload>> = mapOf(
             TaskType.SEARCH_QUERY to listOf(EgressPayload.QUERY_TEXT),
             TaskType.IMAGE_INDEX to listOf(EgressPayload.IMAGE_PIXELS, EgressPayload.OCR_TEXT, EgressPayload.USER_ANNOTATIONS),
@@ -108,6 +108,7 @@ class ManageEgress(
                 EgressPayload.VIDEO_FRAMES,
                 EgressPayload.OCR_TEXT,
                 EgressPayload.USER_ANNOTATIONS,
+                EgressPayload.PLACE_NAME,
             ),
         )
     }
