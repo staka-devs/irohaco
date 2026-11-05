@@ -136,14 +136,21 @@ class AskLibrary(
     ): AskResult {
         val memo = memos.filter { it.isNotBlank() }.joinToString(" / ").ifEmpty { null }
         val hit = SearchHit(item, frameMs ?: 0L.takeIf { item.kind == MediaKind.VIDEO }, setOfNotNull(Evidence.MEMO.takeIf { memo != null }), memo)
-        // When and where say where the user was and when (EXIF); they leave the device only with a grant R0 does not offer (PRD §10).
-        val local = remoteModel() == null
-        return ask(question, listOf(hit), context(takenAtMs.takeIf { local }, place.takeIf { local }, earlier), onText)
+        // The time stays on the device; a remote model gets the place only as the town name, and only once granted.
+        val model = remoteModel()
+        val sent = place?.takeIf { model == null || placeGranted(model) }
+        return ask(question, listOf(hit), context(takenAtMs.takeIf { model == null }, sent, earlier), sent != null, onText)
     }
 
+    private suspend fun placeGranted(model: RemoteModel): Boolean =
+        remote?.policy?.authorize(TaskType.RAG, model.profileId, setOf(EgressPayload.PLACE_NAME), emptySet()) == EgressDecision.Allowed
+
     /** [onText] gets the answer's text so far while the model writes it; [context] goes just before the question. */
-    suspend fun ask(question: String, hits: List<SearchHit>, context: String = "", onText: (String) -> Unit = {}): AskResult {
-        remoteModel()?.let { return askRemote(it, question, hits, context, onText) }
+    suspend fun ask(question: String, hits: List<SearchHit>, context: String = "", onText: (String) -> Unit = {}): AskResult =
+        ask(question, hits, context, sendsPlace = false, onText)
+
+    private suspend fun ask(question: String, hits: List<SearchHit>, context: String, sendsPlace: Boolean, onText: (String) -> Unit): AskResult {
+        remoteModel()?.let { return askRemote(it, question, hits, context, onText, sendsPlace) }
         val path = modelPath() ?: return AskResult.NoModel
         val sources = hits.take(MAX_SOURCES)
         if (question.isBlank() || sources.isEmpty()) return AskResult.NothingFound
@@ -163,11 +170,11 @@ class AskLibrary(
         }
     }
 
-    private suspend fun askRemote(model: RemoteModel, question: String, hits: List<SearchHit>, context: String, onText: (String) -> Unit): AskResult {
+    private suspend fun askRemote(model: RemoteModel, question: String, hits: List<SearchHit>, context: String, onText: (String) -> Unit, sendsPlace: Boolean): AskResult {
         val remote = checkNotNull(remote)
         val sources = hits.take(MAX_SOURCES)
         if (question.isBlank() || sources.isEmpty()) return AskResult.NothingFound
-        val payloads = payloads(sources)
+        val payloads = payloads(sources) + setOfNotNull(EgressPayload.PLACE_NAME.takeIf { sendsPlace })
         val assets = sources.map { it.item.assetId }.toSet()
         if (model.profileId !in consented) {
             val host = remote.connection(model)?.baseUrl?.let { runCatching { URI(it).host }.getOrNull() }.orEmpty()

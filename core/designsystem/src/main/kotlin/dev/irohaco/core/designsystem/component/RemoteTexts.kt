@@ -17,6 +17,7 @@ fun EgressPayload.label(): Int = when (this) {
     EgressPayload.VIDEO_FRAMES -> R.string.egress_video_frames
     EgressPayload.OCR_TEXT -> R.string.egress_ocr_text
     EgressPayload.USER_ANNOTATIONS -> R.string.egress_user_annotations
+    EgressPayload.PLACE_NAME -> R.string.egress_place_name
     // Not offered in R0; named by their codes should one ever be refused.
     EgressPayload.VIDEO_BYTES, EgressPayload.GPS_EXIF -> R.string.egress_query_text
 }
