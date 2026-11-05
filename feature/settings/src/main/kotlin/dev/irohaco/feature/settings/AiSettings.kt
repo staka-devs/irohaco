@@ -1,6 +1,12 @@
 package dev.irohaco.feature.settings
 
 import android.text.format.Formatter
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,12 +43,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -98,7 +107,13 @@ internal fun AiSettings(
     onAddRemote: (RemoteRole, connectionId: String?, NewConnection?, modelId: String, name: String) -> Unit = { _, _, _, _, _ -> },
     onDismissModelTest: () -> Unit = {},
     onRemoveRemote: (String) -> Unit = {},
+    onMarkColor: (id: String, color: Long?) -> Unit = { _, _ -> },
+    onMarkImage: (id: String, uri: String?) -> Unit = { _, _ -> },
 ) {
+    var marking by remember { mutableStateOf<Pair<String, String>?>(null) }
+    marking?.let { (id, name) ->
+        MarkDialog(id, name, onColor = { onMarkColor(id, it) }, onImage = { onMarkImage(id, it) }) { marking = null }
+    }
     var deleting by remember { mutableStateOf<ModelArtifact?>(null) }
     deleting?.let { model ->
         AlertDialog(
@@ -131,20 +146,20 @@ internal fun AiSettings(
     }
     val hosts = connections.associate { it.id to it.host() }
     val answerIds = answerModels.map { it.id }.toSet()
-    val local = LocalModels(states, onDownload, onPause, onCancel, onDelete = { deleting = it })
+    val local = LocalModels(states, onDownload, onPause, onCancel, onDelete = { deleting = it }, onMark = { marking = it.id to it.displayName })
     Column(Modifier.padding(horizontal = IrohacoSpacing.l), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m)) {
         RoleCard(R.string.settings_ai_index_card, R.string.settings_ai_index_card_hint, onAdd = { adding = RemoteRole.INDEX }) {
             models.filter { it.id !in answerIds }.forEach { model ->
                 local.Row(model, selected = embeddingModel == null && states[model.id] is ModelInstallState.Installed) { onSelectEmbeddingModel(null) }
             }
             remoteEmbeddingModels.forEach { model ->
-                RemoteRow(model, hosts[model.connectionId], selected = model.profileId == embeddingModel, onSelect = { onSelectEmbeddingModel(model.profileId) }) { removing = model }
+                RemoteRow(model, hosts[model.connectionId], selected = model.profileId == embeddingModel, onSelect = { onSelectEmbeddingModel(model.profileId) }, onMark = { marking = model.profileId to model.displayName }) { removing = model }
             }
         }
         RoleCard(R.string.settings_ai_answer_card, R.string.settings_ai_answer_card_hint, onAdd = { adding = RemoteRole.ANSWER }) {
             answerModels.forEach { model -> local.Row(model, selected = model.id == answerModel) { onSelectAnswerModel(model.id) } }
             remoteAnswerModels.forEach { model ->
-                RemoteRow(model, hosts[model.connectionId], selected = model.profileId == answerModel, onSelect = { onSelectAnswerModel(model.profileId) }) { removing = model }
+                RemoteRow(model, hosts[model.connectionId], selected = model.profileId == answerModel, onSelect = { onSelectAnswerModel(model.profileId) }, onMark = { marking = model.profileId to model.displayName }) { removing = model }
             }
         }
         Details(importResult, onImport, backend, gpuCheck, onSelectBackend)
@@ -188,6 +203,7 @@ private class LocalModels(
     val onPause: (String) -> Unit,
     val onCancel: (String) -> Unit,
     val onDelete: (ModelArtifact) -> Unit,
+    val onMark: (ModelArtifact) -> Unit,
 ) {
     @Composable
     fun Row(model: ModelArtifact, selected: Boolean, onSelect: () -> Unit) {
@@ -228,12 +244,12 @@ private class LocalModels(
             },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.selectable(selected = selected, enabled = installed, role = Role.RadioButton, onClick = onSelect),
-        ) { MarkedModelName(model.displayName) }
+        ) { MarkedModelName(model.displayName, model.id) { onMark(model) } }
     }
 }
 
 @Composable
-private fun RemoteRow(model: RemoteModel, host: String?, selected: Boolean, onSelect: () -> Unit, onRemove: () -> Unit) {
+private fun RemoteRow(model: RemoteModel, host: String?, selected: Boolean, onSelect: () -> Unit, onMark: () -> Unit, onRemove: () -> Unit) {
     ListItem(
         leadingContent = { RadioButton(selected = selected, onClick = null) },
         supportingContent = { Text(stringResource(R.string.settings_ai_remote_at, host.orEmpty())) },
@@ -242,7 +258,44 @@ private fun RemoteRow(model: RemoteModel, host: String?, selected: Boolean, onSe
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
-    ) { MarkedModelName(model.displayName) }
+    ) { MarkedModelName(model.displayName, model.profileId, onMark) }
+}
+
+/** The fills a mark can take; strong enough to read a white or black letter on. */
+private val MARK_COLORS = listOf(0xFF1A73E8, 0xFF0F9D58, 0xFFF4B400, 0xFFDB4437, 0xFF8E24AA, 0xFF000000, 0xFFD97757, 0xFF10A37F)
+
+/** A color for the mark, or a picture such as the service's logo in place of the letter. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MarkDialog(id: String, name: String, onColor: (Long?) -> Unit, onImage: (String?) -> Unit, onDismiss: () -> Unit) {
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let { onImage(it.toString()) } }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { MarkedModelName(name, id) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m)) {
+                Text(stringResource(R.string.settings_ai_mark_color), style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+                    MARK_COLORS.forEachIndexed { i, color ->
+                        val label = stringResource(R.string.settings_ai_mark_color_n, i + 1)
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape).background(Color(color))
+                                .clickable(onClickLabel = label, role = Role.Button) { onColor(color) }
+                                .semantics { contentDescription = label },
+                        )
+                    }
+                }
+                TextButton(onClick = { pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
+                    Text(stringResource(R.string.settings_ai_mark_image))
+                }
+                Text(stringResource(R.string.settings_ai_mark_image_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_ai_mark_done)) } },
+        dismissButton = {
+            TextButton(onClick = { onColor(null); onImage(null) }) { Text(stringResource(R.string.settings_ai_mark_reset)) }
+        },
+    )
 }
 
 /** The processor and importing a model file: rarely touched, so folded away. */

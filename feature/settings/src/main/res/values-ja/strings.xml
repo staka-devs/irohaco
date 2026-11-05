@@ -72,6 +72,12 @@
     <string name="settings_ai_remote_test_and_use">テストして使う</string>
     <string name="settings_ai_remote_ready">使えるようになりました。</string>
     <string name="settings_ai_details">詳細</string>
+    <string name="settings_ai_mark_color">色</string>
+    <string name="settings_ai_mark_color_n">色 %1$d</string>
+    <string name="settings_ai_mark_image">画像を選ぶ</string>
+    <string name="settings_ai_mark_image_hint">ロゴなどの画像を選ぶと、頭文字の代わりに出します。</string>
+    <string name="settings_ai_mark_done">完了</string>
+    <string name="settings_ai_mark_reset">元に戻す</string>
     <string name="settings_ai_details_summary">プロセッサ、モデルのファイルの取り込み</string>
     <string name="settings_ai_delete">削除</string>
     <string name="settings_ai_delete_title">%1$sを削除しますか？</string>

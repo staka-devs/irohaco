@@ -72,6 +72,12 @@
     <string name="settings_ai_remote_test_and_use">Test and use</string>
     <string name="settings_ai_remote_ready">Ready to use.</string>
     <string name="settings_ai_details">Details</string>
+    <string name="settings_ai_mark_color">Color</string>
+    <string name="settings_ai_mark_color_n">Color %1$d</string>
+    <string name="settings_ai_mark_image">Choose a picture</string>
+    <string name="settings_ai_mark_image_hint">A picture such as a logo shows in place of the letter.</string>
+    <string name="settings_ai_mark_done">Done</string>
+    <string name="settings_ai_mark_reset">Reset</string>
     <string name="settings_ai_details_summary">Processor, importing a model file</string>
     <string name="settings_ai_delete">Delete</string>
     <string name="settings_ai_delete_title">Delete %1$s?</string>

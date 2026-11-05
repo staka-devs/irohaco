@@ -38,6 +38,7 @@
     <string name="egress_video_frames">動画のフレーム</string>
     <string name="egress_ocr_text">写真から読んだ文字</string>
     <string name="egress_user_annotations">メモ</string>
+    <string name="model_mark_change">%1$s のマークを変える</string>
     <string name="remote_rate_limited">外部のモデルが混み合っています。しばらくしてからもう一度試してください。</string>
     <string name="remote_rate_limited_after">外部のモデルが混み合っています。%1$d 秒ほどしてからもう一度試してください。</string>
     <string name="remote_unauthorized">外部の API にキーを拒否されました。設定でキーを確かめてください。</string>
