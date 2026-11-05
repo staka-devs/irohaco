@@ -55,7 +55,7 @@ class AskViewModel(private val chat: ChatWithLibrary) : ViewModel() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AskScreen(viewModel: AskViewModel, onOpen: (SearchHit) -> Unit, onOpenSettings: () -> Unit, onBack: () -> Unit) {
+fun AskScreen(viewModel: AskViewModel, onOpen: (SearchHit) -> Unit, onOpenSettings: () -> Unit, onBack: () -> Unit, onShowPhotos: ((String) -> Unit)? = null) {
     val turns by viewModel.turns.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.warmUp() }
     Scaffold(
@@ -75,6 +75,7 @@ fun AskScreen(viewModel: AskViewModel, onOpen: (SearchHit) -> Unit, onOpenSettin
             askingLabel = R.string.search_asking,
             caution = R.string.search_ask_caution,
             modifier = Modifier.padding(padding),
+            onShowPhotos = onShowPhotos,
         )
     }
 }
