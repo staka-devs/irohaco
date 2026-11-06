@@ -184,7 +184,7 @@
     <string name="settings_remote_parameters_default">空なら %1$d を送ります（この API では必須です）</string>
     <string name="settings_remote_parameters_look_up">models.dev でこのモデルを調べる</string>
     <string name="settings_remote_parameters_look_up_hint">models.dev は、モデルの情報を集めた公開の一覧です。調べるときは一覧の全体を読み込み、端末の中でモデルを探します。モデル ID も含め、あなたの情報は送りません。</string>
-    <string name="settings_remote_parameters_unlisted">models.dev にこのモデルは載っていませんでした。</string>
+    <string name="settings_remote_parameters_unlisted">models.dev に「%1$s」は載っていませんでした。</string>
     <string name="settings_remote_parameters_failed">models.dev を読み込めませんでした。</string>
     <string name="settings_remote_parameters_save">保存</string>
     <string name="settings_remote_model_done">閉じる</string>

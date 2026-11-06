@@ -540,7 +540,7 @@ AndroidXの`ExifInterface`で書き込めるのはJPEG、PNG、WebPである。�
 ### 9.2 タスクごとの割り当てと通信の許可
 
 ```kotlin
-enum class EgressPayload { QUERY_TEXT, IMAGE_PIXELS, VIDEO_FRAMES, VIDEO_BYTES, OCR_TEXT, USER_ANNOTATIONS, GPS_EXIF }
+enum class EgressPayload { QUERY_TEXT, IMAGE_PIXELS, VIDEO_FRAMES, VIDEO_BYTES, OCR_TEXT, USER_ANNOTATIONS, GPS_EXIF, PLACE_NAME }
 
 // 1行 = 1つの許可。行が無ければDENY（allowedフラグは持たない）。
 data class EgressGrant(

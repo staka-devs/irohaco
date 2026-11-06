@@ -186,7 +186,7 @@
     <string name="settings_remote_parameters_default">Empty sends %1$d (this API requires it)</string>
     <string name="settings_remote_parameters_look_up">Look this model up on models.dev</string>
     <string name="settings_remote_parameters_look_up_hint">models.dev is a public list of models. Looking up reads the whole list and finds the model on this device; nothing of yours is sent, not even the model ID.</string>
-    <string name="settings_remote_parameters_unlisted">models.dev does not list this model.</string>
+    <string name="settings_remote_parameters_unlisted">models.dev does not list “%1$s”.</string>
     <string name="settings_remote_parameters_failed">Could not read models.dev.</string>
     <string name="settings_remote_parameters_save">Save</string>
     <string name="settings_remote_model_done">Done</string>

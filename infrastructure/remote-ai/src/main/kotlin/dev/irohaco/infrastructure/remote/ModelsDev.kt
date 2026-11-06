@@ -45,6 +45,15 @@ class ModelsDev(private val url: String = URL_, private val timeoutMs: Int = TIM
         private const val URL_ = "https://models.dev/api.json"
         private const val TIMEOUT_MS = 30_000
 
+        private val DATED = Regex("""-(\d{8}|\d{4}-\d{2}-\d{2}|latest)$""")
+
+        internal fun names(modelId: String): List<String> {
+            val typed = modelId.trim()
+            val lower = typed.lowercase()
+            val bare = lower.substringAfterLast('/')
+            return listOf(typed, lower, bare, DATED.replace(bare, "")).distinct()
+        }
+
         /** The providers models.dev lists without their address, by the host of their API. */
         private val HOSTS = mapOf(
             "api.openai.com" to "openai",
@@ -52,13 +61,18 @@ class ModelsDev(private val url: String = URL_, private val timeoutMs: Int = TIM
             "generativelanguage.googleapis.com" to "google",
         )
 
-        /** The provider at [baseUrl]'s host first, then any other that lists [modelId], since a service may resell a model. */
+        /**
+         * The provider at [baseUrl]'s host first, then any other that lists the model, since a service may resell one.
+         * The ID is tried as typed, then in lower case, without a vendor prefix (`openai/gpt-x`) and without a date
+         * or `-latest` at its end, as services name the same model.
+         */
         internal fun find(list: JSONObject, baseUrl: String, modelId: String): ModelOptions? {
             val host = runCatching { URI(baseUrl.trim()).host }.getOrNull()?.lowercase()
             val providers = list.keys().asSequence().mapNotNull(list::optJSONObject).toList()
             fun hostOf(provider: JSONObject) = runCatching { URI(provider.optString("api")).host }.getOrNull()?.lowercase()
             val (same, others) = providers.partition { HOSTS[host] == it.optString("id") || (host != null && hostOf(it) == host) }
-            val model = (same + others).firstNotNullOfOrNull { it.optJSONObject("models")?.optJSONObject(modelId) } ?: return null
+            val ids = names(modelId)
+            val model = ids.firstNotNullOfOrNull { id -> (same + others).firstNotNullOfOrNull { it.optJSONObject("models")?.optJSONObject(id) } } ?: return null
             val reasoning = model.optJSONArray("reasoning_options")
             val options = (0 until (reasoning?.length() ?: 0)).mapNotNull { reasoning?.optJSONObject(it) }
             fun option(type: String) = options.firstOrNull { it.optString("type") == type }

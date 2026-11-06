@@ -1,5 +1,7 @@
 package dev.irohaco.feature.settings
 
+import androidx.compose.foundation.layout.Row
+import dev.irohaco.core.contracts.GenerationParameter
 import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -108,7 +110,22 @@ internal fun AiSettings(
     onRemoveRemote: (String) -> Unit = {},
     onMarkColor: (id: String, color: Long?) -> Unit = { _, _ -> },
     onMarkImage: (id: String, uri: String?) -> Unit = { _, _ -> },
+    onSetParameters: (profileId: String, values: Map<String, String>) -> Unit = { _, _ -> },
+    optionsLookup: SettingsViewModel.OptionsLookup? = null,
+    onLookUpOptions: (RemoteModel) -> Unit = {},
+    onDismissOptions: () -> Unit = {},
 ) {
+    var tuning by remember { mutableStateOf<Pair<RemoteModel, RemoteProtocol>?>(null) }
+    tuning?.let { (model, protocol) ->
+        ParametersDialog(
+            model = model,
+            parameters = GenerationParameter.of(protocol),
+            lookup = optionsLookup,
+            onLookUp = { onLookUpOptions(model) },
+            onDismiss = { tuning = null; onDismissOptions() },
+            onSave = { tuning = null; onDismissOptions(); onSetParameters(model.profileId, it) },
+        )
+    }
     var marking by remember { mutableStateOf<Pair<String, String>?>(null) }
     marking?.let { (id, name) ->
         MarkDialog(id, name, onColor = { onMarkColor(id, it) }, onImage = { onMarkImage(id, it) }) { marking = null }
@@ -158,7 +175,12 @@ internal fun AiSettings(
         RoleCard(R.string.settings_ai_answer_card, R.string.settings_ai_answer_card_hint, onAdd = { adding = RemoteRole.ANSWER }) {
             answerModels.forEach { model -> local.Row(model, selected = model.id == answerModel) { onSelectAnswerModel(model.id) } }
             remoteAnswerModels.forEach { model ->
-                RemoteRow(model, hosts[model.connectionId], selected = model.profileId == answerModel, onSelect = { onSelectAnswerModel(model.profileId) }, onMark = { marking = model.profileId to model.displayName }) { removing = model }
+                val protocol = connections.firstOrNull { it.id == model.connectionId }?.protocol
+                RemoteRow(
+                    model, hosts[model.connectionId], selected = model.profileId == answerModel, onSelect = { onSelectAnswerModel(model.profileId) },
+                    onMark = { marking = model.profileId to model.displayName },
+                    onTune = protocol?.takeIf { GenerationParameter.of(it).isNotEmpty() }?.let { { tuning = model to it } },
+                ) { removing = model }
             }
         }
         Details(importResult, onImport, backend, gpuCheck, onSelectBackend)
@@ -246,12 +268,27 @@ private class LocalModels(
 }
 
 @Composable
-private fun RemoteRow(model: RemoteModel, host: String?, selected: Boolean, onSelect: () -> Unit, onMark: () -> Unit, onRemove: () -> Unit) {
+private fun RemoteRow(
+    model: RemoteModel,
+    host: String?,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    onMark: () -> Unit,
+    /** Opens the model's request settings; null where its API has none. */
+    onTune: (() -> Unit)? = null,
+    onRemove: () -> Unit,
+) {
     ListItem(
         leadingContent = { RadioButton(selected = selected, onClick = null) },
-        supportingContent = { Text(stringResource(R.string.settings_ai_remote_at, host.orEmpty())) },
+        supportingContent = {
+            // What the user set goes with every question, so the row says it.
+            Text((listOf(stringResource(R.string.settings_ai_remote_at, host.orEmpty())) + model.parameters.map { (path, value) -> "$path: $value" }).joinToString("\n"))
+        },
         trailingContent = {
-            IconButton(onClick = onRemove) { Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.settings_remote_model_remove)) }
+            Row {
+                onTune?.let { IconButton(onClick = it) { Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.settings_remote_parameters)) } }
+                IconButton(onClick = onRemove) { Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.settings_remote_model_remove)) }
+            }
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
@@ -540,7 +577,7 @@ private fun AiSettingsPreview() {
                     onImport = {},
                     onDelete = {},
                     answerModels = previewAnswers,
-                    remoteAnswerModels = listOf(RemoteModel("p", "c", "vision-large", "Vision Large", emptySet())),
+                    remoteAnswerModels = listOf(RemoteModel("p", "c", "vision-large", "Vision Large", emptySet(), parameters = mapOf("reasoning_effort" to "high"))),
                     answerModel = "p",
                     connections = listOf(RemoteConnection("c", RemoteProtocol.OPENAI_CHAT, "https://api.example.com/v1")),
                 )

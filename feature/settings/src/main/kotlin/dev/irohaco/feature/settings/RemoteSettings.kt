@@ -79,22 +79,7 @@ internal fun RemoteSettings(
     onDismissConnectionFailed: () -> Unit = {},
     /** Names a connection; a blank name goes back to the suggested one. */
     onRename: (id: String, name: String) -> Unit = { _, _ -> },
-    onSetParameters: (profileId: String, values: Map<String, String>) -> Unit = { _, _ -> },
-    optionsLookup: SettingsViewModel.OptionsLookup? = null,
-    onLookUpOptions: (RemoteModel) -> Unit = {},
-    onDismissOptions: () -> Unit = {},
 ) {
-    var tuning by remember { mutableStateOf<Pair<RemoteModel, RemoteProtocol>?>(null) }
-    tuning?.let { (model, protocol) ->
-        ParametersDialog(
-            model = model,
-            parameters = GenerationParameter.of(protocol),
-            lookup = optionsLookup,
-            onLookUp = { onLookUpOptions(model) },
-            onDismiss = { tuning = null; onDismissOptions() },
-            onSave = { tuning = null; onDismissOptions(); onSetParameters(model.profileId, it) },
-        )
-    }
     var renaming by remember { mutableStateOf<RemoteConnection?>(null) }
     renaming?.let { connection ->
         var name by rememberSaveable { mutableStateOf(connection.name.orEmpty()) }
@@ -188,21 +173,10 @@ internal fun RemoteSettings(
         ) { Text(connection.serviceName, style = MaterialTheme.typography.titleMedium) }
         models.filter { it.connectionId == connection.id }.forEach { model ->
             ListItem(
-                supportingContent = {
-                    Text(
-                        listOf(capabilitiesText(model.capabilities)).plus(model.parameters.map { (path, value) -> "$path: $value" }).joinToString("\n"),
-                    )
-                },
+                supportingContent = { Text(capabilitiesText(model.capabilities)) },
                 trailingContent = {
-                    Row {
-                        if (GenerationParameter.of(connection.protocol).isNotEmpty()) {
-                            IconButton(onClick = { tuning = model to connection.protocol }) {
-                                Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.settings_remote_parameters))
-                            }
-                        }
-                        IconButton(onClick = { removingModel = model }) {
-                            Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.settings_remote_model_remove))
-                        }
+                    IconButton(onClick = { removingModel = model }) {
+                        Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.settings_remote_model_remove))
                     }
                 },
             ) { Text(model.displayName) }
@@ -317,7 +291,7 @@ private fun AddModelDialog(test: SettingsViewModel.ModelTest?, onDismiss: () -> 
  * default applies. models.dev, read only when the user asks, fills in what this model takes.
  */
 @Composable
-private fun ParametersDialog(
+internal fun ParametersDialog(
     model: RemoteModel,
     parameters: List<GenerationParameter>,
     lookup: SettingsViewModel.OptionsLookup?,
@@ -353,7 +327,7 @@ private fun ParametersDialog(
                     null -> TextButton(onClick = onLookUp) { Text(stringResource(R.string.settings_remote_parameters_look_up)) }
                     SettingsViewModel.OptionsLookup.Running -> LinearProgressIndicator(Modifier.fillMaxWidth())
                     is SettingsViewModel.OptionsLookup.Found -> if (lookup.options == null) {
-                        Text(stringResource(R.string.settings_remote_parameters_unlisted), style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.settings_remote_parameters_unlisted, model.modelId), style = MaterialTheme.typography.bodySmall)
                     }
                     is SettingsViewModel.OptionsLookup.Failed -> Text(
                         remoteFailureText(lookup.cause) ?: stringResource(R.string.settings_remote_parameters_failed),
@@ -476,7 +450,7 @@ private fun RemoteSettingsPreview() {
                     listOf(RemoteConnection("openai", RemoteProtocol.OPENAI_RESPONSES, "https://api.example.com/v1")),
                     setOf(EgressGrant("openai", TaskType.RAG, EgressPayload.QUERY_TEXT)),
                     { _, _ -> },
-                    models = listOf(RemoteModel("p", "openai", "model-x", "Model X", RemoteAnswering.NEEDED + ModelCapability.STREAMING, parameters = mapOf("reasoning.effort" to "high"))),
+                    models = listOf(RemoteModel("p", "openai", "model-x", "Model X", RemoteAnswering.NEEDED + ModelCapability.STREAMING)),
                 )
             }
         }

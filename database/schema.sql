@@ -414,7 +414,7 @@ CREATE INDEX ix_job_items_state ON indexing_job_items(job_id,state);
 CREATE TABLE egress_grants (
   connection_id TEXT NOT NULL REFERENCES provider_connections(connection_id) ON DELETE RESTRICT,
   task_code TEXT NOT NULL CHECK(task_code IN ('SEARCH_QUERY','IMAGE_INDEX','VIDEO_INDEX','CAPTION','RAG','OCR_ASSIST')),
-  payload_type TEXT NOT NULL CHECK(payload_type IN ('QUERY_TEXT','IMAGE_PIXELS','VIDEO_FRAMES','VIDEO_BYTES','OCR_TEXT','USER_ANNOTATIONS','GPS_EXIF')),
+  payload_type TEXT NOT NULL CHECK(payload_type IN ('QUERY_TEXT','IMAGE_PIXELS','VIDEO_FRAMES','VIDEO_BYTES','OCR_TEXT','USER_ANNOTATIONS','GPS_EXIF','PLACE_NAME')),
   granted_at INTEGER NOT NULL,
   PRIMARY KEY(connection_id,task_code,payload_type)
 );

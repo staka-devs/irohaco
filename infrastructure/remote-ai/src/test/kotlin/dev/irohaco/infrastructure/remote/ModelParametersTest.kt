@@ -47,5 +47,9 @@ class ModelParametersTest {
         assertEquals(ModelOptions(null, null, 10), ModelsDev.find(list, "https://example.com/v1", "gpt-x"))
         assertEquals(ModelOptions(null, 1024, null), ModelsDev.find(list, "http://192.168.0.2:8080/v1", "claude-x"))
         assertNull(ModelsDev.find(list, "https://api.openai.com/v1", "unknown"))
+        // As services name the same model.
+        assertEquals(ModelOptions(listOf("low", "high"), null, 50), ModelsDev.find(list, "https://api.openai.com/v1", "openai/GPT-X"))
+        assertEquals(ModelOptions(null, 1024, null), ModelsDev.find(list, "https://api.anthropic.com/v1", "claude-x-20260101"))
+        assertEquals(ModelOptions(null, 1024, null), ModelsDev.find(list, "https://api.anthropic.com/v1", "claude-x-latest"))
     }
 }

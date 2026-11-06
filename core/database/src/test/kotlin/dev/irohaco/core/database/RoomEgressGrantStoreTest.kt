@@ -3,6 +3,7 @@ package dev.irohaco.core.database
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.irohaco.core.contracts.EgressGrant
+import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.EgressPayload.IMAGE_PIXELS
 import dev.irohaco.core.contracts.EgressPayload.QUERY_TEXT
 import dev.irohaco.core.contracts.ModelCapability
@@ -58,6 +59,13 @@ class RoomEgressGrantStoreTest {
         assertEquals(emptySet(), store.granted("gpt", SEARCH_QUERY))
         store.set(EgressGrant("openai", RAG, IMAGE_PIXELS), false)
         assertEquals(setOf(EgressGrant("openai", RAG, QUERY_TEXT)), store.grants.first())
+    }
+
+    @Test
+    fun `every kind of content can be granted`() = runTest {
+        remote()
+        EgressPayload.entries.forEach { store.set(EgressGrant("openai", RAG, it), true) }
+        assertEquals(EgressPayload.entries.toSet(), store.granted("gpt", RAG))
     }
 
     @Test

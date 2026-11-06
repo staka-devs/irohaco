@@ -193,6 +193,10 @@ fun SettingsScreen(
                 onRemoveRemote = viewModel::removeModel,
                 onMarkColor = viewModel::setMarkColor,
                 onMarkImage = viewModel::setMarkImage,
+                onSetParameters = viewModel::setModelParameters,
+                optionsLookup = optionsLookup,
+                onLookUpOptions = viewModel::lookUpOptions,
+                onDismissOptions = viewModel::dismissOptions,
             )
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast, locationPin, viewModel::setLocationPin) },
@@ -229,10 +233,6 @@ fun SettingsScreen(
                 connectionFailed,
                 viewModel::dismissConnectionFailed,
                 viewModel::renameConnection,
-                viewModel::setModelParameters,
-                optionsLookup,
-                viewModel::lookUpOptions,
-                viewModel::dismissOptions,
             )
         },
     )
