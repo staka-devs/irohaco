@@ -30,7 +30,7 @@ class ChatWithLibrary(
         return Found(wanted, lookUp(wanted))
     }
 
-    suspend fun answer(question: String, earlier: List<Turn>, onText: (String) -> Unit = {}): AskResult {
+    suspend fun answer(question: String, earlier: List<Turn>, onText: (AskPartial) -> Unit = {}): AskResult {
         val found = lookUp(QueryReader.read(question, now()))
         val chat = earlier.map { it.question to it.answer.text.replace(CITATION, "") }
         return ask.ask(question, sources(found, earlier), AskLibrary.context(null, null, chat), onText)

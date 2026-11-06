@@ -48,7 +48,7 @@ sealed interface AskResult {
      * [known] is false when the sources do not answer the question; the text then says so (RAG-003).
      * [remoteModel] names the remote model that answered, or is null for the model on this device.
      */
-    data class Answered(val text: String, val known: Boolean, val citations: List<Citation>, val remoteModel: String? = null) : AskResult
+    data class Answered(val text: String, val known: Boolean, val citations: List<Citation>, val remoteModel: String? = null, val thought: String = "") : AskResult
 
     /** No answer model is installed; Settings > AI downloads one. */
     data object NoModel : AskResult
@@ -64,6 +64,9 @@ sealed interface AskResult {
      */
     class NeedsConsent(val model: String, val service: String, val payloads: Set<EgressPayload>, val agree: () -> Unit) : AskResult
 }
+
+/** An answer still being written: what the model thought so far, then the answer's text so far. */
+data class AskPartial(val thought: String, val text: String)
 
 /** When and where a source was taken, written beside it for the model; [guessed] when the place is only a guess. */
 data class SourceFacts(val takenAtMs: Long?, val place: String?, val guessed: Boolean = false)
@@ -159,7 +162,7 @@ class AskLibrary(
         takenAtMs: Long?,
         place: String?,
         earlier: List<Pair<String, String>>,
-        onText: (String) -> Unit = {},
+        onText: (AskPartial) -> Unit = {},
     ): AskResult {
         val memo = memos.filter { it.isNotBlank() }.joinToString(" / ").ifEmpty { null }
         val hit = SearchHit(item, frameMs ?: 0L.takeIf { item.kind == MediaKind.VIDEO }, setOfNotNull(Evidence.MEMO.takeIf { memo != null }), memo)
@@ -176,10 +179,10 @@ class AskLibrary(
      * [onText] gets the answer's text so far while the model writes it; [context] goes just before the question.
      * Each source goes with when and where it was taken, so questions about time and place can be answered.
      */
-    suspend fun ask(question: String, hits: List<SearchHit>, context: String = "", onText: (String) -> Unit = {}): AskResult =
+    suspend fun ask(question: String, hits: List<SearchHit>, context: String = "", onText: (AskPartial) -> Unit = {}): AskResult =
         ask(question, hits, context, sendsPlace = false, onText, described = true)
 
-    private suspend fun ask(question: String, hits: List<SearchHit>, context: String, sendsPlace: Boolean, onText: (String) -> Unit, described: Boolean = false): AskResult {
+    private suspend fun ask(question: String, hits: List<SearchHit>, context: String, sendsPlace: Boolean, onText: (AskPartial) -> Unit, described: Boolean = false): AskResult {
         remoteModel()?.let { return askRemote(it, question, hits, context, onText, sendsPlace, described) }
         val path = modelPath() ?: return AskResult.NoModel
         val sources = hits.take(MAX_SOURCES)
@@ -190,7 +193,7 @@ class AskLibrary(
             }
             val facts = if (described) facts(sources, withTime = true) else emptyMap()
             val reply = withSession(path) { session ->
-                session.answer(INSTRUCTION, pictures, prompt(question, sources, context, facts)) { onText(visibleAnswer(it)) }
+                session.answer(INSTRUCTION, pictures, prompt(question, sources, context, facts)) { onText(AskPartial(visibleThought(it), visibleAnswer(it))) }
             }
             parseAnswer(reply, sources)
         } catch (e: CancellationException) {
@@ -215,7 +218,7 @@ class AskLibrary(
         question: String,
         hits: List<SearchHit>,
         context: String,
-        onText: (String) -> Unit,
+        onText: (AskPartial) -> Unit,
         sendsPlace: Boolean,
         described: Boolean,
     ): AskResult {
@@ -238,7 +241,7 @@ class AskLibrary(
                 sources.map { hit -> hit.timestampMs?.let { images.readFrame(hit.item.contentUri, it) } ?: images.read(hit.item.contentUri) }
             }
             val reply = remote.open(model, payloads, assets).use { session ->
-                withContext(io) { session.answer(INSTRUCTION, pictures, prompt(question, sources, context, facts)) { onText(visibleAnswer(it)) } }
+                withContext(io) { session.answer(INSTRUCTION, pictures, prompt(question, sources, context, facts)) { onText(AskPartial(visibleThought(it), visibleAnswer(it))) } }
             }
             parseAnswer(reply, sources).copy(remoteModel = model.displayName)
         } catch (e: CancellationException) {
@@ -356,6 +359,12 @@ as guessed is INFERRED."""
         private val CITED = Regex("""\[(\d+)]""")
         private val PAIR = Regex("""(\d+)\s*=\s*(OBSERVED|USER_STATED|INFERRED)""", RegexOption.IGNORE_CASE)
 
+        /** What the model thought, inside <think>, so far or in all. */
+        fun visibleThought(partial: String): String {
+            val open = partial.indexOf("<think>").takeIf { it >= 0 } ?: return ""
+            return partial.substring(open + "<think>".length).substringBefore("</think>").trim()
+        }
+
         /** The answer part of a reply still being written; nothing while the model thinks or starts its first line. */
         fun visibleAnswer(partial: String): String {
             val text = partial.replace(THINKING, "")
@@ -382,7 +391,7 @@ as guessed is INFERRED."""
                     Citation(hit, basis, n)
                 }
             }
-            return AskResult.Answered(answer, known, citations)
+            return AskResult.Answered(answer, known, citations, thought = visibleThought(reply))
         }
     }
 }

@@ -71,8 +71,8 @@ class AskViewModel(private val chat: ChatWithLibrary, private val library: AskLi
                 return@launch
             }
             _turns.update { it.dropLast(1) + it.last().copy(answering = true) }
-            val answer = chat.answer(question, earlier) { text -> _turns.update { it.dropLast(1) + it.last().copy(partial = text) } }
-            _turns.update { it.dropLast(1) + it.last().copy(answer = answer, partial = "") }
+            val answer = chat.answer(question, earlier) { so -> _turns.update { it.dropLast(1) + it.last().copy(partial = so.text, thought = so.thought) } }
+            _turns.update { it.dropLast(1) + it.last().copy(answer = answer, partial = "", thought = "") }
         }
     }
 }

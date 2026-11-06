@@ -200,12 +200,17 @@ class AskLibraryTest {
 
     @Test
     fun `the answer shows while it is written, without the reply's other lines`() = runTest {
-        reply = "<think>where</think>ANSWER: A pier at dusk [1].\nKNOWN: yes\nSOURCES: 1=OBSERVED"
-        val shown = mutableListOf<String>()
-        ask(setOf(ModelCatalog.GEMMA_4_E2B.id)).ask("Where?", listOf(photo)) { shown += it }
+        reply = "<think>where is this pier</think>ANSWER: A pier at dusk [1].\nKNOWN: yes\nSOURCES: 1=OBSERVED"
+        val partials = mutableListOf<AskPartial>()
+        val answer = assertIs<AskResult.Answered>(ask(setOf(ModelCatalog.GEMMA_4_E2B.id)).ask("Where?", listOf(photo)) { partials += it })
+        val shown = partials.map { it.text }
         assertTrue(shown.none { "<think>" in it || "KNOWN" in it || "ANSWER" in it }, shown.toString())
         assertEquals("A pier at dusk [1].", shown.last())
         assertTrue(shown.any { it.isNotEmpty() && it != shown.last() }) // it grew before the end
+        // The thoughts grow apart from the answer, before it, and stay with it.
+        assertTrue(partials.any { it.thought.isNotEmpty() && it.text.isEmpty() && it.thought != "where is this pier" }, partials.toString())
+        assertEquals("where is this pier", partials.last().thought)
+        assertEquals("where is this pier", answer.thought)
     }
 
     @Test

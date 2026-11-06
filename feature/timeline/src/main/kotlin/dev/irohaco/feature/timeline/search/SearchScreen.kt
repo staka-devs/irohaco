@@ -126,6 +126,8 @@ data class SearchUi(
     val answer: AskResult? = null,
     /** The answer so far while the model writes it. */
     val partial: String = "",
+    /** What the model thought so far, before the answer. */
+    val thought: String = "",
 )
 
 class SearchViewModel(
@@ -157,10 +159,10 @@ class SearchViewModel(
         val hits = ui.results?.hits ?: return
         val library = askLibrary ?: return
         asking?.cancel()
-        _ui.update { it.copy(asking = true, answer = null, partial = "") }
+        _ui.update { it.copy(asking = true, answer = null, partial = "", thought = "") }
         asking = viewModelScope.launch {
-            val answer = library.ask(ui.query, hits) { text -> _ui.update { it.copy(partial = text) } }
-            _ui.update { it.copy(asking = false, answer = answer, partial = "") }
+            val answer = library.ask(ui.query, hits) { so -> _ui.update { it.copy(partial = so.text, thought = so.thought) } }
+            _ui.update { it.copy(asking = false, answer = answer, partial = "", thought = "") }
         }
     }
 
@@ -226,7 +228,7 @@ class SearchViewModel(
 
     private fun change(edit: (SearchUi) -> SearchUi) {
         asking?.cancel()
-        _ui.update { edit(it).copy(asking = false, answer = null, partial = "") }
+        _ui.update { edit(it).copy(asking = false, answer = null, partial = "", thought = "") }
         val ui = _ui.value
         running?.cancel()
         if (ui.query.isEmpty() && similarTo == null) {
@@ -374,7 +376,7 @@ internal fun SearchContent(
             }
             if (ui.searching) item(span = { GridItemSpan(maxLineSpan) }) { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             if (onAsk != null && !ui.searching && ui.results?.hits.orEmpty().isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) { AnswerCard(ui.asking, ui.answer, onAsk, onOpen, onOpenSettings, ui.partial) }
+                item(span = { GridItemSpan(maxLineSpan) }) { AnswerCard(ui.asking, ui.answer, onAsk, onOpen, onOpenSettings, ui.partial, thought = ui.thought) }
             }
             val hits = ui.results?.hits.orEmpty()
             val compared = ui.results?.searched.orEmpty().takeIf { it.size > 1 }?.map { it.space.spaceId }
