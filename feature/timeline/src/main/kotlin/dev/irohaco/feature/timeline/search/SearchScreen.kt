@@ -508,16 +508,22 @@ private fun Notices(ui: SearchUi, results: SearchResults, labels: Map<String, St
     }
     val partial = results.searched.filter { (it.coverage ?: 1f) < 1f }
     if (partial.isEmpty()) return
-    Banner(
-        BadgeStatus.LowCoverage,
-        partial.map { (space, coverage) ->
-            val percent = ((coverage ?: 0f) * 100).toInt()
-            // With one model the banner needs no name; comparing, each model has its own share.
-            if (results.searched.size == 1) stringResource(R.string.search_coverage, percent)
-            else stringResource(R.string.search_coverage_of, labels.getValue(space.spaceId), percent)
-        }.joinToString("\n"),
-    )
+    val text = partial.map { (space, coverage) ->
+        val percent = ((coverage ?: 0f) * 100).toInt()
+        // With one model the note needs no name; comparing, each model has its own share.
+        if (results.searched.size == 1) stringResource(R.string.search_coverage, percent)
+        else stringResource(R.string.search_coverage_of, labels.getValue(space.spaceId), percent)
+    }.joinToString("\n")
+    // A few photos not indexed yet, such as the latest ones, are only mentioned; the banner is for a share that changes the results.
+    if (partial.any { (it.coverage ?: 0f) < LOW_COVERAGE }) {
+        Banner(BadgeStatus.LowCoverage, text)
+    } else {
+        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
+
+/** Below this share of the library indexed, the results miss enough to say so with a banner. */
+private const val LOW_COVERAGE = 0.9f
 
 @Composable
 private fun Banner(status: BadgeStatus, text: String, action: (@Composable () -> Unit)? = null) {
