@@ -46,9 +46,10 @@ class AnswerService : Service() {
                     val instruction = data.readString().orEmpty()
                     val images = List(data.readInt()) { data.createByteArray() ?: ByteArray(0) }
                     val question = data.readString().orEmpty()
+                    val think = data.readInt() == 1
                     val listener = data.readStrongBinder()
                     val text = runBlocking {
-                        checkNotNull(session).answer(instruction, images, question) { so ->
+                        checkNotNull(session).answer(instruction, images, question, think) { so ->
                             val parcel = Parcel.obtain()
                             try {
                                 parcel.writeString(so)
@@ -102,7 +103,7 @@ class AnswerService : Service() {
         }
 
         private inner class Remote(private val binder: IBinder, private val connection: ServiceConnection, private val pid: Int) : AnswerSession {
-            override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, onText: (String) -> Unit): String =
+            override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, think: Boolean, onText: (String) -> Unit): String =
                 withContext(Dispatchers.IO) {
                     val listener = object : Binder() {
                         override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
@@ -116,6 +117,7 @@ class AnswerService : Service() {
                         writeInt(images.size)
                         images.forEach(::writeByteArray)
                         writeString(question)
+                        writeInt(if (think) 1 else 0)
                         writeStrongBinder(listener)
                     }) { readString().orEmpty() }
                 }

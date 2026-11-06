@@ -19,6 +19,7 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.ThinkingConfig
+import dev.irohaco.core.application.PLAN_INSTRUCTION
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -32,6 +33,9 @@ import java.io.File
  *
  * Arguments: `model` = the catalog id (default lfm3-vl-2b), or `path` = a model file elsewhere; `vision` = cpu (default) or gpu; `text` = gpu (default) or cpu;
  * `warm`, `embeddings`, `embedding` and `embed` replay the order that stopped the answer at its first image (#237).
+ * `tokens` = the context's size (maxNumTokens; default the model file's); `think` = how many tokens the model may think
+ * (default thinking off), its thoughts arriving apart from the answer in the message's channels; `question` replaces the
+ * question asked with the images. `plan` = a message to read as a photo search the way the Ask screen does, instead.
  * The results go to logcat under the tag AnswerSpeed.
  */
 @RunWith(AndroidJUnit4::class)
@@ -50,8 +54,12 @@ class AnswerSpeedTest {
         val text = args.getString("text", "gpu")
         val vision = args.getString("vision", "cpu")
         var start = SystemClock.elapsedRealtime()
-        val engine = Engine(EngineConfig(model.path, backend(text), backend(vision), null, null, 4, context.cacheDir.path)).also { it.initialize() }
-        Log.i(TAG, "${model.name} text=$text vision=$vision load ${SystemClock.elapsedRealtime() - start} ms")
+        val tokens = args.getString("tokens")?.toInt()
+        val think = args.getString("think")?.toInt()
+        val thinking = think?.let { ThinkingConfig(true, it) } ?: ThinkingConfig(false)
+        val question = args.getString("question", "What colors are in the pictures? Answer in one sentence.")
+        val engine = Engine(EngineConfig(model.path, backend(text), backend(vision), null, tokens, 4, context.cacheDir.path)).also { it.initialize() }
+        Log.i(TAG, "${model.name} text=$text vision=$vision tokens=$tokens think=$think load ${SystemClock.elapsedRealtime() - start} ms")
         // warm=text|image: one exchange first, as the app does right after loading.
         args.getString("warm")?.let { warm ->
             engine.createConversation(ConversationConfig(systemInstruction = Contents.of("Reply with OK."), thinkingConfig = ThinkingConfig(false))).use {
@@ -78,6 +86,17 @@ class AnswerSpeedTest {
                 Log.i(TAG, "embedding model used")
             }
         }
+        args.getString("plan")?.let { message ->
+            engine.use {
+                engine.createConversation(ConversationConfig(systemInstruction = Contents.of(PLAN_INSTRUCTION), thinkingConfig = ThinkingConfig(false))).use {
+                    start = SystemClock.elapsedRealtime()
+                    val reply = it.sendMessage(Contents.of(Content.Text("Today: ${java.time.LocalDate.now()}\nQuestion: $message"))).contents.contents
+                        .filterIsInstance<Content.Text>().joinToString("") { part -> part.text }
+                    Log.i(TAG, "plan of '$message' in ${SystemClock.elapsedRealtime() - start} ms: ${reply.replace('\n', ' ')}")
+                }
+            }
+            return@runBlocking
+        }
         engine.use {
             // rounds=N: N questions with four images, each after a search with the embedding model, as the Ask screen does.
             val rounds = args.getString("rounds")?.toInt()
@@ -86,18 +105,25 @@ class AnswerSpeedTest {
                     embedding.computeEmbedding(listOf(InputData.Text("a train $round")), EmbeddingOptions(true))
                     Log.i(TAG, "round ${round + 1}: searched")
                 }
-                engine.createConversation(ConversationConfig(systemInstruction = Contents.of("Answer briefly."), thinkingConfig = ThinkingConfig(false))).use { conversation ->
+                engine.createConversation(ConversationConfig(systemInstruction = Contents.of("Answer briefly."), thinkingConfig = thinking)).use { conversation ->
                     val pictures = List(images) { Content.ImageBytes(picture(it)) }
                     start = SystemClock.elapsedRealtime()
                     var first = -1L
-                    var tokens = 0
+                    var firstAnswer = -1L
+                    var chunks = 0
                     val reply = StringBuilder()
-                    conversation.sendMessageAsync(Contents.of(pictures + Content.Text("What colors are in the pictures? Answer in one sentence."))).collect { message ->
+                    val thoughts = linkedMapOf<String, StringBuilder>()
+                    conversation.sendMessageAsync(Contents.of(pictures + Content.Text(question))).collect { message ->
                         if (first < 0) first = SystemClock.elapsedRealtime() - start
-                        tokens++
-                        message.contents.contents.filterIsInstance<Content.Text>().forEach { reply.append(it.text) }
+                        chunks++
+                        message.channels.forEach { (name, part) -> thoughts.getOrPut(name) { StringBuilder() }.append(part) }
+                        val answer = message.contents.contents.filterIsInstance<Content.Text>().joinToString("") { it.text }
+                        if (firstAnswer < 0 && answer.isNotBlank()) firstAnswer = SystemClock.elapsedRealtime() - start
+                        reply.append(answer)
                     }
-                    Log.i(TAG, "$images images: first token ${first} ms, all ${SystemClock.elapsedRealtime() - start} ms, $tokens chunks: $reply")
+                    Log.i(TAG, "$images images: first token $first ms, first answer text $firstAnswer ms, all ${SystemClock.elapsedRealtime() - start} ms, $chunks chunks: $reply")
+                    thoughts.forEach { (name, thought) -> Log.i(TAG, "  channel '$name', ${thought.length} chars: ${thought.take(600)}") }
+                    if (thoughts.isEmpty()) Log.i(TAG, "  no channels")
                 }
             }
         }
