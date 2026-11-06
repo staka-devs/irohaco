@@ -67,6 +67,7 @@ class SearchMediaTest {
             override suspend fun replaceInferred(places: List<InferredPlace>) {}
             override suspend fun placeNames(includeInferred: Boolean) = listOf("京都市, 京都府")
             override suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int) = listOf(PlaceMatch("p2", "京都市, 京都府", inferred = false))
+            override suspend fun placesOf(assetIds: Collection<String>) = emptyMap<String, PlaceMatch>()
         }
         val atPlaces = SearchMedia(SearchByMeaning(vectors, embedText = { floatArrayOf(1f) }, modelDigest = "d"), SearchText(texts), { ids, _ -> catalog.filter { it.assetId in ids } }, { it }, SearchPlaces(places))
         val narrowed = atPlaces("京都の看板", onlyAtPlace = true)

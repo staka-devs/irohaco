@@ -32,6 +32,7 @@ class PlacesTest {
         }
         override suspend fun placeNames(includeInferred: Boolean) = listOf("徳島市, 徳島県", "京都市, 京都府") + if (includeInferred) listOf("Tokushima, Tokushima") else emptyList()
         override suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int) = names.map { PlaceMatch(it, it, inferred = it.startsWith("T")) }
+        override suspend fun placesOf(assetIds: Collection<String>) = emptyMap<String, PlaceMatch>()
     }
 
     @Test

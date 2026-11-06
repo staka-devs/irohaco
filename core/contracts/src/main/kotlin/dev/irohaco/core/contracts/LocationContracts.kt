@@ -81,6 +81,9 @@ interface PlaceEvidenceStore {
 
     /** Available files at one of [names], confirmed first, then guesses by confidence. */
     suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int): List<PlaceMatch>
+
+    /** The named place of each of [assetIds] that has one: its own or the user's, else the best guess. */
+    suspend fun placesOf(assetIds: Collection<String>): Map<String, PlaceMatch>
 }
 
 /** A stay or a recorded point of the user's location history, from a `Timeline.json` they exported (#174, ADR-0029). */

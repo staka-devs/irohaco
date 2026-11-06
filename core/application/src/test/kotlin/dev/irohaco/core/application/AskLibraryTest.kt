@@ -1,5 +1,10 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.domain.GeoPoint
+import dev.irohaco.core.contracts.InferredPlace
+import dev.irohaco.core.contracts.TimedPoint
+import dev.irohaco.core.contracts.PlaceMatch
+import dev.irohaco.core.contracts.PlaceEvidenceStore
 import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.AnswerModelSettings
 import dev.irohaco.core.contracts.AnswerRuntime
@@ -118,7 +123,7 @@ class AskLibraryTest {
         },
     )
 
-    private fun TestScope.ask(installed: Set<String>) = AskLibrary(
+    private fun TestScope.ask(installed: Set<String>, places: PlaceEvidenceStore? = null) = AskLibrary(
         installed = { id -> "/models/$id".takeIf { id in installed } },
         settings = settings,
         runtime = runtime,
@@ -127,7 +132,23 @@ class AskLibraryTest {
         scope = backgroundScope,
         backend = { AiBackend.CPU },
         remote = remote,
+        places = places,
     )
+
+    private val places = object : PlaceEvidenceStore {
+        override suspend fun unnamedAreas(limit: Int) = emptyList<GeoPoint>()
+        override suspend fun nameArea(area: GeoPoint, name: String) {}
+        override suspend fun locatedTimes() = emptyList<TimedPoint>()
+        override suspend fun unlocatedTimes() = emptyList<Pair<String, Long>>()
+        override suspend fun replaceInferred(places: List<InferredPlace>) {}
+        override suspend fun placeNames(includeInferred: Boolean) = emptyList<String>()
+        override suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int) = emptyList<PlaceMatch>()
+        override suspend fun placesOf(assetIds: Collection<String>) =
+            mapOf("t" to PlaceMatch("t", "Hakodate", inferred = false), "m" to PlaceMatch("m", "Otaru", inferred = true)).filterKeys { it in assetIds }
+    }
+
+    // Taken in the summer of 2025.
+    private val dated = SearchHit(TimelineItem("t", MediaKind.IMAGE, "content://t", 1_754_000_000_000), null, setOf(Evidence.MEANING), null)
 
     @Test
     fun `the choices are the installed models and the services' answering ones, the pick or else the first local`() = runTest {
@@ -273,6 +294,30 @@ class AskLibraryTest {
         val failed = assertIs<AskResult.Failed>(library.ask("Where?", listOf(photo)))
         assertEquals(RemoteFailure.RateLimited(30), (failed.cause as RemoteCallException).failure)
         assertEquals(0, loads)
+    }
+
+    @Test
+    fun `each source goes with when and where it was taken, a guessed place marked as such`() = runTest {
+        reply = "ANSWER: Hakodate [1].\nKNOWN: yes\nSOURCES: 1=OBSERVED"
+        ask(setOf(ModelCatalog.GEMMA_4_E2B.id), places).ask("Where did I go?", listOf(dated, memo))
+        val prompt = asked.single().second
+        assertTrue(Regex("""\[1] photo, taken 2025-\d\d-\d\dT\d\d:\d\d, taken in Hakodate""").containsMatchIn(prompt), prompt)
+        // A file without a time of its own gets none; its guessed place says it is a guess.
+        assertTrue("[2] photo, place guessed from photos taken near it in time or the location history: Otaru" in prompt, prompt)
+    }
+
+    @Test
+    fun `a remote model gets the sources' places only under the place grant, and never their times`() = runTest {
+        reply = "ANSWER: Hakodate [1].\nKNOWN: yes\nSOURCES: 1=OBSERVED"
+        val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id), places)
+        library.choose("claude")
+        assertTrue(EgressPayload.PLACE_NAME in assertIs<AskResult.NeedsConsent>(library.ask("Where?", listOf(dated))).payloads)
+        library.ask("Where?", listOf(dated)).let { (it as AskResult.NeedsConsent).agree() }
+        library.ask("Where?", listOf(dated))
+        assertTrue("taken in Hakodate" in remoteAsked.last() && "2025-" !in remoteAsked.last(), remoteAsked.last())
+        placeGranted = false
+        library.ask("Where?", listOf(dated))
+        assertTrue("Hakodate" !in remoteAsked.last() && EgressPayload.PLACE_NAME !in policyAsked.last(), remoteAsked.last())
     }
 
     @Test
