@@ -9,6 +9,7 @@ import dev.irohaco.core.contracts.EgressDeniedException
 import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.IndexImageReader
 import dev.irohaco.core.contracts.ModelArtifact
+import dev.irohaco.core.contracts.PlaceEvidenceStore
 import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.TaskType
 import dev.irohaco.core.contracts.TimelineItem
@@ -64,6 +65,9 @@ sealed interface AskResult {
     class NeedsConsent(val model: String, val service: String, val payloads: Set<EgressPayload>, val agree: () -> Unit) : AskResult
 }
 
+/** When and where a source was taken, written beside it for the model; [guessed] when the place is only a guess. */
+data class SourceFacts(val takenAtMs: Long?, val place: String?, val guessed: Boolean = false)
+
 /** A model that can answer; [service] is the name of the service it runs at, or null for one on this device. */
 data class AnswerChoice(val id: String, val name: String, val service: String? = null)
 
@@ -89,6 +93,8 @@ class AskLibrary(
     private val idleMs: Long = IDLE_MS,
     /** Remote models the user registered; a remote pick never falls back to the local one when refused or failing (AC-009). */
     private val remote: RemoteAnswering? = null,
+    /** Where each source was taken, written beside it; null leaves the places out. */
+    private val places: PlaceEvidenceStore? = null,
 ) {
     val chosen: Flow<String?> = settings.answerModel
 
@@ -166,12 +172,15 @@ class AskLibrary(
     private suspend fun placeGranted(model: RemoteModel): Boolean =
         remote?.policy?.authorize(TaskType.RAG, model.profileId, setOf(EgressPayload.PLACE_NAME), emptySet()) == EgressDecision.Allowed
 
-    /** [onText] gets the answer's text so far while the model writes it; [context] goes just before the question. */
+    /**
+     * [onText] gets the answer's text so far while the model writes it; [context] goes just before the question.
+     * Each source goes with when and where it was taken, so questions about time and place can be answered.
+     */
     suspend fun ask(question: String, hits: List<SearchHit>, context: String = "", onText: (String) -> Unit = {}): AskResult =
-        ask(question, hits, context, sendsPlace = false, onText)
+        ask(question, hits, context, sendsPlace = false, onText, described = true)
 
-    private suspend fun ask(question: String, hits: List<SearchHit>, context: String, sendsPlace: Boolean, onText: (String) -> Unit): AskResult {
-        remoteModel()?.let { return askRemote(it, question, hits, context, onText, sendsPlace) }
+    private suspend fun ask(question: String, hits: List<SearchHit>, context: String, sendsPlace: Boolean, onText: (String) -> Unit, described: Boolean = false): AskResult {
+        remoteModel()?.let { return askRemote(it, question, hits, context, onText, sendsPlace, described) }
         val path = modelPath() ?: return AskResult.NoModel
         val sources = hits.take(MAX_SOURCES)
         if (question.isBlank() || sources.isEmpty()) return AskResult.NothingFound
@@ -179,8 +188,9 @@ class AskLibrary(
             val pictures = withContext(io) {
                 sources.map { hit -> hit.timestampMs?.let { images.readFrame(hit.item.contentUri, it) } ?: images.read(hit.item.contentUri) }
             }
+            val facts = if (described) facts(sources, withTime = true) else emptyMap()
             val reply = withSession(path) { session ->
-                session.answer(INSTRUCTION, pictures, prompt(question, sources, context)) { onText(visibleAnswer(it)) }
+                session.answer(INSTRUCTION, pictures, prompt(question, sources, context, facts)) { onText(visibleAnswer(it)) }
             }
             parseAnswer(reply, sources)
         } catch (e: CancellationException) {
@@ -191,11 +201,31 @@ class AskLibrary(
         }
     }
 
-    private suspend fun askRemote(model: RemoteModel, question: String, hits: List<SearchHit>, context: String, onText: (String) -> Unit, sendsPlace: Boolean): AskResult {
+    /** When ([withTime]) and where each of [sources] was taken, as far as the app knows. */
+    private suspend fun facts(sources: List<SearchHit>, withTime: Boolean): Map<String, SourceFacts> {
+        val known = places?.placesOf(sources.map { it.item.assetId }).orEmpty()
+        return sources.associate { hit ->
+            val place = known[hit.item.assetId]
+            hit.item.assetId to SourceFacts(hit.item.sortTimeMs.takeIf { withTime && it > 0 }, place?.placeName, place?.inferred == true)
+        }
+    }
+
+    private suspend fun askRemote(
+        model: RemoteModel,
+        question: String,
+        hits: List<SearchHit>,
+        context: String,
+        onText: (String) -> Unit,
+        sendsPlace: Boolean,
+        described: Boolean,
+    ): AskResult {
         val remote = checkNotNull(remote)
         val sources = hits.take(MAX_SOURCES)
         if (question.isBlank() || sources.isEmpty()) return AskResult.NothingFound
-        val payloads = payloads(sources) + setOfNotNull(EgressPayload.PLACE_NAME.takeIf { sendsPlace })
+        // The time stays on the device; the places go only as town names, and only once granted.
+        val named = if (described) facts(sources, withTime = false).filterValues { it.place != null } else emptyMap()
+        val facts = named.takeIf { it.isNotEmpty() && placeGranted(model) }.orEmpty()
+        val payloads = payloads(sources) + setOfNotNull(EgressPayload.PLACE_NAME.takeIf { sendsPlace || facts.isNotEmpty() })
         val assets = sources.map { it.item.assetId }.toSet()
         if (model.profileId !in consented) {
             val service = remote.connection(model)?.serviceName.orEmpty()
@@ -208,7 +238,7 @@ class AskLibrary(
                 sources.map { hit -> hit.timestampMs?.let { images.readFrame(hit.item.contentUri, it) } ?: images.read(hit.item.contentUri) }
             }
             val reply = remote.open(model, payloads, assets).use { session ->
-                withContext(io) { session.answer(INSTRUCTION, pictures, prompt(question, sources, context)) { onText(visibleAnswer(it)) } }
+                withContext(io) { session.answer(INSTRUCTION, pictures, prompt(question, sources, context, facts)) { onText(visibleAnswer(it)) } }
             }
             parseAnswer(reply, sources).copy(remoteModel = model.displayName)
         } catch (e: CancellationException) {
@@ -268,7 +298,9 @@ Reply in the language of the question, in exactly this form:
 ANSWER: <your answer, citing sources like [1]>
 KNOWN: <yes, or no when the sources do not answer the question; then say in ANSWER that you do not know>
 SOURCES: <each source you used and how you know: 1=OBSERVED, 2=USER_STATED, 3=INFERRED>
-OBSERVED means you can see it in the image. USER_STATED means it comes from the user's memo. INFERRED means you guessed it."""
+OBSERVED means you can see it in the image. USER_STATED means it comes from the user's memo. INFERRED means you guessed it.
+The notes may say when and where each source was taken; use them for questions about time and place. A place marked
+as guessed is INFERRED."""
 
         /** Earlier turns kept for a follow-up; each image already costs about 256 of the 2,048 tokens. */
         const val MAX_EARLIER = 3
@@ -294,12 +326,22 @@ OBSERVED means you can see it in the image. USER_STATED means it comes from the 
             if (sources.any { it.text != null && Evidence.TEXT in it.evidence && Evidence.MEMO !in it.evidence }) add(EgressPayload.OCR_TEXT)
         }
 
-        /** The question, one line of notes per source, and [context] before the question. */
-        fun prompt(question: String, sources: List<SearchHit>, context: String = ""): String = buildString {
+        /** The question, one line of notes per source with its [facts], and [context] before the question. */
+        fun prompt(
+            question: String,
+            sources: List<SearchHit>,
+            context: String = "",
+            facts: Map<String, SourceFacts> = emptyMap(),
+            zone: ZoneId = ZoneId.systemDefault(),
+        ): String = buildString {
             sources.forEachIndexed { i, hit ->
                 append("[${i + 1}] ")
                 append(if (hit.item.kind == MediaKind.VIDEO) "video" else "photo")
                 hit.timestampMs?.let { append(", scene at ${it / 1000} s") }
+                facts[hit.item.assetId]?.let { fact ->
+                    fact.takenAtMs?.let { append(", taken ").append(LocalDateTime.ofInstant(Instant.ofEpochMilli(it), zone).truncatedTo(ChronoUnit.MINUTES)) }
+                    fact.place?.let { append(if (fact.guessed) ", place guessed from photos taken near it in time or the location history: " else ", taken in ").append(it) }
+                }
                 val memo = hit.text.takeIf { Evidence.MEMO in hit.evidence }
                 val read = hit.text.takeIf { Evidence.TEXT in hit.evidence && Evidence.MEMO !in hit.evidence }
                 memo?.let { append(". User's memo: \"$it\"") }

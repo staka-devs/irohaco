@@ -374,6 +374,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
                 aiBackendChoice.backend.first() ?: if (aiBackendChoice.gpuCheck.first()?.works == true) AiBackend.GPU else AiBackend.CPU
             },
             remote = remoteAnswering,
+            places = locationStore,
         )
     }
 

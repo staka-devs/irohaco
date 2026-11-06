@@ -182,6 +182,14 @@ interface LocationDao {
     )
     suspend fun filesAt(names: List<String>, includeInferred: Boolean, limit: Int): List<PlaceMatch>
 
+    @Query(
+        """SELECT le.asset_id AS assetId, le.place_text AS placeName, $GUESS AS inferred, le.evidence_source = 'LOCATION_HISTORY' AS history
+           FROM location_evidence le
+           WHERE le.asset_id IN (:assetIds) AND le.place_text IS NOT NULL AND le.place_text <> '' AND (($SHOWN) OR $GUESS)
+           ORDER BY inferred, le.confidence DESC""",
+    )
+    suspend fun placesOf(assetIds: List<String>): List<PlaceMatch>
+
     @Query("DELETE FROM location_evidence WHERE evidence_source = 'LOCATION_HISTORY' AND evidence_status = 'CANDIDATE'")
     suspend fun deleteHistoryCandidates()
 
@@ -327,6 +335,9 @@ class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -
 
     override suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int) =
         dao.filesAt(names.toList(), includeInferred, limit)
+
+    override suspend fun placesOf(assetIds: Collection<String>) =
+        if (assetIds.isEmpty()) emptyMap() else dao.placesOf(assetIds.toList()).groupBy { it.assetId }.mapValues { it.value.first() }
 
     override suspend fun replaceHistory(candidates: List<HistoryCandidate>) = dao.replaceHistory(candidates)
 
