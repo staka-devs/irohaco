@@ -66,9 +66,16 @@ import dev.irohaco.feature.timeline.search.FoundCard
 
 /**
  * One question and its answer; [answer] is null while the model writes [partial]. A request for photos is
- * answered with [found], what the search found, instead.
+ * answered with [found], what the search found, instead. [answering] is false while it is not yet known
+ * which, so the wait says the photos are being looked for rather than an answer written.
  */
-data class AskTurn(val question: String, val answer: AskResult? = null, val partial: String = "", val found: ChatWithLibrary.Found? = null)
+data class AskTurn(
+    val question: String,
+    val answer: AskResult? = null,
+    val partial: String = "",
+    val found: ChatWithLibrary.Found? = null,
+    val answering: Boolean = true,
+)
 
 /** Questions about the photo or scene on screen and the answers, one under another (#201). */
 @Composable
@@ -152,7 +159,7 @@ internal fun AskContent(
                         onOpen = onOpen,
                         onOpenSettings = onOpenSettings,
                         partial = turn.partial,
-                        askingLabel = askingLabel,
+                        askingLabel = if (turn.answering) askingLabel else R.string.ask_finding,
                         caution = caution,
                     )
                     if (onShowPhotos != null && turn.answer != null) {

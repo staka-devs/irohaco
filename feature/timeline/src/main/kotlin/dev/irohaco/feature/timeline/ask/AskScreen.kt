@@ -63,13 +63,14 @@ class AskViewModel(private val chat: ChatWithLibrary, private val library: AskLi
         // A failed turn is asked again rather than kept.
         val kept = _turns.value.filterNot { it.answer is AskResult.Failed || it.answer is AskResult.NeedsConsent }
         val earlier = kept.mapNotNull { turn -> (turn.answer as? AskResult.Answered)?.let { ChatWithLibrary.Turn(turn.question, it) } }
-        _turns.value = kept + AskTurn(question.trim())
+        _turns.value = kept + AskTurn(question.trim(), answering = false)
         asking?.cancel()
         asking = viewModelScope.launch {
             chat.find(question, kept.lastOrNull()?.found)?.let { found ->
                 _turns.update { it.dropLast(1) + it.last().copy(found = found) }
                 return@launch
             }
+            _turns.update { it.dropLast(1) + it.last().copy(answering = true) }
             val answer = chat.answer(question, earlier) { text -> _turns.update { it.dropLast(1) + it.last().copy(partial = text) } }
             _turns.update { it.dropLast(1) + it.last().copy(answer = answer, partial = "") }
         }
