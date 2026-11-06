@@ -340,6 +340,10 @@
     <string name="ask_found">こちらが検索結果です。</string>
     <string name="ask_found_nothing">条件に合う写真は見つかりませんでした。</string>
     <string name="ask_found_all">すべて見る</string>
+    <string name="ask_intro">写真を探したり、写真について質問したりできます。</string>
+    <string name="ask_example_find">去年の夏の花火の写真</string>
+    <string name="ask_example_question">去年の夏はどこに行った？</string>
+    <string name="search_ask_entry">文章で頼むと、写真を探したり質問に答えたりします。</string>
     <string name="ask_show_photos">写真で見る</string>
     <string name="search_back_to_chat">チャットに戻る</string>
     <string name="ask_hint">写真について質問（例: 去年の夏はどこに行った？）</string>

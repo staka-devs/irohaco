@@ -54,6 +54,7 @@ object IrohacoIcons {
     @DrawableRes val FindReplace = R.drawable.ic_find_replace
     @DrawableRes val ExpandMore = R.drawable.ic_expand_more
     @DrawableRes val ChevronRight = R.drawable.ic_chevron_right
+    @DrawableRes val Send = R.drawable.ic_send
     @DrawableRes val GridView = R.drawable.ic_grid_view
     @DrawableRes val ViewList = R.drawable.ic_view_list
     @DrawableRes val PushPin = R.drawable.ic_push_pin

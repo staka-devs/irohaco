@@ -1,5 +1,6 @@
 package dev.irohaco.feature.timeline.ask
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -96,10 +97,11 @@ fun AskScreen(viewModel: AskViewModel, onOpen: (SearchHit) -> Unit, onOpenSettin
             onOpenSettings = onOpenSettings,
             askingLabel = R.string.search_asking,
             caution = R.string.search_ask_caution,
-            modifier = Modifier.padding(padding),
+            modifier = Modifier.padding(padding).fillMaxSize(),
             models = models,
             onChoose = viewModel::choose,
             onShowPhotos = onShowPhotos,
+            examples = listOf(stringResource(R.string.ask_example_find), stringResource(R.string.ask_example_question)),
         )
     }
 }
