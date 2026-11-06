@@ -317,7 +317,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     /** Searches by meaning in one embedding space at a time (M2-08); the query runs before any indexing. */
     val searchByMeaning by lazy {
-        SearchByMeaning(vectorSearchStore, embedText = { text -> aiResourceManager.withEmbedding(AiPriority.USER_SEARCH) { it.embedText(text) } }, remote = remoteEmbedding)
+        SearchByMeaning(vectorSearchStore, embedText = { text -> aiResourceManager.withEmbedding(AiPriority.USER_SEARCH) { it.embedText(text) } }, remote = remoteEmbedding, folders = { indexSettings.indexFolders.first() })
     }
 
     private val embedMemo by lazy {

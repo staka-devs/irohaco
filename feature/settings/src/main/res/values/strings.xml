@@ -95,6 +95,8 @@
     <string name="settings_index">Search index</string>
     <string name="settings_index_start">Build index</string>
     <string name="settings_index_choose_target">Choose what to index</string>
+    <string name="settings_index_target_all">Covers: every folder</string>
+    <string name="settings_index_target_some">Covers: %1$s</string>
     <string name="settings_index_all">All photos and videos</string>
     <string name="settings_index_folders">Choose folders</string>
     <string name="settings_index_needs_model">Download or import the model to build an index.</string>
