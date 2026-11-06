@@ -21,6 +21,7 @@ import dev.irohaco.core.application.AnswerChoices
 import dev.irohaco.core.application.AskLibrary
 import dev.irohaco.core.application.AskResult
 import dev.irohaco.core.application.ChatWithLibrary
+import dev.irohaco.core.application.ReadQuery
 import dev.irohaco.core.application.SearchHit
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.feature.timeline.R
@@ -65,7 +66,7 @@ class AskViewModel(private val chat: ChatWithLibrary, private val library: AskLi
         _turns.value = kept + AskTurn(question.trim())
         asking?.cancel()
         asking = viewModelScope.launch {
-            chat.find(question)?.let { found ->
+            chat.find(question, kept.lastOrNull()?.found)?.let { found ->
                 _turns.update { it.dropLast(1) + it.last().copy(found = found) }
                 return@launch
             }
@@ -77,7 +78,7 @@ class AskViewModel(private val chat: ChatWithLibrary, private val library: AskLi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AskScreen(viewModel: AskViewModel, onOpen: (SearchHit) -> Unit, onOpenSettings: () -> Unit, onBack: () -> Unit, onShowPhotos: ((String) -> Unit)? = null) {
+fun AskScreen(viewModel: AskViewModel, onOpen: (SearchHit) -> Unit, onOpenSettings: () -> Unit, onBack: () -> Unit, onShowPhotos: ((ReadQuery) -> Unit)? = null) {
     val turns by viewModel.turns.collectAsStateWithLifecycle()
     val models by viewModel.models.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.warmUp() }
