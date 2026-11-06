@@ -20,6 +20,7 @@ object QueryReader {
         var text = Normalizer.normalize(query, Normalizer.Form.NFKC)
         fun take(regex: Regex): MatchResult? = regex.find(text)?.also { text = text.replaceRange(it.range, " ") }
 
+        take(REQUEST_JA)
         val kind = KINDS.firstNotNullOfOrNull { (regex, kind) -> take(regex)?.let { kind } }
         val today = now.toLocalDate()
         val span: Pair<LocalDate, LocalDate>? = RELATIVE.firstNotNullOfOrNull { (regex, span) -> take(regex)?.let { span(today) } } ?: run {
@@ -45,6 +46,15 @@ object QueryReader {
             untilMs = span?.second?.atStartOfDay(zone)?.toInstant()?.toEpochMilli(),
             kind = kind,
         )
+    }
+
+    /**
+     * Whether the sentence asks to see photos ("去年の夏の花火の写真", "花火を見せて") rather than asks about them
+     * ("去年の夏はどこに行った？"): it names a kind or asks to be shown, and has no question word.
+     */
+    fun asksForMedia(query: String): Boolean {
+        val text = Normalizer.normalize(query, Normalizer.Form.NFKC)
+        return !QUESTION.containsMatchIn(text) && (REQUEST_JA.containsMatchIn(text) || SHOW_EN.containsMatchIn(text) || KINDS.any { it.first.containsMatchIn(text) })
     }
 
     /** The months [startMonth] onward, [months] long, in [year] or else the latest such stretch that began (or ended) by [today]. */
@@ -100,7 +110,15 @@ object QueryReader {
     private val MONTHS = listOf("january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december")
     private val MONTH_EN = Regex("\\b(${MONTHS.filter { it != "may" }.joinToString("|")})\\b", RegexOption.IGNORE_CASE)
 
+    // Asking to be shown, which is not part of what is searched for: 花火を見せて, 花火の写真ある？
+    private val REQUEST_JA = Regex(
+        "(?:を|が)?(?:見せて|みせて|探して|さがして|出して|だして|表示して|見たい|みたい)(?:ください|下さい|ほしい|欲しい|くれる|くれ|な)?[?!。]*" +
+            "|(?:は|って)?(?:ある|あります|ありますか)[?!。]*$",
+    )
+    private val SHOW_EN = Regex("\\b(show|find)\\b", RegexOption.IGNORE_CASE)
+    private val QUESTION = Regex("どこ|いつ|誰|だれ|何|なに|なん|どう|どんな|どれ|いくつ|\\b(where|when|who|what|how|which|why)\\b", RegexOption.IGNORE_CASE)
+
     // What joins the conditions to the words: 去年の, 夏に, 京都で撮った.
     private val EDGE_JA = Regex("^(?:の|に|で|から|頃|ごろ|、)+|(?:で撮った|で撮影した|に撮った|に撮影した|撮った|撮影した|の|に|で|から|頃|ごろ|、)+$")
-    private val STOP_EN = setOf("from", "in", "of", "on", "at", "during", "taken", "shot", "the", "my", "a", "an")
+    private val STOP_EN = setOf("from", "in", "of", "on", "at", "during", "taken", "shot", "the", "my", "a", "an", "show", "find", "me", "all")
 }

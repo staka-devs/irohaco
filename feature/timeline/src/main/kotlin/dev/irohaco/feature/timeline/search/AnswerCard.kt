@@ -120,12 +120,48 @@ internal fun AnswerCard(
     }
 }
 
+/**
+ * A request for photos answered with what the search found, a few of them in a row; [onShowAll] opens them
+ * all on the search page, where the conditions can be changed.
+ */
+@Composable
+internal fun FoundCard(found: List<SearchHit>, onOpen: (SearchHit) -> Unit, onShowAll: (() -> Unit)?) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(IrohacoSpacing.l), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+            if (found.isEmpty()) {
+                Text(stringResource(R.string.ask_found_nothing), style = MaterialTheme.typography.bodyLarge)
+                return@Column
+            }
+            Text(stringResource(R.string.ask_found), style = MaterialTheme.typography.bodyLarge)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+                found.take(FOUND_SHOWN).forEach { hit ->
+                    MediaThumbnail(
+                        model = hitModel(hit),
+                        contentDescription = listOfNotNull(stringResource(hit.item.kindLabel()), hit.timestampMs?.let { stringResource(R.string.search_at, formatDuration(it)) }).joinToString(", "),
+                        selected = false,
+                        label = hit.timestampMs?.let { formatDuration(it) },
+                        modifier = Modifier.size(CELL).clickable { onOpen(hit) },
+                    )
+                }
+            }
+            onShowAll?.let { TextButton(onClick = it) { Text(stringResource(R.string.ask_found_all)) } }
+        }
+    }
+}
+
+private const val FOUND_SHOWN = 12
+
+@Composable
+private fun hitModel(hit: SearchHit): Any {
+    val at = hit.timestampMs ?: return GridThumbnail(hit.item.contentUri)
+    return ImageRequest.Builder(LocalContext.current).data(hit.item.contentUri).videoFrameMillis(at).build()
+}
+
 @Composable
 private fun CitationCell(citation: Citation, onOpen: (SearchHit) -> Unit) {
     val hit = citation.hit
     val at = hit.timestampMs
-    val context = LocalContext.current
-    val model: Any = if (at != null) ImageRequest.Builder(context).data(hit.item.contentUri).videoFrameMillis(at).build() else GridThumbnail(hit.item.contentUri)
+    val model = hitModel(hit)
     val basis = stringResource(citation.basis.label())
     val number = stringResource(R.string.search_source_number, citation.number)
     Column(Modifier.width(CELL), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
