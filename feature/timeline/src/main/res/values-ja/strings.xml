@@ -337,6 +337,9 @@
     <string name="viewer_asking">この写真や場面を見て答えを作っています</string>
     <string name="viewer_ask_caution">%1$s がこの写真や場面だけを見て答えています。間違うことがあります。</string>
     <string name="ask_title">AI に聞く</string>
+    <string name="ask_found">こちらが検索結果です。</string>
+    <string name="ask_found_nothing">条件に合う写真は見つかりませんでした。</string>
+    <string name="ask_found_all">すべて見る</string>
     <string name="ask_show_photos">写真で見る</string>
     <string name="search_back_to_chat">チャットに戻る</string>
     <string name="ask_hint">写真について質問（例: 去年の夏はどこに行った？）</string>

@@ -50,6 +50,24 @@ class ReadQueryTest {
     }
 
     @Test
+    fun `asking to be shown is not searched for`() {
+        assertEquals(ReadQuery("花火", ms(2025, 6, 1), ms(2025, 9, 1), MediaKind.IMAGE), read("去年の夏の花火の写真を見せて"))
+        assertEquals(ReadQuery("花火", kind = MediaKind.IMAGE), read("花火の写真ある？"))
+        assertEquals(ReadQuery("猫"), read("猫を探して"))
+        assertEquals(ReadQuery("beach", kind = MediaKind.IMAGE), read("show me photos of the beach"))
+    }
+
+    @Test
+    fun `a request for photos is told apart from a question about them`() {
+        assertEquals(true, QueryReader.asksForMedia("去年の夏の花火の写真"))
+        assertEquals(true, QueryReader.asksForMedia("花火を見せて"))
+        assertEquals(true, QueryReader.asksForMedia("show me the beach"))
+        assertEquals(false, QueryReader.asksForMedia("去年の夏はどこに行った？"))
+        assertEquals(false, QueryReader.asksForMedia("花火の写真は何枚ある？"))
+        assertEquals(false, QueryReader.asksForMedia("花火"))
+    }
+
+    @Test
     fun `a sentence of conditions only is searched by its words`() {
         val read = read("去年の動画")
         assertEquals("去年の動画", read.rest)

@@ -64,6 +64,10 @@ class AskViewModel(private val chat: ChatWithLibrary, private val library: AskLi
         _turns.value = kept + AskTurn(question.trim())
         asking?.cancel()
         asking = viewModelScope.launch {
+            chat.find(question)?.let { found ->
+                _turns.update { it.dropLast(1) + it.last().copy(found = found) }
+                return@launch
+            }
             val answer = chat.answer(question, earlier) { text -> _turns.update { it.dropLast(1) + it.last().copy(partial = text) } }
             _turns.update { it.dropLast(1) + it.last().copy(answer = answer, partial = "") }
         }

@@ -48,9 +48,13 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.R
 import dev.irohaco.feature.timeline.search.AnswerCard
+import dev.irohaco.feature.timeline.search.FoundCard
 
-/** One question and its answer; [answer] is null while the model writes [partial]. */
-data class AskTurn(val question: String, val answer: AskResult? = null, val partial: String = "")
+/**
+ * One question and its answer; [answer] is null while the model writes [partial]. A request for photos is
+ * answered with [found], what the search found, instead.
+ */
+data class AskTurn(val question: String, val answer: AskResult? = null, val partial: String = "", val found: List<SearchHit>? = null)
 
 /** Questions about the photo or scene on screen and the answers, one under another (#201). */
 @Composable
@@ -95,7 +99,7 @@ internal fun AskContent(
     onShowPhotos: ((String) -> Unit)? = null,
 ) {
     var question by rememberSaveable { mutableStateOf("") }
-    val busy = turns.lastOrNull()?.answer == null && turns.isNotEmpty()
+    val busy = turns.lastOrNull()?.let { it.answer == null && it.found == null } == true
     val send = {
         if (question.isNotBlank() && !busy) {
             onAsk(question)
@@ -108,6 +112,10 @@ internal fun AskContent(
     ) {
         turns.forEach { turn ->
             Text(turn.question, style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.End))
+            turn.found?.let { found ->
+                FoundCard(found, onOpen, onShowAll = onShowPhotos?.let { show -> { show(turn.question) } })
+                return@forEach
+            }
             AnswerCard(
                 asking = turn.answer == null,
                 answer = turn.answer,
@@ -191,6 +199,7 @@ private fun AskContentPreview() {
                 turns = listOf(
                     AskTurn("What is this?", AskResult.Answered("A pier at dusk [1].", known = true, citations = listOf(Citation(photo, Basis.OBSERVED, 1)))),
                     AskTurn("Where is it?", partial = "Probably a harbour"),
+                    AskTurn("Fireworks last summer", found = listOf(photo, photo.copy(item = photo.item.copy(assetId = "q")))),
                 ),
                 hint = "Ask about this photo",
                 onAsk = {},

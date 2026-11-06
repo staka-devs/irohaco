@@ -17,11 +17,18 @@ class ChatWithLibrary(
 
     fun warmUp() = ask.warmUp()
 
+    /** A request for photos ("去年の夏の花火の写真") is answered with what the search finds, with no model; null for a question. */
+    suspend fun find(question: String): List<SearchHit>? = if (QueryReader.asksForMedia(question)) lookUp(question) else null
+
     suspend fun answer(question: String, earlier: List<Turn>, onText: (String) -> Unit = {}): AskResult {
-        val read = QueryReader.read(question, now())
-        val found = search(read.rest, kind = read.kind, filters = SearchFilters(read.fromMs, read.untilMs), onlyAtPlace = true).hits
+        val found = lookUp(question)
         val chat = earlier.map { it.question to it.answer.text.replace(CITATION, "") }
         return ask.ask(question, sources(found, earlier), AskLibrary.context(null, null, chat), onText)
+    }
+
+    private suspend fun lookUp(question: String): List<SearchHit> {
+        val read = QueryReader.read(question, now())
+        return search(read.rest, kind = read.kind, filters = SearchFilters(read.fromMs, read.untilMs), onlyAtPlace = true).hits
     }
 
     internal companion object {
