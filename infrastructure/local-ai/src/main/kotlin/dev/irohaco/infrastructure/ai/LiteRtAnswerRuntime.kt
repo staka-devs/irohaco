@@ -66,10 +66,13 @@ class LiteRtAnswerRuntime(private val cacheDir: String) : AnswerRuntime {
     private companion object {
         const val MAX_IMAGES = 4
 
-        // shortcut: provisional sizes until AnswerSpeedTest measures them per model on a device; four images take
-        // about 1,024 tokens, the instruction and notes about 400, the thoughts at most THINK_TOKENS, the answer the rest.
+        // Four images take about 1,024 tokens, the instruction and notes about 400, the thoughts at most THINK_TOKENS,
+        // the answer the rest; 8,192 also loads, but nothing needs it. Measured with AnswerSpeedTest (tokens, think):
+        // with four images the answer starts after 14 s (Gemma 4 E2B), 21 s (LFM3-VL 2B) and 32 s (Gemma 4 E4B) on
+        // the GPU. A question the photos do not fit makes a model think up to the limit, about a minute with 512
+        // or 1,024 alike, so the smaller limit is kept.
         const val MAX_TOKENS = 4096
-        const val THINK_TOKENS = 1024
+        const val THINK_TOKENS = 512
 
         val THINKING = ThinkingConfig(true, THINK_TOKENS)
 
