@@ -81,6 +81,8 @@ import dev.irohaco.feature.timeline.library.LocationHistoryScreen
 import dev.irohaco.feature.timeline.library.LocationHistoryViewModel
 import dev.irohaco.feature.timeline.ask.AskViewModel
 import dev.irohaco.core.application.ChatWithLibrary
+import dev.irohaco.core.application.ReadQuery
+import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.ui.IrohacoApp
 import dev.irohaco.ui.ScreenViewModelStores
 import dev.irohaco.ui.TopLevelDestination
@@ -286,7 +288,7 @@ class MainActivity : ComponentActivity() {
             )
             Route.isPhotosFor(route) -> SearchScreen(
                 viewModel(key = route) {
-                    SearchViewModel(container.searchMedia, container.manageCollections, initialQuery = Route.parsePhotosFor(route))
+                    SearchViewModel(container.searchMedia, container.manageCollections, initial = Route.parsePhotosFor(route))
                 },
                 onOpenMedia = { open(Route.viewer(it)) },
                 onPlayAt = { assetId, ms -> open(Route.playVideoAt(assetId, ms)) },
@@ -387,12 +389,16 @@ object Route {
     /** Photos and video scenes like [assetId] (SRCH-001). */
     fun similar(assetId: String) = SIMILAR + assetId
 
-    /** The photos a chat's question is about, as a search page opened with that question. */
-    fun photosFor(question: String) = PHOTOS_FOR + question
+    /** The photos a chat found, as a search page opened with the conditions the chat read. */
+    fun photosFor(read: ReadQuery) =
+        PHOTOS_FOR + listOf(read.fromMs?.toString().orEmpty(), read.untilMs?.toString().orEmpty(), read.kind?.name.orEmpty(), read.rest).joinToString("$SEP")
 
     fun isPhotosFor(route: String) = route.startsWith(PHOTOS_FOR)
 
-    fun parsePhotosFor(route: String) = route.removePrefix(PHOTOS_FOR)
+    fun parsePhotosFor(route: String): ReadQuery {
+        val (from, until, kind, rest) = route.removePrefix(PHOTOS_FOR).split(SEP, limit = 4)
+        return ReadQuery(rest, from.toLongOrNull(), until.toLongOrNull(), kind.takeIf { it.isNotEmpty() }?.let(MediaKind::valueOf))
+    }
 
     fun isSimilar(route: String) = route.startsWith(SIMILAR)
 

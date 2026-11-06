@@ -46,7 +46,11 @@ import dev.irohaco.core.application.AnswerChoice
 import dev.irohaco.core.application.AnswerChoices
 import dev.irohaco.core.application.AskResult
 import dev.irohaco.core.application.Basis
+import dev.irohaco.core.application.ChatWithLibrary
 import dev.irohaco.core.application.Citation
+import dev.irohaco.core.application.QueryReader
+import dev.irohaco.core.application.ReadQuery
+import java.time.ZonedDateTime
 import dev.irohaco.core.application.SearchHit
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.designsystem.component.IrohacoBottomSheet
@@ -64,7 +68,7 @@ import dev.irohaco.feature.timeline.search.FoundCard
  * One question and its answer; [answer] is null while the model writes [partial]. A request for photos is
  * answered with [found], what the search found, instead.
  */
-data class AskTurn(val question: String, val answer: AskResult? = null, val partial: String = "", val found: List<SearchHit>? = null)
+data class AskTurn(val question: String, val answer: AskResult? = null, val partial: String = "", val found: ChatWithLibrary.Found? = null)
 
 /** Questions about the photo or scene on screen and the answers, one under another (#201). */
 @Composable
@@ -108,8 +112,8 @@ internal fun AskContent(
     modifier: Modifier = Modifier,
     models: AnswerChoices? = null,
     onChoose: (String) -> Unit = {},
-    /** Shows the photos a question is about as a grid that can be narrowed further; null hides the button. */
-    onShowPhotos: ((String) -> Unit)? = null,
+    /** Shows the photos searched with these conditions as a grid that can be narrowed further; null hides the button. */
+    onShowPhotos: ((ReadQuery) -> Unit)? = null,
     /** Questions offered before the first one, sent as they are when tapped. */
     examples: List<String> = emptyList(),
 ) {
@@ -138,7 +142,7 @@ internal fun AskContent(
                 Reply {
                     val found = turn.found
                     if (found != null) {
-                        FoundCard(found, onOpen, onShowAll = onShowPhotos?.let { show -> { show(turn.question) } })
+                        FoundCard(found, onOpen, onShowAll = onShowPhotos?.let { show -> { show(found.read) } })
                         return@Reply
                     }
                     AnswerCard(
@@ -152,7 +156,7 @@ internal fun AskContent(
                         caution = caution,
                     )
                     if (onShowPhotos != null && turn.answer != null) {
-                        TextButton(onClick = { onShowPhotos(turn.question) }) {
+                        TextButton(onClick = { onShowPhotos(QueryReader.read(turn.question, ZonedDateTime.now())) }) {
                             Icon(painterResource(IrohacoIcons.Photo), contentDescription = null)
                             Text(stringResource(R.string.ask_show_photos), modifier = Modifier.padding(start = IrohacoSpacing.s))
                         }
@@ -268,7 +272,7 @@ private fun AskContentPreview() {
                 turns = listOf(
                     AskTurn("What is this?", AskResult.Answered("A pier at dusk [1].", known = true, citations = listOf(Citation(photo, Basis.OBSERVED, 1)))),
                     AskTurn("Where is it?", partial = "Probably a harbour"),
-                    AskTurn("Fireworks last summer", found = listOf(photo, photo.copy(item = photo.item.copy(assetId = "q")))),
+                    AskTurn("Fireworks last summer", found = ChatWithLibrary.Found(ReadQuery("fireworks", 1_750_000_000_000, 1_756_000_000_000, MediaKind.IMAGE), (1..4).map { photo.copy(item = photo.item.copy(assetId = "p$it")) })),
                 ),
                 hint = "Ask about this photo",
                 onAsk = {},

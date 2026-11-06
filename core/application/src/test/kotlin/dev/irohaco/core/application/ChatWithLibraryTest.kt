@@ -16,6 +16,17 @@ class ChatWithLibraryTest {
     }
 
     @Test
+    fun `conditions alone right after found photos change that search`() {
+        val last = ReadQuery("花火", 1L, 2L, MediaKind.IMAGE)
+        assertEquals(ReadQuery("花火", 3L, 4L, MediaKind.IMAGE), ChatWithLibrary.follow("一昨年は？", ReadQuery("一昨年は？", 3L, 4L, hasWords = false), last))
+        assertEquals(ReadQuery("花火", 1L, 2L, MediaKind.VIDEO), ChatWithLibrary.follow("動画は？", ReadQuery("動画は？", kind = MediaKind.VIDEO, hasWords = false), last))
+        // New words, a question word, or nothing found before make a search of their own.
+        assertEquals(null, ChatWithLibrary.follow("京都の写真", ReadQuery("京都", kind = MediaKind.IMAGE), last))
+        assertEquals(null, ChatWithLibrary.follow("一昨年はどこ？", ReadQuery("一昨年はどこ？", 3L, 4L, hasWords = false), last))
+        assertEquals(null, ChatWithLibrary.follow("一昨年は？", ReadQuery("一昨年は？", 3L, 4L, hasWords = false), null))
+    }
+
+    @Test
     fun `a first question is answered from the search alone`() {
         assertEquals(listOf("x", "y"), ChatWithLibrary.sources(listOf(hit("x"), hit("y")), emptyList()).map { it.item.assetId })
     }

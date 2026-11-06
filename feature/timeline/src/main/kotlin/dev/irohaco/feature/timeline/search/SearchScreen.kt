@@ -66,6 +66,7 @@ import dev.irohaco.core.application.SearchMedia
 import dev.irohaco.core.application.SearchResults
 import dev.irohaco.core.application.SpaceChoice
 import dev.irohaco.core.application.QueryReader
+import dev.irohaco.core.application.ReadQuery
 import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.SpaceState
 import dev.irohaco.core.contracts.Tag
@@ -134,8 +135,8 @@ class SearchViewModel(
     private val similarTo: String? = null,
     /** Answers the query from the results with a local model (RAG-001); null hides the button. */
     private val askLibrary: AskLibrary? = null,
-    /** Opened from a chat's question: it is searched at once, its dates and kind becoming the conditions. */
-    initialQuery: String? = null,
+    /** Opened from a chat: searched at once with the conditions the chat read, which can then be changed. */
+    initial: ReadQuery? = null,
 ) : ViewModel() {
     val canAsk = askLibrary != null && similarTo == null
 
@@ -165,7 +166,17 @@ class SearchViewModel(
 
     init {
         if (similarTo != null) change { it }
-        initialQuery?.let(::search)
+        initial?.let { read ->
+            change {
+                it.copy(
+                    query = read.rest,
+                    rest = read.rest,
+                    kind = read.kind,
+                    filters = it.filters.copy(fromMs = read.fromMs, untilMs = read.untilMs),
+                    atPlace = true,
+                )
+            }
+        }
     }
 
     /** Capture times from [fromMs] until [untilMs] (exclusive); nulls clear the range. */

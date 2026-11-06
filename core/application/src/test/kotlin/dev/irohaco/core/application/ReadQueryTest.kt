@@ -71,6 +71,9 @@ class ReadQueryTest {
     fun `a sentence of conditions only is searched by its words`() {
         val read = read("去年の動画")
         assertEquals("去年の動画", read.rest)
+        assertEquals(false, read.hasWords)
+        assertEquals(ReadQuery("一昨年の夏は？", ms(2024, 6, 1), ms(2024, 9, 1), hasWords = false), read("一昨年の夏は？"))
+        assertEquals(ReadQuery("動画は？", kind = MediaKind.VIDEO, hasWords = false), read("動画は？"))
         assertEquals(MediaKind.VIDEO, read.kind)
         assertEquals(ms(2025, 1, 1), read.fromMs)
     }

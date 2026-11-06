@@ -28,7 +28,13 @@ import coil3.request.ImageRequest
 import coil3.video.videoFrameMillis
 import dev.irohaco.core.application.AskResult
 import dev.irohaco.core.application.Basis
+import dev.irohaco.core.application.ChatWithLibrary
 import dev.irohaco.core.application.Citation
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.material3.AssistChip
 import dev.irohaco.core.application.Evidence
 import dev.irohaco.core.application.SearchHit
 import dev.irohaco.core.contracts.EgressDeniedException
@@ -121,35 +127,49 @@ internal fun AnswerCard(
 }
 
 /**
- * A request for photos answered with what the search found, a few of them in a row; [onShowAll] opens them
- * all on the search page, where the conditions can be changed.
+ * A request for photos answered with what the search found: the conditions it was read as, then the first
+ * photos in a grid. [onShowAll] opens them all on the search page, where the conditions can be changed.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun FoundCard(found: List<SearchHit>, onOpen: (SearchHit) -> Unit, onShowAll: (() -> Unit)?) {
+internal fun FoundCard(found: ChatWithLibrary.Found, onOpen: (SearchHit) -> Unit, onShowAll: (() -> Unit)?) {
+    val read = found.read
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(IrohacoSpacing.l), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-            if (found.isEmpty()) {
-                Text(stringResource(R.string.ask_found_nothing), style = MaterialTheme.typography.bodyLarge)
-                return@Column
+            Text(stringResource(if (found.hits.isEmpty()) R.string.ask_found_nothing else R.string.ask_found), style = MaterialTheme.typography.bodyLarge)
+            // How the request was read, so a wrong reading shows at once; tapping one changes it on the search page.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+                val conditions = listOfNotNull(
+                    read.rest.takeIf { read.hasWords }?.let { stringResource(R.string.ask_found_words, it) },
+                    read.fromMs?.let { from -> read.untilMs?.let { until -> dateRangeLabel(from, until) } },
+                    read.kind?.let { stringResource(if (it == MediaKind.VIDEO) R.string.search_videos else R.string.search_photos) },
+                )
+                conditions.forEach { AssistChip(onClick = { onShowAll?.invoke() }, enabled = onShowAll != null, label = { Text(it) }) }
             }
-            Text(stringResource(R.string.ask_found), style = MaterialTheme.typography.bodyLarge)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-                found.take(FOUND_SHOWN).forEach { hit ->
-                    MediaThumbnail(
-                        model = hitModel(hit),
-                        contentDescription = listOfNotNull(stringResource(hit.item.kindLabel()), hit.timestampMs?.let { stringResource(R.string.search_at, formatDuration(it)) }).joinToString(", "),
-                        selected = false,
-                        label = hit.timestampMs?.let { formatDuration(it) },
-                        modifier = Modifier.size(CELL).clickable { onOpen(hit) },
-                    )
+            found.hits.take(FOUND_SHOWN).chunked(FOUND_COLUMNS).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
+                    row.forEach { hit ->
+                        MediaThumbnail(
+                            model = hitModel(hit),
+                            contentDescription = listOfNotNull(stringResource(hit.item.kindLabel()), hit.timestampMs?.let { stringResource(R.string.search_at, formatDuration(it)) }).joinToString(", "),
+                            selected = false,
+                            label = hit.timestampMs?.let { formatDuration(it) },
+                            modifier = Modifier.weight(1f).aspectRatio(1f).clickable { onOpen(hit) },
+                        )
+                    }
+                    // A short last row keeps the cells the same size as the full rows above it.
+                    repeat(FOUND_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
-            onShowAll?.let { TextButton(onClick = it) { Text(stringResource(R.string.ask_found_all)) } }
+            if (onShowAll != null && found.hits.isNotEmpty()) {
+                TextButton(onClick = onShowAll) { Text(stringResource(R.string.ask_found_all)) }
+            }
         }
     }
 }
 
-private const val FOUND_SHOWN = 12
+private const val FOUND_COLUMNS = 3
+private const val FOUND_SHOWN = 6
 
 @Composable
 private fun hitModel(hit: SearchHit): Any {

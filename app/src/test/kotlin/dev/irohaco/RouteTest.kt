@@ -1,6 +1,8 @@
 package dev.irohaco
 
+import dev.irohaco.core.application.ReadQuery
 import dev.irohaco.core.contracts.FolderRef
+import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.feature.timeline.library.MediaList
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -33,11 +35,12 @@ class RouteTest {
     }
 
     @Test
-    fun `a chat question's photos route keeps the question whole`() {
-        val question = "去年の夏の花火の写真: viewer:a-1"
-        assertTrue(Route.isPhotosFor(Route.photosFor(question)))
-        assertFalse(Route.isSimilar(Route.photosFor(question)))
-        assertEquals(question, Route.parsePhotosFor(Route.photosFor(question)))
+    fun `a chat's photos route keeps the words and conditions whole`() {
+        val read = ReadQuery("花火: viewer:a-1", 1L, 2L, MediaKind.IMAGE)
+        assertTrue(Route.isPhotosFor(Route.photosFor(read)))
+        assertFalse(Route.isSimilar(Route.photosFor(read)))
+        assertEquals(read, Route.parsePhotosFor(Route.photosFor(read)))
+        assertEquals(ReadQuery("去年の動画"), Route.parsePhotosFor(Route.photosFor(ReadQuery("去年の動画"))))
     }
 
     @Test

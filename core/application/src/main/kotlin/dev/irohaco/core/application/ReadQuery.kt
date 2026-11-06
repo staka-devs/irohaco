@@ -7,8 +7,11 @@ import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.temporal.TemporalAdjusters
 
-/** What a search sentence asks for besides its words: capture times in [fromMs, untilMs) and the kind (#203). */
-data class ReadQuery(val rest: String, val fromMs: Long? = null, val untilMs: Long? = null, val kind: MediaKind? = null)
+/**
+ * What a search sentence asks for besides its words: capture times in [fromMs, untilMs) and the kind (#203).
+ * [hasWords] is false when the sentence names conditions only, and [rest] is then the sentence itself.
+ */
+data class ReadQuery(val rest: String, val fromMs: Long? = null, val untilMs: Long? = null, val kind: MediaKind? = null, val hasWords: Boolean = true)
 
 /**
  * Reads the dates and the kind out of a search sentence by fixed rules, so it works with no model on the
@@ -45,6 +48,7 @@ object QueryReader {
             fromMs = span?.first?.atStartOfDay(zone)?.toInstant()?.toEpochMilli(),
             untilMs = span?.second?.atStartOfDay(zone)?.toInstant()?.toEpochMilli(),
             kind = kind,
+            hasWords = words.isNotEmpty(),
         )
     }
 
@@ -54,8 +58,11 @@ object QueryReader {
      */
     fun asksForMedia(query: String): Boolean {
         val text = Normalizer.normalize(query, Normalizer.Form.NFKC)
-        return !QUESTION.containsMatchIn(text) && (REQUEST_JA.containsMatchIn(text) || SHOW_EN.containsMatchIn(text) || KINDS.any { it.first.containsMatchIn(text) })
+        return !isQuestion(text) && (REQUEST_JA.containsMatchIn(text) || SHOW_EN.containsMatchIn(text) || KINDS.any { it.first.containsMatchIn(text) })
     }
+
+    /** Whether the sentence asks something with a question word (where, when, what...), to be answered in words. */
+    fun isQuestion(query: String): Boolean = QUESTION.containsMatchIn(Normalizer.normalize(query, Normalizer.Form.NFKC))
 
     /** The months [startMonth] onward, [months] long, in [year] or else the latest such stretch that began (or ended) by [today]. */
     private fun latest(today: LocalDate, year: Int?, startMonth: Int, months: Long, endedOnly: Boolean): Pair<LocalDate, LocalDate> {
@@ -119,6 +126,6 @@ object QueryReader {
     private val QUESTION = Regex("どこ|いつ|誰|だれ|何|なに|なん|どう|どんな|どれ|いくつ|\\b(where|when|who|what|how|which|why)\\b", RegexOption.IGNORE_CASE)
 
     // What joins the conditions to the words: 去年の, 夏に, 京都で撮った.
-    private val EDGE_JA = Regex("^(?:の|に|で|から|頃|ごろ|、)+|(?:で撮った|で撮影した|に撮った|に撮影した|撮った|撮影した|の|に|で|から|頃|ごろ|、)+$")
+    private val EDGE_JA = Regex("^(?:の|に|で|から|頃|ごろ|、)+|(?:で撮った|で撮影した|に撮った|に撮影した|撮った|撮影した|の|に|で|から|頃|ごろ|、|は|って|[?!。])+$")
     private val STOP_EN = setOf("from", "in", "of", "on", "at", "during", "taken", "shot", "the", "my", "a", "an", "show", "find", "me", "all")
 }
