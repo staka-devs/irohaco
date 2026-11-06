@@ -345,6 +345,7 @@
     <string name="ask_example_question">去年の夏はどこに行った？</string>
     <string name="search_ask_entry">文章で頼むと、写真を探したり質問に答えたりします。</string>
     <string name="ask_found_words">「%1$s」</string>
+    <string name="ask_finding">写真を探しています</string>
     <string name="ask_show_photos">写真で見る</string>
     <string name="search_back_to_chat">チャットに戻る</string>
     <string name="ask_hint">写真について質問（例: 去年の夏はどこに行った？）</string>

@@ -350,6 +350,7 @@
     <string name="ask_example_question">Where did I go last summer?</string>
     <string name="search_ask_entry">Ask in a sentence to find photos or get answers about them.</string>
     <string name="ask_found_words">“%1$s”</string>
+    <string name="ask_finding">Looking for photos</string>
     <string name="ask_show_photos">Show these photos</string>
     <string name="search_back_to_chat">Back to the chat</string>
     <string name="ask_hint">Ask about your photos, e.g. Where did I go last summer?</string>
