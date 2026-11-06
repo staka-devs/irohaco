@@ -1,6 +1,7 @@
 package dev.irohaco.core.contracts
 
 import kotlinx.coroutines.flow.Flow
+import java.net.URI
 
 /** What a model is used for; the codes `egress_grants` and `task_model_assignments` store (ARCHITECTURE §9.2). */
 enum class TaskType { SEARCH_QUERY, IMAGE_INDEX, VIDEO_INDEX, CAPTION, RAG, OCR_ASSIST }
@@ -20,8 +21,28 @@ enum class RemoteProtocol(val displayName: String, val defaultBaseUrl: String) {
     GEMINI_EMBED_CONTENT("Gemini embedContent", "https://generativelanguage.googleapis.com/v1beta"),
 }
 
-/** A connection to a model outside the device; the local runtime is not one. */
-data class RemoteConnection(val id: String, val protocol: RemoteProtocol, val baseUrl: String)
+/** A connection to a model outside the device; the local runtime is not one. [name] is what the user calls the service. */
+data class RemoteConnection(val id: String, val protocol: RemoteProtocol, val baseUrl: String, val name: String? = null) {
+    /** What the screens call the service: the user's name for it, else the company a well-known address belongs to, else its host. */
+    val serviceName: String get() = name?.takeIf { it.isNotBlank() } ?: suggestedName(baseUrl)
+
+    companion object {
+        fun suggestedName(baseUrl: String): String {
+            val host = runCatching { URI(baseUrl.trim()).host }.getOrNull()?.lowercase() ?: return baseUrl.trim()
+            return KNOWN.entries.firstOrNull { (domain, _) -> host == domain || host.endsWith(".$domain") }?.value ?: host
+        }
+
+        private val KNOWN = mapOf("anthropic.com" to "Anthropic", "openai.com" to "OpenAI", "googleapis.com" to "Google")
+    }
+}
+
+/** The names the user gave remote connections, by connection id; kept apart from the connections' rows. */
+interface ConnectionNames {
+    val names: Flow<Map<String, String>>
+
+    /** A blank or null [name] takes the name off, so the suggested one shows again. */
+    suspend fun setName(id: String, name: String?)
+}
 
 sealed interface EgressDecision {
     data object Allowed : EgressDecision

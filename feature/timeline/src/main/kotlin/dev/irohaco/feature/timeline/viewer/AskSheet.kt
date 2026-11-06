@@ -240,7 +240,7 @@ private fun ModelPicker(models: AnswerChoices, onChoose: (String) -> Unit) {
                         Column {
                             Text(choice.name)
                             Text(
-                                choice.host?.let { stringResource(R.string.ask_model_at, it) } ?: stringResource(R.string.ask_model_on_device),
+                                choice.service?.let { stringResource(R.string.ask_model_at, it) } ?: stringResource(R.string.ask_model_on_device),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -280,7 +280,7 @@ private fun AskContentPreview() {
                 onOpenSettings = {},
                 askingLabel = R.string.viewer_asking,
                 caution = R.string.viewer_ask_caution,
-                models = AnswerChoices(listOf(AnswerChoice("gemma", "Gemma 4 E2B"), AnswerChoice("claude", "Claude", "api.anthropic.com")), "gemma"),
+                models = AnswerChoices(listOf(AnswerChoice("gemma", "Gemma 4 E2B"), AnswerChoice("claude", "Claude", "Anthropic")), "gemma"),
             )
         }
     }

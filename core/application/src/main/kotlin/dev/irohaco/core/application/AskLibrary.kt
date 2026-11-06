@@ -27,7 +27,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.net.URI
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -62,11 +61,11 @@ sealed interface AskResult {
      * The picked model is remote and has not had a question in this run of the app: nothing is sent until
      * the user agrees, having seen where it goes and what it carries (API-007). [agree] lets the next ask through.
      */
-    class NeedsConsent(val model: String, val host: String, val payloads: Set<EgressPayload>, val agree: () -> Unit) : AskResult
+    class NeedsConsent(val model: String, val service: String, val payloads: Set<EgressPayload>, val agree: () -> Unit) : AskResult
 }
 
-/** A model that can answer; [host] is the service it runs at, or null for one on this device. */
-data class AnswerChoice(val id: String, val name: String, val host: String? = null)
+/** A model that can answer; [service] is the name of the service it runs at, or null for one on this device. */
+data class AnswerChoice(val id: String, val name: String, val service: String? = null)
 
 /** [current] is the model a question goes to, or null when none can answer. */
 data class AnswerChoices(val all: List<AnswerChoice>, val current: String?)
@@ -97,10 +96,10 @@ class AskLibrary(
      * The models that can answer now, on this device or at a service, and the one a question goes to.
      * shortcut: a model downloaded while a screen shows this is listed once the pick or the services change.
      */
-    val choices: Flow<AnswerChoices> = combine(settings.answerModel, remote?.models ?: flowOf(emptyList())) { picked, services ->
+    val choices: Flow<AnswerChoices> = combine(settings.answerModel, remote?.models ?: flowOf(emptyList()), remote?.serviceNames ?: flowOf(emptyMap())) { picked, services, _ ->
         val local = catalog.filter { installed(it.id) != null }.map { AnswerChoice(it.id, it.displayName) }
         val far = services.filter { it.capabilities.containsAll(RemoteAnswering.NEEDED) }.map { model ->
-            AnswerChoice(model.profileId, model.displayName, remote?.connection(model)?.baseUrl?.let { runCatching { URI(it).host }.getOrNull() }.orEmpty())
+            AnswerChoice(model.profileId, model.displayName, remote?.connection(model)?.serviceName.orEmpty())
         }
         val all = local + far
         AnswerChoices(all, picked?.takeIf { id -> all.any { it.id == id } } ?: local.firstOrNull()?.id)
@@ -199,8 +198,8 @@ class AskLibrary(
         val payloads = payloads(sources) + setOfNotNull(EgressPayload.PLACE_NAME.takeIf { sendsPlace })
         val assets = sources.map { it.item.assetId }.toSet()
         if (model.profileId !in consented) {
-            val host = remote.connection(model)?.baseUrl?.let { runCatching { URI(it).host }.getOrNull() }.orEmpty()
-            return AskResult.NeedsConsent(model.displayName, host, payloads) { consented += model.profileId }
+            val service = remote.connection(model)?.serviceName.orEmpty()
+            return AskResult.NeedsConsent(model.displayName, service, payloads) { consented += model.profileId }
         }
         return try {
             val decision = remote.policy.authorize(TaskType.RAG, model.profileId, payloads, assets)
