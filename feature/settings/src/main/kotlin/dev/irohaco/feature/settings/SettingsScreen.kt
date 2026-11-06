@@ -227,6 +227,7 @@ fun SettingsScreen(
                 viewModel::dismissModelTest,
                 connectionFailed,
                 viewModel::dismissConnectionFailed,
+                viewModel::renameConnection,
             )
         },
     )

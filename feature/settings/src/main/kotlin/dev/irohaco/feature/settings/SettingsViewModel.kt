@@ -310,7 +310,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             var created: String? = null
             _modelTest.value = try {
-                val id = connectionId ?: manage.add(newConnection!!.protocol, newConnection.baseUrl, newConnection.apiKey).also { created = it }
+                val id = connectionId ?: manage.add(newConnection!!.protocol, newConnection.baseUrl, newConnection.apiKey, newConnection.name).also { created = it }
                 val capabilities = manage.addModel(id, modelId, displayName)
                 val model = manage.models().first().last { it.connectionId == id && it.modelId == modelId.trim() }
                 val usable = when (role) {
@@ -501,6 +501,11 @@ class SettingsViewModel(
         _connectionFailed.value = false
     }
 
+    /** A blank [name] goes back to the suggested one. */
+    fun renameConnection(id: String, name: String) {
+        viewModelScope.launch { egress?.rename(id, name) }
+    }
+
     fun removeConnection(id: String) {
         viewModelScope.launch { egress?.remove(id) }
     }
@@ -557,4 +562,4 @@ enum class RemoteRole(val tasks: List<TaskType>) {
 }
 
 /** A connection typed in while adding a model; the key goes straight to the Keystore. */
-class NewConnection(val protocol: RemoteProtocol, val baseUrl: String, val apiKey: String)
+class NewConnection(val protocol: RemoteProtocol, val baseUrl: String, val apiKey: String, val name: String = "")

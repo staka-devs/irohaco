@@ -71,7 +71,6 @@ import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
-import java.net.URI
 
 /**
  * Settings > AI (DESIGN §4.5, M2-02), one card per job: the model that builds the photo index and the
@@ -144,7 +143,7 @@ internal fun AiSettings(
             onDismiss = { adding = null; onDismissModelTest() },
         )
     }
-    val hosts = connections.associate { it.id to it.host() }
+    val hosts = connections.associate { it.id to it.serviceName }
     val answerIds = answerModels.map { it.id }.toSet()
     val local = LocalModels(states, onDownload, onPause, onCancel, onDelete = { deleting = it }, onMark = { marking = it.id to it.displayName })
     Column(Modifier.padding(horizontal = IrohacoSpacing.l), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m)) {
@@ -172,8 +171,6 @@ internal val RemoteRole.protocols: Set<RemoteProtocol>
         RemoteRole.ANSWER -> setOf(RemoteProtocol.OPENAI_CHAT, RemoteProtocol.OPENAI_RESPONSES, RemoteProtocol.ANTHROPIC_MESSAGES)
         RemoteRole.INDEX -> setOf(RemoteProtocol.OPENAI_EMBEDDINGS, RemoteProtocol.GEMINI_EMBED_CONTENT)
     }
-
-private fun RemoteConnection.host() = runCatching { URI(baseUrl).host }.getOrNull() ?: baseUrl
 
 @Composable
 private fun RoleCard(title: Int, hint: Int, onAdd: () -> Unit, rows: @Composable () -> Unit) {
@@ -356,6 +353,7 @@ private fun AddRemoteModelDialog(
     var url by rememberSaveable { mutableStateOf(protocol.defaultBaseUrl) }
     // Not saved: the key stays out of the saved instance state.
     var key by remember { mutableStateOf("") }
+    var service by rememberSaveable { mutableStateOf("") }
     var plainAccepted by rememberSaveable { mutableStateOf(false) }
     var modelId by rememberSaveable { mutableStateOf("") }
     var name by rememberSaveable { mutableStateOf("") }
@@ -371,7 +369,7 @@ private fun AddRemoteModelDialog(
                 Text(stringResource(R.string.settings_ai_remote_connection), style = MaterialTheme.typography.labelLarge)
                 Column(Modifier.selectableGroup()) {
                     connections.forEach { connection ->
-                        ChoiceRow(connection.id == chosen, editable, "${connection.protocol.displayName} · ${connection.host()}") { chosen = connection.id }
+                        ChoiceRow(connection.id == chosen, editable, "${connection.serviceName} · ${connection.protocol.displayName}") { chosen = connection.id }
                     }
                     ChoiceRow(chosen == null, editable, stringResource(R.string.settings_ai_remote_new_connection)) { chosen = null }
                 }
@@ -399,6 +397,16 @@ private fun AddRemoteModelDialog(
                             modifier = Modifier.toggleable(plainAccepted, role = Role.Checkbox) { plainAccepted = it },
                         ) { Text(stringResource(R.string.settings_remote_http_accept)) }
                     }
+                    OutlinedTextField(
+                        value = service,
+                        onValueChange = { service = it },
+                        label = { Text(stringResource(R.string.settings_remote_name)) },
+                        placeholder = { Text(RemoteConnection.suggestedName(url)) },
+                        supportingText = { Text(stringResource(R.string.settings_remote_name_hint)) },
+                        singleLine = true,
+                        enabled = editable,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     OutlinedTextField(
                         value = key,
                         onValueChange = { key = it },
@@ -458,7 +466,7 @@ private fun AddRemoteModelDialog(
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_remote_model_done)) }
             } else {
                 TextButton(enabled = modelId.isNotBlank() && connectionReady && !running, onClick = {
-                    onAdd(chosen, if (chosen == null) NewConnection(protocol, url, key) else null, modelId, name)
+                    onAdd(chosen, if (chosen == null) NewConnection(protocol, url, key, service) else null, modelId, name)
                 }) { Text(stringResource(R.string.settings_ai_remote_test_and_use)) }
             }
         },

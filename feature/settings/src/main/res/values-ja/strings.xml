@@ -163,6 +163,9 @@
     <string name="settings_remote_model_remove_title">「%1$s」を削除しますか？</string>
     <string name="settings_remote_model_remove_body">このモデルで作った写真の索引も消えます。端末のモデルの索引は残ります。</string>
     <string name="settings_remote_model_id">モデル ID</string>
+    <string name="settings_remote_name">サービスの名前</string>
+    <string name="settings_remote_name_hint">空のままなら、アドレスから付けた名前を出します。</string>
+    <string name="settings_remote_rename">名前を変える</string>
     <string name="settings_remote_model_name">表示する名前（省略可）</string>
     <string name="settings_remote_model_test">テストして追加</string>
     <string name="settings_remote_model_test_hint">テストでは、アプリが持つサンプルの文と画像をモデルに送ります。あなたの写真は送りません。</string>

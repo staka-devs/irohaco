@@ -100,7 +100,7 @@ internal fun AnswerCard(
                 }
                 is AskResult.NeedsConsent -> {
                     val what = answer.payloads.map { stringResource(it.label()) }.joinToString(" / ")
-                    Text(stringResource(R.string.search_ask_consent, answer.model, answer.host, what), style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.search_ask_consent, answer.model, answer.service, what), style = MaterialTheme.typography.bodyMedium)
                     TextButton(
                         onClick = {
                             answer.agree()
@@ -234,7 +234,7 @@ private fun AnswerCardPreview() {
                 AnswerCard(asking = false, answer = AskResult.NoModel, onAsk = {}, onOpen = {}, onOpenSettings = {})
                 AnswerCard(
                     asking = false,
-                    answer = AskResult.NeedsConsent("Claude", "api.anthropic.com", setOf(EgressPayload.QUERY_TEXT, EgressPayload.IMAGE_PIXELS)) {},
+                    answer = AskResult.NeedsConsent("Claude", "Anthropic", setOf(EgressPayload.QUERY_TEXT, EgressPayload.IMAGE_PIXELS)) {},
                     onAsk = {},
                     onOpen = {},
                     onOpenSettings = {},

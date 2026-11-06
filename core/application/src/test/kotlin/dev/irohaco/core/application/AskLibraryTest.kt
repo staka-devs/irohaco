@@ -133,7 +133,7 @@ class AskLibraryTest {
     fun `the choices are the installed models and the services' answering ones, the pick or else the first local`() = runTest {
         val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id))
         val local = AnswerChoice(ModelCatalog.GEMMA_4_E2B.id, ModelCatalog.GEMMA_4_E2B.displayName)
-        assertEquals(AnswerChoices(listOf(local, AnswerChoice("claude", "Claude", "api.anthropic.com")), local.id), library.choices.first())
+        assertEquals(AnswerChoices(listOf(local, AnswerChoice("claude", "Claude", "Anthropic")), local.id), library.choices.first())
         library.choose("claude")
         assertEquals("claude", library.choices.first().current)
         library.choose("removed")
@@ -248,7 +248,7 @@ class AskLibraryTest {
         val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id))
         library.choose("claude")
         val consent = assertIs<AskResult.NeedsConsent>(library.ask("Whose birthday?", listOf(photo, memo, scene)))
-        assertEquals("api.anthropic.com", consent.host)
+        assertEquals("Anthropic", consent.service)
         assertEquals(setOf(EgressPayload.QUERY_TEXT, EgressPayload.IMAGE_PIXELS, EgressPayload.VIDEO_FRAMES, EgressPayload.USER_ANNOTATIONS), consent.payloads)
         assertTrue(read.isEmpty() && remoteAsked.isEmpty()) // nothing read, nothing sent before the user agrees
         consent.agree()

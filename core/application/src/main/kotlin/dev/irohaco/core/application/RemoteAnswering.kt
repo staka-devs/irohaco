@@ -1,6 +1,10 @@
 package dev.irohaco.core.application
 
 import dev.irohaco.core.contracts.AnswerSession
+import dev.irohaco.core.contracts.ConnectionNames
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import dev.irohaco.core.contracts.CredentialStore
 import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.EgressPolicy
@@ -17,13 +21,18 @@ class RemoteAnswering(
     private val credentials: CredentialStore,
     private val sessions: RemoteSessions,
     val policy: EgressPolicy,
+    private val names: ConnectionNames? = null,
 ) {
     val models = store.models
+
+    /** The names the user gave the services; a change shows at once where they are listed. */
+    val serviceNames: Flow<Map<String, String>> = names?.names ?: flowOf(emptyMap())
 
     /** The model [id] names, when it is remote and its test found all that answering needs. */
     suspend fun model(id: String): RemoteModel? = store.model(id)?.takeIf { it.capabilities.containsAll(NEEDED) }
 
-    suspend fun connection(model: RemoteModel): RemoteConnection? = store.connection(model.connectionId)
+    suspend fun connection(model: RemoteModel): RemoteConnection? =
+        store.connection(model.connectionId)?.let { it.copy(name = serviceNames.first()[it.id]) }
 
     /** A session whose every request is checked for exactly [payloads] and [assetIds] first (ARCHITECTURE §9.3). */
     suspend fun open(model: RemoteModel, payloads: Set<EgressPayload>, assetIds: Set<String>): AnswerSession {

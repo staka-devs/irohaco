@@ -99,6 +99,7 @@ import dev.irohaco.infrastructure.media.AndroidShareFiles
 import dev.irohaco.infrastructure.media.AndroidTrashReader
 import dev.irohaco.infrastructure.media.MediaStoreCatalogSource
 import dev.irohaco.infrastructure.preferences.DataStoreAiSettings
+import dev.irohaco.infrastructure.preferences.DataStoreConnectionNames
 import dev.irohaco.infrastructure.preferences.DataStoreModelMarks
 import dev.irohaco.infrastructure.preferences.DataStoreAppearanceSettings
 import dev.irohaco.infrastructure.preferences.DataStoreIndexSettings
@@ -135,13 +136,14 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val timelineSettings by lazy { DataStoreTimelineSettings(settingsStore) }
     val modelMarks: ModelMarks by lazy { DataStoreModelMarks(settingsStore) { appContext.contentResolver } }
     private val egressStore by lazy { RoomEgressGrantStore(database) }
+    private val connectionNames by lazy { DataStoreConnectionNames(settingsStore) }
     private val credentials by lazy { KeystoreCredentials(appContext) }
     val manageEgress by lazy {
-        ManageEgress(egressStore, egressStore, credentials, { UUID.randomUUID().toString() }, egressStore, RemoteCapabilityProbe())
+        ManageEgress(egressStore, egressStore, credentials, { UUID.randomUUID().toString() }, egressStore, RemoteCapabilityProbe(), connectionNames)
     }
 
     /** Remote models the user registered for questions, each request checked by the egress policy (API-007). */
-    val remoteAnswering by lazy { RemoteAnswering(egressStore, credentials, RemoteAnswerSessions, GrantedEgressPolicy(egressStore)) }
+    val remoteAnswering by lazy { RemoteAnswering(egressStore, credentials, RemoteAnswerSessions, GrantedEgressPolicy(egressStore), connectionNames) }
 
     /** Remote models the user registered to index and search photos with, each request checked first (API-007). */
     val remoteEmbedding by lazy { RemoteEmbedding(egressStore, credentials, RemoteEmbeddingSessionFactory, GrantedEgressPolicy(egressStore)) }

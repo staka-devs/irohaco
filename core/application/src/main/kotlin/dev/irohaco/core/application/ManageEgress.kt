@@ -1,6 +1,7 @@
 package dev.irohaco.core.application
 
 import dev.irohaco.core.contracts.CapabilityProbe
+import dev.irohaco.core.contracts.ConnectionNames
 import dev.irohaco.core.contracts.ConnectionStore
 import dev.irohaco.core.contracts.CredentialStore
 import dev.irohaco.core.contracts.EgressDecision
@@ -15,6 +16,7 @@ import dev.irohaco.core.contracts.RemoteModelStore
 import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.TaskType
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import java.net.URI
 
 /**
@@ -41,15 +43,21 @@ class ManageEgress(
     private val newId: () -> String,
     private val modelStore: RemoteModelStore,
     private val probe: CapabilityProbe,
+    private val names: ConnectionNames? = null,
 ) {
-    fun connections(): Flow<List<RemoteConnection>> = store.connections
+    fun connections(): Flow<List<RemoteConnection>> =
+        names?.let { combine(store.connections, it.names) { list, named -> list.map { c -> c.copy(name = named[c.id]) } } } ?: store.connections
+
+    suspend fun rename(id: String, name: String?) {
+        names?.setName(id, name?.trim()?.takeIf { it.isNotEmpty() })
+    }
 
     fun grants(): Flow<Set<EgressGrant>> = store.grants
 
     suspend fun set(grant: EgressGrant, allowed: Boolean) = store.set(grant, allowed)
 
     /** Keeps [apiKey] in the Keystore-backed store and the connection with only its reference; returns the connection's id. */
-    suspend fun add(protocol: RemoteProtocol, baseUrl: String, apiKey: String): String {
+    suspend fun add(protocol: RemoteProtocol, baseUrl: String, apiKey: String, name: String? = null): String {
         require(urlKind(baseUrl) != UrlKind.INVALID) { "Not an http or https URL" }
         require(apiKey.isNotBlank()) { "No API key" }
         val ref = credentials.save(apiKey.trim())
@@ -60,11 +68,13 @@ class ManageEgress(
             credentials.delete(ref) // no key left behind without its connection
             throw e
         }
+        if (!name.isNullOrBlank()) rename(id, name)
         return id
     }
 
     suspend fun remove(id: String) {
         connectionStore.remove(id)?.let(credentials::delete)
+        names?.setName(id, null)
     }
 
     fun models(): Flow<List<RemoteModel>> = modelStore.models

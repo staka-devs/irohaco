@@ -17,6 +17,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -73,7 +74,29 @@ internal fun RemoteSettings(
     /** The last connection could not be added. */
     connectionFailed: Boolean = false,
     onDismissConnectionFailed: () -> Unit = {},
+    /** Names a connection; a blank name goes back to the suggested one. */
+    onRename: (id: String, name: String) -> Unit = { _, _ -> },
 ) {
+    var renaming by remember { mutableStateOf<RemoteConnection?>(null) }
+    renaming?.let { connection ->
+        var name by rememberSaveable { mutableStateOf(connection.name.orEmpty()) }
+        AlertDialog(
+            onDismissRequest = { renaming = null },
+            title = { Text(stringResource(R.string.settings_remote_rename)) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.settings_remote_name)) },
+                    placeholder = { Text(RemoteConnection.suggestedName(connection.baseUrl)) },
+                    supportingText = { Text(stringResource(R.string.settings_remote_name_hint)) },
+                    singleLine = true,
+                )
+            },
+            confirmButton = { TextButton(onClick = { renaming = null; onRename(connection.id, name) }) { Text(stringResource(R.string.settings_remote_model_done)) } },
+            dismissButton = { TextButton(onClick = { renaming = null }) { Text(stringResource(R.string.settings_ai_cancel)) } },
+        )
+    }
     if (connectionFailed) {
         AlertDialog(
             onDismissRequest = onDismissConnectionFailed,
@@ -131,14 +154,20 @@ internal fun RemoteSettings(
             supportingContent = {
                 // Every send to a plain-http address goes out unencrypted, so the list keeps saying so (PRD §10).
                 val plain = ManageEgress.urlKind(connection.baseUrl) == UrlKind.PLAIN_HTTP
-                Text(if (plain) stringResource(R.string.settings_remote_http_label, connection.baseUrl) else connection.baseUrl, color = if (plain) MaterialTheme.colorScheme.error else Color.Unspecified)
+                val address = if (plain) stringResource(R.string.settings_remote_http_label, connection.baseUrl) else connection.baseUrl
+                Text("${connection.protocol.displayName} · $address", color = if (plain) MaterialTheme.colorScheme.error else Color.Unspecified)
             },
             trailingContent = {
-                IconButton(onClick = { removing = connection }) {
-                    Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.settings_remote_remove))
+                Row {
+                    IconButton(onClick = { renaming = connection }) {
+                        Icon(painterResource(IrohacoIcons.Edit), stringResource(R.string.settings_remote_rename))
+                    }
+                    IconButton(onClick = { removing = connection }) {
+                        Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.settings_remote_remove))
+                    }
                 }
             },
-        ) { Text(connection.protocol.displayName, style = MaterialTheme.typography.titleMedium) }
+        ) { Text(connection.serviceName, style = MaterialTheme.typography.titleMedium) }
         models.filter { it.connectionId == connection.id }.forEach { model ->
             ListItem(
                 supportingContent = { Text(capabilitiesText(model.capabilities)) },

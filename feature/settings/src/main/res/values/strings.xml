@@ -165,6 +165,9 @@
     <string name="settings_remote_model_remove_title">Remove “%1$s”?</string>
     <string name="settings_remote_model_remove_body">The photo index built with this model goes too. The index of the model on this device stays.</string>
     <string name="settings_remote_model_id">Model ID</string>
+    <string name="settings_remote_name">Service name</string>
+    <string name="settings_remote_name_hint">Left empty, a name taken from the address shows.</string>
+    <string name="settings_remote_rename">Rename</string>
     <string name="settings_remote_model_name">Name (optional)</string>
     <string name="settings_remote_model_test">Test and add</string>
     <string name="settings_remote_model_test_hint">The test sends a sample sentence and a sample image of the app\'s own to the model. None of your photos are sent.</string>
