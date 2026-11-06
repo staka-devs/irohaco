@@ -25,6 +25,7 @@ import dev.irohaco.core.contracts.IndexSettings
 import dev.irohaco.core.contracts.LibraryFolder
 import dev.irohaco.core.contracts.MapSettings
 import dev.irohaco.core.contracts.ModelArtifact
+import dev.irohaco.core.contracts.ModelMarks
 import dev.irohaco.core.contracts.ModelInstallState
 import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteConnection
@@ -78,6 +79,8 @@ class SettingsViewModel(
     private val exportBackup: ExportBackup? = null,
     /** Opens a backup, matches its files here and applies it once the user agrees (UC-RESTORE-01). */
     private val restoreBackup: RestoreBackup? = null,
+    /** The colors and pictures the user gave the models' marks. */
+    private val marks: ModelMarks? = null,
     /** Runs a job in the foreground service, so it carries on after the user leaves this screen. */
     private val runIndexJob: (String) -> Unit = {},
 ) : ViewModel() {
@@ -256,6 +259,15 @@ class SettingsViewModel(
         val installed = answerModels.map { it.id }.filter { states[it] is ModelInstallState.Installed }
         picked?.takeIf { it in installed || remote.any { model -> model.profileId == it } } ?: installed.firstOrNull()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun setMarkColor(id: String, color: Long?) {
+        viewModelScope.launch { marks?.setColor(id, color) }
+    }
+
+    /** A picture the app cannot read is left off; the mark keeps its letter. */
+    fun setMarkImage(id: String, uri: String?) {
+        viewModelScope.launch { runCatching { marks?.setImage(id, uri) } }
+    }
 
     fun selectAnswerModel(id: String) {
         viewModelScope.launch {

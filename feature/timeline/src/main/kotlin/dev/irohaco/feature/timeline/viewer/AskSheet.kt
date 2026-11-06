@@ -149,7 +149,7 @@ private fun ModelPicker(models: AnswerChoices, onChoose: (String) -> Unit) {
         AssistChip(
             onClick = { open = true },
             label = { Text(current?.name ?: stringResource(R.string.ask_model_choose)) },
-            leadingIcon = current?.let { { ModelMark(it.name) } },
+            leadingIcon = current?.let { { ModelMark(it.name, it.id) } },
             trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), contentDescription = stringResource(R.string.ask_model_choose)) },
         )
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
@@ -165,7 +165,7 @@ private fun ModelPicker(models: AnswerChoices, onChoose: (String) -> Unit) {
                             )
                         }
                     },
-                    leadingIcon = { ModelMark(choice.name) },
+                    leadingIcon = { ModelMark(choice.name, choice.id) },
                     trailingIcon = if (choice.id == models.current) {
                         { Icon(painterResource(IrohacoIcons.Check), contentDescription = null) }
                     } else {

@@ -190,6 +190,8 @@ fun SettingsScreen(
                 onAddRemote = viewModel::addRemoteModel,
                 onDismissModelTest = viewModel::dismissModelTest,
                 onRemoveRemote = viewModel::removeModel,
+                onMarkColor = viewModel::setMarkColor,
+                onMarkImage = viewModel::setMarkImage,
             )
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast, locationPin, viewModel::setLocationPin) },

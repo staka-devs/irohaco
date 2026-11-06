@@ -42,6 +42,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.irohaco.core.designsystem.component.LocalModelMarks
 import dev.irohaco.core.designsystem.motion.LocalSharedMediaScope
 import dev.irohaco.core.designsystem.motion.SharedMediaScope
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
@@ -117,62 +118,65 @@ class MainActivity : ComponentActivity() {
                     ThemeContrast.HIGH -> SchemeContrast.HIGH
                 },
             ) {
-                // The first open of the database runs its schema and checks; it must not happen on the main thread
-                // when the first screen builds its ViewModel, so the screens wait for it here.
-                val databaseReady by produceState(false) {
-                    withContext(Dispatchers.IO) { container.database }
-                    value = true
-                }
-                if (!databaseReady) {
-                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
-                    return@IrohacoTheme
-                }
-                // Full-screen pages stack over the shell, which keeps its saved state (tab, scroll position) meanwhile.
-                var stack by rememberSaveable(saver = listSaver(save = { it.value }, restore = { mutableStateOf(it) })) {
-                    mutableStateOf(listOf(Route.SHELL))
-                }
-                val open = { route: String -> stack = stack + route }
-                val back = { stack = stack.dropLast(1).ifEmpty { listOf(Route.SHELL) } }
-                val review by handedOver.collectAsStateWithLifecycle()
-                LaunchedEffect(review) {
-                    review?.let { stack = listOf(Route.SHELL, it) }
-                    handedOver.value = null
-                }
-                val shellState = rememberSaveableStateHolder()
-                val stores = viewModel { ScreenViewModelStores() }
-                SharedTransitionLayout {
-                    val reducedMotion = rememberReducedMotion()
-                    AnimatedContent(
-                        targetState = stack.last(),
-                        // With animations off a page changes at once (DESIGN §2.4).
-                        // Otherwise the same fade and scale AnimatedContent uses by default.
-                        transitionSpec = {
-                            if (reducedMotion) {
-                                EnterTransition.None togetherWith ExitTransition.None
-                            } else {
-                                (fadeIn(tween(220, delayMillis = 90)) + scaleIn(tween(220, delayMillis = 90), initialScale = 0.92f)) togetherWith fadeOut(tween(90))
-                            }
-                        },
-                        label = "route",
-                    ) { target ->
-                        CompositionLocalProvider(LocalSharedMediaScope provides SharedMediaScope(this@SharedTransitionLayout, this)) {
-                            if (target == Route.SHELL) {
-                                shellState.SaveableStateProvider(Route.SHELL) {
-                                    Shell(
-                                        onOpenMedia = { assetId, list -> open(Route.viewer(assetId, list)) },
-                                        onOpenList = { open(Route.list(it)) },
-                                        onOpenCandidates = { open(Route.IDENTITY) },
-                                        onOpenSettings = { open(Route.SETTINGS) },
-                                        onOpenTrash = { open(Route.TRASH) },
-                                        onOpenMap = { open(Route.MAP) },
-                                        onPlayAt = { assetId, ms -> open(Route.playVideoAt(assetId, ms)) },
-                                        onOpenAsk = { open(Route.ASK) },
-                                        onOpenLocationHistory = { open(Route.locationHistory(it)) },
-                                    )
+                val marks by container.modelMarks.marks.collectAsStateWithLifecycle(emptyMap())
+                CompositionLocalProvider(LocalModelMarks provides marks) {
+                    // The first open of the database runs its schema and checks; it must not happen on the main thread
+                    // when the first screen builds its ViewModel, so the screens wait for it here.
+                    val databaseReady by produceState(false) {
+                        withContext(Dispatchers.IO) { container.database }
+                        value = true
+                    }
+                    if (!databaseReady) {
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                        return@CompositionLocalProvider
+                    }
+                    // Full-screen pages stack over the shell, which keeps its saved state (tab, scroll position) meanwhile.
+                    var stack by rememberSaveable(saver = listSaver(save = { it.value }, restore = { mutableStateOf(it) })) {
+                        mutableStateOf(listOf(Route.SHELL))
+                    }
+                    val open = { route: String -> stack = stack + route }
+                    val back = { stack = stack.dropLast(1).ifEmpty { listOf(Route.SHELL) } }
+                    val review by handedOver.collectAsStateWithLifecycle()
+                    LaunchedEffect(review) {
+                        review?.let { stack = listOf(Route.SHELL, it) }
+                        handedOver.value = null
+                    }
+                    val shellState = rememberSaveableStateHolder()
+                    val stores = viewModel { ScreenViewModelStores() }
+                    SharedTransitionLayout {
+                        val reducedMotion = rememberReducedMotion()
+                        AnimatedContent(
+                            targetState = stack.last(),
+                            // With animations off a page changes at once (DESIGN §2.4).
+                            // Otherwise the same fade and scale AnimatedContent uses by default.
+                            transitionSpec = {
+                                if (reducedMotion) {
+                                    EnterTransition.None togetherWith ExitTransition.None
+                                } else {
+                                    (fadeIn(tween(220, delayMillis = 90)) + scaleIn(tween(220, delayMillis = 90), initialScale = 0.92f)) togetherWith fadeOut(tween(90))
                                 }
-                            } else {
-                                RouteScope(target, stores, isOpen = { it in stack }) {
-                                    FullScreen(target, open, back)
+                            },
+                            label = "route",
+                        ) { target ->
+                            CompositionLocalProvider(LocalSharedMediaScope provides SharedMediaScope(this@SharedTransitionLayout, this)) {
+                                if (target == Route.SHELL) {
+                                    shellState.SaveableStateProvider(Route.SHELL) {
+                                        Shell(
+                                            onOpenMedia = { assetId, list -> open(Route.viewer(assetId, list)) },
+                                            onOpenList = { open(Route.list(it)) },
+                                            onOpenCandidates = { open(Route.IDENTITY) },
+                                            onOpenSettings = { open(Route.SETTINGS) },
+                                            onOpenTrash = { open(Route.TRASH) },
+                                            onOpenMap = { open(Route.MAP) },
+                                            onPlayAt = { assetId, ms -> open(Route.playVideoAt(assetId, ms)) },
+                                            onOpenAsk = { open(Route.ASK) },
+                                            onOpenLocationHistory = { open(Route.locationHistory(it)) },
+                                        )
+                                    }
+                                } else {
+                                    RouteScope(target, stores, isOpen = { it in stack }) {
+                                        FullScreen(target, open, back)
+                                    }
                                 }
                             }
                         }
@@ -255,7 +259,7 @@ class MainActivity : ComponentActivity() {
                         container.themeColorSettings, container.sharingSettings, container.mapSettings, container.browseLibrary,
                         container.manageModels, container::downloadModel, container.indexJobs, container.planMediaIndex,
                         container.indexSettings, container.searchByMeaning.spaces(), container.aiBackendChoice, container.askLibrary, container.timelineSettings,
-                        container.manageEgress, container.embeddingModelSettings, container.exportBackup, container.restoreBackup,
+                        container.manageEgress, container.embeddingModelSettings, container.exportBackup, container.restoreBackup, container.modelMarks,
                     ) { IndexingService.start(applicationContext, it) }
                 },
                 onBack,

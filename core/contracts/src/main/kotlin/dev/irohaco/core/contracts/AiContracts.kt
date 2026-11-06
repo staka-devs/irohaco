@@ -140,3 +140,16 @@ interface ModelDownloader {
 fun interface ModelProfiles {
     suspend fun register(artifact: ModelArtifact)
 }
+
+/** How the user marked a model: a fill color as ARGB, and a small picture in place of the letter. */
+class ModelMarkStyle(val color: Long? = null, val image: ByteArray? = null)
+
+/** The marks the user set for models, by model or profile id (installed or at a service). */
+interface ModelMarks {
+    val marks: Flow<Map<String, ModelMarkStyle>>
+
+    suspend fun setColor(id: String, color: Long?)
+
+    /** Reads the picture at [uri], made small; null takes the picture off. */
+    suspend fun setImage(id: String, uri: String?)
+}

@@ -57,6 +57,7 @@ import dev.irohaco.core.application.ThemeColorSettings
 import dev.irohaco.core.contracts.AiBackend
 import dev.irohaco.core.contracts.AiPriority
 import dev.irohaco.core.contracts.EmbeddingModelSettings
+import dev.irohaco.core.contracts.ModelMarks
 import dev.irohaco.core.database.IrohacoDatabase
 import dev.irohaco.core.database.IrohacoDatabaseFactory
 import dev.irohaco.core.database.RoomAnnotationStore
@@ -98,6 +99,7 @@ import dev.irohaco.infrastructure.media.AndroidShareFiles
 import dev.irohaco.infrastructure.media.AndroidTrashReader
 import dev.irohaco.infrastructure.media.MediaStoreCatalogSource
 import dev.irohaco.infrastructure.preferences.DataStoreAiSettings
+import dev.irohaco.infrastructure.preferences.DataStoreModelMarks
 import dev.irohaco.infrastructure.preferences.DataStoreAppearanceSettings
 import dev.irohaco.infrastructure.preferences.DataStoreIndexSettings
 import dev.irohaco.infrastructure.preferences.DataStoreLibrarySettings
@@ -131,6 +133,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val themeColorSettings by lazy { ThemeColorSettings(DataStoreAppearanceSettings(settingsStore)) }
 
     val timelineSettings by lazy { DataStoreTimelineSettings(settingsStore) }
+    val modelMarks: ModelMarks by lazy { DataStoreModelMarks(settingsStore) { appContext.contentResolver } }
     private val egressStore by lazy { RoomEgressGrantStore(database) }
     private val credentials by lazy { KeystoreCredentials(appContext) }
     val manageEgress by lazy {
