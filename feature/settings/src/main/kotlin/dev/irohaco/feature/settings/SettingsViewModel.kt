@@ -29,6 +29,7 @@ import dev.irohaco.core.contracts.ModelMarks
 import dev.irohaco.core.contracts.ModelInstallState
 import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.ModelOptions
 import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.TaskType
@@ -546,6 +547,41 @@ class SettingsViewModel(
 
     fun removeModel(profileId: String) {
         viewModelScope.launch { egress?.removeModel(profileId) }
+    }
+
+    fun setModelParameters(profileId: String, values: Map<String, String>) {
+        viewModelScope.launch { egress?.setParameters(profileId, values) }
+    }
+
+    /** models.dev being read for one model, then what it says; null until the user asks. */
+    private val _optionsLookup = MutableStateFlow<OptionsLookup?>(null)
+    val optionsLookup: StateFlow<OptionsLookup?> = _optionsLookup
+
+    sealed interface OptionsLookup {
+        data object Running : OptionsLookup
+
+        /** [options] is null when the model is not listed. */
+        data class Found(val options: ModelOptions?) : OptionsLookup
+
+        data class Failed(val cause: Throwable) : OptionsLookup
+    }
+
+    fun lookUpOptions(model: RemoteModel) {
+        val manage = egress ?: return
+        _optionsLookup.value = OptionsLookup.Running
+        viewModelScope.launch {
+            _optionsLookup.value = try {
+                OptionsLookup.Found(manage.options(model))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                OptionsLookup.Failed(e)
+            }
+        }
+    }
+
+    fun dismissOptions() {
+        _optionsLookup.value = null
     }
 
     fun selectShareLocationPolicy(policy: ShareLocationPolicy) {

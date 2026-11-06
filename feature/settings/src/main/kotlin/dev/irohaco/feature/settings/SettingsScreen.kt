@@ -103,6 +103,7 @@ fun SettingsScreen(
     val modelStates by viewModel.modelStates.collectAsStateWithLifecycle()
     val importResult by viewModel.importResult.collectAsStateWithLifecycle()
     val indexing by viewModel.indexing.collectAsStateWithLifecycle()
+    val optionsLookup by viewModel.optionsLookup.collectAsStateWithLifecycle()
     val indexFolders by viewModel.indexFolders.collectAsStateWithLifecycle()
     val lowCoverageVideos by viewModel.lowCoverageVideos.collectAsStateWithLifecycle()
     val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
@@ -228,6 +229,10 @@ fun SettingsScreen(
                 connectionFailed,
                 viewModel::dismissConnectionFailed,
                 viewModel::renameConnection,
+                viewModel::setModelParameters,
+                optionsLookup,
+                viewModel::lookUpOptions,
+                viewModel::dismissOptions,
             )
         },
     )

@@ -9,6 +9,7 @@ import dev.irohaco.core.contracts.CredentialStore
 import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.EgressPolicy
 import dev.irohaco.core.contracts.ModelCapability
+import dev.irohaco.core.contracts.ModelParameters
 import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.RemoteModelStore
@@ -22,6 +23,7 @@ class RemoteAnswering(
     private val sessions: RemoteSessions,
     val policy: EgressPolicy,
     private val names: ConnectionNames? = null,
+    private val parameters: ModelParameters? = null,
 ) {
     val models = store.models
 
@@ -38,7 +40,8 @@ class RemoteAnswering(
     suspend fun open(model: RemoteModel, payloads: Set<EgressPayload>, assetIds: Set<String>): AnswerSession {
         val connection = checkNotNull(store.connection(model.connectionId)) { "The connection is gone" }
         val key = checkNotNull(store.credentialRef(connection.id)?.let(credentials::read)) { "The API key is gone" }
-        return sessions.open(connection, key, model) { policy.authorize(TaskType.RAG, model.profileId, payloads, assetIds) }
+        val values = parameters?.parameters?.first()?.get(model.profileId).orEmpty()
+        return sessions.open(connection, key, model.copy(parameters = values)) { policy.authorize(TaskType.RAG, model.profileId, payloads, assetIds) }
     }
 
     companion object {

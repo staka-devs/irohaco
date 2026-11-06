@@ -64,6 +64,7 @@ import dev.irohaco.core.database.RoomAnnotationStore
 import dev.irohaco.core.database.RoomCatalogStore
 import dev.irohaco.core.database.RoomCollectionsStore
 import dev.irohaco.core.database.RoomEgressGrantStore
+import dev.irohaco.infrastructure.remote.ModelsDev
 import dev.irohaco.infrastructure.remote.RemoteAnswerSessions
 import dev.irohaco.infrastructure.remote.RemoteCapabilityProbe
 import dev.irohaco.infrastructure.remote.RemoteEmbeddingSessionFactory
@@ -100,6 +101,7 @@ import dev.irohaco.infrastructure.media.AndroidTrashReader
 import dev.irohaco.infrastructure.media.MediaStoreCatalogSource
 import dev.irohaco.infrastructure.preferences.DataStoreAiSettings
 import dev.irohaco.infrastructure.preferences.DataStoreConnectionNames
+import dev.irohaco.infrastructure.preferences.DataStoreModelParameters
 import dev.irohaco.infrastructure.preferences.DataStoreModelMarks
 import dev.irohaco.infrastructure.preferences.DataStoreAppearanceSettings
 import dev.irohaco.infrastructure.preferences.DataStoreIndexSettings
@@ -137,13 +139,14 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     val modelMarks: ModelMarks by lazy { DataStoreModelMarks(settingsStore) { appContext.contentResolver } }
     private val egressStore by lazy { RoomEgressGrantStore(database) }
     private val connectionNames by lazy { DataStoreConnectionNames(settingsStore) }
+    private val modelParameters by lazy { DataStoreModelParameters(settingsStore) }
     private val credentials by lazy { KeystoreCredentials(appContext) }
     val manageEgress by lazy {
-        ManageEgress(egressStore, egressStore, credentials, { UUID.randomUUID().toString() }, egressStore, RemoteCapabilityProbe(), connectionNames)
+        ManageEgress(egressStore, egressStore, credentials, { UUID.randomUUID().toString() }, egressStore, RemoteCapabilityProbe(), connectionNames, modelParameters, ModelsDev())
     }
 
     /** Remote models the user registered for questions, each request checked by the egress policy (API-007). */
-    val remoteAnswering by lazy { RemoteAnswering(egressStore, credentials, RemoteAnswerSessions, GrantedEgressPolicy(egressStore), connectionNames) }
+    val remoteAnswering by lazy { RemoteAnswering(egressStore, credentials, RemoteAnswerSessions, GrantedEgressPolicy(egressStore), connectionNames, modelParameters) }
 
     /** Remote models the user registered to index and search photos with, each request checked first (API-007). */
     val remoteEmbedding by lazy { RemoteEmbedding(egressStore, credentials, RemoteEmbeddingSessionFactory, GrantedEgressPolicy(egressStore)) }

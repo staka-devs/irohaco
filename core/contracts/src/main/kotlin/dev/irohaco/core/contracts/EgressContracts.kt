@@ -36,6 +36,55 @@ data class RemoteConnection(val id: String, val protocol: RemoteProtocol, val ba
     }
 }
 
+/**
+ * A request field [protocol]s define for how a model thinks and how long it answers, as its API documents it: [path] is
+ * dotted (`reasoning.effort` is `{"reasoning": {"effort": …}}`), [number] fields are sent as integers, and [values]
+ * are the ones the API documents for a choice; a model may take only some of them, and the user may type another.
+ */
+data class GenerationParameter(val path: String, val number: Boolean = false, val values: List<String> = emptyList()) {
+    companion object {
+        private val OPENAI_EFFORT = listOf("none", "minimal", "low", "medium", "high", "xhigh")
+
+        fun of(protocol: RemoteProtocol): List<GenerationParameter> = when (protocol) {
+            RemoteProtocol.OPENAI_CHAT -> listOf(
+                GenerationParameter("reasoning_effort", values = OPENAI_EFFORT),
+                GenerationParameter("max_completion_tokens", number = true),
+            )
+            RemoteProtocol.OPENAI_RESPONSES -> listOf(
+                GenerationParameter("reasoning.effort", values = OPENAI_EFFORT),
+                GenerationParameter("max_output_tokens", number = true),
+            )
+            RemoteProtocol.ANTHROPIC_MESSAGES -> listOf(
+                GenerationParameter("thinking.type", values = listOf("disabled", "enabled", "adaptive")),
+                GenerationParameter("thinking.budget_tokens", number = true),
+                GenerationParameter("output_config.effort", values = listOf("low", "medium", "high", "xhigh", "max")),
+                // Required by the API; the app sends 1,024 unless set, and thinking counts against it.
+                GenerationParameter("max_tokens", number = true),
+            )
+            else -> emptyList()
+        }
+    }
+}
+
+/**
+ * What a public list of models (models.dev) says one model takes: the effort values, the least thinking budget and the
+ * longest answer in tokens; null where it says nothing. It only fills in choices; the service has the last word.
+ */
+data class ModelOptions(val efforts: List<String>? = null, val minBudget: Int? = null, val maxOutput: Int? = null)
+
+/** Looks a model up in a public list of models; null when it is not listed. Throws [RemoteCallException] when the list cannot be read. */
+fun interface ModelInfo {
+    suspend fun options(baseUrl: String, modelId: String): ModelOptions?
+}
+
+/** The values the user set for [GenerationParameter]s, by model profile id and path; kept apart from the models' rows. */
+interface ModelParameters {
+    val parameters: Flow<Map<String, Map<String, String>>>
+
+    /** Replaces the values of [profileId]; an empty map sends none, so each model's own defaults apply. */
+    suspend fun set(profileId: String, values: Map<String, String>)
+}
+
 /** The names the user gave remote connections, by connection id; kept apart from the connections' rows. */
 interface ConnectionNames {
     val names: Flow<Map<String, String>>
@@ -126,6 +175,8 @@ data class RemoteModel(
     val capabilities: Set<ModelCapability>,
     /** The length of its vectors, for an embedding model; its connection test measured it. */
     val dimension: Int? = null,
+    /** The [GenerationParameter] values each request carries, by path; none at first. */
+    val parameters: Map<String, String> = emptyMap(),
 )
 
 interface RemoteModelStore {

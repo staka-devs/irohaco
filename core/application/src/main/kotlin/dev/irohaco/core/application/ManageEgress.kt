@@ -10,6 +10,9 @@ import dev.irohaco.core.contracts.EgressGrantStore
 import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.EgressPolicy
 import dev.irohaco.core.contracts.ModelCapability
+import dev.irohaco.core.contracts.ModelInfo
+import dev.irohaco.core.contracts.ModelOptions
+import dev.irohaco.core.contracts.ModelParameters
 import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.RemoteModelStore
@@ -44,6 +47,8 @@ class ManageEgress(
     private val modelStore: RemoteModelStore,
     private val probe: CapabilityProbe,
     private val names: ConnectionNames? = null,
+    private val parameters: ModelParameters? = null,
+    private val info: ModelInfo? = null,
 ) {
     fun connections(): Flow<List<RemoteConnection>> =
         names?.let { combine(store.connections, it.names) { list, named -> list.map { c -> c.copy(name = named[c.id]) } } } ?: store.connections
@@ -77,7 +82,20 @@ class ManageEgress(
         names?.setName(id, null)
     }
 
-    fun models(): Flow<List<RemoteModel>> = modelStore.models
+    fun models(): Flow<List<RemoteModel>> =
+        parameters?.let { combine(modelStore.models, it.parameters) { list, set -> list.map { m -> m.copy(parameters = set[m.profileId].orEmpty()) } } }
+            ?: modelStore.models
+
+    /** Keeps the non-blank [values] for each request [profileId] sends; none leaves each model's own defaults. */
+    suspend fun setParameters(profileId: String, values: Map<String, String>) {
+        parameters?.set(profileId, values.mapValues { it.value.trim() }.filterValues { it.isNotEmpty() })
+    }
+
+    /** What the public list of models says [model] takes; null when it is not listed or there is no list. */
+    suspend fun options(model: RemoteModel): ModelOptions? {
+        val connection = modelStore.connection(model.connectionId) ?: return null
+        return info?.options(connection.baseUrl, model.modelId)
+    }
 
     /**
      * Runs the connection test on [modelId] and keeps the model with what the test confirmed (ADR-0032).
@@ -92,7 +110,10 @@ class ManageEgress(
         return found.capabilities
     }
 
-    suspend fun removeModel(profileId: String) = modelStore.removeModel(profileId)
+    suspend fun removeModel(profileId: String) {
+        modelStore.removeModel(profileId)
+        parameters?.set(profileId, emptyMap())
+    }
 
     enum class UrlKind { HTTPS, PLAIN_HTTP, INVALID }
 
