@@ -29,6 +29,9 @@ import dev.irohaco.core.contracts.ModelMarks
 import dev.irohaco.core.contracts.ModelInstallState
 import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteConnection
+import dev.irohaco.core.contracts.ListedModel
+import dev.irohaco.core.contracts.ModelKind
+import dev.irohaco.core.contracts.ModelOptions
 import dev.irohaco.core.contracts.RemoteModel
 import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.TaskType
@@ -548,12 +551,86 @@ class SettingsViewModel(
         viewModelScope.launch { egress?.removeModel(profileId) }
     }
 
+    fun setModelParameters(profileId: String, values: Map<String, String>) {
+        viewModelScope.launch { egress?.setParameters(profileId, values) }
+    }
+
+    /** models.dev being read for one model, then what it says; null until the user asks. */
+    private val _optionsLookup = MutableStateFlow<OptionsLookup?>(null)
+    val optionsLookup: StateFlow<OptionsLookup?> = _optionsLookup
+
+    sealed interface OptionsLookup {
+        data object Running : OptionsLookup
+
+        /** [options] is null when the model is not listed. */
+        data class Found(val options: ModelOptions?) : OptionsLookup
+
+        data class Failed(val cause: Throwable) : OptionsLookup
+    }
+
+    fun lookUpOptions(model: RemoteModel) {
+        val manage = egress ?: return
+        _optionsLookup.value = OptionsLookup.Running
+        viewModelScope.launch {
+            _optionsLookup.value = try {
+                OptionsLookup.Found(manage.options(model))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                OptionsLookup.Failed(e)
+            }
+        }
+    }
+
+    fun dismissOptions() {
+        _optionsLookup.value = null
+    }
+
+    /** The models offered while adding one for a job, read when the user asks; null until then. */
+    private val _modelList = MutableStateFlow<ModelList?>(null)
+    val modelList: StateFlow<ModelList?> = _modelList
+
+    sealed interface ModelList {
+        data object Running : ModelList
+
+        data class Found(val models: List<ListedModel>) : ModelList
+
+        data class Failed(val cause: Throwable) : ModelList
+    }
+
+    /** Lists [connectionId]'s models, or those of [newConnection] before it is added, keeping the ones [role] can use. */
+    fun listModels(role: RemoteRole, connectionId: String?, newConnection: NewConnection?, endpoint: String?) {
+        val manage = egress ?: return
+        _modelList.value = ModelList.Running
+        viewModelScope.launch {
+            _modelList.value = try {
+                val all = if (connectionId != null) manage.listModels(connectionId, endpoint)
+                else manage.listModels(newConnection!!.protocol, newConnection.baseUrl, newConnection.apiKey, endpoint)
+                ModelList.Found(all.filter { role.lists(it) })
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ModelList.Failed(e)
+            }
+        }
+    }
+
+    fun dismissModelList() {
+        _modelList.value = null
+    }
+
     fun selectShareLocationPolicy(policy: ShareLocationPolicy) {
         viewModelScope.launch { sharing?.setShareLocationPolicy(policy) }
     }
 }
 
 private val LIVE = setOf(SpaceState.BUILDING, SpaceState.VERIFYING, SpaceState.READY)
+
+/** Whether a listed model can do [this] job: answering needs a chat model that is not known to be blind, indexing a vector model. */
+internal fun RemoteRole.lists(model: ListedModel): Boolean = when (this) {
+    RemoteRole.ANSWER -> model.kind != ModelKind.EMBEDDING && model.kind != ModelKind.OTHER && model.readsImages != false
+    RemoteRole.INDEX -> model.kind == ModelKind.EMBEDDING || model.kind == null
+}
 
 /** What a remote model is added for; each job sends its own kinds of content (ManageEgress.offered). */
 enum class RemoteRole(val tasks: List<TaskType>) {

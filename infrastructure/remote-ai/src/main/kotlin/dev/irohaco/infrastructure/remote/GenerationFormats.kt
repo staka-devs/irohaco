@@ -1,5 +1,7 @@
 package dev.irohaco.infrastructure.remote
 
+import dev.irohaco.core.contracts.GenerationParameter
+import dev.irohaco.core.contracts.RemoteProtocol
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -138,6 +140,21 @@ internal object AnthropicMessages : GenerationFormat {
 
     private const val VERSION = "2023-06-01"
     private const val MAX_TOKENS = 1024
+}
+
+/**
+ * Puts the user's [values] into a request [body]; only the paths [protocol] defines go in, so the question,
+ * the photos and the model are never changed. A number that does not read as one is left out.
+ */
+internal fun withParameters(body: JSONObject, protocol: RemoteProtocol, values: Map<String, String>): JSONObject {
+    val defined = GenerationParameter.of(protocol).associateBy { it.path }
+    values.forEach { (path, value) ->
+        val parameter = defined[path] ?: return@forEach
+        val keys = path.split('.')
+        val parent = keys.dropLast(1).fold(body) { obj, key -> obj.optJSONObject(key) ?: JSONObject().also { obj.put(key, it) } }
+        parent.put(keys.last(), if (parameter.number) value.trim().toLongOrNull() ?: return@forEach else value.trim())
+    }
+    return body
 }
 
 /** Reads Server-Sent Events: an `event:` line names the next `data:`; a blank line ends one event. */
