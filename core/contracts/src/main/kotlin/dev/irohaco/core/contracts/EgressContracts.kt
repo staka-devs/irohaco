@@ -77,6 +77,20 @@ fun interface ModelInfo {
     suspend fun options(baseUrl: String, modelId: String): ModelOptions?
 }
 
+/** What a model is for, as a list of models says: answering in text, making vectors, or something else (pictures, speech). */
+enum class ModelKind { CHAT, EMBEDDING, OTHER }
+
+/** A model a service or models.dev lists, offered when the user adds one; null where nothing says. */
+data class ListedModel(val id: String, val name: String? = null, val kind: ModelKind? = null, val readsImages: Boolean? = null)
+
+/**
+ * The models a connection offers, from its own list of models ([endpoint], or the protocol's usual one under the base URL)
+ * and from models.dev. Only GETs go out: the service's with its key, models.dev's with nothing of the user's.
+ */
+fun interface ModelLister {
+    suspend fun list(protocol: RemoteProtocol, baseUrl: String, apiKey: String?, endpoint: String?): List<ListedModel>
+}
+
 /** The values the user set for [GenerationParameter]s, by model profile id and path; kept apart from the models' rows. */
 interface ModelParameters {
     val parameters: Flow<Map<String, Map<String, String>>>

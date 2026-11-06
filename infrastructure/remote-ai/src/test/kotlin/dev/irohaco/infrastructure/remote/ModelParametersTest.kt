@@ -1,5 +1,7 @@
 package dev.irohaco.infrastructure.remote
 
+import dev.irohaco.core.contracts.ListedModel
+import dev.irohaco.core.contracts.ModelKind
 import dev.irohaco.core.contracts.ModelOptions
 import dev.irohaco.core.contracts.RemoteProtocol
 import org.json.JSONObject
@@ -30,6 +32,34 @@ class ModelParametersTest {
         assertEquals(1, body.getJSONArray("input").length())
         val anthropic = withParameters(AnthropicMessages.body("m", "i", emptyList(), "q", false), RemoteProtocol.ANTHROPIC_MESSAGES, mapOf("max_tokens" to "lots"))
         assertEquals(1024, anthropic.get("max_tokens"))
+    }
+
+    @Test
+    fun `a service's list is read in its own format, and models dev says what each model is`() {
+        val openai = ServiceModelLister.parse(JSONObject("""{"data": [{"id": "gpt-x"}, {"id": "text-embed-y"}, {"id": "whisper"}]}"""))
+        val dev = JSONObject(
+            """{"openai": {"id": "openai", "models": {
+                "gpt-x": {"id": "gpt-x", "name": "GPT X", "modalities": {"input": ["text", "image"]}},
+                "whisper": {"id": "whisper", "type": "transcription"}}}}""",
+        )
+        assertEquals(
+            listOf(
+                ListedModel("gpt-x", "GPT X", ModelKind.CHAT, true),
+                ListedModel("text-embed-y", null, ModelKind.EMBEDDING),
+                ListedModel("whisper", null, ModelKind.OTHER, null),
+            ),
+            ServiceModelLister.merge(openai, dev, "https://api.openai.com/v1"),
+        )
+        val gemini = ServiceModelLister.parse(
+            JSONObject(
+                """{"models": [
+                    {"name": "models/gemini-embedding-001", "displayName": "Gemini Embedding", "supportedGenerationMethods": ["embedContent"]},
+                    {"name": "models/gemini-x", "supportedGenerationMethods": ["generateContent"]}]}""",
+            ),
+        )
+        assertEquals(listOf(ListedModel("gemini-embedding-001", "Gemini Embedding", ModelKind.EMBEDDING), ListedModel("gemini-x", null, ModelKind.CHAT)), gemini)
+        assertEquals(listOf(ListedModel("gpt-x", "GPT X", ModelKind.CHAT, true), ListedModel("whisper", null, ModelKind.OTHER, null)), ServiceModelLister.fromModelsDev(dev, "https://api.openai.com/v1"))
+        assertEquals("https://api.anthropic.com/v1/models?limit=1000", ServiceModelLister.defaultEndpoint(RemoteProtocol.ANTHROPIC_MESSAGES, "https://api.anthropic.com/v1/"))
     }
 
     @Test

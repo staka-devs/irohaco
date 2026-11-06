@@ -9,7 +9,9 @@ import dev.irohaco.core.contracts.EgressGrant
 import dev.irohaco.core.contracts.EgressGrantStore
 import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.EgressPolicy
+import dev.irohaco.core.contracts.ListedModel
 import dev.irohaco.core.contracts.ModelCapability
+import dev.irohaco.core.contracts.ModelLister
 import dev.irohaco.core.contracts.ModelInfo
 import dev.irohaco.core.contracts.ModelOptions
 import dev.irohaco.core.contracts.ModelParameters
@@ -49,6 +51,7 @@ class ManageEgress(
     private val names: ConnectionNames? = null,
     private val parameters: ModelParameters? = null,
     private val info: ModelInfo? = null,
+    private val lister: ModelLister? = null,
 ) {
     fun connections(): Flow<List<RemoteConnection>> =
         names?.let { combine(store.connections, it.names) { list, named -> list.map { c -> c.copy(name = named[c.id]) } } } ?: store.connections
@@ -90,6 +93,17 @@ class ManageEgress(
     suspend fun setParameters(profileId: String, values: Map<String, String>) {
         parameters?.set(profileId, values.mapValues { it.value.trim() }.filterValues { it.isNotEmpty() })
     }
+
+    /** The models the connection [connectionId] offers, read with its saved key; empty when nothing lists them. */
+    suspend fun listModels(connectionId: String, endpoint: String?): List<ListedModel> {
+        val connection = modelStore.connection(connectionId) ?: return emptyList()
+        val key = modelStore.credentialRef(connectionId)?.let(credentials::read)
+        return lister?.list(connection.protocol, connection.baseUrl, key, endpoint).orEmpty()
+    }
+
+    /** The models a connection not yet added offers; without a key only models.dev can say. */
+    suspend fun listModels(protocol: RemoteProtocol, baseUrl: String, apiKey: String?, endpoint: String?): List<ListedModel> =
+        lister?.list(protocol, baseUrl, apiKey?.takeIf { it.isNotBlank() }, endpoint).orEmpty()
 
     /** What the public list of models says [model] takes; null when it is not listed or there is no list. */
     suspend fun options(model: RemoteModel): ModelOptions? {

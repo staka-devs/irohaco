@@ -66,6 +66,7 @@ import dev.irohaco.core.database.RoomCollectionsStore
 import dev.irohaco.core.database.RoomEgressGrantStore
 import dev.irohaco.infrastructure.remote.ModelsDev
 import dev.irohaco.infrastructure.remote.RemoteAnswerSessions
+import dev.irohaco.infrastructure.remote.ServiceModelLister
 import dev.irohaco.infrastructure.remote.RemoteCapabilityProbe
 import dev.irohaco.infrastructure.remote.RemoteEmbeddingSessionFactory
 import dev.irohaco.core.database.RoomIdentityStore
@@ -140,9 +141,10 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
     private val egressStore by lazy { RoomEgressGrantStore(database) }
     private val connectionNames by lazy { DataStoreConnectionNames(settingsStore) }
     private val modelParameters by lazy { DataStoreModelParameters(settingsStore) }
+    private val modelsDev by lazy { ModelsDev() }
     private val credentials by lazy { KeystoreCredentials(appContext) }
     val manageEgress by lazy {
-        ManageEgress(egressStore, egressStore, credentials, { UUID.randomUUID().toString() }, egressStore, RemoteCapabilityProbe(), connectionNames, modelParameters, ModelsDev())
+        ManageEgress(egressStore, egressStore, credentials, { UUID.randomUUID().toString() }, egressStore, RemoteCapabilityProbe(), connectionNames, modelParameters, modelsDev, ServiceModelLister(modelsDev))
     }
 
     /** Remote models the user registered for questions, each request checked by the egress policy (API-007). */

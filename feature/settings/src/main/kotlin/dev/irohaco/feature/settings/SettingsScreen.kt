@@ -104,6 +104,7 @@ fun SettingsScreen(
     val importResult by viewModel.importResult.collectAsStateWithLifecycle()
     val indexing by viewModel.indexing.collectAsStateWithLifecycle()
     val optionsLookup by viewModel.optionsLookup.collectAsStateWithLifecycle()
+    val modelList by viewModel.modelList.collectAsStateWithLifecycle()
     val indexFolders by viewModel.indexFolders.collectAsStateWithLifecycle()
     val lowCoverageVideos by viewModel.lowCoverageVideos.collectAsStateWithLifecycle()
     val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
@@ -197,6 +198,9 @@ fun SettingsScreen(
                 optionsLookup = optionsLookup,
                 onLookUpOptions = viewModel::lookUpOptions,
                 onDismissOptions = viewModel::dismissOptions,
+                modelList = modelList,
+                onListModels = viewModel::listModels,
+                onDismissModelList = viewModel::dismissModelList,
             )
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast, locationPin, viewModel::setLocationPin) },

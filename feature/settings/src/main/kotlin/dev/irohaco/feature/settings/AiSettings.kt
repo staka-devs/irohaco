@@ -1,5 +1,6 @@
 package dev.irohaco.feature.settings
 
+import dev.irohaco.core.contracts.ListedModel
 import androidx.compose.foundation.layout.Row
 import dev.irohaco.core.contracts.GenerationParameter
 import android.text.format.Formatter
@@ -114,6 +115,9 @@ internal fun AiSettings(
     optionsLookup: SettingsViewModel.OptionsLookup? = null,
     onLookUpOptions: (RemoteModel) -> Unit = {},
     onDismissOptions: () -> Unit = {},
+    modelList: SettingsViewModel.ModelList? = null,
+    onListModels: (RemoteRole, connectionId: String?, NewConnection?, endpoint: String?) -> Unit = { _, _, _, _ -> },
+    onDismissModelList: () -> Unit = {},
 ) {
     var tuning by remember { mutableStateOf<Pair<RemoteModel, RemoteProtocol>?>(null) }
     tuning?.let { (model, protocol) ->
@@ -157,7 +161,9 @@ internal fun AiSettings(
             connections = connections.filter { it.protocol in role.protocols },
             test = modelTest,
             onAdd = { connectionId, new, modelId, name -> onAddRemote(role, connectionId, new, modelId, name) },
-            onDismiss = { adding = null; onDismissModelTest() },
+            onDismiss = { adding = null; onDismissModelTest(); onDismissModelList() },
+            list = modelList,
+            onList = { connectionId, new, endpoint -> onListModels(role, connectionId, new, endpoint) },
         )
     }
     val hosts = connections.associate { it.id to it.serviceName }
@@ -384,6 +390,8 @@ private fun AddRemoteModelDialog(
     test: SettingsViewModel.ModelTest?,
     onAdd: (connectionId: String?, NewConnection?, modelId: String, name: String) -> Unit,
     onDismiss: () -> Unit,
+    list: SettingsViewModel.ModelList? = null,
+    onList: (connectionId: String?, NewConnection?, endpoint: String?) -> Unit = { _, _, _ -> },
 ) {
     var chosen by rememberSaveable { mutableStateOf(connections.firstOrNull()?.id) }
     var protocol by rememberSaveable { mutableStateOf(role.protocols.first()) }
@@ -464,6 +472,16 @@ private fun AddRemoteModelDialog(
                     enabled = editable,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                ModelCandidates(
+                    list = list,
+                    enabled = editable,
+                    base = connections.firstOrNull { it.id == chosen }?.baseUrl ?: url,
+                    typed = modelId,
+                    onList = { endpoint -> onList(chosen, if (chosen == null) NewConnection(protocol, url, key, service) else null, endpoint) },
+                ) { listed ->
+                    modelId = listed.id
+                    if (name.isBlank()) listed.name?.let { name = it }
+                }
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -514,6 +532,66 @@ private fun AddRemoteModelDialog(
         },
     )
 }
+
+/**
+ * Model IDs to pick from: the service's own list (at [base]/models, or another address for a proxy) and models.dev,
+ * read when the user asks, narrowed to the job and to what has been typed.
+ */
+@Composable
+private fun ModelCandidates(
+    list: SettingsViewModel.ModelList?,
+    enabled: Boolean,
+    base: String,
+    typed: String,
+    onList: (endpoint: String?) -> Unit,
+    onPick: (ListedModel) -> Unit,
+) {
+    var endpoint by rememberSaveable { mutableStateOf("") }
+    var other by rememberSaveable { mutableStateOf(false) }
+    if (other) {
+        OutlinedTextField(
+            value = endpoint,
+            onValueChange = { endpoint = it },
+            label = { Text(stringResource(R.string.settings_ai_remote_list_url)) },
+            placeholder = { Text(base.trim().trimEnd('/') + "/models") },
+            singleLine = true,
+            enabled = enabled,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    Row {
+        TextButton(enabled = enabled && list != SettingsViewModel.ModelList.Running, onClick = { onList(endpoint.takeIf { other && it.isNotBlank() }) }) {
+            Text(stringResource(R.string.settings_ai_remote_list))
+        }
+        if (!other) TextButton(enabled = enabled, onClick = { other = true }) { Text(stringResource(R.string.settings_ai_remote_list_other)) }
+    }
+    when (list) {
+        null -> Unit
+        SettingsViewModel.ModelList.Running -> LinearProgressIndicator(Modifier.fillMaxWidth())
+        is SettingsViewModel.ModelList.Failed -> Text(
+            remoteFailureText(list.cause) ?: stringResource(R.string.settings_ai_remote_list_failed),
+            color = MaterialTheme.colorScheme.error,
+        )
+        is SettingsViewModel.ModelList.Found -> {
+            val shown = list.models.filter { typed.isBlank() || typed.trim().lowercase() in (it.id + " " + it.name.orEmpty()).lowercase() }
+            if (shown.isEmpty()) Text(stringResource(R.string.settings_ai_remote_list_none), style = MaterialTheme.typography.bodySmall)
+            shown.take(MAX_CANDIDATES).forEach { model ->
+                ListItem(
+                    supportingContent = model.name?.let { { Text(model.id) } },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.selectable(selected = model.id == typed, enabled = enabled, role = Role.Button) { onPick(model) },
+                ) { Text(model.name ?: model.id) }
+            }
+            if (shown.size > MAX_CANDIDATES) {
+                Text(stringResource(R.string.settings_ai_remote_list_more, shown.size - MAX_CANDIDATES), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+/** Enough to scroll through in a dialog; typing narrows the rest down. */
+private const val MAX_CANDIDATES = 20
 
 @Composable
 private fun ChoiceRow(selected: Boolean, enabled: Boolean, label: String, onClick: () -> Unit) {

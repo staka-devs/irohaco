@@ -189,6 +189,12 @@
     <string name="settings_remote_parameters_unlisted">models.dev does not list “%1$s”.</string>
     <string name="settings_remote_parameters_failed">Could not read models.dev.</string>
     <string name="settings_remote_parameters_save">Save</string>
+    <string name="settings_ai_remote_list">Show models</string>
+    <string name="settings_ai_remote_list_other">Use another list URL</string>
+    <string name="settings_ai_remote_list_url">Model list URL (for a proxy, say)</string>
+    <string name="settings_ai_remote_list_failed">Could not read the list of models.</string>
+    <string name="settings_ai_remote_list_none">No listed model fits this job. Type the model ID instead.</string>
+    <string name="settings_ai_remote_list_more">%1$d more. Type in the model ID field to narrow them down.</string>
     <string name="settings_remote_model_done">Done</string>
     <string name="settings_remote_cap_image">reads images</string>
     <string name="settings_remote_cap_streaming">answers as it writes</string>
