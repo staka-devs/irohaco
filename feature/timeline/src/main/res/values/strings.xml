@@ -345,6 +345,10 @@
     <string name="ask_found">Here are the results.</string>
     <string name="ask_found_nothing">No photos match.</string>
     <string name="ask_found_all">See all</string>
+    <string name="ask_intro">Find photos or ask about them.</string>
+    <string name="ask_example_find">Fireworks photos from last summer</string>
+    <string name="ask_example_question">Where did I go last summer?</string>
+    <string name="search_ask_entry">Ask in a sentence to find photos or get answers about them.</string>
     <string name="ask_show_photos">Show these photos</string>
     <string name="search_back_to_chat">Back to the chat</string>
     <string name="ask_hint">Ask about your photos, e.g. Where did I go last summer?</string>

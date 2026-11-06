@@ -3,6 +3,16 @@ package dev.irohaco.feature.timeline.viewer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -82,7 +92,10 @@ internal fun AskSheet(
     }
 }
 
-/** The turns one under another and a field for the next question; also the "Ask AI" screen's body (#202). */
+/**
+ * The turns as a chat, the user's questions on the right and the AI's replies on the left, with the field for
+ * the next question kept under them; also the "Ask AI" screen's body (#202).
+ */
 @Composable
 internal fun AskContent(
     turns: List<AskTurn>,
@@ -97,6 +110,8 @@ internal fun AskContent(
     onChoose: (String) -> Unit = {},
     /** Shows the photos a question is about as a grid that can be narrowed further; null hides the button. */
     onShowPhotos: ((String) -> Unit)? = null,
+    /** Questions offered before the first one, sent as they are when tapped. */
+    examples: List<String> = emptyList(),
 ) {
     var question by rememberSaveable { mutableStateOf("") }
     val busy = turns.lastOrNull()?.let { it.answer == null && it.found == null } == true
@@ -106,44 +121,98 @@ internal fun AskContent(
             question = ""
         }
     }
-    Column(
-        modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = IrohacoSpacing.l).navigationBarsPadding().imePadding(),
-        verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
-    ) {
-        turns.forEach { turn ->
-            Text(turn.question, style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.End))
-            turn.found?.let { found ->
-                FoundCard(found, onOpen, onShowAll = onShowPhotos?.let { show -> { show(turn.question) } })
-                return@forEach
-            }
-            AnswerCard(
-                asking = turn.answer == null,
-                answer = turn.answer,
-                onAsk = { onAsk(turn.question) },
-                onOpen = onOpen,
-                onOpenSettings = onOpenSettings,
-                partial = turn.partial,
-                askingLabel = askingLabel,
-                caution = caution,
-            )
-            if (onShowPhotos != null && turn.answer != null) {
-                TextButton(onClick = { onShowPhotos(turn.question) }) {
-                    Icon(painterResource(IrohacoIcons.Photo), contentDescription = null)
-                    Text(stringResource(R.string.ask_show_photos), modifier = Modifier.padding(start = IrohacoSpacing.s))
+    val scroll = rememberScrollState()
+    // The newest message stays in view as it is asked and written, as in a chat.
+    LaunchedEffect(turns.size, turns.lastOrNull()?.partial?.length, turns.lastOrNull()?.answer, turns.lastOrNull()?.found) {
+        scroll.animateScrollTo(scroll.maxValue)
+    }
+    // Messages sit on the field when there are few, as in a chat; the sheet wraps them instead.
+    Column(modifier.fillMaxWidth().navigationBarsPadding().imePadding(), verticalArrangement = Arrangement.Bottom) {
+        Column(
+            Modifier.weight(1f, fill = false).verticalScroll(scroll).padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
+            verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
+        ) {
+            if (turns.isEmpty() && examples.isNotEmpty()) Examples(examples) { onAsk(it) }
+            turns.forEach { turn ->
+                QuestionBubble(turn.question, Modifier.align(Alignment.End))
+                Reply {
+                    val found = turn.found
+                    if (found != null) {
+                        FoundCard(found, onOpen, onShowAll = onShowPhotos?.let { show -> { show(turn.question) } })
+                        return@Reply
+                    }
+                    AnswerCard(
+                        asking = turn.answer == null,
+                        answer = turn.answer,
+                        onAsk = { onAsk(turn.question) },
+                        onOpen = onOpen,
+                        onOpenSettings = onOpenSettings,
+                        partial = turn.partial,
+                        askingLabel = askingLabel,
+                        caution = caution,
+                    )
+                    if (onShowPhotos != null && turn.answer != null) {
+                        TextButton(onClick = { onShowPhotos(turn.question) }) {
+                            Icon(painterResource(IrohacoIcons.Photo), contentDescription = null)
+                            Text(stringResource(R.string.ask_show_photos), modifier = Modifier.padding(start = IrohacoSpacing.s))
+                        }
+                    }
                 }
             }
         }
-        if (models != null && models.all.isNotEmpty()) ModelPicker(models, onChoose)
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
+            if (models != null && models.all.isNotEmpty()) ModelPicker(models, onChoose)
             OutlinedTextField(
                 value = question,
                 onValueChange = { question = it },
-                label = { Text(hint) },
+                placeholder = { Text(hint) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { send() }),
-                modifier = Modifier.weight(1f),
+                maxLines = 4,
+                shape = RoundedCornerShape(28.dp),
+                trailingIcon = {
+                    IconButton(onClick = send, enabled = question.isNotBlank() && !busy) {
+                        Icon(painterResource(IrohacoIcons.Send), stringResource(R.string.viewer_ask_send))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
             )
-            TextButton(onClick = send, enabled = question.isNotBlank() && !busy) { Text(stringResource(R.string.viewer_ask_send)) }
+        }
+    }
+}
+
+/** The user's question, on the right in its own color. */
+@Composable
+private fun QuestionBubble(text: String, modifier: Modifier = Modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 4.dp),
+        modifier = modifier.padding(start = 48.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.m))
+    }
+}
+
+/** The AI's reply, on the left beside its mark. */
+@Composable
+private fun Reply(content: @Composable ColumnScope.() -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+        Surface(color = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer, shape = CircleShape, modifier = Modifier.size(32.dp)) {
+            Box(contentAlignment = Alignment.Center) { Icon(painterResource(IrohacoIcons.SmartToy), contentDescription = null, modifier = Modifier.size(18.dp)) }
+        }
+        Column(Modifier.weight(1f), content = content)
+    }
+}
+
+/** What can be asked, before the first question. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Examples(examples: List<String>, onAsk: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+        Text(stringResource(R.string.ask_intro), style = MaterialTheme.typography.bodyLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+            examples.forEach { example -> SuggestionChip(onClick = { onAsk(example) }, label = { Text(example) }) }
         }
     }
 }
@@ -208,6 +277,25 @@ private fun AskContentPreview() {
                 askingLabel = R.string.viewer_asking,
                 caution = R.string.viewer_ask_caution,
                 models = AnswerChoices(listOf(AnswerChoice("gemma", "Gemma 4 E2B"), AnswerChoice("claude", "Claude", "api.anthropic.com")), "gemma"),
+            )
+        }
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun AskContentEmptyPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        Surface {
+            AskContent(
+                turns = emptyList(),
+                hint = "Ask about your photos",
+                onAsk = {},
+                onOpen = {},
+                onOpenSettings = {},
+                askingLabel = R.string.search_asking,
+                caution = R.string.search_ask_caution,
+                examples = listOf("Fireworks last summer", "Where did I go last summer?"),
             )
         }
     }

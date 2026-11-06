@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -335,7 +337,6 @@ internal fun SearchContent(
                     },
                     trailingIcon = {
                         Row {
-                            onOpenAsk?.let { IconButton(onClick = it) { Icon(painterResource(IrohacoIcons.SmartToy), stringResource(R.string.ask_title)) } }
                             IconButton(onClick = onOpenSettings) { Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.timeline_settings)) }
                         }
                     },
@@ -352,6 +353,8 @@ internal fun SearchContent(
                     ),
                 )
             }
+            // Asking AI is a way of its own beside the search, not hidden in the bar.
+            if (onOpenAsk != null && ui.results == null) item(span = { GridItemSpan(maxLineSpan) }) { AskEntry(onOpenAsk) }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTags, onToggleInferredPlaces, onToggleAtPlace, similar = onBack != null)
             }
@@ -642,5 +645,24 @@ private fun SearchResultsPreview() {
 private fun SearchNoIndexPreview() {
     IrohacoTheme(dynamicColor = false) {
         SearchContent(SearchUi(query = "駅", results = SearchResults(emptyList(), emptyList(), meaningUnavailable = true)), emptyList(), {}, {}, {}, {}, {}, {}, {}, {}, {})
+    }
+}
+
+/** The way into the chat with AI, set apart from the search above it. */
+@Composable
+private fun AskEntry(onOpenAsk: () -> Unit) {
+    Card(
+        onClick = onOpenAsk,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        modifier = Modifier.fillMaxWidth().padding(top = IrohacoSpacing.s),
+    ) {
+        Row(Modifier.padding(IrohacoSpacing.l), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.m)) {
+            Icon(painterResource(IrohacoIcons.SmartToy), contentDescription = null)
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.ask_title), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.search_ask_entry), style = MaterialTheme.typography.bodyMedium)
+            }
+            Icon(painterResource(IrohacoIcons.ChevronRight), contentDescription = null)
+        }
     }
 }
