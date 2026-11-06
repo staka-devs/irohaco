@@ -39,8 +39,8 @@ class LiteRtAnswerRuntime(private val cacheDir: String) : AnswerRuntime {
          * The thoughts arrive apart from the answer, in the message's channels; they go first, inside <think>, so the
          * reply stays one string across the answer process's boundary and AskLibrary tells the two apart.
          */
-        override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, onText: (String) -> Unit): String =
-            conversation(instruction, THINKING).use { conversation ->
+        override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, think: Boolean, onText: (String) -> Unit): String =
+            conversation(instruction, if (think) THINKING else ThinkingConfig(false)).use { conversation ->
                 val thought = StringBuilder()
                 val reply = StringBuilder()
                 fun whole() = (if (thought.isEmpty()) "" else "<think>$thought</think>") + reply

@@ -1,5 +1,7 @@
 package dev.irohaco.core.application
 
+import java.time.ZoneId
+import java.time.LocalDate
 import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.contracts.InferredPlace
 import dev.irohaco.core.contracts.TimedPoint
@@ -67,7 +69,7 @@ class AskLibraryTest {
     private val runtime = AnswerRuntime { _, _ ->
         loads++
         object : AnswerSession {
-            override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, onText: (String) -> Unit): String {
+            override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, think: Boolean, onText: (String) -> Unit): String {
                 check(!failing) { "The model's process died" }
                 asked += images.size to question
                 // The reply arrives in pieces, as the runtime streams it.
@@ -105,7 +107,7 @@ class AskLibraryTest {
         },
         RemoteSessions { _, _, _, authorize ->
             object : AnswerSession {
-                override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, onText: (String) -> Unit): String {
+                override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, think: Boolean, onText: (String) -> Unit): String {
                     check(authorize() == EgressDecision.Allowed)
                     if (remoteFails) throw RemoteCallException(RemoteFailure.RateLimited(30))
                     remoteAsked += question
@@ -323,6 +325,30 @@ class AskLibraryTest {
         placeGranted = false
         library.ask("Where?", listOf(dated))
         assertTrue("Hakodate" !in remoteAsked.last() && EgressPayload.PLACE_NAME !in policyAsked.last(), remoteAsked.last())
+    }
+
+    @Test
+    fun `the plan's JSON is read into words, a day span, the kind and whether to show photos`() {
+        val zone = ZoneId.of("Asia/Tokyo")
+        fun ms(y: Int, m: Int, d: Int) = LocalDate.of(y, m, d).atStartOfDay(zone).toInstant().toEpochMilli()
+        val plan = AskLibrary.parsePlan("""```json
+{"words": ["旅行", "観光"], "place": "京都", "from": "2025-06-01", "until": "2025-08-31", "kind": "any", "show": false}
+```""", zone)
+        assertEquals(SearchPlan("京都 旅行 観光", ms(2025, 6, 1), ms(2025, 9, 1), null, show = false), plan)
+        assertEquals(
+            SearchPlan("fireworks", null, null, MediaKind.IMAGE, show = true),
+            AskLibrary.parsePlan("""Sure: {"words": ["fireworks"], "place": null, "from": null, "until": null, "kind": "photo", "show": true}""", zone),
+        )
+        // No JSON, or days the wrong way round, give no plan and no span.
+        assertEquals(null, AskLibrary.parsePlan("I think you mean fireworks.", zone))
+        assertEquals(null, AskLibrary.parsePlan("""{"words": ["x"], "from": "2025-09-01", "until": "2025-08-01", "show": true}""", zone)?.fromMs)
+    }
+
+    @Test
+    fun `the previous search goes back to the model in the plan's own form`() {
+        val zone = ZoneId.of("Asia/Tokyo")
+        val read = ReadQuery("花火", LocalDate.of(2025, 6, 1).atStartOfDay(zone).toInstant().toEpochMilli(), LocalDate.of(2025, 9, 1).atStartOfDay(zone).toInstant().toEpochMilli(), MediaKind.IMAGE)
+        assertEquals("""{"words": ["花火"], "from": "2025-06-01", "until": "2025-08-31", "kind": "photo"}""", AskLibrary.planJson(read, zone))
     }
 
     @Test

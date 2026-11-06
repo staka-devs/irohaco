@@ -29,6 +29,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZonedDateTime
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -65,11 +67,32 @@ sealed interface AskResult {
     class NeedsConsent(val model: String, val service: String, val payloads: Set<EgressPayload>, val agree: () -> Unit) : AskResult
 }
 
+/**
+ * A question read as a photo search by the answering model: the words to search for (a place it names first),
+ * capture times in [fromMs, untilMs), the kind, and whether the user wants to see photos rather than an answer.
+ */
+data class SearchPlan(val words: String, val fromMs: Long?, val untilMs: Long?, val kind: MediaKind?, val show: Boolean)
+
 /** An answer still being written: what the model thought so far, then the answer's text so far. */
 data class AskPartial(val thought: String, val text: String)
 
 /** When and where a source was taken, written beside it for the model; [guessed] when the place is only a guess. */
 data class SourceFacts(val takenAtMs: Long?, val place: String?, val guessed: Boolean = false)
+
+/** Asks a model to read a message as a photo search, as JSON (AskLibrary.plan). */
+const val PLAN_INSTRUCTION =
+    """You turn a message about the user's own photos and videos into a search of them. Reply with one JSON
+object and nothing else:
+{"words": [a few words for what the photos show, in the language of the message; leave out question words, dates,
+places and words such as photo or video; when the message names nothing to look for, words for photos that would
+answer it, such as travel and sightseeing for "where did I go?"],
+ "place": a place the message names, or null,
+ "from": the first day it means as "YYYY-MM-DD", or null,
+ "until": the last day it means as "YYYY-MM-DD", or null,
+ "kind": "photo", "video" or "any",
+ "show": true when the user wants to see photos, false when the user asks something to be answered}
+When a previous search is given and the message only changes it, such as "and the year before?" or "videos?", keep
+what it does not change."""
 
 /** A model that can answer; [service] is the name of the service it runs at, or null for one on this device. */
 data class AnswerChoice(val id: String, val name: String, val service: String? = null)
@@ -170,6 +193,37 @@ class AskLibrary(
         val model = remoteModel()
         val sent = place?.takeIf { model == null || placeGranted(model) }
         return ask(question, listOf(hit), context(takenAtMs.takeIf { model == null }, sent, earlier), sent != null, onText)
+    }
+
+    /**
+     * How the answering model reads [question] as a photo search, as JSON and without thinking, so it takes a few
+     * seconds; the answer, if one is wanted, is a second request. [previous] is the search just made, so a follow-up
+     * such as "and the year before?" can change it. Null when no model is ready, a service is not agreed to or granted
+     * the question yet, or the reply cannot be read.
+     */
+    suspend fun plan(question: String, now: ZonedDateTime, previous: ReadQuery? = null): SearchPlan? {
+        val prompt = buildString {
+            append("Today: ").append(now.toLocalDate()).append('\n')
+            previous?.let { append("Previous search: ").append(planJson(it, now.zone)).append('\n') }
+            append("Question: ").append(question.trim())
+        }
+        return try {
+            val model = remoteModel()
+            val reply = if (model != null) {
+                val remote = checkNotNull(remote)
+                val text = setOf(EgressPayload.QUERY_TEXT)
+                if (model.profileId !in consented || remote.policy.authorize(TaskType.RAG, model.profileId, text, emptySet()) != EgressDecision.Allowed) return null
+                remote.open(model, text, emptySet()).use { withContext(io) { it.answer(PLAN_INSTRUCTION, emptyList(), prompt, think = false) } }
+            } else {
+                val path = modelPath() ?: return null
+                withSession(path) { it.answer(PLAN_INSTRUCTION, emptyList(), prompt, think = false) }
+            }
+            parsePlan(reply, now.zone)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            null // the fixed rules read the question instead
+        }
     }
 
     private suspend fun placeGranted(model: RemoteModel): Boolean =
@@ -304,6 +358,47 @@ SOURCES: <each source you used and how you know: 1=OBSERVED, 2=USER_STATED, 3=IN
 OBSERVED means you can see it in the image. USER_STATED means it comes from the user's memo. INFERRED means you guessed it.
 The notes may say when and where each source was taken; use them for questions about time and place. A place marked
 as guessed is INFERRED."""
+
+        /** A search as [PLAN_INSTRUCTION]'s JSON, given back to the model as the previous search. */
+        fun planJson(read: ReadQuery, zone: ZoneId): String {
+            fun day(ms: Long?) = ms?.let { "\"" + Instant.ofEpochMilli(it).atZone(zone).toLocalDate() + "\"" } ?: "null"
+            val words = if (read.hasWords) "[\"" + read.rest.replace("\"", "") + "\"]" else "[]"
+            val kind = when (read.kind) {
+                MediaKind.IMAGE -> "photo"
+                MediaKind.VIDEO -> "video"
+                null -> "any"
+            }
+            return """{"words": $words, "from": ${day(read.fromMs)}, "until": ${day(read.untilMs?.minus(1))}, "kind": "$kind"}"""
+        }
+
+        /** Reads [PLAN_INSTRUCTION]'s JSON, also inside a code fence or after other text; null when it has no "show". */
+        fun parsePlan(reply: String, zone: ZoneId): SearchPlan? {
+            val json = reply.replace(THINKING, "").substringAfter('{', "").substringBeforeLast('}', "")
+            fun raw(key: String) = Regex(""""$key"\s*:\s*("(?:[^"\\]|\\.)*"|\[[^\]]*]|true|false|null)""").find(json)?.groupValues?.get(1)
+            fun strings(value: String?) = STRING.findAll(value.orEmpty()).map { it.groupValues[1].replace("\\\"", "\"").replace("\\\\", "\\").trim() }.filter { it.isNotEmpty() }.toList()
+            val show = when (raw("show")) {
+                "true" -> true
+                "false" -> false
+                else -> return null
+            }
+            fun day(key: String) = strings(raw(key)).firstOrNull()?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() }
+            val from = day("from")
+            val until = day("until")
+            val span = if (from != null && until != null && !until.isBefore(from)) from to until.plusDays(1) else null
+            return SearchPlan(
+                words = (strings(raw("place")) + strings(raw("words"))).joinToString(" "),
+                fromMs = span?.first?.atStartOfDay(zone)?.toInstant()?.toEpochMilli(),
+                untilMs = span?.second?.atStartOfDay(zone)?.toInstant()?.toEpochMilli(),
+                kind = when (strings(raw("kind")).firstOrNull()?.lowercase()) {
+                    "photo", "photos", "image" -> MediaKind.IMAGE
+                    "video", "videos" -> MediaKind.VIDEO
+                    else -> null
+                },
+                show = show,
+            )
+        }
+
+        private val STRING = Regex(""""((?:[^"\\]|\\.)*)"""")
 
         /** Earlier turns kept for a follow-up; each image already costs about 256 of the 2,048 tokens. */
         const val MAX_EARLIER = 3

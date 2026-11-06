@@ -19,6 +19,7 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.ThinkingConfig
+import dev.irohaco.core.application.PLAN_INSTRUCTION
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -34,7 +35,7 @@ import java.io.File
  * `warm`, `embeddings`, `embedding` and `embed` replay the order that stopped the answer at its first image (#237).
  * `tokens` = the context's size (maxNumTokens; default the model file's); `think` = how many tokens the model may think
  * (default thinking off), its thoughts arriving apart from the answer in the message's channels; `question` replaces the
- * question asked with the images.
+ * question asked with the images. `plan` = a message to read as a photo search the way the Ask screen does, instead.
  * The results go to logcat under the tag AnswerSpeed.
  */
 @RunWith(AndroidJUnit4::class)
@@ -84,6 +85,17 @@ class AnswerSpeedTest {
                 }
                 Log.i(TAG, "embedding model used")
             }
+        }
+        args.getString("plan")?.let { message ->
+            engine.use {
+                engine.createConversation(ConversationConfig(systemInstruction = Contents.of(PLAN_INSTRUCTION), thinkingConfig = ThinkingConfig(false))).use {
+                    start = SystemClock.elapsedRealtime()
+                    val reply = it.sendMessage(Contents.of(Content.Text("Today: ${java.time.LocalDate.now()}\nQuestion: $message"))).contents.contents
+                        .filterIsInstance<Content.Text>().joinToString("") { part -> part.text }
+                    Log.i(TAG, "plan of '$message' in ${SystemClock.elapsedRealtime() - start} ms: ${reply.replace('\n', ' ')}")
+                }
+            }
+            return@runBlocking
         }
         engine.use {
             // rounds=N: N questions with four images, each after a search with the embedding model, as the Ask screen does.

@@ -20,18 +20,26 @@ class ChatWithLibrary(
 
     fun warmUp() = ask.warmUp()
 
+    /** A question read as a search, and whether it asks to see photos ([show]) rather than to be answered. */
+    data class Reading(val read: ReadQuery, val show: Boolean)
+
     /**
-     * A request for photos ("去年の夏の花火の写真") is answered with what the search finds, with no model; null for a
-     * question. Right after photos were found, conditions alone ("一昨年は？", "動画は？") change that search.
+     * Reads [question] with the answering model, in any language, so the search gets fitting words instead of the
+     * question's own ("去年の夏はどこに行った？" searches for trips in last summer). Right after photos were found, the
+     * model gets that search too, so "一昨年は？" or "動画は？" changes it. Without a model the fixed rules read it.
      */
-    suspend fun find(question: String, earlier: Found? = null): Found? {
-        val read = QueryReader.read(question, now())
-        val wanted = follow(question, read, earlier?.read) ?: read.takeIf { QueryReader.asksForMedia(question) } ?: return null
-        return Found(wanted, lookUp(wanted))
+    suspend fun read(question: String, earlier: Found? = null): Reading {
+        val rules = QueryReader.read(question, now())
+        val plan = ask.plan(question, now(), earlier?.read)
+            ?: return follow(question, rules, earlier?.read)?.let { Reading(it, show = true) } ?: Reading(rules, QueryReader.asksForMedia(question))
+        return Reading(merge(rules, plan), plan.show)
     }
 
-    suspend fun answer(question: String, earlier: List<Turn>, onText: (AskPartial) -> Unit = {}): AskResult {
-        val found = lookUp(QueryReader.read(question, now()))
+    /** A request for photos ("去年の夏の花火の写真") is answered with what the search finds, with no model. */
+    suspend fun find(read: ReadQuery): Found = Found(read, lookUp(read))
+
+    suspend fun answer(question: String, read: ReadQuery, earlier: List<Turn>, onText: (AskPartial) -> Unit = {}): AskResult {
+        val found = lookUp(read)
         val chat = earlier.map { it.question to it.answer.text.replace(CITATION, "") }
         return ask.ask(question, sources(found, earlier), AskLibrary.context(null, null, chat), onText)
     }
@@ -45,6 +53,12 @@ class ChatWithLibrary(
 
         // The numbers in an earlier answer point at that answer's sources, not this one's.
         private val CITATION = Regex("""\s*\[\d+]""")
+
+        /** The model's reading; only when it gave no words does the search fall back on the rules' words. */
+        fun merge(rules: ReadQuery, plan: SearchPlan): ReadQuery {
+            val words = plan.words.takeIf { it.isNotBlank() }
+            return ReadQuery(words ?: rules.rest, plan.fromMs, plan.untilMs, plan.kind, hasWords = words != null || rules.hasWords)
+        }
 
         /** The last search with the dates or kind [read] names put in its place; null unless [question] is only that. */
         fun follow(question: String, read: ReadQuery, last: ReadQuery?): ReadQuery? {

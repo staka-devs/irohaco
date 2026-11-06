@@ -77,6 +77,8 @@ data class AskTurn(
     val answering: Boolean = true,
     /** What the model thought so far, before [partial]. */
     val thought: String = "",
+    /** The search the question was read as, for showing its photos; null before it is read. */
+    val read: ReadQuery? = null,
 )
 
 /** Questions about the photo or scene on screen and the answers, one under another (#201). */
@@ -166,7 +168,7 @@ internal fun AskContent(
                         caution = caution,
                     )
                     if (onShowPhotos != null && turn.answer != null) {
-                        TextButton(onClick = { onShowPhotos(QueryReader.read(turn.question, ZonedDateTime.now())) }) {
+                        TextButton(onClick = { onShowPhotos(turn.read ?: QueryReader.read(turn.question, ZonedDateTime.now())) }) {
                             Icon(painterResource(IrohacoIcons.Photo), contentDescription = null)
                             Text(stringResource(R.string.ask_show_photos), modifier = Modifier.padding(start = IrohacoSpacing.s))
                         }

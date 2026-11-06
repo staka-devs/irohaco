@@ -68,9 +68,10 @@ interface EmbeddingModelSettings {
 interface AnswerSession : AutoCloseable {
     /**
      * One question in a fresh conversation, so an earlier question cannot leak into this answer. [onText]
-     * gets the reply so far each time it grows; the whole reply is returned at the end.
+     * gets the reply so far each time it grows; the whole reply is returned at the end. [think] false asks a
+     * model that can think to answer at once, for short replies such as reading a question.
      */
-    suspend fun answer(instruction: String, images: List<ByteArray>, question: String, onText: (String) -> Unit = {}): String
+    suspend fun answer(instruction: String, images: List<ByteArray>, question: String, think: Boolean = true, onText: (String) -> Unit = {}): String
 
     /** Runs one tiny turn, so the first real question does not wait for the runtime to set itself up. */
     suspend fun warm()
