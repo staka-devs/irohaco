@@ -87,20 +87,20 @@
     <string name="timeline_filter_edit">変更</string>
     <string name="timeline_filter_off">%1$sの絞り込みを外す</string>
     <string name="timeline_filter_favorites">お気に入り</string>
-    <string name="timeline_sort_filtered">並べ替えと絞り込み（絞り込み中）</string>
-    <string name="timeline_sort_newest">撮影日時（新しい順）</string>
-    <string name="timeline_sort_oldest">撮影日時（古い順）</string>
-    <string name="timeline_sort_name_asc">ファイル名（A→Z）</string>
-    <string name="timeline_sort_name_desc">ファイル名（Z→A）</string>
-    <string name="timeline_sort_largest">サイズ（大きい順）</string>
-    <string name="timeline_sort_smallest">サイズ（小さい順）</string>
+    <string name="timeline_sort_filtered">並べ替えと絞り込み(絞り込み中)</string>
+    <string name="timeline_sort_newest">撮影日時(新しい順)</string>
+    <string name="timeline_sort_oldest">撮影日時(古い順)</string>
+    <string name="timeline_sort_name_asc">ファイル名(A→Z)</string>
+    <string name="timeline_sort_name_desc">ファイル名(Z→A)</string>
+    <string name="timeline_sort_largest">サイズ(大きい順)</string>
+    <string name="timeline_sort_smallest">サイズ(小さい順)</string>
     <string name="timeline_kind_all">すべて</string>
     <string name="timeline_kind_photos">写真</string>
     <string name="timeline_kind_videos">動画</string>
     <string name="library_title">ライブラリ</string>
     <string name="library_empty">写真と動画はまだありません</string>
     <string name="library_internal">内蔵ストレージ</string>
-    <string name="library_sd_card">SDカード（%1$s）</string>
+    <string name="library_sd_card">SDカード(%1$s)</string>
     <string name="library_excluded">%1$s・写真のタブに表示しない</string>
     <string name="library_exclude">写真のタブに表示しない</string>
     <string name="library_include">写真のタブに表示する</string>
@@ -109,8 +109,8 @@
         <item quantity="one">%d件</item>
         <item quantity="other">%d件</item>
     </plurals>
-    <string name="timeline_sort_rating_high">評価（高い順）</string>
-    <string name="timeline_sort_rating_low">評価（低い順）</string>
+    <string name="timeline_sort_rating_high">評価(高い順)</string>
+    <string name="timeline_sort_rating_low">評価(低い順)</string>
     <string name="timeline_favorite">お気に入りに追加</string>
     <string name="viewer_favorite">お気に入りに追加</string>
     <string name="viewer_unfavorite">お気に入りから外す</string>
@@ -151,7 +151,7 @@
     <string name="albums_empty_list">まだ何もありません。写真タブで写真を長押しして選ぶと、ここに追加できます。</string>
     <string name="identity_title">別の場所で見つかった写真</string>
     <string name="identity_body">見つからなくなった写真や動画と、ファイル名と撮影日時が同じファイルが見つかりました。同じ写真なら、お気に入り、評価、タグ、アルバムを引き継ぎます。</string>
-    <string name="identity_was">前の場所: %1$s（見つかりません）</string>
+    <string name="identity_was">前の場所: %1$s(見つかりません)</string>
     <string name="identity_now">見つかった場所: %1$s</string>
     <string name="identity_same">同じ写真</string>
     <string name="identity_different">別の写真</string>
@@ -198,7 +198,7 @@
     <string name="share_location_keep">含めて共有</string>
     <string name="share_location_unremovable_title">位置情報を外せない項目があります</string>
     <plurals name="share_location_unremovable_body">
-        <item quantity="other">%d件は位置情報が残ります（多くは動画です）。</item>
+        <item quantity="other">%d件は位置情報が残ります(多くは動画です)。</item>
     </plurals>
     <string name="share_location_unremovable_include">そのまま共有</string>
     <string name="share_location_unremovable_exclude">この項目を除く</string>
@@ -273,7 +273,7 @@
     <string name="memo_kind_keywords">キーワード</string>
     <string name="memo_kind_ai_caption">AIの説明</string>
     <string name="memo_by_ai">AIが作成</string>
-    <string name="memo_by_ai_model">AI（%1$s）</string>
+    <string name="memo_by_ai_model">AI(%1$s)</string>
     <string name="memo_by_user">あなた</string>
     <string name="memo_revision">第%1$d版 · %2$s · %3$s</string>
     <string name="search_dates">日付</string>
@@ -286,8 +286,8 @@
     <string name="memo_scene_not_indexed">この場面はまだ索引されていません。先に検索用の索引を作成するか、動画全体にメモを付けてください。</string>
     <string name="search_inferred_places">推定した場所も含める</string>
     <string name="search_place">場所</string>
-    <string name="search_place_inferred">場所（推定）</string>
-    <string name="search_place_history">場所（履歴）</string>
+    <string name="search_place_inferred">場所(推定)</string>
+    <string name="search_place_history">場所(履歴)</string>
     <string name="details_edited">アプリで編集済み。ファイルの値: %1$s</string>
     <string name="details_revert">ファイルの値に戻す</string>
     <string name="details_conflict">編集したあとで、ファイルの値がほかのアプリで変わりました。編集したときのファイルの値: %1$s</string>
@@ -357,7 +357,7 @@
     <string name="ask_thought_hide">Thinking を閉じる</string>
     <string name="ask_show_photos">写真で見る</string>
     <string name="search_back_to_chat">チャットに戻る</string>
-    <string name="ask_hint">写真について質問（例: 去年の夏はどこに行った？）</string>
+    <string name="ask_hint">写真について質問(例: 去年の夏はどこに行った？)</string>
     <string name="history_title">位置情報の履歴</string>
     <string name="history_explain">Timeline.json を選んでください。Timeline.json は、端末の設定の「位置情報」>「位置情報サービス」>「タイムライン」で書き出せます。GPS のない写真に、撮ったときにいた場所を候補として付けます。ファイルは端末の外に送りません。確定して書き込むまで、写真のファイルは変わりません。</string>
     <string name="history_import">Timeline.json を選ぶ</string>
@@ -382,7 +382,7 @@
     <string name="history_confirm">確定</string>
     <string name="history_confidence_high">滞在していた場所</string>
     <string name="history_confidence_medium">移動中の場所</string>
-    <string name="history_confidence_low">移動中の場所（時刻が少し離れている）</string>
+    <string name="history_confidence_low">移動中の場所(時刻が少し離れている)</string>
     <plurals name="history_matched">
         <item quantity="other">%d 件の写真と動画に場所の候補を見つけました。</item>
     </plurals>
@@ -397,7 +397,7 @@
     </plurals>
     <string name="library_unlocated">場所のない写真</string>
     <string name="timeline_place">場所を付ける</string>
-    <string name="search_ask_consent">この質問は %1$s（%2$s）へ送ります。送るもの: %3$s。</string>
+    <string name="search_ask_consent">この質問は %1$s(%2$s)へ送ります。送るもの: %3$s。</string>
     <string name="search_ask_consent_send">送って聞く</string>
     <string name="ask_on_device_ai">端末の AI</string>
     <string name="viewer_action_previous">前の写真</string>

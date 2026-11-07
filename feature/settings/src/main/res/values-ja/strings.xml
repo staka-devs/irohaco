@@ -13,7 +13,7 @@
     <string name="settings_theme_preview_button">ボタン</string>
     <string name="settings_theme_preview_chip">チップ</string>
     <string name="settings_color_picker">色を選ぶ。横が鮮やかさ、縦が明るさ</string>
-    <string name="settings_custom_hex_label">カラーコード（#RRGGBB）</string>
+    <string name="settings_custom_hex_label">カラーコード(#RRGGBB)</string>
     <string name="settings_custom_hex_error">#RRGGBBの形式で入力</string>
     <string name="settings_contrast">コントラスト</string>
     <string name="settings_timeline">タイムライン</string>
@@ -111,12 +111,12 @@
     <string name="settings_index_paused_thermal">端末の温度が高いため一時停止中</string>
     <string name="settings_index_paused_battery">電池残量が少ないため一時停止中</string>
     <string name="settings_index_succeeded">索引の作成完了</string>
-    <string name="settings_index_partial">索引の作成完了（読み取れない項目あり）</string>
+    <string name="settings_index_partial">索引の作成完了(読み取れない項目あり)</string>
     <string name="settings_index_failed">モデルを読み込めないため停止</string>
     <string name="settings_index_cancelled">キャンセルしました</string>
     <string name="settings_index_stop">索引作りをやめる</string>
     <string name="settings_remote_add_failed">接続先を追加できませんでした。API キーを端末に保存できなかった可能性があります。もう一度試してください。</string>
-    <string name="settings_index_counts">%2$d件中%1$d件（%3$d%%）</string>
+    <string name="settings_index_counts">%2$d件中%1$d件(%3$d%%)</string>
     <string name="settings_index_remaining">残り%1$d件 · 失敗%2$d件</string>
     <string name="settings_index_eta_measuring">残り時間を計算中</string>
     <string name="settings_index_eta_minutes">残り約%1$d分</string>
@@ -127,8 +127,8 @@
     <string name="settings_index_failed_list">失敗した項目</string>
     <string name="settings_index_retry">失敗した項目を再試行</string>
     <string name="settings_index_scenes">うち動画の場面%1$d件</string>
-    <string name="settings_index_quality_balanced">動画: 標準（10秒ごと）</string>
-    <string name="settings_index_quality_thorough">動画: 詳細（3秒ごと）</string>
+    <string name="settings_index_quality_balanced">動画: 標準(10秒ごと)</string>
+    <string name="settings_index_quality_thorough">動画: 詳細(3秒ごと)</string>
     <plurals name="settings_index_low_coverage">
         <item quantity="other">長い動画%1$d本は途中までしか索引していないため、後半の場面は検索できません。</item>
     </plurals>
@@ -159,7 +159,7 @@
     <string name="settings_remote_billing">外部の API は、使った量に応じて課金されます。アプリで示す目安は、プロバイダーの請求の上限にはなりません。</string>
     <string name="settings_remote_http_warning">この URL は http なので、API キーと送る内容が暗号化されずに送られます。</string>
     <string name="settings_remote_http_accept">暗号化されないことを了承する</string>
-    <string name="settings_remote_http_label">暗号化なし（http）：%1$s</string>
+    <string name="settings_remote_http_label">暗号化なし(http)：%1$s</string>
     <string name="settings_remote_remove">接続先を削除</string>
     <string name="settings_remote_remove_title">この接続先を削除しますか？</string>
     <string name="settings_remote_remove_body">保存した API キーと、この接続先への送信の許可も消えます。</string>
@@ -171,7 +171,7 @@
     <string name="settings_remote_name">サービスの名前</string>
     <string name="settings_remote_name_hint">空のままなら、アドレスから付けた名前を出します。</string>
     <string name="settings_remote_rename">名前を変える</string>
-    <string name="settings_remote_model_name">表示する名前（省略可）</string>
+    <string name="settings_remote_model_name">表示する名前(省略可)</string>
     <string name="settings_remote_model_test">テストして追加</string>
     <string name="settings_remote_model_test_hint">テストでは、アプリが持つサンプルの文と画像をモデルに送ります。あなたの写真は送りません。</string>
     <string name="settings_remote_model_testing">モデルをテストしています…</string>
@@ -186,14 +186,14 @@
     <string name="settings_remote_parameters_listed">models.dev によると、このモデルが受け付ける値: %1$s</string>
     <string name="settings_remote_parameters_min">models.dev によると、%1$d 以上</string>
     <string name="settings_remote_parameters_max">models.dev によると、最大 %1$d</string>
-    <string name="settings_remote_parameters_default">空なら %1$d を送ります（この API では必須です）</string>
+    <string name="settings_remote_parameters_default">空なら %1$d を送ります(この API では必須です)</string>
     <string name="settings_remote_parameters_look_up">models.dev でこのモデルを調べる</string>
     <string name="settings_remote_parameters_look_up_hint">models.dev は、モデルの情報を集めた公開の一覧です。調べるときは一覧の全体を読み込み、端末の中でモデルを探します。モデル ID も含め、あなたの情報は送りません。</string>
     <string name="settings_remote_parameters_unlisted">models.dev に「%1$s」は載っていませんでした。</string>
     <string name="settings_remote_parameters_failed">models.dev を読み込めませんでした。</string>
     <string name="settings_remote_parameters_save">保存</string>
     <string name="settings_ai_remote_list">候補を読み込み直す</string>
-    <string name="settings_ai_remote_list_url">モデル一覧の URL（独自のプロキシなど）</string>
+    <string name="settings_ai_remote_list_url">モデル一覧の URL(独自のプロキシなど)</string>
     <string name="settings_ai_remote_list_failed">モデルの一覧を読み込めませんでした。</string>
     <string name="settings_ai_remote_list_none">この用途に使える候補はありません。モデル ID を直接入れてください。</string>
     <string name="settings_ai_remote_list_more">ほかに %1$d 件あります。モデル ID の欄に入れると絞り込めます。</string>
@@ -204,7 +204,7 @@
     <string name="settings_ai_remote_model_hint">下の候補から選ぶか、入れた文字で候補を絞り込めます。</string>
     <string name="settings_ai_remote_list_url_hint">独自のプロキシなど、一覧が別の URL にあるときだけ入れて、「候補を読み込み直す」を押します。</string>
     <string name="settings_ai_remote_listing">候補を読み込んでいます…</string>
-    <string name="settings_ai_remote_candidates">候補（%1$d 件）</string>
+    <string name="settings_ai_remote_candidates">候補(%1$d 件)</string>
     <string name="settings_remote_detail">%1$s の詳細</string>
     <string name="settings_remote_detail_can">できること</string>
     <string name="settings_remote_detail_mark">印を変える</string>
@@ -226,7 +226,7 @@
     <string name="settings_backup_passphrase_title">パスフレーズを決める</string>
     <string name="settings_backup_passphrase_body">%1$d 文字以上で決めてください。アプリには残らないため、忘れるとバックアップを開けません。</string>
     <string name="settings_backup_passphrase">パスフレーズ</string>
-    <string name="settings_backup_passphrase_again">パスフレーズ（確認）</string>
+    <string name="settings_backup_passphrase_again">パスフレーズ(確認)</string>
     <string name="settings_backup_done">エクスポートしました</string>
     <string name="settings_backup_done_body">ファイルを読み直して確かめました。%1$d 件の記録が入っています。</string>
     <string name="settings_backup_failed">エクスポートできませんでした</string>
