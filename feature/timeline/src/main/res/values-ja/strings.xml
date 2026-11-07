@@ -320,7 +320,7 @@
     <string name="search_asking">上位の写真と場面を見て答えを作っています</string>
     <string name="search_ask_no_model">質問に答えるモデルが入っていません。設定の AI でダウンロードしてください。</string>
     <string name="search_ask_nothing">答えに使える写真がありません。</string>
-    <string name="search_ask_failed">答えを作れませんでした。</string>
+    <string name="search_ask_failed">回答できませんでした。</string>
     <string name="search_ask_retry">もう一度</string>
     <string name="search_ask_caution">%1$s が上位の写真と場面だけを見て答えています。間違うことがあります。</string>
     <string name="search_basis_observed">写っている</string>
@@ -339,7 +339,7 @@
     <string name="ask_effort_section">Effort</string>
     <string name="ask_model_choose">回答するモデルを選ぶ</string>
     <string name="ask_model_on_device">この端末</string>
-    <string name="ask_model_at">%1$s で動きます</string>
+    <string name="ask_model_at">%1$s</string>
     <string name="viewer_asking">この写真や場面を見て答えを作っています</string>
     <string name="viewer_ask_caution">%1$s がこの写真や場面だけを見て答えています。間違うことがあります。</string>
     <string name="ask_title">AI に聞く</string>

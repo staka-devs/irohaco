@@ -60,12 +60,12 @@
     <string name="settings_ai_pause">Pause</string>
     <string name="settings_ai_resume">Resume</string>
     <string name="settings_ai_retry">Retry</string>
-    <string name="settings_ai_index_card">Photo index</string>
+    <string name="settings_ai_index_card">Embedding model (photo embedding and search)</string>
     <string name="settings_ai_index_card_hint">The model that reads your photos so you can search them by meaning.</string>
-    <string name="settings_ai_answer_card">Answering questions</string>
+    <string name="settings_ai_answer_card">Chat model (answering questions)</string>
     <string name="settings_ai_answer_card_hint">The model that looks at the photos a search finds and answers your question.</string>
     <string name="settings_ai_on_device">On this device</string>
-    <string name="settings_ai_remote_at">Runs on %1$s</string>
+    <string name="settings_ai_remote_at">%1$s</string>
     <string name="settings_ai_add_remote">Add a model from a service</string>
     <string name="settings_ai_add_remote_answer">Add a model that answers</string>
     <string name="settings_ai_add_remote_index">Add a model that indexes</string>
@@ -106,7 +106,7 @@
     <string name="settings_index_confirm_title">Build the search index?</string>
     <string name="settings_index_confirm_body">Irohaco reads each photo on this device and nothing is sent out. It takes a while and uses battery; you can pause it at any time.</string>
     <string name="settings_index_running">Building index</string>
-    <string name="settings_index_pausing">Pausing after the current item</string>
+    <string name="settings_index_pausing">Pausing once the current item finishes</string>
     <string name="settings_index_paused">Paused</string>
     <string name="settings_index_paused_thermal">Paused: device is hot</string>
     <string name="settings_index_paused_battery">Paused: battery is low</string>
@@ -142,7 +142,7 @@
     <string name="settings_index_preparing">Preparing what to index</string>
     <string name="settings_index_start_failed">Could not start the index</string>
     <string name="settings_index_dismiss">Dismiss</string>
-    <string name="settings_index_auto">Index changes automatically</string>
+    <string name="settings_index_auto">Index new photos automatically</string>
     <string name="settings_index_auto_summary">Indexes added or edited photos and videos when you open the app. Available after the first index</string>
     <string name="settings_location_history">Location history</string>
     <string name="settings_location_history_open">Add places from Google Maps Timeline</string>
@@ -180,7 +180,7 @@
     <string name="settings_remote_model_added">Added. It can: %1$s</string>
     <string name="settings_remote_model_cannot_answer">It cannot read images, so it cannot answer questions about your photos.</string>
     <string name="settings_remote_model_test_failed">The test failed. Check that the model ID matches the provider\'s list, and that the connection\'s URL and API key are right.</string>
-    <string name="settings_remote_parameters">Request settings</string>
+    <string name="settings_remote_parameters">API request settings</string>
     <string name="settings_remote_parameters_title">Request settings for %1$s</string>
     <string name="settings_remote_parameters_hint">Each question sends these values with the request. Empty fields are not sent, so the model uses its defaults. A value the service does not take shows its error when you ask.</string>
     <string name="settings_remote_parameters_unset">Not sent</string>
@@ -215,8 +215,8 @@
     <string name="settings_remote_model_done">Done</string>
     <string name="settings_remote_cap_image">reads images</string>
     <string name="settings_remote_cap_streaming">answers as it writes</string>
-    <string name="settings_remote_cap_text_only">text only</string>
-    <string name="settings_remote_cap_embedding">can search photos</string>
+    <string name="settings_remote_cap_text_only">Text only</string>
+    <string name="settings_remote_cap_embedding">Embedding</string>
     <string name="settings_remote_model_cannot_index">It cannot read images, so it cannot index your photos.</string>
     <string name="settings_index_send_title">Send to the remote model?</string>
     <string name="settings_index_send_body">To build the index, these go to the remote model:\nPhotos: %1$d\nVideo scenes: %2$d\nMemos: %3$d\nData, roughly: %4$s\n\nPhotos are sent without their location. A memo that names a place sends that name too. What it costs depends on the provider\'s prices, and nothing in the app stops the bill.</string>

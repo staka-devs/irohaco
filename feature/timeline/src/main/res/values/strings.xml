@@ -324,7 +324,7 @@
     <string name="search_asking">Looking at the top photos and scenes</string>
     <string name="search_ask_no_model">No model to answer questions is installed. Download one in Settings, AI.</string>
     <string name="search_ask_nothing">There are no photos to answer from.</string>
-    <string name="search_ask_failed">The answer could not be made.</string>
+    <string name="search_ask_failed">Could not answer.</string>
     <string name="search_ask_retry">Try again</string>
     <string name="search_ask_caution">%1$s answered from the top photos and scenes only. It can be wrong.</string>
     <string name="search_basis_observed">Seen in it</string>
@@ -344,7 +344,7 @@
     <string name="ask_effort_section">Effort</string>
     <string name="ask_model_choose">Choose the model that answers</string>
     <string name="ask_model_on_device">On this device</string>
-    <string name="ask_model_at">Runs at %1$s</string>
+    <string name="ask_model_at">%1$s</string>
     <string name="viewer_asking">Looking at this photo or scene</string>
     <string name="viewer_ask_caution">%1$s answered from this photo or scene only. It can be wrong.</string>
     <string name="ask_title">Ask AI</string>

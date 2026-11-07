@@ -42,7 +42,7 @@
     <string name="egress_place_name">Town name where it was taken</string>
     <string name="remote_rate_limited">The remote model is busy. Try again in a while.</string>
     <string name="remote_rate_limited_after">The remote model is busy. Try again in %1$d s.</string>
-    <string name="remote_unauthorized">The remote API refused the key. Check it in Settings.</string>
+    <string name="remote_unauthorized">The API key was refused. Check that a valid key is set.</string>
     <string name="remote_quota">The remote account has reached its usage limit.</string>
     <string name="remote_timeout">The remote model did not answer in time.</string>
     <string name="remote_failed">The remote model returned an error (%1$d).</string>

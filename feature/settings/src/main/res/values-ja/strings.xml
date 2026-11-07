@@ -60,12 +60,12 @@
     <string name="settings_ai_pause">一時停止</string>
     <string name="settings_ai_resume">再開</string>
     <string name="settings_ai_retry">再試行</string>
-    <string name="settings_ai_index_card">写真の索引</string>
+    <string name="settings_ai_index_card">Embedding モデル（写真の埋め込み・検索）</string>
     <string name="settings_ai_index_card_hint">写真を読んで、意味で探せるようにするモデルです。</string>
-    <string name="settings_ai_answer_card">質問への回答</string>
+    <string name="settings_ai_answer_card">チャットモデル（質問への回答）</string>
     <string name="settings_ai_answer_card_hint">検索で見つかった写真を見て、質問に答えるモデルです。</string>
     <string name="settings_ai_on_device">この端末</string>
-    <string name="settings_ai_remote_at">%1$s で動きます</string>
+    <string name="settings_ai_remote_at">%1$s</string>
     <string name="settings_ai_add_remote">サービスのモデルを追加</string>
     <string name="settings_ai_add_remote_answer">質問に答えるモデルを追加</string>
     <string name="settings_ai_add_remote_index">索引を作るモデルを追加</string>
@@ -106,7 +106,7 @@
     <string name="settings_index_confirm_title">検索用の索引を作成しますか？</string>
     <string name="settings_index_confirm_body">写真はこの端末の中だけで読み取り、外部には送りません。時間がかかり電池を使いますが、いつでも一時停止できます。</string>
     <string name="settings_index_running">索引を作成中</string>
-    <string name="settings_index_pausing">処理中の項目のあとで一時停止</string>
+    <string name="settings_index_pausing">処理中の項目の完了後に一時停止</string>
     <string name="settings_index_paused">一時停止中</string>
     <string name="settings_index_paused_thermal">端末の温度が高いため一時停止中</string>
     <string name="settings_index_paused_battery">電池残量が少ないため一時停止中</string>
@@ -140,7 +140,7 @@
     <string name="settings_index_preparing">索引の対象を準備中</string>
     <string name="settings_index_start_failed">索引を開始できませんでした</string>
     <string name="settings_index_dismiss">閉じる</string>
-    <string name="settings_index_auto">変更を自動で索引</string>
+    <string name="settings_index_auto">新しい写真を自動でインデックス</string>
     <string name="settings_index_auto_summary">写真や動画の追加・変更を、アプリを開いたときに索引。最初の索引のあとから有効</string>
     <string name="settings_location_history">位置情報の履歴</string>
     <string name="settings_location_history_open">Google マップのタイムラインから場所を付ける</string>
@@ -178,7 +178,7 @@
     <string name="settings_remote_model_added">追加しました。できること: %1$s</string>
     <string name="settings_remote_model_cannot_answer">画像を読めないので、写真についての質問には使えません。</string>
     <string name="settings_remote_model_test_failed">テストに失敗しました。モデル ID が接続先の一覧にある名前と同じか、接続先の URL と API キーが正しいかを確かめてください。</string>
-    <string name="settings_remote_parameters">リクエストの設定</string>
+    <string name="settings_remote_parameters">API リクエストの設定</string>
     <string name="settings_remote_parameters_title">%1$s のリクエストの設定</string>
     <string name="settings_remote_parameters_hint">質問するたびに、ここで入れた値をリクエストに足して送ります。空の項目は送らず、モデルの既定の値で動きます。受け付けない値を入れると、質問したときにサービスのエラーが出ます。</string>
     <string name="settings_remote_parameters_unset">送らない</string>
@@ -213,8 +213,8 @@
     <string name="settings_remote_model_done">閉じる</string>
     <string name="settings_remote_cap_image">画像を読める</string>
     <string name="settings_remote_cap_streaming">ストリーミング</string>
-    <string name="settings_remote_cap_text_only">文だけ</string>
-    <string name="settings_remote_cap_embedding">写真の検索に使える</string>
+    <string name="settings_remote_cap_text_only">テキストのみ</string>
+    <string name="settings_remote_cap_embedding">Embedding</string>
     <string name="settings_remote_model_cannot_index">画像を読めないため、写真の索引には使えません。</string>
     <string name="settings_index_send_title">外部のモデルへ送りますか？</string>
     <string name="settings_index_send_body">索引を作るため、次のものを外部のモデルへ送ります。\n写真：%1$d 枚\n動画の場面：%2$d 枚\nメモ：%3$d 件\nデータ量の目安：%4$s\n\n写真は位置の情報を除いて送ります。メモに地名を書いていると、その地名も送られます。費用はプロバイダーの料金で決まり、アプリには請求を止める仕組みはありません。</string>
