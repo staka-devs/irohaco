@@ -71,14 +71,24 @@ class SearchPlaces(private val store: PlaceEvidenceStore) {
     internal companion object {
         const val LIMIT = 200
 
-        fun mentions(query: String, placeName: String): Boolean {
+        fun mentions(query: String, placeName: String): Boolean = mentionedPart(query, placeName) != null
+
+        /**
+         * The name the query gives the place, as [placeName] writes it without 市, 県 and the like: "徳島" in both
+         * "徳島市, 徳島県" and "三好市, 徳島県", so the search says what was asked, not the town of whichever file came first.
+         */
+        fun mentionedPart(query: String, placeName: String): String? {
             val text = fold(query)
-            return placeName.split(",").map { fold(it.trim()) }.any { part ->
+            return placeName.split(",").map { it.trim() }.firstNotNullOfOrNull { part ->
                 // One suffix only: 京都府 is 京都, and 京都 stays 京都.
                 val core = if (part.length > 2 && part.last() in ADMIN_SUFFIXES) part.dropLast(1) else part
-                core.length >= 2 && core in text
+                core.takeIf { it.length >= 2 && fold(it) in text }
             }
         }
+
+        /** [query] without [word] and the 市, 県 or the like right after it, and the particle that ties it on (の, で, に). */
+        fun without(query: String, word: String): String =
+            query.replace(Regex(Regex.escape(word) + "[" + String(ADMIN_SUFFIXES) + "]?[のでにへ]?"), " ").replace(Regex("""\s+"""), " ").trim()
 
         private fun fold(text: String) = Normalizer.normalize(text, Normalizer.Form.NFKC).lowercase()
 

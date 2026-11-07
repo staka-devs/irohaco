@@ -258,9 +258,14 @@
     <string name="search_placeholder">Search by what is in the photo, or its text</string>
     <string name="search_options">Search options</string>
     <string name="search_all_kinds">All kinds</string>
-    <string name="search_by_meaning_hint">Finds what is in the photo with the embedding model</string>
-    <string name="search_by_text_hint">Finds the text written in the photo</string>
-    <string name="search_inferred_places_hint">Places guessed for photos without GPS</string>
+    <string name="search_by_meaning_hint">Find by what is in the photo (embedding)</string>
+    <string name="search_by_text_hint">Find by the text written in the photo</string>
+    <string name="search_inferred_places_hint">Include photos without GPS, with a guessed place</string>
+    <string name="search_options_sources">Search in</string>
+    <string name="search_options_places">Places</string>
+    <string name="search_options_models">Models</string>
+    <string name="search_by_memo_hint">Find by your own memos</string>
+    <string name="search_compare_hint">Show the results of several models side by side</string>
     <string name="search_by_meaning">Image content</string>
     <string name="search_by_text">Text (OCR)</string>
     <string name="search_photos">Photos</string>

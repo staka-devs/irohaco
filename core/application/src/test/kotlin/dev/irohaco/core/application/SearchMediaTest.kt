@@ -72,7 +72,7 @@ class SearchMediaTest {
         val atPlaces = SearchMedia(SearchByMeaning(vectors, embedText = { floatArrayOf(1f) }, modelDigest = "d"), SearchText(texts), { ids, _ -> catalog.filter { it.assetId in ids } }, { it }, SearchPlaces(places))
         val narrowed = atPlaces("京都の看板", onlyAtPlace = true)
         assertEquals(listOf("p2"), narrowed.hits.map { it.item.assetId })
-        assertEquals("京都市", narrowed.place)
+        assertEquals("京都", narrowed.place) // as asked, not the town of the first file
         assertEquals(listOf("p2", "p1", "v1", "v1"), atPlaces("京都の看板").hits.map { it.item.assetId })
     }
 

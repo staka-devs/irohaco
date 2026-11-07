@@ -254,9 +254,14 @@
     <string name="search_placeholder">写っているものや、写真の中の文字で探す</string>
     <string name="search_options">検索の設定</string>
     <string name="search_all_kinds">すべての種類</string>
-    <string name="search_by_meaning_hint">Embedding で写っているものを探す</string>
-    <string name="search_by_text_hint">写真に写った文字を探す</string>
-    <string name="search_inferred_places_hint">GPS のない写真で、撮った場所を推定したもの</string>
+    <string name="search_by_meaning_hint">写っているものから探す(Embedding)</string>
+    <string name="search_by_text_hint">写真に写った文字から探す</string>
+    <string name="search_inferred_places_hint">GPS のない写真も、撮影場所を推定して含める</string>
+    <string name="search_options_sources">探す対象</string>
+    <string name="search_options_places">場所</string>
+    <string name="search_options_models">モデル</string>
+    <string name="search_by_memo_hint">自分で付けたメモから探す</string>
+    <string name="search_compare_hint">複数のモデルの結果を並べて比べる</string>
     <string name="search_by_meaning">画像の内容</string>
     <string name="search_by_text">文字(OCR)</string>
     <string name="search_photos">写真</string>

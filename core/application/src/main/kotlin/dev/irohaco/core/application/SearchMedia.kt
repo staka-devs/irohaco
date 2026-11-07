@@ -85,15 +85,18 @@ class SearchMedia(
         /** Only files at the place the query names, when it names one (#203). */
         onlyAtPlace: Boolean = false,
     ): SearchResults {
-        val meant = if (byMeaning) meaningOrEmpty { if (compare) meaning.compare(query) else listOfNotNull(meaning(query, spaceId)) } else emptyList()
-        val texts = if (byText || byMemo) text(query).filter { if (it.fromMemo) byMemo else byText } else emptyList()
         val atPlaces = places?.invoke(query, includeInferredPlaces).orEmpty()
+        val placeWord = atPlaces.firstNotNullOfOrNull { SearchPlaces.mentionedPart(query, it.placeName) }
+        // Narrowed to the place, the place's name says nothing more about what is in the photo: "大阪 花火" looks for 花火.
+        val asked = if (onlyAtPlace && placeWord != null) SearchPlaces.without(query, placeWord).ifBlank { query } else query
+        val meant = if (byMeaning) meaningOrEmpty { if (compare) meaning.compare(asked) else listOfNotNull(meaning(asked, spaceId)) } else emptyList()
+        val texts = if (byText || byMemo) text(query).filter { if (it.fromMemo) byMemo else byText } else emptyList()
         // shortcut: the place search keeps its first 200 files, so a place with more loses the rest; page it if that shows.
         val atPlace = atPlaces.map { it.assetId }.toSet().takeIf { onlyAtPlace && it.isNotEmpty() }
         val results = fuse(meant.map { it.copy(hits = it.hits.filter { hit -> byMemo || !hit.fromMemo }) }, texts, kind, filters, meaningAsked = byMeaning, atPlaces)
         return results.copy(
             hits = results.hits.filter { atPlace == null || it.item.assetId in atPlace },
-            place = atPlaces.firstOrNull()?.placeName?.substringBefore(",")?.trim(),
+            place = placeWord,
         )
     }
 

@@ -444,19 +444,7 @@ private fun Conditions(
     }
     if (tuning && !similar) {
         IrohacoBottomSheet(onDismiss = onTuned) {
-            Text(stringResource(R.string.search_options), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = IrohacoSpacing.l))
-            @Composable
-            fun Option(label: Int, hint: Int?, on: Boolean, enabled: Boolean = true, onToggle: () -> Unit) = ListItem(
-                supportingContent = hint?.let { { Text(stringResource(it)) } },
-                trailingContent = { Switch(checked = on, onCheckedChange = null, enabled = enabled) },
-                modifier = Modifier.toggleable(on, enabled = enabled, role = Role.Switch) { onToggle() },
-            ) { Text(stringResource(label)) }
-            Option(R.string.search_by_meaning, R.string.search_by_meaning_hint, ui.byMeaning, onToggle = onToggleMeaning)
-            Option(R.string.search_by_text, R.string.search_by_text_hint, ui.byText, onToggle = onToggleText)
-            Option(R.string.search_by_memo, null, ui.byMemo, onToggle = onToggleMemo)
-            Option(R.string.search_inferred_places, R.string.search_inferred_places_hint, ui.inferredPlaces, onToggle = onToggleInferredPlaces)
-            // Comparing searches every model at once, so it needs two of them (SRCH-005).
-            if (searchable > 1) Option(R.string.search_compare, null, ui.compare, enabled = ui.byMeaning, onToggle = onToggleCompare)
+            SearchOptions(ui, searchable > 1, onToggleMeaning, onToggleText, onToggleMemo, onToggleInferredPlaces, onToggleCompare)
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
@@ -497,6 +485,55 @@ private fun Conditions(
                 }
             }
         }
+    }
+}
+
+/** What the search looks in, where it takes places from, and the models side by side, each under its heading. */
+@Composable
+private fun SearchOptions(
+    ui: SearchUi,
+    /** Comparing searches every model at once, so it needs two of them (SRCH-005). */
+    comparable: Boolean,
+    onToggleMeaning: () -> Unit,
+    onToggleText: () -> Unit,
+    onToggleMemo: () -> Unit,
+    onToggleInferredPlaces: () -> Unit,
+    onToggleCompare: () -> Unit,
+) {
+    @Composable
+    fun Heading(text: Int) = Text(
+        stringResource(text),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = IrohacoSpacing.l, end = IrohacoSpacing.l, top = IrohacoSpacing.m),
+    )
+
+    @Composable
+    fun Option(label: Int, hint: Int, on: Boolean, enabled: Boolean = true, onToggle: () -> Unit) = ListItem(
+        supportingContent = { Text(stringResource(hint)) },
+        trailingContent = { Switch(checked = on, onCheckedChange = null, enabled = enabled) },
+        modifier = Modifier.toggleable(on, enabled = enabled, role = Role.Switch) { onToggle() },
+    ) { Text(stringResource(label)) }
+    Column(Modifier.padding(bottom = IrohacoSpacing.l)) {
+        Text(stringResource(R.string.search_options), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = IrohacoSpacing.l))
+        Heading(R.string.search_options_sources)
+        Option(R.string.search_by_meaning, R.string.search_by_meaning_hint, ui.byMeaning, onToggle = onToggleMeaning)
+        Option(R.string.search_by_text, R.string.search_by_text_hint, ui.byText, onToggle = onToggleText)
+        Option(R.string.search_by_memo, R.string.search_by_memo_hint, ui.byMemo, onToggle = onToggleMemo)
+        Heading(R.string.search_options_places)
+        Option(R.string.search_inferred_places, R.string.search_inferred_places_hint, ui.inferredPlaces, onToggle = onToggleInferredPlaces)
+        if (comparable) {
+            Heading(R.string.search_options_models)
+            Option(R.string.search_compare, R.string.search_compare_hint, ui.compare, enabled = ui.byMeaning, onToggle = onToggleCompare)
+        }
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun SearchOptionsPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        Surface { SearchOptions(SearchUi(), comparable = true, {}, {}, {}, {}, {}) }
     }
 }
 
