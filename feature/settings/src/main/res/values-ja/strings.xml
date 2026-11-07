@@ -60,9 +60,9 @@
     <string name="settings_ai_pause">一時停止</string>
     <string name="settings_ai_resume">再開</string>
     <string name="settings_ai_retry">再試行</string>
-    <string name="settings_ai_index_card">Embedding モデル（写真の埋め込み・検索）</string>
+    <string name="settings_ai_index_card">Embedding モデル(写真の埋め込み・検索)</string>
     <string name="settings_ai_index_card_hint">写真を読んで、意味で探せるようにするモデルです。</string>
-    <string name="settings_ai_answer_card">チャットモデル（質問への回答）</string>
+    <string name="settings_ai_answer_card">チャットモデル(質問への回答)</string>
     <string name="settings_ai_answer_card_hint">検索で見つかった写真を見て、質問に答えるモデルです。</string>
     <string name="settings_ai_on_device">この端末</string>
     <string name="settings_ai_remote_at">%1$s</string>

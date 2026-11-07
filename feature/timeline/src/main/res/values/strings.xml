@@ -240,8 +240,8 @@
     <string name="timeline_size_under">Under %1$s</string>
     <string name="timeline_unrated">No rating</string>
     <string name="search_placeholder">Search by what is in the photo, or its text</string>
-    <string name="search_by_meaning">Meaning</string>
-    <string name="search_by_text">Text</string>
+    <string name="search_by_meaning">Image content</string>
+    <string name="search_by_text">Text (OCR)</string>
     <string name="search_photos">Photos</string>
     <string name="search_videos">Videos</string>
     <string name="search_no_index">Only the text in photos was searched. Build the search index in Settings to search by meaning too.</string>

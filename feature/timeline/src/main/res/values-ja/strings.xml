@@ -236,8 +236,8 @@
     <string name="timeline_size_under">%1$s未満</string>
     <string name="timeline_unrated">評価なし</string>
     <string name="search_placeholder">写っているものや、写真の中の文字で探す</string>
-    <string name="search_by_meaning">意味</string>
-    <string name="search_by_text">文字</string>
+    <string name="search_by_meaning">画像の内容</string>
+    <string name="search_by_text">文字(OCR)</string>
     <string name="search_photos">写真</string>
     <string name="search_videos">動画</string>
     <string name="search_no_index">写真の中の文字だけで探しました。設定で検索用の索引を作成すると、意味でも探せます。</string>
