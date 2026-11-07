@@ -27,7 +27,8 @@ data class TimelineItem(
     val hasLocation: Boolean = false,
 )
 
-enum class TimelineSortKey { TAKEN, NAME, SIZE, RATING }
+/** DISTANCE orders by the straight-line distance from [TimelineQuery.near]; files without a place come last. */
+enum class TimelineSortKey { TAKEN, NAME, SIZE, RATING, DISTANCE }
 
 /** What to name a position in the timeline, for the fast scrollbar's bubble while dragging (PRD GAL-014). */
 sealed interface TimelineLabel {
@@ -66,6 +67,10 @@ data class TimelineQuery(
     val takenFromMs: Long? = null,
     /** Only items taken before this instant; null has no upper bound. */
     val takenUntilMs: Long? = null,
+    /** Where the distance order measures from: where the device was when the user chose it. */
+    val near: GeoPoint? = null,
+    /** The distance order also uses places guessed for files without GPS. */
+    val nearIncludesInferred: Boolean = false,
 ) {
     /** The user narrowed what is shown, beyond the order and the hidden folders. */
     val filtered: Boolean get() = kind != null || favoritesOnly || tagIds.isNotEmpty() || takenFromMs != null || takenUntilMs != null

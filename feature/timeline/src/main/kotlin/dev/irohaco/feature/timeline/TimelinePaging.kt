@@ -42,7 +42,7 @@ sealed interface SortGroup {
 internal val SIZE_BANDS = longArrayOf(100_000_000, 10_000_000, 1_000_000, 100_000, 0)
 
 internal fun TimelineItem.sortGroup(key: TimelineSortKey): SortGroup? = when (key) {
-    TimelineSortKey.TAKEN -> null
+    TimelineSortKey.TAKEN, TimelineSortKey.DISTANCE -> null
     TimelineSortKey.NAME -> SortGroup.Initial(displayName?.firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() } ?: '#')
     TimelineSortKey.SIZE -> SortGroup.Size(SIZE_BANDS.indexOfFirst { (sizeBytes ?: 0) >= it })
     TimelineSortKey.RATING -> SortGroup.Stars(rating)

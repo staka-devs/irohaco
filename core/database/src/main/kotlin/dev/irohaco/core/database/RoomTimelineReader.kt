@@ -1,5 +1,6 @@
 package dev.irohaco.core.database
 
+import dev.irohaco.core.domain.GeoPoint
 import androidx.sqlite.db.SimpleSQLiteQuery
 import dev.irohaco.core.contracts.FolderMedia
 import dev.irohaco.core.contracts.FolderRef
@@ -91,6 +92,8 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             TimelineSortKey.NAME -> TimelineLabel.Name(row.displayName.firstOrNull()?.uppercaseChar() ?: '#')
             TimelineSortKey.SIZE -> TimelineLabel.Size(row.sizeBytes)
             TimelineSortKey.RATING -> TimelineLabel.Rating(row.rating)
+            // shortcut: the scrollbar's bubble shows the date when sorted by distance; show the distance if it is missed.
+            TimelineSortKey.DISTANCE -> TimelineLabel.Taken(row.takenMs)
         }
 
     /**
@@ -158,9 +161,24 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
                 TimelineSortKey.NAME -> "s.display_name COLLATE NOCASE"
                 TimelineSortKey.SIZE -> "s.file_size_bytes"
                 TimelineSortKey.RATING -> "COALESCE(r.rating, 0)"
+                TimelineSortKey.DISTANCE -> query.near?.let { distance(it, query.nearIncludesInferred, query.descending) } ?: TIME
             }
             val direction = if (query.descending) "DESC" else "ASC"
             return "$key $direction, a.asset_id $direction"
+        }
+
+        /**
+         * The squared distance on a flat map, which orders places as the true distance does at the sizes a photo library
+         * spans; the numbers are the app's own, so they go into the SQL as text. A file without a place sorts last either way.
+         */
+        internal fun distance(near: GeoPoint, inferred: Boolean, descending: Boolean): String {
+            val scale = Math.cos(Math.toRadians(near.latitude))
+            val lat = near.latitude.toString()
+            val lon = near.longitude.toString()
+            val which = if (inferred) "(($SHOWN) OR $GUESS)" else "($SHOWN)"
+            val nearest = "(SELECT MIN((le.latitude - $lat) * (le.latitude - $lat) + (le.longitude - $lon) * (le.longitude - $lon) * $scale * $scale) " +
+                "FROM location_evidence le WHERE le.asset_id = a.asset_id AND le.latitude IS NOT NULL AND $which)"
+            return "COALESCE($nearest, ${if (descending) "-1" else "1e18"})"
         }
     }
 }

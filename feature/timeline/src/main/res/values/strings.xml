@@ -88,12 +88,20 @@
     <string name="timeline_filter_off">Stop narrowing by %1$s</string>
     <string name="timeline_filter_favorites">Favorites</string>
     <string name="timeline_sort_filtered">Sort and filter (filtered)</string>
-    <string name="timeline_sort_newest">Date taken, newest first</string>
-    <string name="timeline_sort_oldest">Date taken, oldest first</string>
-    <string name="timeline_sort_name_asc">File name, A to Z</string>
-    <string name="timeline_sort_name_desc">File name, Z to A</string>
-    <string name="timeline_sort_largest">Size, largest first</string>
-    <string name="timeline_sort_smallest">Size, smallest first</string>
+    <string name="timeline_sort_taken">Date taken</string>
+    <string name="timeline_sort_distance">Distance</string>
+    <string name="timeline_sort_name">File name</string>
+    <string name="timeline_sort_size">Size</string>
+    <string name="timeline_sort_rating">Rating</string>
+    <string name="timeline_sort_distance_hint">Straight-line distance from where you are. Photos without a place come last</string>
+    <string name="timeline_sort_nearest">Nearest first</string>
+    <string name="timeline_sort_farthest">Farthest first</string>
+    <string name="timeline_sort_newest">Newest first</string>
+    <string name="timeline_sort_oldest">Oldest first</string>
+    <string name="timeline_sort_name_asc">A to Z</string>
+    <string name="timeline_sort_name_desc">Z to A</string>
+    <string name="timeline_sort_largest">Largest first</string>
+    <string name="timeline_sort_smallest">Smallest first</string>
     <string name="timeline_kind_all">All</string>
     <string name="timeline_kind_photos">Photos</string>
     <string name="timeline_kind_videos">Videos</string>
@@ -109,8 +117,8 @@
         <item quantity="one">%d item</item>
         <item quantity="other">%d items</item>
     </plurals>
-    <string name="timeline_sort_rating_high">Rating, highest first</string>
-    <string name="timeline_sort_rating_low">Rating, lowest first</string>
+    <string name="timeline_sort_rating_high">Highest first</string>
+    <string name="timeline_sort_rating_low">Lowest first</string>
     <string name="timeline_favorite">Add to favorites</string>
     <string name="viewer_favorite">Add to favorites</string>
     <string name="viewer_unfavorite">Remove from favorites</string>

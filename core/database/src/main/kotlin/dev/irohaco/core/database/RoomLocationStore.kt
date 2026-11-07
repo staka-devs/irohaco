@@ -297,7 +297,7 @@ private const val UNDECIDED =
        WHERE $HISTORY_CANDIDATE AND s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL"""
 
 /** A place guessed for a file without GPS: from nearby photos, or from the location history (SRCH-003, #174). */
-private const val GUESS = "(le.evidence_status = 'CANDIDATE' AND le.evidence_source IN ('NEARBY_MEDIA', 'LOCATION_HISTORY'))"
+internal const val GUESS = "(le.evidence_status = 'CANDIDATE' AND le.evidence_source IN ('NEARBY_MEDIA', 'LOCATION_HISTORY'))"
 
 /** EXIF and video GPS in `location_evidence`, source EXIF (PRD GAL-017). A file without GPS is kept as UNKNOWN. */
 class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -> String = { UUID.randomUUID().toString() }) : LocationStore, PlaceEvidenceStore, LocationHistoryStore {

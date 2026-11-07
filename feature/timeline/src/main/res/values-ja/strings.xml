@@ -88,12 +88,20 @@
     <string name="timeline_filter_off">%1$sの絞り込みを外す</string>
     <string name="timeline_filter_favorites">お気に入り</string>
     <string name="timeline_sort_filtered">並べ替えと絞り込み(絞り込み中)</string>
-    <string name="timeline_sort_newest">撮影日時(新しい順)</string>
-    <string name="timeline_sort_oldest">撮影日時(古い順)</string>
-    <string name="timeline_sort_name_asc">ファイル名(A→Z)</string>
-    <string name="timeline_sort_name_desc">ファイル名(Z→A)</string>
-    <string name="timeline_sort_largest">サイズ(大きい順)</string>
-    <string name="timeline_sort_smallest">サイズ(小さい順)</string>
+    <string name="timeline_sort_taken">撮影日時</string>
+    <string name="timeline_sort_distance">距離</string>
+    <string name="timeline_sort_name">ファイル名</string>
+    <string name="timeline_sort_size">サイズ</string>
+    <string name="timeline_sort_rating">評価</string>
+    <string name="timeline_sort_distance_hint">現在地からの直線距離。位置のない写真は最後</string>
+    <string name="timeline_sort_nearest">近い順</string>
+    <string name="timeline_sort_farthest">遠い順</string>
+    <string name="timeline_sort_newest">新しい順</string>
+    <string name="timeline_sort_oldest">古い順</string>
+    <string name="timeline_sort_name_asc">A→Z</string>
+    <string name="timeline_sort_name_desc">Z→A</string>
+    <string name="timeline_sort_largest">大きい順</string>
+    <string name="timeline_sort_smallest">小さい順</string>
     <string name="timeline_kind_all">すべて</string>
     <string name="timeline_kind_photos">写真</string>
     <string name="timeline_kind_videos">動画</string>
@@ -109,8 +117,8 @@
         <item quantity="one">%d件</item>
         <item quantity="other">%d件</item>
     </plurals>
-    <string name="timeline_sort_rating_high">評価(高い順)</string>
-    <string name="timeline_sort_rating_low">評価(低い順)</string>
+    <string name="timeline_sort_rating_high">高い順</string>
+    <string name="timeline_sort_rating_low">低い順</string>
     <string name="timeline_favorite">お気に入りに追加</string>
     <string name="viewer_favorite">お気に入りに追加</string>
     <string name="viewer_unfavorite">お気に入りから外す</string>

@@ -11,6 +11,7 @@ import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineSortKey
 import dev.irohaco.core.domain.AssetAvailability
+import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -96,6 +97,30 @@ class RoomTimelineReaderTest {
         assertEquals(listOf("b", "c"), order(days.copy(takenUntilMs = null)))
         assertEquals(listOf("b"), order(days.copy(takenUntilMs = null, kind = MediaKind.IMAGE)))
         assertEquals(TimelineQuery(TimelineSortKey.TAKEN, descending = false), days.unfiltered())
+    }
+
+    @Test
+    fun `sorts by the distance from a place, guessed places only when asked, files without one last`() = runTest {
+        RoomCatalogStore(db).apply(
+            CatalogChanges(
+                observedAtMs = 1,
+                newVolumes = listOf(CatalogVolume("v1", "external_primary", null, null)),
+                newAssets = listOf(asset("far", 1, 1, 1), asset("near", 2, 2, 1), asset("guessed", 3, 3, 1), asset("none", 4, 4, 1)),
+            ),
+        )
+        fun place(id: String, asset: String, lat: Double, lon: Double, source: String, status: String) = db.openHelper.writableDatabase.execSQL(
+            "INSERT INTO location_evidence(evidence_id, asset_id, evidence_source, evidence_status, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)",
+            arrayOf<Any>(id, asset, source, status, lat, lon),
+        )
+        place("l1", "far", 43.06, 141.35, "EXIF", "CONFIRMED") // Sapporo
+        place("l2", "near", 35.69, 139.70, "EXIF", "CONFIRMED") // Tokyo
+        place("l3", "guessed", 35.68, 139.76, "NEARBY_MEDIA", "CANDIDATE")
+        val fromTokyo = TimelineQuery(TimelineSortKey.DISTANCE, descending = false, near = GeoPoint(35.68, 139.76))
+        suspend fun order(query: TimelineQuery) = reader.page(query, 0, 10).map { it.assetId }
+
+        assertEquals(listOf("near", "far", "guessed", "none"), order(fromTokyo))
+        assertEquals(listOf("guessed", "near", "far", "none"), order(fromTokyo.copy(nearIncludesInferred = true)))
+        assertEquals(listOf("far", "near", "none", "guessed"), order(fromTokyo.copy(descending = true))) // no place: last, id breaks the tie
     }
 
     @Test
