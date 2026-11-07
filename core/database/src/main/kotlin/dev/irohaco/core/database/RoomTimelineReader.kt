@@ -35,7 +35,7 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
         db.timelineDao().page(
             SimpleSQLiteQuery(
                 """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
-                          s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, 0 AS rating, $HAS_LOCATION AS hasLocation
+                          s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, 0 AS rating, $HAS_LOCATION AS hasLocation, NULL AS distance
                    $FROM WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL AND a.asset_id IN (${ids.joinToString { "?" }})
                      ${HAS_TAG.repeat(tagIds.size)}""",
                 (ids + tagIds).toTypedArray(),
@@ -51,11 +51,11 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             SimpleSQLiteQuery(
                 """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
                           s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes,
-                          COALESCE(r.rating, 0) AS rating, $HAS_LOCATION AS hasLocation
+                          COALESCE(r.rating, 0) AS rating, $HAS_LOCATION AS hasLocation, ${distanceColumn(query)} AS distance
                    ${from(query)} ${where(query)} ORDER BY ${orderBy(query)} LIMIT ? OFFSET ?""",
                 arrayOf(*fromArgs(query), *args(query), limit, offset),
             ),
-        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, it.rating ?: 0, it.hasLocation == true) }
+        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, it.rating ?: 0, it.hasLocation == true, it.distance?.let(::km)) }
 
     override suspend fun indexOf(query: TimelineQuery, assetId: String): Int? =
         db.timelineDao().indexOf(
@@ -71,16 +71,16 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             SimpleSQLiteQuery(
                 """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
                           s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes,
-                          COALESCE(r.rating, 0) AS rating, $HAS_LOCATION AS hasLocation
+                          COALESCE(r.rating, 0) AS rating, $HAS_LOCATION AS hasLocation, ${distanceColumn(query)} AS distance
                    ${from(query)} ${where(query)} AND $TIME >= ? AND $TIME < ? ORDER BY ${orderBy(query)}""",
                 arrayOf(*fromArgs(query), *args(query), fromMs, untilMs),
             ),
-        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, it.rating ?: 0, it.hasLocation == true) }
+        ).map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, it.rating ?: 0, it.hasLocation == true, it.distance?.let(::km)) }
 
     override suspend fun labels(query: TimelineQuery): List<TimelineLabel> =
         db.timelineDao().labelRows(
             SimpleSQLiteQuery(
-                """SELECT $TIME AS takenMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, COALESCE(r.rating, 0) AS rating
+                """SELECT $TIME AS takenMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, COALESCE(r.rating, 0) AS rating, ${distanceColumn(query)} AS distance
                    ${from(query)} ${where(query)} ORDER BY ${orderBy(query)}""",
                 arrayOf(*fromArgs(query), *args(query)),
             ),
@@ -92,8 +92,7 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             TimelineSortKey.NAME -> TimelineLabel.Name(row.displayName.firstOrNull()?.uppercaseChar() ?: '#')
             TimelineSortKey.SIZE -> TimelineLabel.Size(row.sizeBytes)
             TimelineSortKey.RATING -> TimelineLabel.Rating(row.rating)
-            // shortcut: the scrollbar's bubble shows the date when sorted by distance; show the distance if it is missed.
-            TimelineSortKey.DISTANCE -> TimelineLabel.Taken(row.takenMs)
+            TimelineSortKey.DISTANCE -> TimelineLabel.Distance(row.distance?.let(::km))
         }
 
     /**
@@ -140,6 +139,12 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             }
             if (query.takenFromMs != null) append(" AND $TIME >= ?")
             if (query.takenUntilMs != null) append(" AND $TIME < ?")
+            if (query.minRating != null) append(" AND COALESCE(r.rating, 0) >= ?")
+            when (query.located) {
+                true -> append(" AND $HAS_LOCATION")
+                false -> append(" AND NOT $HAS_LOCATION")
+                null -> Unit
+            }
         }
 
         /** In the order of the placeholders in [where]. */
@@ -151,6 +156,7 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             query.area?.let { add(it.south); add(it.north); add(it.west); add(it.east) }
             query.takenFromMs?.let { add(it) }
             query.takenUntilMs?.let { add(it) }
+            query.minRating?.let { add(it) }
         }.toTypedArray()
 
         /** The asset id breaks ties in the same direction, so pages never overlap or skip. */
@@ -171,14 +177,26 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
          * The squared distance on a flat map, which orders places as the true distance does at the sizes a photo library
          * spans; the numbers are the app's own, so they go into the SQL as text. A file without a place sorts last either way.
          */
-        internal fun distance(near: GeoPoint, inferred: Boolean, descending: Boolean): String {
+        internal fun distance(near: GeoPoint, inferred: Boolean, descending: Boolean): String =
+            "COALESCE(${nearest(near, inferred)}, ${if (descending) "-1" else "1e18"})"
+
+        /** The squared flat distance, in degrees of latitude, to the nearest place the order may use; null without one. */
+        private fun nearest(near: GeoPoint, inferred: Boolean): String {
             val scale = Math.cos(Math.toRadians(near.latitude))
             val lat = near.latitude.toString()
             val lon = near.longitude.toString()
             val which = if (inferred) "(($SHOWN) OR $GUESS)" else "($SHOWN)"
-            val nearest = "(SELECT MIN((le.latitude - $lat) * (le.latitude - $lat) + (le.longitude - $lon) * (le.longitude - $lon) * $scale * $scale) " +
+            return "(SELECT MIN((le.latitude - $lat) * (le.latitude - $lat) + (le.longitude - $lon) * (le.longitude - $lon) * $scale * $scale) " +
                 "FROM location_evidence le WHERE le.asset_id = a.asset_id AND le.latitude IS NOT NULL AND $which)"
-            return "COALESCE($nearest, ${if (descending) "-1" else "1e18"})"
         }
+
+        /** The distance column of a row: filled only when sorted by distance. */
+        fun distanceColumn(query: TimelineQuery): String =
+            query.near?.takeIf { query.sortKey == TimelineSortKey.DISTANCE }?.let { nearest(it, query.nearIncludesInferred) } ?: "NULL"
+
+        /** Degrees of latitude to km; SQLite on Android has no square root, so it is taken here. */
+        fun km(squared: Double): Double = Math.sqrt(squared) * KM_PER_DEGREE
+
+        private const val KM_PER_DEGREE = 111.32
     }
 }

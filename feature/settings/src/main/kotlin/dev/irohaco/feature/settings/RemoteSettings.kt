@@ -115,7 +115,7 @@ internal fun RemoteSettings(
             OutlinedButton(onClick = { renaming = connection }) { Text(stringResource(R.string.settings_remote_rename)) }
             HorizontalDivider()
             Text(stringResource(R.string.settings_remote_hint), style = MaterialTheme.typography.bodyMedium)
-            ManageEgress.offered.forEach { (task, payloads) ->
+            ManageEgress.offeredFor(connection.protocol).forEach { (task, payloads) ->
                 Text(stringResource(TASK_LABELS.getValue(task)), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                 payloads.forEach { payload ->
                     val grant = EgressGrant(connection.id, task, payload)
@@ -150,7 +150,7 @@ internal fun RemoteSettings(
     }
     connections.forEach { connection ->
         // One line per task with what this connection may get, so the list shows what goes out without opening it.
-        val allowed = ManageEgress.offered.mapNotNull { (task, payloads) ->
+        val allowed = ManageEgress.offeredFor(connection.protocol).mapNotNull { (task, payloads) ->
             payloads.filter { EgressGrant(connection.id, task, it) in grants }.takeIf { it.isNotEmpty() }
                 ?.let { granted -> stringResource(TASK_LABELS.getValue(task)) + ": " + granted.map { stringResource(it.label()) }.joinToString(", ") }
         }

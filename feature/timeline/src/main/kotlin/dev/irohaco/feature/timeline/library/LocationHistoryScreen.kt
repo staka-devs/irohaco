@@ -268,7 +268,12 @@ internal fun LocationHistoryContent(
 ) {
     var open by rememberSaveable { mutableStateOf(opened) }
     var pickingDates by rememberSaveable { mutableStateOf(false) }
-    if (pickingDates) DateRangeDialog(dates?.first, dates?.second, onDismiss = { pickingDates = false }) { from, until -> pickingDates = false; onDates(from, until) }
+    if (pickingDates) {
+        DateRangeDialog(dates?.first, dates?.second, onDismiss = { pickingDates = false }, onClear = { pickingDates = false; onDates(null, null) }) { from, until ->
+            pickingDates = false
+            onDates(from, until)
+        }
+    }
     var pickingPlace by rememberSaveable { mutableStateOf(false) }
     if (pickingPlace) PlacePickerDialog(places, onDismiss = { pickingPlace = false }) { pickingPlace = false; onPlace(it.point) }
     Scaffold(
@@ -312,7 +317,12 @@ internal fun LocationHistoryContent(
                             FilterChip(byDay, onToggleByDay, label = { Text(stringResource(R.string.history_by_day)) })
                         }
                         val label = dates?.let { (from, until) -> dateRangeLabel(from, until) }
-                        FilterChip(label != null, { if (label != null) onDates(null, null) else pickingDates = true }, label = { Text(label ?: stringResource(R.string.search_dates)) })
+                        FilterChip(
+                            label != null,
+                            { pickingDates = true },
+                            label = { Text(label ?: stringResource(R.string.search_dates)) },
+                            trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), null) },
+                        )
                     }
                     when {
                         importing -> Unit

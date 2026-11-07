@@ -20,6 +20,7 @@ internal fun TimelineLabel.format(dateFormatter: DateTimeFormatter, zone: ZoneId
     is TimelineLabel.Name -> firstChar.toString()
     is TimelineLabel.Size -> Formatter.formatShortFileSize(context, bytes)
     is TimelineLabel.Rating -> if (rating <= 0) "☆" else "★".repeat(rating)
+    is TimelineLabel.Distance -> km?.let { if (it < 10) "%.1f km".format(it) else "%,d km".format(it.toInt()) } ?: context.getString(R.string.timeline_distance_none)
 }
 
 /**

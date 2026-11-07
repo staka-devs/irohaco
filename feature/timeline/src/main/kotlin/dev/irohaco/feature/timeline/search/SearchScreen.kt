@@ -1,5 +1,7 @@
 package dev.irohaco.feature.timeline.search
 
+import dev.irohaco.feature.timeline.kindLabel
+import dev.irohaco.feature.timeline.ChoiceChip
 import dev.irohaco.core.designsystem.component.IrohacoBottomSheet
 import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.Switch
@@ -434,7 +436,12 @@ private fun Conditions(
 ) {
     val searchable = spaces.count { it.space.state in PICKABLE }
     var pickingDates by rememberSaveable { mutableStateOf(false) }
-    if (pickingDates) DateRangeDialog(ui.filters.fromMs, ui.filters.untilMs, onDismiss = { pickingDates = false }) { from, until -> pickingDates = false; onDates(from, until) }
+    if (pickingDates) {
+        DateRangeDialog(ui.filters.fromMs, ui.filters.untilMs, onDismiss = { pickingDates = false }, onClear = { pickingDates = false; onDates(null, null) }) { from, until ->
+            pickingDates = false
+            onDates(from, until)
+        }
+    }
     if (tuning && !similar) {
         IrohacoBottomSheet(onDismiss = onTuned) {
             Text(stringResource(R.string.search_options), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = IrohacoSpacing.l))
@@ -455,13 +462,13 @@ private fun Conditions(
     Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
         // The conditions on the files, in one row that scrolls sideways.
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-            KindChip(ui.kind, onKind)
+            ChoiceChip(ui.kind, listOf(null, MediaKind.IMAGE, MediaKind.VIDEO), { kindLabel(it) }, onKind)
             val dates = ui.filters.fromMs?.let { from -> ui.filters.untilMs?.let { until -> dateRangeLabel(from, until) } }
             FilterChip(
                 dates != null,
-                { if (dates != null) onDates(null, null) else pickingDates = true },
+                { pickingDates = true },
                 label = { Text(dates ?: stringResource(R.string.search_dates)) },
-                trailingIcon = if (dates == null) ({ Icon(painterResource(IrohacoIcons.ExpandMore), null) }) else null,
+                trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), null) },
             )
             ui.results?.place?.let { place -> FilterChip(ui.atPlace, onToggleAtPlace, label = { Text(place) }) }
             TagFilterChips(tags, ui.filters.tagIds, onTags)
@@ -485,37 +492,6 @@ private fun Conditions(
     }
 }
 
-/** Photos, videos or both, chosen from a menu under one chip. */
-@Composable
-private fun KindChip(kind: MediaKind?, onKind: (MediaKind?) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    @Composable
-    fun label(value: MediaKind?) = stringResource(
-        when (value) {
-            MediaKind.IMAGE -> R.string.search_photos
-            MediaKind.VIDEO -> R.string.search_videos
-            null -> R.string.search_all_kinds
-        },
-    )
-    Box {
-        FilterChip(
-            selected = kind != null,
-            onClick = { open = true },
-            label = { Text(label(kind)) },
-            trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), null) },
-        )
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            listOf(null, MediaKind.IMAGE, MediaKind.VIDEO).forEach { value ->
-                DropdownMenuItem(
-                    text = { Text(label(value)) },
-                    trailingIcon = if (value == kind) ({ Icon(painterResource(IrohacoIcons.Check), null) }) else null,
-                    onClick = { open = false; onKind(value) },
-                )
-            }
-        }
-    }
-}
-
 /** The similar photos page's header: a way back and what the page shows. */
 @Composable
 private fun SimilarHeader(onBack: () -> Unit) {
@@ -528,7 +504,14 @@ private fun SimilarHeader(onBack: () -> Unit) {
 /** Picks a range of days, given and returned as the start of the first and the end of the last whole local day. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DateRangeDialog(fromMs: Long?, untilMs: Long?, onDismiss: () -> Unit, onPick: (Long, Long) -> Unit) {
+internal fun DateRangeDialog(
+    fromMs: Long?,
+    untilMs: Long?,
+    onDismiss: () -> Unit,
+    /** Takes the dates off; offered only while some are set. */
+    onClear: (() -> Unit)? = null,
+    onPick: (Long, Long) -> Unit,
+) {
     val zone = ZoneId.systemDefault()
     // The picker works in UTC days; the filter in this device's days.
     fun toPicker(ms: Long?) = ms?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }
@@ -546,7 +529,12 @@ internal fun DateRangeDialog(fromMs: Long?, untilMs: Long?, onDismiss: () -> Uni
                 enabled = state.selectedStartDateMillis != null,
             ) { Text(stringResource(R.string.search_dates_apply)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.memo_cancel)) } },
+        dismissButton = {
+            Row {
+                if (onClear != null && fromMs != null) TextButton(onClick = onClear) { Text(stringResource(R.string.timeline_filter_clear)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.memo_cancel)) }
+            }
+        },
     ) {
         DateRangePicker(state, modifier = Modifier.heightIn(max = 520.dp))
     }

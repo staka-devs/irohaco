@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="status_ready">検索できます</string>
-    <string name="status_building">索引作成中 %1$d%%</string>
-    <string name="status_not_indexed">未索引</string>
+    <string name="status_building">インデックス作成中 %1$d%%</string>
+    <string name="status_not_indexed">未インデックス</string>
     <string name="status_stale">更新が必要</string>
     <string name="status_failed">失敗</string>
     <string name="status_failed_with_reason">失敗：%1$s</string>
@@ -46,7 +46,7 @@
     <string name="remote_quota">外部のアカウントの利用量が上限に達しています。</string>
     <string name="remote_timeout">外部のモデルから時間内に答えが返りませんでした。</string>
     <string name="remote_failed">外部のモデルからエラーが返りました(%1$d)。</string>
-    <string name="remote_denied">送っていません。このモデルには%1$sの送信が許可されていません。設定のプライバシーでオンにできます。</string>
-    <string name="remote_blocked">送っていません。送信しないようにした写真が含まれています。</string>
+    <string name="remote_denied">%1$sの送信が許可されていません。</string>
+    <string name="remote_blocked">送信しない設定の写真が含まれています。</string>
     <string name="remote_unreachable">外部のモデルにつながりませんでした。</string>
 </resources>

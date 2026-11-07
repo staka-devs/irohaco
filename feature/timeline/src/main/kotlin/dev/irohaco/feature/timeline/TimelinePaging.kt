@@ -36,13 +36,24 @@ sealed interface SortGroup {
 
     /** 0 is no rating. */
     data class Stars(val count: Int) : SortGroup
+
+    /** An index into [DISTANCE_BANDS]; one past its end for files without a place. */
+    data class Distance(val band: Int) : SortGroup
 }
+
+/** Upper edges of the distance bands in km, nearest first; the band after the last is everything farther. */
+internal val DISTANCE_BANDS = intArrayOf(1, 10, 100, 1_000)
+
+/** The band of [km]: 0 within 1 km, ..., DISTANCE_BANDS.size farther than the last edge, one more without a place. */
+internal fun distanceBand(km: Double?): Int =
+    if (km == null) DISTANCE_BANDS.size + 1 else DISTANCE_BANDS.indexOfFirst { km <= it }.takeIf { it >= 0 } ?: DISTANCE_BANDS.size
 
 /** Lower edges of the size bands, largest first; the last band is everything smaller. */
 internal val SIZE_BANDS = longArrayOf(100_000_000, 10_000_000, 1_000_000, 100_000, 0)
 
 internal fun TimelineItem.sortGroup(key: TimelineSortKey): SortGroup? = when (key) {
-    TimelineSortKey.TAKEN, TimelineSortKey.DISTANCE -> null
+    TimelineSortKey.TAKEN -> null
+    TimelineSortKey.DISTANCE -> SortGroup.Distance(distanceBand(distanceKm))
     TimelineSortKey.NAME -> SortGroup.Initial(displayName?.firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() } ?: '#')
     TimelineSortKey.SIZE -> SortGroup.Size(SIZE_BANDS.indexOfFirst { (sizeBytes ?: 0) >= it })
     TimelineSortKey.RATING -> SortGroup.Stars(rating)

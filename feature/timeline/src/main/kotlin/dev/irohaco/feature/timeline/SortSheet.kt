@@ -123,12 +123,7 @@ private val GROUPINGS = listOf(
     DateGrouping.DAY to R.string.timeline_group_day,
 )
 
-private val KINDS = listOf(null to R.string.timeline_kind_all, MediaKind.IMAGE to R.string.timeline_kind_photos, MediaKind.VIDEO to R.string.timeline_kind_videos)
-
-/**
- * Narrows the grid by kind, favorites, tags and the dates taken, then picks one of the sort orders
- * (GAL-006, DESIGN §3). The viewer opened from the grid follows the same filter.
- */
+/** Picks the grid's order (GAL-006, DESIGN §3); the filters are in the row over the grid ([FilterRow]). */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun SortContent(
@@ -140,57 +135,7 @@ internal fun SortContent(
     /** Sorts by distance once the device's place is known; [TimelineQuery.near] is filled in by the caller. */
     onDistance: (TimelineQuery) -> Unit = onChange,
 ) {
-    var pickingDates by rememberSaveable { mutableStateOf(false) }
-    if (pickingDates) {
-        DateRangeDialog(query.takenFromMs, query.takenUntilMs, onDismiss = { pickingDates = false }) { from, until ->
-            pickingDates = false
-            onChange(query.copy(takenFromMs = from, takenUntilMs = until))
-        }
-    }
     Column(Modifier.fillMaxWidth().navigationBarsPadding().verticalScroll(rememberScrollState())) {
-        Row(Modifier.fillMaxWidth().padding(end = IrohacoSpacing.s), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(R.string.timeline_filter),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.weight(1f).padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
-            )
-            if (query.filtered) TextButton(onClick = { onChange(query.unfiltered()) }) { Text(stringResource(R.string.timeline_filter_clear)) }
-        }
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
-            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-        ) {
-            KINDS.forEachIndexed { index, (kind, label) ->
-                ToggleButton(
-                    checked = query.kind == kind,
-                    onCheckedChange = { onChange(query.copy(kind = kind)) },
-                    shapes = when (index) {
-                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                        KINDS.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                    },
-                    modifier = Modifier.weight(1f),
-                ) { Text(stringResource(label)) }
-            }
-        }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
-            modifier = Modifier.padding(horizontal = IrohacoSpacing.l),
-        ) {
-            FilterChip(
-                selected = query.favoritesOnly,
-                onClick = { onChange(query.copy(favoritesOnly = !query.favoritesOnly)) },
-                label = { Text(stringResource(R.string.timeline_filter_favorites)) },
-            )
-            val from = query.takenFromMs
-            val until = query.takenUntilMs
-            FilterChip(
-                selected = from != null && until != null,
-                onClick = { if (from != null && until != null) onChange(query.copy(takenFromMs = null, takenUntilMs = null)) else pickingDates = true },
-                label = { Text(if (from != null && until != null) dateRangeLabel(from, until) else stringResource(R.string.search_dates)) },
-            )
-            TagFilterChips(tags, query.tagIds) { onChange(query.copy(tagIds = it)) }
-        }
         Text(
             stringResource(R.string.timeline_sort_title),
             style = MaterialTheme.typography.titleLarge,
@@ -256,53 +201,10 @@ private fun Connected(labels: List<Int>, selected: Int, onSelect: (Int) -> Unit)
 /** Under the radio's text, so the options read as the chosen key's own. */
 private val SUB_INDENT = 56.dp
 
-/**
- * What the grid is narrowed by, under the bar, so photos that do not show are never a mystery; each
- * chip takes its own condition off, and the last button all of them.
- */
-@Composable
-internal fun ActiveFilters(query: TimelineQuery, tags: List<Tag>, onChange: (TimelineQuery) -> Unit, onEdit: () -> Unit) {
-    if (!query.filtered) return
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = IrohacoSpacing.l),
-        horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        query.kind?.let { kind ->
-            FilterOff(stringResource(KINDS.first { it.first == kind }.second)) { onChange(query.copy(kind = null)) }
-        }
-        if (query.favoritesOnly) FilterOff(stringResource(R.string.timeline_filter_favorites)) { onChange(query.copy(favoritesOnly = false)) }
-        val from = query.takenFromMs
-        val until = query.takenUntilMs
-        if (from != null && until != null) FilterOff(dateRangeLabel(from, until)) { onChange(query.copy(takenFromMs = null, takenUntilMs = null)) }
-        tags.filter { it.tagId in query.tagIds }.forEach { tag -> FilterOff(tag.name) { onChange(query.copy(tagIds = query.tagIds - tag.tagId)) } }
-        TextButton(onClick = onEdit) { Text(stringResource(R.string.timeline_filter_edit)) }
-        TextButton(onClick = { onChange(query.unfiltered()) }) { Text(stringResource(R.string.timeline_filter_clear)) }
-    }
-}
-
-@Composable
-private fun FilterOff(label: String, onOff: () -> Unit) {
-    InputChip(
-        selected = true,
-        onClick = onOff,
-        label = { Text(label) },
-        trailingIcon = { Icon(painterResource(IrohacoIcons.Close), stringResource(R.string.timeline_filter_off, label)) },
-    )
-}
-
 @IrohacoPreviews
 @Composable
 private fun SortContentPreview() {
     IrohacoTheme(dynamicColor = false) {
-        Surface { SortContent(TimelineQuery(kind = MediaKind.IMAGE, favoritesOnly = true, tagIds = setOf("t")), {}, DateGrouping.MONTH, tags = listOf(Tag("t", "海", 3), Tag("u", "山", 1))) }
-    }
-}
-
-@IrohacoPreviews
-@Composable
-private fun ActiveFiltersPreview() {
-    IrohacoTheme(dynamicColor = false) {
-        Surface { ActiveFilters(TimelineQuery(favoritesOnly = true, tagIds = setOf("t", "u")), listOf(Tag("t", "海", 3), Tag("u", "山", 1)), {}, {}) }
+        Surface { SortContent(TimelineQuery(), {}, DateGrouping.MONTH) }
     }
 }

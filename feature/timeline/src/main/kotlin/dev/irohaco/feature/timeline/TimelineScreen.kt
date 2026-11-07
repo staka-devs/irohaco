@@ -430,12 +430,7 @@ internal fun TimelineContent(
                             Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.timeline_settings))
                         }
                         if (!noAccess) {
-                            IconButton(onClick = { sorting = true }) {
-                                // A dot says the grid is narrowed, so missing photos are not a surprise.
-                                BadgedBox(badge = { if (query.filtered) Badge() }) {
-                                    Icon(painterResource(IrohacoIcons.Sort), stringResource(if (query.filtered) R.string.timeline_sort_filtered else R.string.timeline_sort))
-                                }
-                            }
+                            IconButton(onClick = { sorting = true }) { Icon(painterResource(IrohacoIcons.Sort), stringResource(R.string.timeline_sort_title)) }
                             // Pinch changes the columns; the menu keeps a way without gestures, as for TalkBack (M1-30).
                             var menu by remember { mutableStateOf(false) }
                             IconButton(onClick = { menu = true }) {
@@ -471,7 +466,8 @@ internal fun TimelineContent(
                     if (access.images == LibraryAccess.SELECTED || access.videos == LibraryAccess.SELECTED) {
                         PartialAccessBar(onRequestAccess)
                     }
-                    if (selection.isEmpty()) ActiveFilters(query, tags, onQueryChange) { sorting = true }
+                    // Kept while selecting too: hiding it would move the grid under the finger mid-drag.
+                    FilterRow(query, tags, onQueryChange)
                     TimelineGrid(
                         cells = cells,
                         columns = columns,
@@ -838,7 +834,15 @@ internal fun SortGroup.title(): String {
             SIZE_BANDS.lastIndex -> stringResource(R.string.timeline_size_under, size(SIZE_BANDS[band - 1]))
             else -> stringResource(R.string.timeline_size_between, size(SIZE_BANDS[band]), size(SIZE_BANDS[band - 1]))
         }
+        is SortGroup.Distance -> distanceBandTitle(band)
     }
+}
+
+@Composable
+internal fun distanceBandTitle(band: Int): String = when {
+    band < DISTANCE_BANDS.size -> stringResource(R.string.timeline_distance_within, "%,d".format(DISTANCE_BANDS[band]))
+    band == DISTANCE_BANDS.size -> stringResource(R.string.timeline_distance_farther, "%,d".format(DISTANCE_BANDS.last()))
+    else -> stringResource(R.string.timeline_distance_none)
 }
 
 @Composable

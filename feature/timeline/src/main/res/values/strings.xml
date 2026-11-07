@@ -86,6 +86,11 @@
     <string name="timeline_filter_clear">Clear</string>
     <string name="timeline_filter_edit">Change</string>
     <string name="timeline_filter_off">Stop narrowing by %1$s</string>
+    <string name="timeline_filter_rating">Rating</string>
+    <string name="timeline_filter_rating_at_least">%1$s or more</string>
+    <string name="timeline_filter_place">Place</string>
+    <string name="timeline_filter_located">With a place</string>
+    <string name="timeline_filter_unlocated">Without a place</string>
     <string name="timeline_filter_favorites">Favorites</string>
     <string name="timeline_sort_filtered">Sort and filter (filtered)</string>
     <string name="timeline_sort_taken">Date taken</string>
@@ -237,7 +242,7 @@
     <string name="map_consent_body">The map loads from %1$s, which then learns the area you look at. To show place names, the places where photos were taken may also be sent to your device\'s place-name service.</string>
     <string name="map_consent_allow">Allow</string>
     <string name="map_consent_decline">Not now</string>
-    <string name="map_declined">The map stays off. To see one photo\'s place, open it and choose Show on map from its menu; it opens in your map app.</string>
+    <string name="map_declined">The map stays off. Show on map on a photo still opens it in your map app.</string>
     <string name="map_area_title">Photos on the map</string>
     <plurals name="map_marker_description">
         <item quantity="one">%d photo or video here</item>
@@ -246,6 +251,9 @@
     <string name="timeline_size_at_least">%1$s or more</string>
     <string name="timeline_size_between">%1$s–%2$s</string>
     <string name="timeline_size_under">Under %1$s</string>
+    <string name="timeline_distance_within">Within %1$s km</string>
+    <string name="timeline_distance_farther">Farther than %1$s km</string>
+    <string name="timeline_distance_none">No place</string>
     <string name="timeline_unrated">No rating</string>
     <string name="search_placeholder">Search by what is in the photo, or its text</string>
     <string name="search_options">Search options</string>
@@ -259,7 +267,7 @@
     <string name="search_videos">Videos</string>
     <string name="search_no_index">Only the text in photos was searched. Build the search index in Settings to search by meaning too.</string>
     <string name="search_open_settings">Open settings</string>
-    <string name="search_coverage">The index covers %1$d%% of your photos and videos; the rest are not in these results.</string>
+    <string name="search_coverage">Indexed: %1$d%% of your photos and videos\nThe rest are not in these results.</string>
     <string name="search_nothing">Nothing found</string>
     <string name="search_hint">Describe a scene, such as “sunset over the sea”, or type a word written in the photo.</string>
     <string name="search_at">at %1$s</string>
@@ -323,10 +331,10 @@
     <string name="edit_location_clear_hint">Clear both to remove the location. The file is not changed.</string>
     <string name="file_write">Write to the file</string>
     <string name="file_write_confirm">Write</string>
-    <string name="file_write_explain">Writes the chosen fields into the file\'s EXIF. The file as it was stays in the app until the written values are checked.</string>
+    <string name="file_write_explain">Writes the chosen fields into the file\'s EXIF.</string>
     <string name="file_write_conflict">Choose which value to keep in the items above, and writing becomes possible.</string>
     <string name="file_write_unsupported">Files of this type cannot be written to.</string>
-    <string name="file_write_needs_location">Without the permission, writing would drop the file\'s location, so allow location access to write to the file.</string>
+    <string name="file_write_needs_location">Writing to the file removes its location. Allow access to location first.</string>
     <string name="file_write_unchecked">The file could not be checked after the write. Put back the file as it was, or keep it as it is.</string>
     <string name="file_write_restore">Put back as it was</string>
     <string name="file_write_keep">Keep as it is</string>
@@ -346,7 +354,7 @@
     <string name="search_ask_nothing">There are no photos to answer from.</string>
     <string name="search_ask_failed">Could not answer.</string>
     <string name="search_ask_retry">Try again</string>
-    <string name="search_ask_caution">%1$s answered from the top photos and scenes only. It can be wrong.</string>
+    <string name="search_ask_caution">%1$s is an AI and can make mistakes. Always check the answer.</string>
     <string name="search_basis_observed">Seen in it</string>
     <string name="search_basis_user_stated">In your memo</string>
     <string name="search_basis_inferred">Guessed</string>
@@ -366,7 +374,7 @@
     <string name="ask_model_on_device">On this device</string>
     <string name="ask_model_at">%1$s</string>
     <string name="viewer_asking">Looking at this photo or scene</string>
-    <string name="viewer_ask_caution">%1$s answered from this photo or scene only. It can be wrong.</string>
+    <string name="viewer_ask_caution">%1$s is an AI and can make mistakes. Always check the answer.</string>
     <string name="ask_title">Ask AI</string>
     <string name="ask_found">Here are the results.</string>
     <string name="ask_found_nothing">No photos match.</string>
@@ -384,7 +392,7 @@
     <string name="search_back_to_chat">Back to the chat</string>
     <string name="ask_hint">Ask about your photos, e.g. Where did I go last summer?</string>
     <string name="history_title">Location history</string>
-    <string name="history_explain">Pick your Timeline.json. You can export it in the device settings, under Location > Location services > Timeline. Photos without GPS get the place you were at when you took them. The file stays on this device, and nothing changes in your photos until you confirm and write it to them.</string>
+    <string name="history_explain">Pick your Timeline.json. Photos without GPS get the place you were at when you took them, as a candidate.\n\nTo export it: device settings > Location > Location services > Timeline\n\n• The file stays on this device.\n• Nothing changes in your photos until you confirm and write it to them.</string>
     <string name="history_import">Choose Timeline.json</string>
     <string name="history_open_timeline">Open Location services</string>
     <string name="history_not_json">This file is not JSON, so nothing was imported.</string>
