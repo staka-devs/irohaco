@@ -1,19 +1,22 @@
 package dev.irohaco.feature.timeline.viewer
 
+import dev.irohaco.core.application.THINK_ON
+import dev.irohaco.core.application.THINK_OFF
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -91,6 +94,7 @@ internal fun AskSheet(
     onAsk: (String) -> Unit,
     onOpenSettings: () -> Unit,
     onDismiss: () -> Unit,
+    onEffort: (String?) -> Unit = {},
 ) {
     IrohacoBottomSheet(onDismiss = onDismiss) {
         AskContent(
@@ -103,6 +107,7 @@ internal fun AskSheet(
             caution = R.string.viewer_ask_caution,
             models = models,
             onChoose = onChoose,
+            onEffort = onEffort,
         )
     }
 }
@@ -123,6 +128,8 @@ internal fun AskContent(
     modifier: Modifier = Modifier,
     models: AnswerChoices? = null,
     onChoose: (String) -> Unit = {},
+    /** Sets how deeply the next questions are thought about; null for the model's own depth. */
+    onEffort: (String?) -> Unit = {},
     /** Shows the photos searched with these conditions as a grid that can be narrowed further; null hides the button. */
     onShowPhotos: ((ReadQuery) -> Unit)? = null,
     /** Questions offered before the first one, sent as they are when tapped. */
@@ -177,7 +184,7 @@ internal fun AskContent(
             }
         }
         Column(Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
-            if (models != null && models.all.isNotEmpty()) ModelPicker(models, onChoose)
+            if (models != null && models.all.isNotEmpty()) ModelPicker(models, onChoose, onEffort)
             OutlinedTextField(
                 value = question,
                 onValueChange = { question = it },
@@ -233,19 +240,25 @@ private fun Examples(examples: List<String>, onAsk: (String) -> Unit) {
     }
 }
 
-/** Which model answers, switched here instead of in the settings. */
+/**
+ * Which model answers and how deeply it thinks, in one menu as chat apps have it: the models, then the depths the chosen
+ * one takes. A depth is the service's own effort value as its API names it, or, on the device, with or without
+ * thoughts; "Default" sends nothing, so the model's own or the saved setting applies.
+ */
 @Composable
-private fun ModelPicker(models: AnswerChoices, onChoose: (String) -> Unit) {
+private fun ModelPicker(models: AnswerChoices, onChoose: (String) -> Unit, onEffort: (String?) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val current = models.all.firstOrNull { it.id == models.current }
+    val effort = models.effort?.let { effortLabel(it) }
     Box {
         AssistChip(
             onClick = { open = true },
-            label = { Text(current?.name ?: stringResource(R.string.ask_model_choose)) },
+            label = { Text(listOfNotNull(current?.name ?: stringResource(R.string.ask_model_choose), effort).joinToString(" · ")) },
             leadingIcon = current?.let { { ModelMark(it.name, it.id) } },
             trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), contentDescription = stringResource(R.string.ask_model_choose)) },
         )
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            MenuHeading(R.string.ask_model_section)
             models.all.forEach { choice ->
                 DropdownMenuItem(
                     text = {
@@ -270,8 +283,44 @@ private fun ModelPicker(models: AnswerChoices, onChoose: (String) -> Unit) {
                     },
                 )
             }
+            current?.efforts?.takeIf { it.isNotEmpty() }?.let { efforts ->
+                HorizontalDivider()
+                MenuHeading(R.string.ask_effort_section)
+                (listOf<String?>(null) + efforts).forEach { value ->
+                    DropdownMenuItem(
+                        text = { Text(effortLabel(value)) },
+                        trailingIcon = if (value == models.effort) {
+                            { Icon(painterResource(IrohacoIcons.Check), contentDescription = null) }
+                        } else {
+                            null
+                        },
+                        onClick = {
+                            open = false
+                            onEffort(value)
+                        },
+                    )
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun MenuHeading(text: Int) {
+    Text(
+        stringResource(text),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
+    )
+}
+
+@Composable
+private fun effortLabel(value: String?): String = when (value) {
+    null -> stringResource(R.string.ask_effort_default)
+    THINK_OFF -> stringResource(R.string.ask_effort_off)
+    THINK_ON -> stringResource(R.string.ask_effort_on)
+    else -> value
 }
 
 @IrohacoPreviews
@@ -292,7 +341,7 @@ private fun AskContentPreview() {
                 onOpenSettings = {},
                 askingLabel = R.string.viewer_asking,
                 caution = R.string.viewer_ask_caution,
-                models = AnswerChoices(listOf(AnswerChoice("gemma", "Gemma 4 E2B"), AnswerChoice("claude", "Claude", "Anthropic")), "gemma"),
+                models = AnswerChoices(listOf(AnswerChoice("gemma", "Gemma 4 E2B"), AnswerChoice("claude", "Claude", "Anthropic", listOf("low", "high"))), "claude", "high"),
             )
         }
     }

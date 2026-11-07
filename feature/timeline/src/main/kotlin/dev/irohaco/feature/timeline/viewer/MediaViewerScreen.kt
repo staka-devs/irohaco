@@ -158,6 +158,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
             isVideo = item.kind == MediaKind.VIDEO,
             models = answerModels,
             onChoose = viewModel::chooseAnswerModel,
+            onEffort = viewModel::chooseAnswerEffort,
             onAsk = { viewModel.askAbout(item, it) },
             onOpenSettings = onOpenSettings,
             onDismiss = {

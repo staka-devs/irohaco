@@ -336,6 +336,11 @@
     <string name="viewer_ask_hint">Ask about this photo</string>
     <string name="viewer_ask_hint_video">Ask about this scene</string>
     <string name="viewer_ask_send">Ask</string>
+    <string name="ask_effort_default">Default</string>
+    <string name="ask_effort_off">No thinking</string>
+    <string name="ask_effort_on">Thinking</string>
+    <string name="ask_model_section">Model</string>
+    <string name="ask_effort_section">Effort</string>
     <string name="ask_model_choose">Choose the model that answers</string>
     <string name="ask_model_on_device">On this device</string>
     <string name="ask_model_at">Runs at %1$s</string>

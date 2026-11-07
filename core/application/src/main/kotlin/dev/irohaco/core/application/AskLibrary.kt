@@ -7,6 +7,8 @@ import dev.irohaco.core.contracts.AnswerSession
 import dev.irohaco.core.contracts.EgressDecision
 import dev.irohaco.core.contracts.EgressDeniedException
 import dev.irohaco.core.contracts.EgressPayload
+import dev.irohaco.core.contracts.GenerationParameter
+import dev.irohaco.core.contracts.RemoteProtocol
 import dev.irohaco.core.contracts.IndexImageReader
 import dev.irohaco.core.contracts.ModelArtifact
 import dev.irohaco.core.contracts.PlaceEvidenceStore
@@ -20,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
@@ -95,10 +98,20 @@ When a previous search is given and the message only changes it, such as "and th
 what it does not change."""
 
 /** A model that can answer; [service] is the name of the service it runs at, or null for one on this device. */
-data class AnswerChoice(val id: String, val name: String, val service: String? = null)
+data class AnswerChoice(
+    val id: String,
+    val name: String,
+    val service: String? = null,
+    /** The thinking depths a question can ask for: the service's effort values, or [THINK_OFF] and [THINK_ON] on the device. */
+    val efforts: List<String> = emptyList(),
+)
+
+/** A model on the device answers without its thoughts, or with them, as it does unless told. */
+const val THINK_OFF = "off"
+const val THINK_ON = "on"
 
 /** [current] is the model a question goes to, or null when none can answer. */
-data class AnswerChoices(val all: List<AnswerChoice>, val current: String?)
+data class AnswerChoices(val all: List<AnswerChoice>, val current: String?, val effort: String? = null)
 
 /**
  * Answers a question from the top search results on this device (RAG-001〜003, ARCHITECTURE §7.2). The
@@ -124,21 +137,35 @@ class AskLibrary(
 ) {
     val chosen: Flow<String?> = settings.answerModel
 
+    /** The depth the next questions ask for, kept until another model is chosen; null leaves the model's own or saved one. */
+    private val effort = MutableStateFlow<String?>(null)
+
     /**
      * The models that can answer now, on this device or at a service, and the one a question goes to.
      * shortcut: a model downloaded while a screen shows this is listed once the pick or the services change.
      */
-    val choices: Flow<AnswerChoices> = combine(settings.answerModel, remote?.models ?: flowOf(emptyList()), remote?.serviceNames ?: flowOf(emptyMap())) { picked, services, _ ->
-        val local = catalog.filter { installed(it.id) != null }.map { AnswerChoice(it.id, it.displayName) }
+    val choices: Flow<AnswerChoices> = combine(
+        settings.answerModel,
+        remote?.models ?: flowOf(emptyList()),
+        remote?.serviceNames ?: flowOf(emptyMap()),
+        effort,
+    ) { picked, services, _, effort ->
+        val local = catalog.filter { installed(it.id) != null }.map { AnswerChoice(it.id, it.displayName, efforts = listOf(THINK_OFF, THINK_ON)) }
         val far = services.filter { it.capabilities.containsAll(RemoteAnswering.NEEDED) }.map { model ->
-            AnswerChoice(model.profileId, model.displayName, remote?.connection(model)?.serviceName.orEmpty())
+            val connection = remote?.connection(model)
+            AnswerChoice(model.profileId, model.displayName, connection?.serviceName.orEmpty(), connection?.protocol?.let { effortOf(it)?.values }.orEmpty())
         }
         val all = local + far
-        AnswerChoices(all, picked?.takeIf { id -> all.any { it.id == id } } ?: local.firstOrNull()?.id)
+        AnswerChoices(all, picked?.takeIf { id -> all.any { it.id == id } } ?: local.firstOrNull()?.id, effort)
     }.flowOn(io)
+
+    fun chooseEffort(value: String?) {
+        effort.value = value
+    }
 
     suspend fun choose(id: String) {
         settings.setAnswerModel(id)
+        effort.value = null
         release()
     }
 
@@ -247,7 +274,9 @@ class AskLibrary(
             }
             val facts = if (described) facts(sources, withTime = true) else emptyMap()
             val reply = withSession(path) { session ->
-                session.answer(INSTRUCTION, pictures, prompt(question, sources, context, facts)) { onText(AskPartial(visibleThought(it), visibleAnswer(it))) }
+                session.answer(INSTRUCTION, pictures, prompt(question, sources, context, facts), think = effort.value != THINK_OFF) {
+                    onText(AskPartial(visibleThought(it), visibleAnswer(it)))
+                }
             }
             parseAnswer(reply, sources)
         } catch (e: CancellationException) {
@@ -294,7 +323,8 @@ class AskLibrary(
             val pictures = withContext(io) {
                 sources.map { hit -> hit.timestampMs?.let { images.readFrame(hit.item.contentUri, it) } ?: images.read(hit.item.contentUri) }
             }
-            val reply = remote.open(model, payloads, assets).use { session ->
+            val depth = effort.value?.let { value -> remote.connection(model)?.protocol?.let(::effortOf)?.let { mapOf(it.path to value) } }.orEmpty()
+            val reply = remote.open(model, payloads, assets, depth).use { session ->
                 withContext(io) { session.answer(INSTRUCTION, pictures, prompt(question, sources, context, facts)) { onText(AskPartial(visibleThought(it), visibleAnswer(it))) } }
             }
             parseAnswer(reply, sources).copy(remoteModel = model.displayName)
@@ -344,6 +374,9 @@ class AskLibrary(
 
     internal companion object {
         const val IDLE_MS = 5 * 60_000L
+
+        /** The request field a protocol sets its thinking depth with, if it has one. */
+        fun effortOf(protocol: RemoteProtocol): GenerationParameter? = GenerationParameter.of(protocol).firstOrNull { it.path.endsWith("effort") }
 
         /** Each image costs a model about 256 tokens; the smallest context here is 2,048. */
         const val MAX_SOURCES = 4

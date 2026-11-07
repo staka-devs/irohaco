@@ -119,17 +119,6 @@ internal fun AiSettings(
     onListModels: (RemoteRole, connectionId: String?, NewConnection?, endpoint: String?) -> Unit = { _, _, _, _ -> },
     onDismissModelList: () -> Unit = {},
 ) {
-    var tuning by remember { mutableStateOf<Pair<RemoteModel, RemoteProtocol>?>(null) }
-    tuning?.let { (model, protocol) ->
-        ParametersDialog(
-            model = model,
-            parameters = GenerationParameter.of(protocol),
-            lookup = optionsLookup,
-            onLookUp = { onLookUpOptions(model) },
-            onDismiss = { tuning = null; onDismissOptions() },
-            onSave = { tuning = null; onDismissOptions(); onSetParameters(model.profileId, it) },
-        )
-    }
     var marking by remember { mutableStateOf<Pair<String, String>?>(null) }
     marking?.let { (id, name) ->
         MarkDialog(id, name, onColor = { onMarkColor(id, it) }, onImage = { onMarkImage(id, it) }) { marking = null }
@@ -156,7 +145,7 @@ internal fun AiSettings(
     }
     var adding by rememberSaveable { mutableStateOf<RemoteRole?>(null) }
     adding?.let { role ->
-        AddRemoteModelDialog(
+        AddRemoteModelScreen(
             role = role,
             connections = connections.filter { it.protocol in role.protocols },
             test = modelTest,
@@ -164,6 +153,19 @@ internal fun AiSettings(
             onDismiss = { adding = null; onDismissModelTest(); onDismissModelList() },
             list = modelList,
             onList = { connectionId, new, endpoint -> onListModels(role, connectionId, new, endpoint) },
+        )
+    }
+    var opened by rememberSaveable { mutableStateOf<String?>(null) }
+    (remoteAnswerModels + remoteEmbeddingModels).firstOrNull { it.profileId == opened }?.let { model ->
+        RemoteModelScreen(
+            model = model,
+            connection = connections.firstOrNull { it.id == model.connectionId },
+            lookup = optionsLookup,
+            onLookUp = { onLookUpOptions(model) },
+            onSave = { onSetParameters(model.profileId, it) },
+            onMark = { marking = model.profileId to model.displayName },
+            onRemove = { removing = model },
+            onDismiss = { opened = null; onDismissOptions() },
         )
     }
     val hosts = connections.associate { it.id to it.serviceName }
@@ -175,18 +177,15 @@ internal fun AiSettings(
                 local.Row(model, selected = embeddingModel == null && states[model.id] is ModelInstallState.Installed) { onSelectEmbeddingModel(null) }
             }
             remoteEmbeddingModels.forEach { model ->
-                RemoteRow(model, hosts[model.connectionId], selected = model.profileId == embeddingModel, onSelect = { onSelectEmbeddingModel(model.profileId) }, onMark = { marking = model.profileId to model.displayName }) { removing = model }
+                RemoteRow(model, hosts[model.connectionId], selected = model.profileId == embeddingModel, onSelect = { onSelectEmbeddingModel(model.profileId) }) { opened = model.profileId }
             }
         }
         RoleCard(R.string.settings_ai_answer_card, R.string.settings_ai_answer_card_hint, onAdd = { adding = RemoteRole.ANSWER }) {
             answerModels.forEach { model -> local.Row(model, selected = model.id == answerModel) { onSelectAnswerModel(model.id) } }
             remoteAnswerModels.forEach { model ->
-                val protocol = connections.firstOrNull { it.id == model.connectionId }?.protocol
-                RemoteRow(
-                    model, hosts[model.connectionId], selected = model.profileId == answerModel, onSelect = { onSelectAnswerModel(model.profileId) },
-                    onMark = { marking = model.profileId to model.displayName },
-                    onTune = protocol?.takeIf { GenerationParameter.of(it).isNotEmpty() }?.let { { tuning = model to it } },
-                ) { removing = model }
+                RemoteRow(model, hosts[model.connectionId], selected = model.profileId == answerModel, onSelect = { onSelectAnswerModel(model.profileId) }) {
+                    opened = model.profileId
+                }
             }
         }
         Details(importResult, onImport, backend, gpuCheck, onSelectBackend)
@@ -279,10 +278,8 @@ private fun RemoteRow(
     host: String?,
     selected: Boolean,
     onSelect: () -> Unit,
-    onMark: () -> Unit,
-    /** Opens the model's request settings; null where its API has none. */
-    onTune: (() -> Unit)? = null,
-    onRemove: () -> Unit,
+    /** Opens the model's own screen: its service, request settings, mark and removal. */
+    onOpen: () -> Unit,
 ) {
     ListItem(
         leadingContent = { RadioButton(selected = selected, onClick = null) },
@@ -291,14 +288,11 @@ private fun RemoteRow(
             Text((listOf(stringResource(R.string.settings_ai_remote_at, host.orEmpty())) + model.parameters.map { (path, value) -> "$path: $value" }).joinToString("\n"))
         },
         trailingContent = {
-            Row {
-                onTune?.let { IconButton(onClick = it) { Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.settings_remote_parameters)) } }
-                IconButton(onClick = onRemove) { Icon(painterResource(IrohacoIcons.Delete), stringResource(R.string.settings_remote_model_remove)) }
-            }
+            IconButton(onClick = onOpen) { Icon(painterResource(IrohacoIcons.ChevronRight), stringResource(R.string.settings_remote_detail, model.displayName)) }
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
-    ) { MarkedModelName(model.displayName, model.profileId, onMark) }
+    ) { MarkedModelName(model.displayName, model.profileId, onOpen) }
 }
 
 /** The fills a mark can take; strong enough to read a white or black letter on. */
@@ -378,223 +372,8 @@ private fun Details(importResult: ModelInstallState?, onImport: () -> Unit, back
     ) { Text(stringResource(R.string.settings_ai_import)) }
 }
 
-/**
- * Adds a remote model for [role] in one dialog: a connection already added or a new one, the model ID,
- * then the test, which sends the app's sample text and image, never the user's photos (ADR-0032).
- * What the job will send is said once, plainly, before the button.
- */
 @Composable
-private fun AddRemoteModelDialog(
-    role: RemoteRole,
-    connections: List<RemoteConnection>,
-    test: SettingsViewModel.ModelTest?,
-    onAdd: (connectionId: String?, NewConnection?, modelId: String, name: String) -> Unit,
-    onDismiss: () -> Unit,
-    list: SettingsViewModel.ModelList? = null,
-    onList: (connectionId: String?, NewConnection?, endpoint: String?) -> Unit = { _, _, _ -> },
-) {
-    var chosen by rememberSaveable { mutableStateOf(connections.firstOrNull()?.id) }
-    var protocol by rememberSaveable { mutableStateOf(role.protocols.first()) }
-    var url by rememberSaveable { mutableStateOf(protocol.defaultBaseUrl) }
-    // Not saved: the key stays out of the saved instance state.
-    var key by remember { mutableStateOf("") }
-    var service by rememberSaveable { mutableStateOf("") }
-    var plainAccepted by rememberSaveable { mutableStateOf(false) }
-    var modelId by rememberSaveable { mutableStateOf("") }
-    var name by rememberSaveable { mutableStateOf("") }
-    val running = test is SettingsViewModel.ModelTest.Running
-    val editable = test == null || test is SettingsViewModel.ModelTest.Failed
-    val kind = ManageEgress.urlKind(url)
-    val connectionReady = chosen != null || key.isNotBlank() && (kind == UrlKind.HTTPS || kind == UrlKind.PLAIN_HTTP && plainAccepted)
-    AlertDialog(
-        onDismissRequest = { if (!running) onDismiss() },
-        title = { Text(stringResource(if (role == RemoteRole.ANSWER) R.string.settings_ai_add_remote_answer else R.string.settings_ai_add_remote_index)) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-                Text(stringResource(R.string.settings_ai_remote_connection), style = MaterialTheme.typography.labelLarge)
-                Column(Modifier.selectableGroup()) {
-                    connections.forEach { connection ->
-                        ChoiceRow(connection.id == chosen, editable, "${connection.serviceName} · ${connection.protocol.displayName}") { chosen = connection.id }
-                    }
-                    ChoiceRow(chosen == null, editable, stringResource(R.string.settings_ai_remote_new_connection)) { chosen = null }
-                }
-                if (chosen == null) {
-                    Column(Modifier.selectableGroup()) {
-                        role.protocols.forEach { entry ->
-                            ChoiceRow(entry == protocol, editable, entry.displayName) { protocol = entry; url = entry.defaultBaseUrl }
-                        }
-                    }
-                    OutlinedTextField(
-                        value = url,
-                        onValueChange = { url = it; plainAccepted = false },
-                        label = { Text(stringResource(R.string.settings_remote_url)) },
-                        isError = kind == UrlKind.INVALID,
-                        singleLine = true,
-                        enabled = editable,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    if (kind == UrlKind.PLAIN_HTTP) {
-                        Text(stringResource(R.string.settings_remote_http_warning), color = MaterialTheme.colorScheme.error)
-                        ListItem(
-                            leadingContent = { Checkbox(checked = plainAccepted, onCheckedChange = null) },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            modifier = Modifier.toggleable(plainAccepted, role = Role.Checkbox) { plainAccepted = it },
-                        ) { Text(stringResource(R.string.settings_remote_http_accept)) }
-                    }
-                    OutlinedTextField(
-                        value = service,
-                        onValueChange = { service = it },
-                        label = { Text(stringResource(R.string.settings_remote_name)) },
-                        placeholder = { Text(RemoteConnection.suggestedName(url)) },
-                        supportingText = { Text(stringResource(R.string.settings_remote_name_hint)) },
-                        singleLine = true,
-                        enabled = editable,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = key,
-                        onValueChange = { key = it },
-                        label = { Text(stringResource(R.string.settings_remote_key)) },
-                        singleLine = true,
-                        enabled = editable,
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                Text(stringResource(R.string.settings_ai_remote_model), style = MaterialTheme.typography.labelLarge)
-                OutlinedTextField(
-                    value = modelId,
-                    onValueChange = { modelId = it },
-                    label = { Text(stringResource(R.string.settings_remote_model_id)) },
-                    singleLine = true,
-                    enabled = editable,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                ModelCandidates(
-                    list = list,
-                    enabled = editable,
-                    base = connections.firstOrNull { it.id == chosen }?.baseUrl ?: url,
-                    typed = modelId,
-                    onList = { endpoint -> onList(chosen, if (chosen == null) NewConnection(protocol, url, key, service) else null, endpoint) },
-                ) { listed ->
-                    modelId = listed.id
-                    if (name.isBlank()) listed.name?.let { name = it }
-                }
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.settings_remote_model_name)) },
-                    singleLine = true,
-                    enabled = editable,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    stringResource(if (role == RemoteRole.ANSWER) R.string.settings_ai_remote_sends_answer else R.string.settings_ai_remote_sends_index) +
-                        " " + stringResource(R.string.settings_remote_billing),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                when (test) {
-                    null -> Unit
-                    SettingsViewModel.ModelTest.Running -> {
-                        Text(stringResource(R.string.settings_remote_model_testing), style = MaterialTheme.typography.bodySmall)
-                        LinearProgressIndicator(Modifier.fillMaxWidth())
-                    }
-                    is SettingsViewModel.ModelTest.Added -> Text(
-                        if (test.usable) {
-                            stringResource(R.string.settings_ai_remote_ready)
-                        } else {
-                            stringResource(if (role == RemoteRole.ANSWER) R.string.settings_remote_model_cannot_answer else R.string.settings_remote_model_cannot_index)
-                        },
-                    )
-                    is SettingsViewModel.ModelTest.Failed -> Text(
-                        remoteFailureText(test.cause) ?: stringResource(R.string.settings_remote_model_test_failed),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            if (test is SettingsViewModel.ModelTest.Added) {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_remote_model_done)) }
-            } else {
-                TextButton(enabled = modelId.isNotBlank() && connectionReady && !running, onClick = {
-                    onAdd(chosen, if (chosen == null) NewConnection(protocol, url, key, service) else null, modelId, name)
-                }) { Text(stringResource(R.string.settings_ai_remote_test_and_use)) }
-            }
-        },
-        dismissButton = {
-            if (test !is SettingsViewModel.ModelTest.Added) {
-                TextButton(enabled = !running, onClick = onDismiss) { Text(stringResource(R.string.settings_ai_cancel)) }
-            }
-        },
-    )
-}
-
-/**
- * Model IDs to pick from: the service's own list (at [base]/models, or another address for a proxy) and models.dev,
- * read when the user asks, narrowed to the job and to what has been typed.
- */
-@Composable
-private fun ModelCandidates(
-    list: SettingsViewModel.ModelList?,
-    enabled: Boolean,
-    base: String,
-    typed: String,
-    onList: (endpoint: String?) -> Unit,
-    onPick: (ListedModel) -> Unit,
-) {
-    var endpoint by rememberSaveable { mutableStateOf("") }
-    var other by rememberSaveable { mutableStateOf(false) }
-    if (other) {
-        OutlinedTextField(
-            value = endpoint,
-            onValueChange = { endpoint = it },
-            label = { Text(stringResource(R.string.settings_ai_remote_list_url)) },
-            placeholder = { Text(base.trim().trimEnd('/') + "/models") },
-            singleLine = true,
-            enabled = enabled,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-    Row {
-        TextButton(enabled = enabled && list != SettingsViewModel.ModelList.Running, onClick = { onList(endpoint.takeIf { other && it.isNotBlank() }) }) {
-            Text(stringResource(R.string.settings_ai_remote_list))
-        }
-        if (!other) TextButton(enabled = enabled, onClick = { other = true }) { Text(stringResource(R.string.settings_ai_remote_list_other)) }
-    }
-    when (list) {
-        null -> Unit
-        SettingsViewModel.ModelList.Running -> LinearProgressIndicator(Modifier.fillMaxWidth())
-        is SettingsViewModel.ModelList.Failed -> Text(
-            remoteFailureText(list.cause) ?: stringResource(R.string.settings_ai_remote_list_failed),
-            color = MaterialTheme.colorScheme.error,
-        )
-        is SettingsViewModel.ModelList.Found -> {
-            val shown = list.models.filter { typed.isBlank() || typed.trim().lowercase() in (it.id + " " + it.name.orEmpty()).lowercase() }
-            if (shown.isEmpty()) Text(stringResource(R.string.settings_ai_remote_list_none), style = MaterialTheme.typography.bodySmall)
-            shown.take(MAX_CANDIDATES).forEach { model ->
-                ListItem(
-                    supportingContent = model.name?.let { { Text(model.id) } },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    modifier = Modifier.selectable(selected = model.id == typed, enabled = enabled, role = Role.Button) { onPick(model) },
-                ) { Text(model.name ?: model.id) }
-            }
-            if (shown.size > MAX_CANDIDATES) {
-                Text(stringResource(R.string.settings_ai_remote_list_more, shown.size - MAX_CANDIDATES), style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
-
-/** Enough to scroll through in a dialog; typing narrows the rest down. */
-private const val MAX_CANDIDATES = 20
-
-@Composable
-private fun ChoiceRow(selected: Boolean, enabled: Boolean, label: String, onClick: () -> Unit) {
+internal fun ChoiceRow(selected: Boolean, enabled: Boolean, label: String, onClick: () -> Unit) {
     ListItem(
         leadingContent = { RadioButton(selected = selected, onClick = null, enabled = enabled) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),

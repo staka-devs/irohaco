@@ -36,11 +36,14 @@ class RemoteAnswering(
     suspend fun connection(model: RemoteModel): RemoteConnection? =
         store.connection(model.connectionId)?.let { it.copy(name = serviceNames.first()[it.id]) }
 
-    /** A session whose every request is checked for exactly [payloads] and [assetIds] first (ARCHITECTURE §9.3). */
-    suspend fun open(model: RemoteModel, payloads: Set<EgressPayload>, assetIds: Set<String>): AnswerSession {
+    /**
+     * A session whose every request is checked for exactly [payloads] and [assetIds] first (ARCHITECTURE §9.3). It sends
+     * the request settings the user saved for [model], with [extra] over them for this question.
+     */
+    suspend fun open(model: RemoteModel, payloads: Set<EgressPayload>, assetIds: Set<String>, extra: Map<String, String> = emptyMap()): AnswerSession {
         val connection = checkNotNull(store.connection(model.connectionId)) { "The connection is gone" }
         val key = checkNotNull(store.credentialRef(connection.id)?.let(credentials::read)) { "The API key is gone" }
-        val values = parameters?.parameters?.first()?.get(model.profileId).orEmpty()
+        val values = parameters?.parameters?.first()?.get(model.profileId).orEmpty() + extra
         return sessions.open(connection, key, model.copy(parameters = values)) { policy.authorize(TaskType.RAG, model.profileId, payloads, assetIds) }
     }
 

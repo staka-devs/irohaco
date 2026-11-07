@@ -239,6 +239,11 @@ class ViewerViewModel(
     val answerModels: StateFlow<AnswerChoices?> =
         (ask?.choices ?: flowOf(null)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** The thinking depth the next questions ask for; null for the model's own. */
+    fun chooseAnswerEffort(value: String?) {
+        ask?.chooseEffort(value)
+    }
+
     fun chooseAnswerModel(id: String) {
         val library = ask ?: return
         viewModelScope.launch {

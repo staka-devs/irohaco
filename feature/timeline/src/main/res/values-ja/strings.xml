@@ -331,6 +331,11 @@
     <string name="viewer_ask_hint">この写真について質問</string>
     <string name="viewer_ask_hint_video">この場面について質問</string>
     <string name="viewer_ask_send">聞く</string>
+    <string name="ask_effort_default">既定</string>
+    <string name="ask_effort_off">考えない</string>
+    <string name="ask_effort_on">考える</string>
+    <string name="ask_model_section">モデル</string>
+    <string name="ask_effort_section">考える深さ</string>
     <string name="ask_model_choose">回答するモデルを選ぶ</string>
     <string name="ask_model_on_device">この端末</string>
     <string name="ask_model_at">%1$s で動きます</string>
