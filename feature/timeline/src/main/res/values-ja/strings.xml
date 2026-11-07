@@ -258,6 +258,7 @@
     <string name="search_by_memo">メモ</string>
     <string name="memo_title">検索用メモ</string>
     <string name="memo_add">メモを追加</string>
+    <string name="memo_actions">メモの操作</string>
     <string name="memo_edit">編集</string>
     <string name="memo_history">履歴</string>
     <string name="memo_delete">削除</string>
@@ -294,6 +295,12 @@
     <string name="details_keep_edit">アプリの値を残す</string>
     <string name="details_edit">%1$sを編集</string>
     <string name="edit_next">次へ</string>
+    <string name="edit_location_title">位置情報を編集</string>
+    <string name="edit_location_search">場所を検索</string>
+    <string name="edit_location_use">ここにする</string>
+    <string name="edit_location_none">見つかりませんでした</string>
+    <string name="edit_location_clear">場所をなしにする</string>
+    <string name="edit_location_map_off">地図と場所の検索は、設定 > プライバシーでオンライン地図を許可すると使えます。</string>
     <string name="edit_latitude">緯度</string>
     <string name="edit_longitude">経度</string>
     <string name="edit_location_clear_hint">両方を空にすると、場所をなしにします。ファイルは変えません。</string>

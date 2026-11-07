@@ -262,6 +262,7 @@
     <string name="search_by_memo">Memo</string>
     <string name="memo_title">Search memos</string>
     <string name="memo_add">Add a memo</string>
+    <string name="memo_actions">Memo actions</string>
     <string name="memo_edit">Edit</string>
     <string name="memo_history">History</string>
     <string name="memo_delete">Delete</string>
@@ -298,6 +299,12 @@
     <string name="details_keep_edit">Keep the edited value</string>
     <string name="details_edit">Edit %1$s</string>
     <string name="edit_next">Next</string>
+    <string name="edit_location_title">Edit location</string>
+    <string name="edit_location_search">Search for a place</string>
+    <string name="edit_location_use">Use this</string>
+    <string name="edit_location_none">Nothing found</string>
+    <string name="edit_location_clear">Remove the location</string>
+    <string name="edit_location_map_off">Allow the online map in Settings > Privacy to use the map and the place search.</string>
     <string name="edit_latitude">Latitude</string>
     <string name="edit_longitude">Longitude</string>
     <string name="edit_location_clear_hint">Clear both to remove the location. The file is not changed.</string>

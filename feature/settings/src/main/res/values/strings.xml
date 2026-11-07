@@ -154,6 +154,7 @@
     <string name="settings_remote_task_image_index">Indexing photos</string>
     <string name="settings_remote_task_video_index">Indexing videos</string>
     <string name="settings_remote_task_rag">Questions to the AI</string>
+    <string name="settings_remote_sends_nothing">Nothing is sent</string>
     <string name="settings_remote_add">Add a connection</string>
     <string name="settings_remote_add_confirm">Add</string>
     <string name="settings_remote_url">URL</string>
@@ -229,6 +230,8 @@
     <string name="settings_backup_passphrase_body">At least %1$d characters. The app does not keep it, so without it the backup cannot be opened.</string>
     <string name="settings_backup_passphrase">Passphrase</string>
     <string name="settings_backup_passphrase_again">Passphrase again</string>
+    <string name="settings_backup_done_short">Exported (%1$d records)</string>
+    <string name="settings_restore_done_short">Restored %1$d records (%2$d left out)</string>
     <string name="settings_backup_done">Exported</string>
     <string name="settings_backup_done_body">The file was read back and holds %1$d records.</string>
     <string name="settings_backup_failed">Could not export</string>

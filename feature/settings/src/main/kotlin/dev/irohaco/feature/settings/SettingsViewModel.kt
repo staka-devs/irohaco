@@ -513,9 +513,6 @@ class SettingsViewModel(
         viewModelScope.launch { egress?.remove(id) }
     }
 
-    val remoteModels: StateFlow<List<RemoteModel>> =
-        (egress?.models() ?: flowOf(emptyList())).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
     /** The connection test while it runs, then what it found or why it failed; null when none was run. */
     private val _modelTest = MutableStateFlow<ModelTest?>(null)
     val modelTest: StateFlow<ModelTest?> = _modelTest
@@ -527,20 +524,6 @@ class SettingsViewModel(
         data class Added(val capabilities: Set<ModelCapability>, val usable: Boolean = true) : ModelTest
 
         data class Failed(val cause: Throwable) : ModelTest
-    }
-
-    fun addModel(connectionId: String, modelId: String, displayName: String) {
-        val manage = egress ?: return
-        _modelTest.value = ModelTest.Running
-        viewModelScope.launch {
-            _modelTest.value = try {
-                ModelTest.Added(manage.addModel(connectionId, modelId, displayName))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                ModelTest.Failed(e)
-            }
-        }
     }
 
     fun dismissModelTest() {

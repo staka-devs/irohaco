@@ -32,7 +32,13 @@ interface LocationStore {
 /** Turns a point into a place name; this goes outside the device (ADR-0011). */
 fun interface PlaceNames {
     suspend fun nameOf(point: GeoPoint): String?
+
+    /** Places whose name matches [query], best first; none where the service cannot search. */
+    suspend fun find(query: String): List<NamedPlace> = emptyList()
 }
+
+/** A place a name search found. */
+data class NamedPlace(val name: String, val point: GeoPoint)
 
 /**
  * Whether the user allowed the online map (ADR-0011): OpenFreeMap gets the area shown, and the place

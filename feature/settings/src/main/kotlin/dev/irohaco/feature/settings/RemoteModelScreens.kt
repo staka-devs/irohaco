@@ -19,6 +19,9 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +50,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.window.Dialog
@@ -178,10 +184,19 @@ internal fun AddRemoteModelScreen(
         },
     ) {
         val steps = listOf(R.string.settings_ai_remote_connection, R.string.settings_ai_remote_model, R.string.settings_ai_remote_step_test)
-        Text(
-            stringResource(R.string.settings_ai_remote_step, step + 1, steps.size, stringResource(steps[step])),
-            style = MaterialTheme.typography.titleMedium,
-        )
+        // How far along, as a bar, and the three steps by name with the current one in colour.
+        val where = stringResource(R.string.settings_ai_remote_step, step + 1, steps.size, stringResource(steps[step]))
+        LinearProgressIndicator(progress = { (step + 1f) / steps.size }, modifier = Modifier.fillMaxWidth().semantics { contentDescription = where })
+        Row(Modifier.fillMaxWidth().clearAndSetSemantics {}) {
+            steps.forEachIndexed { index, label ->
+                Text(
+                    "${index + 1} ${stringResource(label)}",
+                    style = if (index == step) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
+                    color = if (index == step) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
         when (step) {
             0 -> {
                 Column(Modifier.selectableGroup()) {
@@ -454,11 +469,16 @@ internal fun LocalModelScreen(model: ModelArtifact, state: ModelInstallState, on
     }
 }
 
-/** A field for one request field: numbers only for a number, otherwise any text, with the documented values to pick from. */
+/**
+ * A field for one request field: a number for a number; otherwise Material's exposed dropdown, which opens on a tap on
+ * the field with the documented values as wide as it, and still takes a value typed in.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ParameterField(parameter: GenerationParameter, value: String, choices: List<String>, hint: String?, onChange: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    OutlinedTextField(
+    @Composable
+    fun Field(modifier: Modifier, trailing: (@Composable () -> Unit)?) = OutlinedTextField(
         value = value,
         onValueChange = { onChange(if (parameter.number) it.filter(Char::isDigit) else it) },
         label = { Text(parameter.path) },
@@ -466,21 +486,20 @@ private fun ParameterField(parameter: GenerationParameter, value: String, choice
         supportingText = hint?.let { { Text(it) } },
         singleLine = true,
         keyboardOptions = if (parameter.number) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
-        trailingIcon = if (choices.isEmpty()) null else {
-            {
-                Box {
-                    IconButton(onClick = { open = true }) {
-                        Icon(painterResource(IrohacoIcons.ExpandMore), stringResource(R.string.settings_remote_parameters_choose))
-                    }
-                    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.settings_remote_parameters_unset)) }, onClick = { open = false; onChange("") })
-                        choices.forEach { choice -> DropdownMenuItem(text = { Text(choice) }, onClick = { open = false; onChange(choice) }) }
-                    }
-                }
-            }
-        },
-        modifier = Modifier.fillMaxWidth(),
+        trailingIcon = trailing,
+        modifier = modifier.fillMaxWidth(),
     )
+    if (choices.isEmpty()) {
+        Field(Modifier, null)
+        return
+    }
+    ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }) {
+        Field(Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)) { ExposedDropdownMenuDefaults.TrailingIcon(expanded = open) }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.exposedDropdownSize()) {
+            DropdownMenuItem(text = { Text(stringResource(R.string.settings_remote_parameters_unset)) }, onClick = { open = false; onChange("") })
+            choices.forEach { choice -> DropdownMenuItem(text = { Text(choice) }, onClick = { open = false; onChange(choice) }) }
+        }
+    }
 }
 
 @IrohacoPreviews

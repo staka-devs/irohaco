@@ -25,7 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -251,12 +250,17 @@ private fun ModelPicker(models: AnswerChoices, onChoose: (String) -> Unit, onEff
     val current = models.all.firstOrNull { it.id == models.current }
     val effort = models.effort?.let { effortLabel(it) }
     Box {
-        AssistChip(
-            onClick = { open = true },
-            label = { Text(listOfNotNull(current?.name ?: stringResource(R.string.ask_model_choose), effort).joinToString(" · ")) },
-            leadingIcon = current?.let { { ModelMark(it.name, it.id) } },
-            trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), contentDescription = stringResource(R.string.ask_model_choose)) },
-        )
+        // A plain button with the model's name and depth, as chat apps show the model in use.
+        TextButton(onClick = { open = true }) {
+            current?.let { ModelMark(it.name, it.id) }
+            Text(
+                current?.name ?: stringResource(R.string.ask_model_choose),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(horizontal = IrohacoSpacing.s),
+            )
+            effort?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = IrohacoSpacing.xs)) }
+            Icon(painterResource(IrohacoIcons.ExpandMore), contentDescription = stringResource(R.string.ask_model_choose))
+        }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             MenuHeading(R.string.ask_model_section)
             models.all.forEach { choice ->

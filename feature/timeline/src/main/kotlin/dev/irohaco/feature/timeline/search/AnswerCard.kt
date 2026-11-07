@@ -36,11 +36,8 @@ import dev.irohaco.core.application.AskResult
 import dev.irohaco.core.application.Basis
 import dev.irohaco.core.application.ChatWithLibrary
 import dev.irohaco.core.application.Citation
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.material3.AssistChip
 import dev.irohaco.core.application.Evidence
 import dev.irohaco.core.application.SearchHit
 import dev.irohaco.core.contracts.EgressDeniedException
@@ -147,21 +144,20 @@ internal fun AnswerCard(
  * A request for photos answered with what the search found: the conditions it was read as, then the first
  * photos in a grid. [onShowAll] opens them all on the search page, where the conditions can be changed.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun FoundCard(found: ChatWithLibrary.Found, onOpen: (SearchHit) -> Unit, onShowAll: (() -> Unit)?) {
     val read = found.read
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(IrohacoSpacing.l), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
             Text(stringResource(if (found.hits.isEmpty()) R.string.ask_found_nothing else R.string.ask_found), style = MaterialTheme.typography.bodyLarge)
-            // How the request was read, so a wrong reading shows at once; tapping one changes it on the search page.
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-                val conditions = listOfNotNull(
-                    read.rest.takeIf { read.hasWords }?.let { stringResource(R.string.ask_found_words, it) },
-                    read.fromMs?.let { from -> read.untilMs?.let { until -> dateRangeLabel(from, until) } },
-                    read.kind?.let { stringResource(if (it == MediaKind.VIDEO) R.string.search_videos else R.string.search_photos) },
-                )
-                conditions.forEach { AssistChip(onClick = { onShowAll?.invoke() }, enabled = onShowAll != null, label = { Text(it) }) }
+            // How the request was read, so a wrong reading shows at once; it is changed with the button below.
+            val conditions = listOfNotNull(
+                read.rest.takeIf { read.hasWords }?.let { stringResource(R.string.ask_found_words, it) },
+                read.fromMs?.let { from -> read.untilMs?.let { until -> dateRangeLabel(from, until) } },
+                read.kind?.let { stringResource(if (it == MediaKind.VIDEO) R.string.search_videos else R.string.search_photos) },
+            )
+            if (conditions.isNotEmpty()) {
+                Text(conditions.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             found.hits.take(FOUND_SHOWN).chunked(FOUND_COLUMNS).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
@@ -178,7 +174,8 @@ internal fun FoundCard(found: ChatWithLibrary.Found, onOpen: (SearchHit) -> Unit
                     repeat(FOUND_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
-            if (onShowAll != null && found.hits.isNotEmpty()) {
+            // Also when nothing was found: changing the conditions is then what the user needs.
+            if (onShowAll != null) {
                 TextButton(onClick = onShowAll) { Text(stringResource(R.string.ask_found_all)) }
             }
         }
