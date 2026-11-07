@@ -170,7 +170,17 @@ internal fun AiSettings(
     }
     val hosts = connections.associate { it.id to it.serviceName }
     val answerIds = answerModels.map { it.id }.toSet()
-    val local = LocalModels(states, onDownload, onPause, onCancel, onDelete = { deleting = it }, onMark = { marking = it.id to it.displayName })
+    var openedLocal by rememberSaveable { mutableStateOf<String?>(null) }
+    (models + answerModels).firstOrNull { it.id == openedLocal }?.let { model ->
+        LocalModelScreen(
+            model = model,
+            state = states[model.id] ?: ModelInstallState.NotInstalled,
+            onMark = { marking = model.id to model.displayName },
+            onDelete = { deleting = model },
+            onDismiss = { openedLocal = null },
+        )
+    }
+    val local = LocalModels(states, onDownload, onPause, onCancel, onOpen = { openedLocal = it.id })
     Column(Modifier.padding(horizontal = IrohacoSpacing.l), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.m)) {
         RoleCard(R.string.settings_ai_index_card, R.string.settings_ai_index_card_hint, onAdd = { adding = RemoteRole.INDEX }) {
             models.filter { it.id !in answerIds }.forEach { model ->
@@ -226,8 +236,8 @@ private class LocalModels(
     val onDownload: (String) -> Unit,
     val onPause: (String) -> Unit,
     val onCancel: (String) -> Unit,
-    val onDelete: (ModelArtifact) -> Unit,
-    val onMark: (ModelArtifact) -> Unit,
+    /** Opens the model's own screen, where it is deleted and its mark changed. */
+    val onOpen: (ModelArtifact) -> Unit,
 ) {
     @Composable
     fun Row(model: ModelArtifact, selected: Boolean, onSelect: () -> Unit) {
@@ -249,26 +259,31 @@ private class LocalModels(
                     }
                 }
             },
+            // The row picks the model; its one action sits at the end as an icon, and deleting is on the model's screen.
             trailingContent = {
-                when (state) {
-                    is ModelInstallState.Installed -> TextButton(onClick = { onDelete(model) }) { Text(stringResource(R.string.settings_ai_delete)) }
-                    is ModelInstallState.Downloading -> Column {
-                        TextButton(onClick = { onPause(model.id) }) { Text(stringResource(R.string.settings_ai_pause)) }
-                        TextButton(onClick = { onCancel(model.id) }) { Text(stringResource(R.string.settings_ai_cancel)) }
+                @Composable
+                fun Action(icon: Int, label: Int, onClick: () -> Unit) = IconButton(onClick = onClick) { Icon(painterResource(icon), stringResource(label)) }
+                Row {
+                    when (state) {
+                        is ModelInstallState.Installed -> Action(IrohacoIcons.ChevronRight, R.string.settings_ai_details) { onOpen(model) }
+                        is ModelInstallState.Downloading -> {
+                            Action(IrohacoIcons.Pause, R.string.settings_ai_pause) { onPause(model.id) }
+                            Action(IrohacoIcons.Close, R.string.settings_ai_cancel) { onCancel(model.id) }
+                        }
+                        is ModelInstallState.Paused -> {
+                            Action(IrohacoIcons.PlayArrowFilled, R.string.settings_ai_resume) { onDownload(model.id) }
+                            Action(IrohacoIcons.Close, R.string.settings_ai_cancel) { onCancel(model.id) }
+                        }
+                        ModelInstallState.Verifying -> Unit
+                        // A failed download keeps what it got, and the retry resumes from there.
+                        is ModelInstallState.Failed -> Action(IrohacoIcons.Refresh, R.string.settings_ai_retry) { onDownload(model.id) }
+                        ModelInstallState.NotInstalled -> Action(IrohacoIcons.Download, R.string.settings_ai_download) { onDownload(model.id) }
                     }
-                    is ModelInstallState.Paused -> Column {
-                        TextButton(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_resume)) }
-                        TextButton(onClick = { onCancel(model.id) }) { Text(stringResource(R.string.settings_ai_cancel)) }
-                    }
-                    ModelInstallState.Verifying -> Unit
-                    // A failed download keeps what it got, and the retry resumes from there.
-                    is ModelInstallState.Failed -> TextButton(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_retry)) }
-                    ModelInstallState.NotInstalled -> TextButton(onClick = { onDownload(model.id) }) { Text(stringResource(R.string.settings_ai_download)) }
                 }
             },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             modifier = Modifier.selectable(selected = selected, enabled = installed, role = Role.RadioButton, onClick = onSelect),
-        ) { MarkedModelName(model.displayName, model.id) { onMark(model) } }
+        ) { MarkedModelName(model.displayName, model.id) { onOpen(model) } }
     }
 }
 

@@ -430,6 +430,7 @@ internal fun DisplaySettings(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
         )
+        ThemePreview(Color(0xFF000000.toInt() or seed.rgb), Modifier.padding(horizontal = IrohacoSpacing.l))
     }
 
     SectionTitle(R.string.settings_contrast)
@@ -499,7 +500,14 @@ private fun PaletteColors(seed: ThemeColor.Seed?, seedHue: Int?, enabled: Boolea
 /** Any colour as #RRGGBB; only a valid code is applied. */
 @Composable
 private fun ColorCode(seed: ThemeColor.Seed?, enabled: Boolean, onSelect: (ThemeColor) -> Unit) {
-    var text by rememberSaveable { mutableStateOf(seed?.toHex() ?: "#") }
+    var text by rememberSaveable(seed) { mutableStateOf(seed?.toHex() ?: "#") }
+    if (enabled) {
+        ColorPicker(
+            color = Color(0xFF000000.toInt() or (seed?.rgb ?: 0x2196F3)),
+            onPick = { onSelect(it.toSeed()) },
+            modifier = Modifier.padding(horizontal = IrohacoSpacing.l).padding(top = IrohacoSpacing.l),
+        )
+    }
     val invalid = text.length > 1 && ThemeColor.Seed.parseHex(text) == null
     OutlinedTextField(
         value = text,

@@ -56,7 +56,11 @@ import dev.irohaco.core.application.ManageEgress.UrlKind
 import dev.irohaco.core.application.RemoteAnswering
 import dev.irohaco.core.application.RemoteEmbedding
 import dev.irohaco.core.contracts.GenerationParameter
+import android.text.format.Formatter
+import androidx.compose.ui.platform.LocalContext
 import dev.irohaco.core.contracts.ListedModel
+import dev.irohaco.core.contracts.ModelArtifact
+import dev.irohaco.core.contracts.ModelInstallState
 import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.RemoteModel
@@ -73,7 +77,7 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FullScreenPage(
+internal fun FullScreenPage(
     title: String,
     onBack: () -> Unit,
     closes: Boolean,
@@ -431,6 +435,23 @@ private fun ColumnScope.RemoteModelBody(
     HorizontalDivider()
     OutlinedButton(onClick = onMark) { Text(stringResource(R.string.settings_remote_detail_mark)) }
     TextButton(onClick = onRemove) { Text(stringResource(R.string.settings_remote_model_remove), color = MaterialTheme.colorScheme.error) }
+}
+
+/** One model on the device: what it is and where it stands, its mark, and deleting its file. */
+@Composable
+internal fun LocalModelScreen(model: ModelArtifact, state: ModelInstallState, onMark: () -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    FullScreenPage(title = model.displayName, onBack = onDismiss, closes = true) {
+        val plain = ListItemDefaults.colors(containerColor = Color.Transparent)
+        ListItem(overlineContent = { Text(stringResource(R.string.settings_ai_remote_connection)) }, colors = plain) { Text(stringResource(R.string.settings_ai_on_device)) }
+        ListItem(overlineContent = { Text(stringResource(R.string.settings_local_state)) }, colors = plain) { Text(modelStateLabel(state)) }
+        ListItem(overlineContent = { Text(stringResource(R.string.settings_local_size)) }, colors = plain) { Text(Formatter.formatShortFileSize(context, model.sizeBytes)) }
+        HorizontalDivider()
+        OutlinedButton(onClick = onMark) { Text(stringResource(R.string.settings_remote_detail_mark)) }
+        if (state is ModelInstallState.Installed) {
+            TextButton(onClick = onDelete) { Text(stringResource(R.string.settings_ai_delete), color = MaterialTheme.colorScheme.error) }
+        }
+    }
 }
 
 /** A field for one request field: numbers only for a number, otherwise any text, with the documented values to pick from. */

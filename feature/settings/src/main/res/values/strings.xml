@@ -8,6 +8,11 @@
     <string name="settings_theme_color_palette">Palette</string>
     <string name="settings_theme_color_code">Colour code</string>
     <string name="settings_palette_shade">%1$s %2$s</string>
+    <string name="settings_theme_preview">Preview</string>
+    <string name="settings_theme_preview_card">Card colour</string>
+    <string name="settings_theme_preview_button">Button</string>
+    <string name="settings_theme_preview_chip">Chip</string>
+    <string name="settings_color_picker">Pick a colour: saturation across, brightness down</string>
     <string name="settings_custom_hex_label">Colour code (#RRGGBB)</string>
     <string name="settings_custom_hex_error">Enter as #RRGGBB</string>
     <string name="settings_contrast">Contrast</string>
@@ -205,6 +210,8 @@
     <string name="settings_remote_detail">About %1$s</string>
     <string name="settings_remote_detail_can">What it can do</string>
     <string name="settings_remote_detail_mark">Change the mark</string>
+    <string name="settings_local_state">State</string>
+    <string name="settings_local_size">Size</string>
     <string name="settings_remote_model_done">Done</string>
     <string name="settings_remote_cap_image">reads images</string>
     <string name="settings_remote_cap_streaming">answers as it writes</string>

@@ -337,9 +337,10 @@
     <string name="viewer_ask_hint_video">Ask about this scene</string>
     <string name="viewer_ask_send">Ask</string>
     <string name="ask_effort_default">Default</string>
-    <string name="ask_effort_off">No thinking</string>
-    <string name="ask_effort_on">Thinking</string>
+    <string name="ask_effort_off">Thinking off</string>
+    <string name="ask_effort_on">Thinking on</string>
     <string name="ask_model_section">Model</string>
+    <string name="ask_thinking_section">Thinking</string>
     <string name="ask_effort_section">Effort</string>
     <string name="ask_model_choose">Choose the model that answers</string>
     <string name="ask_model_on_device">On this device</string>

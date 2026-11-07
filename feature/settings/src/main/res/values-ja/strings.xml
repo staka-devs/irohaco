@@ -8,6 +8,11 @@
     <string name="settings_theme_color_palette">パレット</string>
     <string name="settings_theme_color_code">カラーコード</string>
     <string name="settings_palette_shade">%1$s %2$s</string>
+    <string name="settings_theme_preview">プレビュー</string>
+    <string name="settings_theme_preview_card">カードの色</string>
+    <string name="settings_theme_preview_button">ボタン</string>
+    <string name="settings_theme_preview_chip">チップ</string>
+    <string name="settings_color_picker">色を選ぶ。横が鮮やかさ、縦が明るさ</string>
     <string name="settings_custom_hex_label">カラーコード（#RRGGBB）</string>
     <string name="settings_custom_hex_error">#RRGGBBの形式で入力</string>
     <string name="settings_contrast">コントラスト</string>
@@ -203,9 +208,11 @@
     <string name="settings_remote_detail">%1$s の詳細</string>
     <string name="settings_remote_detail_can">できること</string>
     <string name="settings_remote_detail_mark">印を変える</string>
+    <string name="settings_local_state">状態</string>
+    <string name="settings_local_size">サイズ</string>
     <string name="settings_remote_model_done">閉じる</string>
     <string name="settings_remote_cap_image">画像を読める</string>
-    <string name="settings_remote_cap_streaming">書きながら答える</string>
+    <string name="settings_remote_cap_streaming">ストリーミング</string>
     <string name="settings_remote_cap_text_only">文だけ</string>
     <string name="settings_remote_cap_embedding">写真の検索に使える</string>
     <string name="settings_remote_model_cannot_index">画像を読めないため、写真の索引には使えません。</string>

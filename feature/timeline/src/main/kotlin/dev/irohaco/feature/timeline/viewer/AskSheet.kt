@@ -285,7 +285,7 @@ private fun ModelPicker(models: AnswerChoices, onChoose: (String) -> Unit, onEff
             }
             current?.efforts?.takeIf { it.isNotEmpty() }?.let { efforts ->
                 HorizontalDivider()
-                MenuHeading(R.string.ask_effort_section)
+                MenuHeading(if (THINK_OFF in efforts) R.string.ask_thinking_section else R.string.ask_effort_section)
                 (listOf<String?>(null) + efforts).forEach { value ->
                     DropdownMenuItem(
                         text = { Text(effortLabel(value)) },

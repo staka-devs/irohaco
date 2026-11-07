@@ -60,6 +60,8 @@ object IrohacoIcons {
     @DrawableRes val PushPin = R.drawable.ic_push_pin
     @DrawableRes val PushPinFilled = R.drawable.ic_push_pin_filled
     @DrawableRes val Close = R.drawable.ic_close
+    @DrawableRes val Download = R.drawable.ic_download
+    @DrawableRes val Pause = R.drawable.ic_pause
     @DrawableRes val Settings = R.drawable.ic_settings
     @DrawableRes val Check = R.drawable.ic_check
     @DrawableRes val Map = R.drawable.ic_map
