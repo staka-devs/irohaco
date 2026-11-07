@@ -56,6 +56,8 @@ class TimelineViewModel(
     private val share: PrepareShare? = null,
     private val sharingSettings: SharingSettings? = null,
     private val zone: ZoneId = ZoneId.systemDefault(),
+    /** The places photos were taken at, with their numbers of files, for the place filter. */
+    val placeCounts: suspend () -> Map<String, Int> = { emptyMap() },
 ) : ViewModel() {
     private var source: TimelinePagingSource? = null
 

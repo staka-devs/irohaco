@@ -215,6 +215,7 @@ class MainActivity : ComponentActivity() {
                             container.timelineSettings,
                             container.prepareShare,
                             container.sharingSettings,
+                            placeCounts = { container.searchMedia.placeCounts(includeInferred = false) },
                         )
                     },
                     onOpenMedia = { onOpenMedia(it, null) },
@@ -391,13 +392,13 @@ object Route {
 
     /** The photos a chat found, as a search page opened with the conditions the chat read. */
     fun photosFor(read: ReadQuery) =
-        PHOTOS_FOR + listOf(read.fromMs?.toString().orEmpty(), read.untilMs?.toString().orEmpty(), read.kind?.name.orEmpty(), read.rest).joinToString("$SEP")
+        PHOTOS_FOR + listOf(read.fromMs?.toString().orEmpty(), read.untilMs?.toString().orEmpty(), read.kind?.name.orEmpty(), read.place.orEmpty(), read.rest).joinToString("$SEP")
 
     fun isPhotosFor(route: String) = route.startsWith(PHOTOS_FOR)
 
     fun parsePhotosFor(route: String): ReadQuery {
-        val (from, until, kind, rest) = route.removePrefix(PHOTOS_FOR).split(SEP, limit = 4)
-        return ReadQuery(rest, from.toLongOrNull(), until.toLongOrNull(), kind.takeIf { it.isNotEmpty() }?.let(MediaKind::valueOf))
+        val (from, until, kind, place, rest) = route.removePrefix(PHOTOS_FOR).split(SEP, limit = 5)
+        return ReadQuery(rest, from.toLongOrNull(), until.toLongOrNull(), kind.takeIf { it.isNotEmpty() }?.let(MediaKind::valueOf), place = place.ifEmpty { null })
     }
 
     fun isSimilar(route: String) = route.startsWith(SIMILAR)

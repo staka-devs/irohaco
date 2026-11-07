@@ -32,7 +32,13 @@ interface LocationStore {
 /** Turns a point into a place name; this goes outside the device (ADR-0011). */
 fun interface PlaceNames {
     suspend fun nameOf(point: GeoPoint): String?
+
+    /** Places whose name matches [query], best first; none where the service cannot search. */
+    suspend fun find(query: String): List<NamedPlace> = emptyList()
 }
+
+/** A place a name search found. */
+data class NamedPlace(val name: String, val point: GeoPoint)
 
 /**
  * Whether the user allowed the online map (ADR-0011): OpenFreeMap gets the area shown, and the place
@@ -78,6 +84,15 @@ interface PlaceEvidenceStore {
 
     /** The place names known, from GPS and, with [includeInferred], from guesses. */
     suspend fun placeNames(includeInferred: Boolean): List<String>
+
+    /** Each place name with how many files are there, for choosing a place to narrow by. */
+    suspend fun placeCounts(includeInferred: Boolean): Map<String, Int> = placeNames(includeInferred).associateWith { 0 }
+
+    /**
+     * Every file at [place]: a whole place name ("三好市, 徳島県") or one of its parts ("徳島県", "三好市"). The
+     * filter a user chose, so unlike [filesAt] it has no limit.
+     */
+    suspend fun assetsAt(place: String, includeInferred: Boolean): Set<String> = emptySet()
 
     /** Available files at one of [names], confirmed first, then guesses by confidence. */
     suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int): List<PlaceMatch>

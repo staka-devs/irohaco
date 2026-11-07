@@ -50,6 +50,11 @@ class AskViewModel(private val chat: ChatWithLibrary, private val library: AskLi
     val models: StateFlow<AnswerChoices?> =
         (library?.choices ?: flowOf(null)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** The thinking depth the next questions ask for; null for the model's own. */
+    fun chooseEffort(value: String?) {
+        library?.chooseEffort(value)
+    }
+
     fun choose(id: String) {
         val library = library ?: return
         viewModelScope.launch {
@@ -104,6 +109,7 @@ fun AskScreen(viewModel: AskViewModel, onOpen: (SearchHit) -> Unit, onOpenSettin
             modifier = Modifier.padding(padding).fillMaxSize(),
             models = models,
             onChoose = viewModel::choose,
+            onEffort = viewModel::chooseEffort,
             onShowPhotos = onShowPhotos,
             examples = listOf(stringResource(R.string.ask_example_find), stringResource(R.string.ask_example_question)),
         )

@@ -22,7 +22,9 @@ interface TimelineDao {
 
 data class TimelineRow(val assetId: String, val mediaKind: String, val contentUri: String, val sortTimeMs: Long, val mimeType: String?, val durationMs: Long? = null,
     val displayName: String? = null, val sizeBytes: Long? = null, val rating: Int? = null, val hasLocation: Boolean? = null,
+    /** The squared flat distance the distance order uses; null without a place or another order. */
+    val distance: Double? = null,
 )
 
 /** Every column the fast scrollbar's bubble might need, whichever sort is active ([RoomTimelineReader] picks one). */
-data class LabelRow(val takenMs: Long, val displayName: String, val sizeBytes: Long, val rating: Int)
+data class LabelRow(val takenMs: Long, val displayName: String, val sizeBytes: Long, val rating: Int, val distance: Double? = null)

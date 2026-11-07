@@ -158,6 +158,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
             isVideo = item.kind == MediaKind.VIDEO,
             models = answerModels,
             onChoose = viewModel::chooseAnswerModel,
+            onEffort = viewModel::chooseAnswerEffort,
             onAsk = { viewModel.askAbout(item, it) },
             onOpenSettings = onOpenSettings,
             onDismiss = {
@@ -175,11 +176,16 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
                 onDismiss = done,
                 onSave = { done(); viewModel.setTakenAt(item, it) },
             )
-            MetadataField.LOCATION -> LocationDialog(
-                initial = (location as? Detail.Value<GeoPoint>)?.value,
-                onDismiss = done,
-                onSave = { done(); viewModel.setLocation(item, it) },
-            )
+            MetadataField.LOCATION -> {
+                val mapAllowed by viewModel.mapAllowed.collectAsStateWithLifecycle()
+                LocationEditor(
+                    initial = (location as? Detail.Value<GeoPoint>)?.value,
+                    mapAllowed = mapAllowed,
+                    findPlaces = viewModel::findPlaces,
+                    onDismiss = done,
+                    onSave = { done(); viewModel.setLocation(item, it) },
+                )
+            }
             MetadataField.DESCRIPTION -> DescriptionDialog(
                 initial = when (val e = edits.description) {
                     is FieldEdit.Set -> e.value

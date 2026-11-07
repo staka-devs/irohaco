@@ -68,28 +68,6 @@ internal fun TakenAtDialog(initialMs: Long, onDismiss: () -> Unit, onSave: (Long
 internal fun takenAt(day: LocalDate, hour: Int, minute: Int, second: Int, zone: ZoneId): Long =
     LocalDateTime.of(day.year, day.month, day.dayOfMonth, hour, minute, second).atZone(zone).toInstant().toEpochMilli()
 
-/** Latitude and longitude as numbers; clearing both removes the location. */
-@Composable
-internal fun LocationDialog(initial: GeoPoint?, onDismiss: () -> Unit, onSave: (FieldEdit<GeoPoint>) -> Unit) {
-    var latitude by rememberSaveable { mutableStateOf(initial?.latitude?.toString().orEmpty()) }
-    var longitude by rememberSaveable { mutableStateOf(initial?.longitude?.toString().orEmpty()) }
-    val edit = parseLocation(latitude, longitude)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.details_location)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-                val numbers = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                OutlinedTextField(latitude, { latitude = it }, label = { Text(stringResource(R.string.edit_latitude)) }, singleLine = true, keyboardOptions = numbers, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(longitude, { longitude = it }, label = { Text(stringResource(R.string.edit_longitude)) }, singleLine = true, keyboardOptions = numbers, modifier = Modifier.fillMaxWidth())
-                Text(stringResource(R.string.edit_location_clear_hint))
-            }
-        },
-        confirmButton = { TextButton(onClick = { edit?.let(onSave) }, enabled = edit != null) { Text(stringResource(R.string.memo_save)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.memo_cancel)) } },
-    )
-}
-
 /** Both blank removes the location; null when the numbers are not a place on Earth. */
 internal fun parseLocation(latitude: String, longitude: String): FieldEdit<GeoPoint>? {
     if (latitude.isBlank() && longitude.isBlank()) return FieldEdit.Removed
