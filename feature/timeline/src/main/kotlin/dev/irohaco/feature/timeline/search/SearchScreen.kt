@@ -1,5 +1,7 @@
 package dev.irohaco.feature.timeline.search
 
+import dev.irohaco.feature.timeline.PlaceChip
+import androidx.compose.material3.AssistChip
 import dev.irohaco.feature.timeline.kindLabel
 import dev.irohaco.feature.timeline.ChoiceChip
 import dev.irohaco.core.designsystem.component.IrohacoBottomSheet
@@ -117,8 +119,6 @@ data class SearchUi(
     val query: String = "",
     /** The query without the dates and the kind read out of it (#203); what is searched. */
     val rest: String = "",
-    /** Only files at the place the query names (#203). */
-    val atPlace: Boolean = true,
     val byMeaning: Boolean = true,
     val byText: Boolean = true,
     val byMemo: Boolean = true,
@@ -186,8 +186,7 @@ class SearchViewModel(
                     query = read.rest,
                     rest = read.rest,
                     kind = read.kind,
-                    filters = it.filters.copy(fromMs = read.fromMs, untilMs = read.untilMs),
-                    atPlace = true,
+                    filters = it.filters.copy(fromMs = read.fromMs, untilMs = read.untilMs, place = read.place),
                 )
             }
         }
@@ -207,12 +206,14 @@ class SearchViewModel(
                 rest = read.rest,
                 kind = read.kind ?: it.kind,
                 filters = if (read.fromMs != null) it.filters.copy(fromMs = read.fromMs, untilMs = read.untilMs) else it.filters,
-                atPlace = true,
             )
         }
     }
 
-    fun toggleAtPlace() = change { it.copy(atPlace = !it.atPlace) }
+    /** Only files at [place], a place name or one of its parts; null for every place. */
+    fun showPlace(place: String?) = change { it.copy(filters = it.filters.copy(place = place)) }
+
+    suspend fun placeCounts(): Map<String, Int> = search.placeCounts(_ui.value.inferredPlaces)
 
     fun toggleMeaning() = change { it.copy(byMeaning = !it.byMeaning) }
 
@@ -252,7 +253,7 @@ class SearchViewModel(
             val results = if (similarTo != null) {
                 search.similar(similarTo, ui.spaceId, ui.kind, ui.filters)
             } else {
-                search(ui.rest.ifEmpty { ui.query }, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare, ui.byMemo, ui.filters, ui.inferredPlaces, ui.atPlace)
+                search(ui.rest.ifEmpty { ui.query }, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare, ui.byMemo, ui.filters, ui.inferredPlaces)
             }
             _ui.update { it.copy(searching = false, results = results) }
             // Loading a model takes half a minute; start while the user looks at the results.
@@ -285,7 +286,8 @@ fun SearchScreen(
         onDates = viewModel::showDates,
         onTags = viewModel::showTags,
         onToggleInferredPlaces = viewModel::toggleInferredPlaces,
-        onToggleAtPlace = viewModel::toggleAtPlace,
+        onPlace = viewModel::showPlace,
+        placeCounts = viewModel::placeCounts,
         onBack = onBack,
         onBackToChat = onBackToChat,
         onSearch = viewModel::search,
@@ -324,7 +326,8 @@ internal fun SearchContent(
     onDates: (Long?, Long?) -> Unit = { _, _ -> },
     onTags: (Set<String>) -> Unit = {},
     onToggleInferredPlaces: () -> Unit = {},
-    onToggleAtPlace: () -> Unit = {},
+    onPlace: (String?) -> Unit = {},
+    placeCounts: suspend () -> Map<String, Int> = { emptyMap() },
     onBack: (() -> Unit)? = null,
     onAsk: (() -> Unit)? = null,
     onOpenAsk: (() -> Unit)? = null,
@@ -385,7 +388,7 @@ internal fun SearchContent(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Conditions(
                     ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTags,
-                    onToggleInferredPlaces, onToggleAtPlace, similar = onBack != null, tuning = tuning, onTuned = { tuning = false },
+                    onToggleInferredPlaces, onPlace, placeCounts, similar = onBack != null, tuning = tuning, onTuned = { tuning = false },
                 )
             }
             ui.results?.let { results ->
@@ -427,7 +430,8 @@ private fun Conditions(
     onDates: (Long?, Long?) -> Unit,
     onTags: (Set<String>) -> Unit,
     onToggleInferredPlaces: () -> Unit,
-    onToggleAtPlace: () -> Unit,
+    onPlace: (String?) -> Unit,
+    placeCounts: suspend () -> Map<String, Int>,
     /** The similar photos page: no query, so only conditions on the files apply. */
     similar: Boolean,
     /** The search options sheet is open: what to search in, which rarely changes, kept off the screen. */
@@ -458,16 +462,15 @@ private fun Conditions(
                 label = { Text(dates ?: stringResource(R.string.search_dates)) },
                 trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), null) },
             )
-            // The place the query names: on, only files taken there show (#203).
-            ui.results?.place?.let { place ->
-                FilterChip(
-                    ui.atPlace,
-                    onToggleAtPlace,
-                    label = { Text(stringResource(R.string.search_at_place, place)) },
-                    leadingIcon = { Icon(painterResource(if (ui.atPlace) IrohacoIcons.Check else IrohacoIcons.LocationOn), null) },
-                )
-            }
+            PlaceChip(ui.filters.place, placeCounts, { place, _ -> onPlace(place) })
             TagFilterChips(tags, ui.filters.tagIds, onTags)
+        }
+        ui.results?.place?.takeIf { ui.filters.place == null && !similar }?.let { place ->
+            AssistChip(
+                onClick = { onPlace(place) },
+                label = { Text(stringResource(R.string.search_narrow_to_place, place)) },
+                leadingIcon = { Icon(painterResource(IrohacoIcons.LocationOn), null) },
+            )
         }
         // The model switch appears once there is a choice (DESIGN §3: a few models side by side).
         if (spaces.size > 1) {

@@ -153,6 +153,7 @@ internal fun FoundCard(found: ChatWithLibrary.Found, onOpen: (SearchHit) -> Unit
             // How the request was read, so a wrong reading shows at once; it is changed with the button below.
             val conditions = listOfNotNull(
                 read.rest.takeIf { read.hasWords }?.let { stringResource(R.string.ask_found_words, it) },
+                read.place?.substringBefore(", "),
                 read.fromMs?.let { from -> read.untilMs?.let { until -> dateRangeLabel(from, until) } },
                 read.kind?.let { stringResource(if (it == MediaKind.VIDEO) R.string.search_videos else R.string.search_photos) },
             )

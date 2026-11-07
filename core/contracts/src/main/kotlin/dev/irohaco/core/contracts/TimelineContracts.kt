@@ -76,6 +76,8 @@ data class TimelineQuery(
     val minRating: Int? = null,
     /** Only items with a place the app shows (true) or without one (false); null shows both. */
     val located: Boolean? = null,
+    /** Only items at this place name or one of its parts ("徳島県", "三好市, 徳島県"). */
+    val place: String? = null,
     /** Where the distance order measures from: where the device was when the user chose it. */
     val near: GeoPoint? = null,
     /** The distance order also uses places guessed for files without GPS. */
@@ -83,10 +85,10 @@ data class TimelineQuery(
 ) {
     /** The user narrowed what is shown, beyond the order and the hidden folders. */
     val filtered: Boolean
-        get() = kind != null || favoritesOnly || tagIds.isNotEmpty() || takenFromMs != null || takenUntilMs != null || minRating != null || located != null
+        get() = kind != null || favoritesOnly || tagIds.isNotEmpty() || takenFromMs != null || takenUntilMs != null || minRating != null || located != null || place != null
 
     /** The same order, with every filter the user can set in the sheet taken off. */
-    fun unfiltered() = copy(kind = null, favoritesOnly = false, tagIds = emptySet(), takenFromMs = null, takenUntilMs = null, minRating = null, located = null)
+    fun unfiltered() = copy(kind = null, favoritesOnly = false, tagIds = emptySet(), takenFromMs = null, takenUntilMs = null, minRating = null, located = null, place = null)
 }
 
 /**

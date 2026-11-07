@@ -363,7 +363,8 @@ class AskLibraryTest {
         val plan = AskLibrary.parsePlan("""```json
 {"words": ["旅行", "観光"], "place": "京都", "from": "2025-06-01", "until": "2025-08-31", "kind": "any", "show": false}
 ```""", zone)
-        assertEquals(SearchPlan("京都 旅行 観光", ms(2025, 6, 1), ms(2025, 9, 1), null, show = false), plan)
+        // The place stays apart from the words, as a condition on where.
+        assertEquals(SearchPlan("旅行 観光", ms(2025, 6, 1), ms(2025, 9, 1), null, show = false, place = "京都"), plan)
         assertEquals(
             SearchPlan("fireworks", null, null, MediaKind.IMAGE, show = true),
             AskLibrary.parsePlan("""Sure: {"words": ["fireworks"], "place": null, "from": null, "until": null, "kind": "photo", "show": true}""", zone),
@@ -377,7 +378,8 @@ class AskLibraryTest {
     fun `the previous search goes back to the model in the plan's own form`() {
         val zone = ZoneId.of("Asia/Tokyo")
         val read = ReadQuery("花火", LocalDate.of(2025, 6, 1).atStartOfDay(zone).toInstant().toEpochMilli(), LocalDate.of(2025, 9, 1).atStartOfDay(zone).toInstant().toEpochMilli(), MediaKind.IMAGE)
-        assertEquals("""{"words": ["花火"], "from": "2025-06-01", "until": "2025-08-31", "kind": "photo"}""", AskLibrary.planJson(read, zone))
+        assertEquals("""{"words": ["花火"], "place": null, "from": "2025-06-01", "until": "2025-08-31", "kind": "photo"}""", AskLibrary.planJson(read, zone))
+        assertEquals("""{"words": ["花火"], "place": "大阪府", "from": null, "until": null, "kind": "any"}""", AskLibrary.planJson(ReadQuery("花火", place = "大阪府"), zone))
     }
 
     @Test

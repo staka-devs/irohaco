@@ -145,6 +145,23 @@ interface LocationDao {
     )
     suspend fun placeNames(includeInferred: Boolean): List<String>
 
+    @Query(
+        """SELECT le.place_text AS name, COUNT(DISTINCT le.asset_id) AS count
+           FROM location_evidence le JOIN media_assets a ON a.asset_id = le.asset_id
+           WHERE le.place_text IS NOT NULL AND le.place_text <> '' AND a.tombstoned_at IS NULL
+             AND (($SHOWN) OR (:includeInferred AND $GUESS))
+           GROUP BY le.place_text""",
+    )
+    suspend fun placeCounts(includeInferred: Boolean): List<PlaceCountRow>
+
+    // A part is the whole name, its first part or its last one, as the names are "town, prefecture".
+    @Query(
+        """SELECT DISTINCT le.asset_id FROM location_evidence le
+           WHERE (le.place_text = :place OR le.place_text LIKE :place || ', %' OR le.place_text LIKE '%, ' || :place)
+             AND (($SHOWN) OR (:includeInferred AND $GUESS))""",
+    )
+    suspend fun assetsAt(place: String, includeInferred: Boolean): List<String>
+
     @Query("DELETE FROM location_evidence WHERE asset_id = :assetId AND evidence_source = 'USER'")
     suspend fun deleteUser(assetId: String)
 
@@ -277,6 +294,8 @@ data class AssetTime(val assetId: String, val timeMs: Long)
 
 data class ItemRow(val assetId: String, val mediaKind: String, val contentUri: String, val sortTimeMs: Long, val mimeType: String?)
 
+data class PlaceCountRow(val name: String, val count: Int)
+
 data class KnownPlaceRow(val name: String, val latitude: Double, val longitude: Double, val count: Int)
 
 /** Capture time, else modified time, else when the catalog first saw the file: the timeline's order. */
@@ -332,6 +351,10 @@ class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -
     override suspend fun replaceInferred(places: List<InferredPlace>) = dao.replaceInferred(places)
 
     override suspend fun placeNames(includeInferred: Boolean) = dao.placeNames(includeInferred)
+
+    override suspend fun placeCounts(includeInferred: Boolean) = dao.placeCounts(includeInferred).associate { it.name to it.count }
+
+    override suspend fun assetsAt(place: String, includeInferred: Boolean) = dao.assetsAt(place, includeInferred).toSet()
 
     override suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int) =
         dao.filesAt(names.toList(), includeInferred, limit)

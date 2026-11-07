@@ -145,6 +145,13 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
                 false -> append(" AND NOT $HAS_LOCATION")
                 null -> Unit
             }
+            // A part is the whole name, its first part or its last one, as the names are "town, prefecture".
+            if (query.place != null) {
+                append(
+                    " AND EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = a.asset_id AND $SHOWN" +
+                        " AND (le.place_text = ? OR le.place_text LIKE ? || ', %' OR le.place_text LIKE '%, ' || ?))",
+                )
+            }
         }
 
         /** In the order of the placeholders in [where]. */
@@ -157,6 +164,7 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             query.takenFromMs?.let { add(it) }
             query.takenUntilMs?.let { add(it) }
             query.minRating?.let { add(it) }
+            query.place?.let { add(it); add(it); add(it) }
         }.toTypedArray()
 
         /** The asset id breaks ties in the same direction, so pages never overlap or skip. */

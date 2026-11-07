@@ -68,11 +68,14 @@ class SearchMediaTest {
             override suspend fun placeNames(includeInferred: Boolean) = listOf("京都市, 京都府")
             override suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int) = listOf(PlaceMatch("p2", "京都市, 京都府", inferred = false))
             override suspend fun placesOf(assetIds: Collection<String>) = emptyMap<String, PlaceMatch>()
+            override suspend fun assetsAt(place: String, includeInferred: Boolean) = if (place == "京都府") setOf("p2") else emptySet()
         }
         val atPlaces = SearchMedia(SearchByMeaning(vectors, embedText = { floatArrayOf(1f) }, modelDigest = "d"), SearchText(texts), { ids, _ -> catalog.filter { it.assetId in ids } }, { it }, SearchPlaces(places))
-        val narrowed = atPlaces("京都の看板", onlyAtPlace = true)
+        // Named in the query, the place is offered, not applied.
+        assertEquals("京都府", atPlaces("京都の看板").place)
+        val narrowed = atPlaces("京都の看板", filters = SearchFilters(place = "京都府"))
         assertEquals(listOf("p2"), narrowed.hits.map { it.item.assetId })
-        assertEquals("京都", narrowed.place) // as asked, not the town of the first file
+        assertEquals(null, narrowed.place) // already chosen
         assertEquals(listOf("p2", "p1", "v1", "v1"), atPlaces("京都の看板").hits.map { it.item.assetId })
     }
 

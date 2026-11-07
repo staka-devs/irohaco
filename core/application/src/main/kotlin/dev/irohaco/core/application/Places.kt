@@ -68,6 +68,16 @@ class SearchPlaces(private val store: PlaceEvidenceStore) {
         return store.filesAt(names, includeInferred, LIMIT)
     }
 
+    /** The files at a place the user chose. */
+    suspend fun at(place: String, includeInferred: Boolean): Set<String> = store.assetsAt(place, includeInferred)
+
+    /** Every place name with its number of files, for the place picker. */
+    suspend fun counts(includeInferred: Boolean): Map<String, Int> = store.placeCounts(includeInferred)
+
+    /** The place a text names, as a part of a known place name ("大阪" names "大阪府"); null when it names none. */
+    suspend fun named(text: String, includeInferred: Boolean): String? =
+        store.placeNames(includeInferred).firstNotNullOfOrNull { mentionedName(text, it) }
+
     internal companion object {
         const val LIMIT = 200
 
@@ -77,6 +87,18 @@ class SearchPlaces(private val store: PlaceEvidenceStore) {
          * The name the query gives the place, as [placeName] writes it without 市, 県 and the like: "徳島" in both
          * "徳島市, 徳島県" and "三好市, 徳島県", so the search says what was asked, not the town of whichever file came first.
          */
+        /**
+         * The part of [placeName] the query names, as written in it with its 市 or 県; the widest when several do, so
+         * "大阪" names 大阪府 in "大阪市, 大阪府", as the user asked for the place, not one city of it.
+         */
+        fun mentionedName(query: String, placeName: String): String? {
+            val text = fold(query)
+            return placeName.split(",").map { it.trim() }.lastOrNull { part ->
+                val core = if (part.length > 2 && part.last() in ADMIN_SUFFIXES) part.dropLast(1) else part
+                core.length >= 2 && fold(core) in text
+            }
+        }
+
         fun mentionedPart(query: String, placeName: String): String? {
             val text = fold(query)
             return placeName.split(",").map { it.trim() }.firstNotNullOfOrNull { part ->
@@ -93,5 +115,8 @@ class SearchPlaces(private val store: PlaceEvidenceStore) {
         private fun fold(text: String) = Normalizer.normalize(text, Normalizer.Form.NFKC).lowercase()
 
         private val ADMIN_SUFFIXES = charArrayOf('都', '道', '府', '県', '市', '区', '町', '村')
+
+        /** The endings a place's own name drops: 大阪府 is called 大阪. */
+        val SUFFIXES: CharArray get() = ADMIN_SUFFIXES
     }
 }

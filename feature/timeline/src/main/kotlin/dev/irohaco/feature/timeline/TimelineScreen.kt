@@ -248,6 +248,7 @@ fun TimelineScreen(
     TimelineContent(
         access = access,
         cells = cells,
+        placeCounts = viewModel.placeCounts,
         onRequestAccess = { request.launch(MEDIA_PERMISSIONS) },
         onOpenSystemSettings = {
             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))
@@ -379,6 +380,7 @@ internal fun TimelineContent(
     snackbar: SnackbarHostState = remember { SnackbarHostState() },
     query: TimelineQuery = TimelineQuery(),
     onQueryChange: (TimelineQuery) -> Unit = {},
+    placeCounts: suspend () -> Map<String, Int> = { emptyMap() },
     scrollToTop: Flow<Unit> = emptyFlow(),
     grouping: DateGrouping = DateGrouping.DAY,
     onGrouping: (DateGrouping) -> Unit = {},
@@ -467,7 +469,7 @@ internal fun TimelineContent(
                         PartialAccessBar(onRequestAccess)
                     }
                     // Kept while selecting too: hiding it would move the grid under the finger mid-drag.
-                    FilterRow(query, tags, onQueryChange)
+                    FilterRow(query, tags, onQueryChange, placeCounts = placeCounts)
                     TimelineGrid(
                         cells = cells,
                         columns = columns,

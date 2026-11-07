@@ -39,7 +39,14 @@ import dev.irohaco.feature.timeline.search.dateRangeLabel
  * a chip with a choice opens a menu. The order is in its own sheet. The viewer opened from the grid follows the same filter.
  */
 @Composable
-internal fun FilterRow(query: TimelineQuery, tags: List<Tag>, onChange: (TimelineQuery) -> Unit, modifier: Modifier = Modifier) {
+internal fun FilterRow(
+    query: TimelineQuery,
+    tags: List<Tag>,
+    onChange: (TimelineQuery) -> Unit,
+    modifier: Modifier = Modifier,
+    /** The places photos were taken at, with their numbers of files, read when the place chip opens. */
+    placeCounts: suspend () -> Map<String, Int> = { emptyMap() },
+) {
     var pickingDates by rememberSaveable { mutableStateOf(false) }
     if (pickingDates) {
         DateRangeDialog(
@@ -73,7 +80,7 @@ internal fun FilterRow(query: TimelineQuery, tags: List<Tag>, onChange: (Timelin
             trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), null) },
         )
         ChoiceChip(query.minRating, listOf(null, 1, 2, 3, 4, 5), { ratingLabel(it) }) { onChange(query.copy(minRating = it)) }
-        ChoiceChip(query.located, listOf(null, true, false), { placeLabel(it) }) { onChange(query.copy(located = it)) }
+        PlaceChip(query.place, placeCounts, { place, located -> onChange(query.copy(place = place, located = located)) }, query.located, offerLocated = true)
         TagFilterChips(tags, query.tagIds) { onChange(query.copy(tagIds = it)) }
         if (query.filtered) TextButton(onClick = { onChange(query.unfiltered()) }) { Text(stringResource(R.string.timeline_filter_clear)) }
     }
@@ -113,15 +120,6 @@ internal fun kindLabel(kind: MediaKind?) = stringResource(
 
 @Composable
 private fun ratingLabel(min: Int?) = min?.let { stringResource(R.string.timeline_filter_rating_at_least, "★".repeat(it)) } ?: stringResource(R.string.timeline_filter_rating)
-
-@Composable
-private fun placeLabel(located: Boolean?) = stringResource(
-    when (located) {
-        true -> R.string.timeline_filter_located
-        false -> R.string.timeline_filter_unlocated
-        null -> R.string.timeline_filter_place
-    },
-)
 
 @IrohacoPreviews
 @Composable

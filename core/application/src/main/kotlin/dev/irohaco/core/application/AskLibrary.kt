@@ -74,7 +74,7 @@ sealed interface AskResult {
  * A question read as a photo search by the answering model: the words to search for (a place it names first),
  * capture times in [fromMs, untilMs), the kind, and whether the user wants to see photos rather than an answer.
  */
-data class SearchPlan(val words: String, val fromMs: Long?, val untilMs: Long?, val kind: MediaKind?, val show: Boolean)
+data class SearchPlan(val words: String, val fromMs: Long?, val untilMs: Long?, val kind: MediaKind?, val show: Boolean, val place: String? = null)
 
 /** An answer still being written: what the model thought so far, then the answer's text so far. */
 data class AskPartial(val thought: String, val text: String)
@@ -401,7 +401,8 @@ as guessed is INFERRED."""
                 MediaKind.VIDEO -> "video"
                 null -> "any"
             }
-            return """{"words": $words, "from": ${day(read.fromMs)}, "until": ${day(read.untilMs?.minus(1))}, "kind": "$kind"}"""
+            val place = read.place?.let { "\"" + it.replace("\"", "") + "\"" } ?: "null"
+            return """{"words": $words, "place": $place, "from": ${day(read.fromMs)}, "until": ${day(read.untilMs?.minus(1))}, "kind": "$kind"}"""
         }
 
         /** Reads [PLAN_INSTRUCTION]'s JSON, also inside a code fence or after other text; null when it has no "show". */
@@ -419,7 +420,9 @@ as guessed is INFERRED."""
             val until = day("until")
             val span = if (from != null && until != null && !until.isBefore(from)) from to until.plusDays(1) else null
             return SearchPlan(
-                words = (strings(raw("place")) + strings(raw("words"))).joinToString(" "),
+                // The place is a condition on where, apart from the words looked for by meaning.
+                words = strings(raw("words")).joinToString(" "),
+                place = strings(raw("place")).firstOrNull(),
                 fromMs = span?.first?.atStartOfDay(zone)?.toInstant()?.toEpochMilli(),
                 untilMs = span?.second?.atStartOfDay(zone)?.toInstant()?.toEpochMilli(),
                 kind = when (strings(raw("kind")).firstOrNull()?.lowercase()) {

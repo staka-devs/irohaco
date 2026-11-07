@@ -121,6 +121,15 @@ class RoomTimelineReaderTest {
         assertEquals(listOf("near", "far", "guessed", "none"), order(fromTokyo))
         assertEquals(listOf("guessed", "near", "far", "none"), order(fromTokyo.copy(nearIncludesInferred = true)))
         assertEquals(listOf("far", "near", "none", "guessed"), order(fromTokyo.copy(descending = true))) // no place: last, id breaks the tie
+
+        // A place name or one of its parts narrows to the files there; a guessed place does not count.
+        db.openHelper.writableDatabase.execSQL("UPDATE location_evidence SET place_text = '札幌市, 北海道' WHERE evidence_id = 'l1'")
+        db.openHelper.writableDatabase.execSQL("UPDATE location_evidence SET place_text = '新宿区, 東京都' WHERE evidence_id = 'l2'")
+        db.openHelper.writableDatabase.execSQL("UPDATE location_evidence SET place_text = '千代田区, 東京都' WHERE evidence_id = 'l3'")
+        assertEquals(listOf("near"), order(TimelineQuery(place = "東京都")))
+        assertEquals(listOf("far"), order(TimelineQuery(place = "札幌市")))
+        assertEquals(listOf("far"), order(TimelineQuery(place = "札幌市, 北海道")))
+        assertEquals(emptyList(), order(TimelineQuery(place = "京都")))
     }
 
     @Test
