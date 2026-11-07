@@ -470,7 +470,15 @@ private fun Conditions(
                 label = { Text(dates ?: stringResource(R.string.search_dates)) },
                 trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), null) },
             )
-            ui.results?.place?.let { place -> FilterChip(ui.atPlace, onToggleAtPlace, label = { Text(place) }) }
+            // The place the query names: on, only files taken there show (#203).
+            ui.results?.place?.let { place ->
+                FilterChip(
+                    ui.atPlace,
+                    onToggleAtPlace,
+                    label = { Text(stringResource(R.string.search_at_place, place)) },
+                    leadingIcon = { Icon(painterResource(if (ui.atPlace) IrohacoIcons.Check else IrohacoIcons.LocationOn), null) },
+                )
+            }
             TagFilterChips(tags, ui.filters.tagIds, onTags)
         }
         // The model switch appears once there is a choice (DESIGN §3: a few models side by side).
