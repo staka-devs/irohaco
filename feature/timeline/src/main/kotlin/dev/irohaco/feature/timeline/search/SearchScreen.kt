@@ -1,5 +1,15 @@
 package dev.irohaco.feature.timeline.search
 
+import dev.irohaco.core.designsystem.component.IrohacoBottomSheet
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.Switch
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.text.KeyboardOptions
@@ -319,6 +329,7 @@ internal fun SearchContent(
     onBackToChat: (() -> Unit)? = null,
 ) {
     val text = rememberTextFieldState(ui.query)
+    var tuning by rememberSaveable { mutableStateOf(false) }
     // The query arrives after the first frame when the page opens with one, so the field takes it up then.
     LaunchedEffect(ui.query) { if (text.text.isEmpty() && ui.query.isNotEmpty()) text.setTextAndPlaceCursorAtEnd(ui.query) }
     val labels = spaceLabels(spaces)
@@ -350,6 +361,7 @@ internal fun SearchContent(
                     },
                     trailingIcon = {
                         Row {
+                            IconButton(onClick = { tuning = true }) { Icon(painterResource(IrohacoIcons.Tune), stringResource(R.string.search_options)) }
                             IconButton(onClick = onOpenSettings) { Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.timeline_settings)) }
                         }
                     },
@@ -369,7 +381,10 @@ internal fun SearchContent(
             // Asking AI is a way of its own beside the search, not hidden in the bar.
             if (onOpenAsk != null && ui.results == null) item(span = { GridItemSpan(maxLineSpan) }) { AskEntry(onOpenAsk) }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTags, onToggleInferredPlaces, onToggleAtPlace, similar = onBack != null)
+                Conditions(
+                    ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTags,
+                    onToggleInferredPlaces, onToggleAtPlace, similar = onBack != null, tuning = tuning, onTuned = { tuning = false },
+                )
             }
             ui.results?.let { results ->
                 item(span = { GridItemSpan(maxLineSpan) }) { Notices(ui, results, labels, onOpenSettings) }
@@ -413,28 +428,43 @@ private fun Conditions(
     onToggleAtPlace: () -> Unit,
     /** The similar photos page: no query, so only conditions on the files apply. */
     similar: Boolean,
+    /** The search options sheet is open: what to search in, which rarely changes, kept off the screen. */
+    tuning: Boolean = false,
+    onTuned: () -> Unit = {},
 ) {
     val searchable = spaces.count { it.space.state in PICKABLE }
     var pickingDates by rememberSaveable { mutableStateOf(false) }
     if (pickingDates) DateRangeDialog(ui.filters.fromMs, ui.filters.untilMs, onDismiss = { pickingDates = false }) { from, until -> pickingDates = false; onDates(from, until) }
+    if (tuning && !similar) {
+        IrohacoBottomSheet(onDismiss = onTuned) {
+            Text(stringResource(R.string.search_options), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = IrohacoSpacing.l))
+            @Composable
+            fun Option(label: Int, hint: Int?, on: Boolean, enabled: Boolean = true, onToggle: () -> Unit) = ListItem(
+                supportingContent = hint?.let { { Text(stringResource(it)) } },
+                trailingContent = { Switch(checked = on, onCheckedChange = null, enabled = enabled) },
+                modifier = Modifier.toggleable(on, enabled = enabled, role = Role.Switch) { onToggle() },
+            ) { Text(stringResource(label)) }
+            Option(R.string.search_by_meaning, R.string.search_by_meaning_hint, ui.byMeaning, onToggle = onToggleMeaning)
+            Option(R.string.search_by_text, R.string.search_by_text_hint, ui.byText, onToggle = onToggleText)
+            Option(R.string.search_by_memo, null, ui.byMemo, onToggle = onToggleMemo)
+            Option(R.string.search_inferred_places, R.string.search_inferred_places_hint, ui.inferredPlaces, onToggle = onToggleInferredPlaces)
+            // Comparing searches every model at once, so it needs two of them (SRCH-005).
+            if (searchable > 1) Option(R.string.search_compare, null, ui.compare, enabled = ui.byMeaning, onToggle = onToggleCompare)
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-            if (!similar) {
-                FilterChip(ui.byMeaning, onToggleMeaning, label = { Text(stringResource(R.string.search_by_meaning)) })
-                FilterChip(ui.byText, onToggleText, label = { Text(stringResource(R.string.search_by_text)) })
-                FilterChip(ui.byMemo, onToggleMemo, label = { Text(stringResource(R.string.search_by_memo)) })
-            }
-            FilterChip(ui.kind == MediaKind.IMAGE, { onKind(if (ui.kind == MediaKind.IMAGE) null else MediaKind.IMAGE) }, label = { Text(stringResource(R.string.search_photos)) })
-            FilterChip(ui.kind == MediaKind.VIDEO, { onKind(if (ui.kind == MediaKind.VIDEO) null else MediaKind.VIDEO) }, label = { Text(stringResource(R.string.search_videos)) })
+        // The conditions on the files, in one row that scrolls sideways.
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+            KindChip(ui.kind, onKind)
             val dates = ui.filters.fromMs?.let { from -> ui.filters.untilMs?.let { until -> dateRangeLabel(from, until) } }
-            FilterChip(dates != null, { if (dates != null) onDates(null, null) else pickingDates = true }, label = { Text(dates ?: stringResource(R.string.search_dates)) })
+            FilterChip(
+                dates != null,
+                { if (dates != null) onDates(null, null) else pickingDates = true },
+                label = { Text(dates ?: stringResource(R.string.search_dates)) },
+                trailingIcon = if (dates == null) ({ Icon(painterResource(IrohacoIcons.ExpandMore), null) }) else null,
+            )
             ui.results?.place?.let { place -> FilterChip(ui.atPlace, onToggleAtPlace, label = { Text(place) }) }
             TagFilterChips(tags, ui.filters.tagIds, onTags)
-            if (!similar) FilterChip(ui.inferredPlaces, onToggleInferredPlaces, label = { Text(stringResource(R.string.search_inferred_places)) })
-            // Comparing searches every model at once, so it needs two of them (SRCH-005).
-            if (searchable > 1 && !similar) {
-                FilterChip(ui.compare, onToggleCompare, enabled = ui.byMeaning, label = { Text(stringResource(R.string.search_compare)) })
-            }
         }
         // The model switch appears once there is a choice (DESIGN §3: a few models side by side).
         if (spaces.size > 1) {
@@ -450,6 +480,37 @@ private fun Conditions(
                         trailingIcon = space.badge(coverage)?.let { { StatusBadge(it) } },
                     )
                 }
+            }
+        }
+    }
+}
+
+/** Photos, videos or both, chosen from a menu under one chip. */
+@Composable
+private fun KindChip(kind: MediaKind?, onKind: (MediaKind?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    @Composable
+    fun label(value: MediaKind?) = stringResource(
+        when (value) {
+            MediaKind.IMAGE -> R.string.search_photos
+            MediaKind.VIDEO -> R.string.search_videos
+            null -> R.string.search_all_kinds
+        },
+    )
+    Box {
+        FilterChip(
+            selected = kind != null,
+            onClick = { open = true },
+            label = { Text(label(kind)) },
+            trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), null) },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            listOf(null, MediaKind.IMAGE, MediaKind.VIDEO).forEach { value ->
+                DropdownMenuItem(
+                    text = { Text(label(value)) },
+                    trailingIcon = if (value == kind) ({ Icon(painterResource(IrohacoIcons.Check), null) }) else null,
+                    onClick = { open = false; onKind(value) },
+                )
             }
         }
     }

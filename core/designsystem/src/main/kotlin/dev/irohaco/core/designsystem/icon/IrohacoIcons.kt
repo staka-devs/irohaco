@@ -62,6 +62,7 @@ object IrohacoIcons {
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val Download = R.drawable.ic_download
     @DrawableRes val Pause = R.drawable.ic_pause
+    @DrawableRes val Tune = R.drawable.ic_tune
     @DrawableRes val Settings = R.drawable.ic_settings
     @DrawableRes val Check = R.drawable.ic_check
     @DrawableRes val Map = R.drawable.ic_map

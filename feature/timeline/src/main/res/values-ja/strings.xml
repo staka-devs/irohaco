@@ -236,6 +236,11 @@
     <string name="timeline_size_under">%1$s未満</string>
     <string name="timeline_unrated">評価なし</string>
     <string name="search_placeholder">写っているものや、写真の中の文字で探す</string>
+    <string name="search_options">検索の設定</string>
+    <string name="search_all_kinds">すべての種類</string>
+    <string name="search_by_meaning_hint">Embedding で写っているものを探す</string>
+    <string name="search_by_text_hint">写真に写った文字を探す</string>
+    <string name="search_inferred_places_hint">GPS のない写真で、撮った場所を推定したもの</string>
     <string name="search_by_meaning">画像の内容</string>
     <string name="search_by_text">文字(OCR)</string>
     <string name="search_photos">写真</string>

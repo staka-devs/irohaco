@@ -240,6 +240,11 @@
     <string name="timeline_size_under">Under %1$s</string>
     <string name="timeline_unrated">No rating</string>
     <string name="search_placeholder">Search by what is in the photo, or its text</string>
+    <string name="search_options">Search options</string>
+    <string name="search_all_kinds">All kinds</string>
+    <string name="search_by_meaning_hint">Finds what is in the photo with the embedding model</string>
+    <string name="search_by_text_hint">Finds the text written in the photo</string>
+    <string name="search_inferred_places_hint">Places guessed for photos without GPS</string>
     <string name="search_by_meaning">Image content</string>
     <string name="search_by_text">Text (OCR)</string>
     <string name="search_photos">Photos</string>
