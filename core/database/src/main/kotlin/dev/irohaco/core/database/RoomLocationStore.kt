@@ -1,5 +1,6 @@
 package dev.irohaco.core.database
 
+import dev.irohaco.core.domain.GeoBounds
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Transaction
@@ -161,6 +162,13 @@ interface LocationDao {
              AND (($SHOWN) OR (:includeInferred AND $GUESS))""",
     )
     suspend fun assetsAt(place: String, includeInferred: Boolean): List<String>
+
+    @Query(
+        """SELECT DISTINCT le.asset_id FROM location_evidence le
+           WHERE le.latitude BETWEEN :south AND :north AND le.longitude BETWEEN :west AND :east
+             AND (($SHOWN) OR (:includeInferred AND $GUESS))""",
+    )
+    suspend fun assetsIn(south: Double, west: Double, north: Double, east: Double, includeInferred: Boolean): List<String>
 
     @Query("DELETE FROM location_evidence WHERE asset_id = :assetId AND evidence_source = 'USER'")
     suspend fun deleteUser(assetId: String)
@@ -355,6 +363,9 @@ class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -
     override suspend fun placeCounts(includeInferred: Boolean) = dao.placeCounts(includeInferred).associate { it.name to it.count }
 
     override suspend fun assetsAt(place: String, includeInferred: Boolean) = dao.assetsAt(place, includeInferred).toSet()
+
+    override suspend fun assetsIn(area: GeoBounds, includeInferred: Boolean) =
+        dao.assetsIn(area.south, area.west, area.north, area.east, includeInferred).toSet()
 
     override suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int) =
         dao.filesAt(names.toList(), includeInferred, limit)

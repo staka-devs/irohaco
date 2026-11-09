@@ -1,5 +1,6 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.domain.GeoBounds
 import dev.irohaco.core.contracts.InferredPlace
 import dev.irohaco.core.contracts.PlaceEvidenceStore
 import dev.irohaco.core.contracts.PlaceMatch
@@ -70,6 +71,9 @@ class SearchPlaces(private val store: PlaceEvidenceStore) {
 
     /** The files at a place the user chose. */
     suspend fun at(place: String, includeInferred: Boolean): Set<String> = store.assetsAt(place, includeInferred)
+
+    /** The files inside the part of the map the user chose. */
+    suspend fun within(area: GeoBounds, includeInferred: Boolean): Set<String> = store.assetsIn(area, includeInferred)
 
     /** Every place name with its number of files, for the place picker. */
     suspend fun counts(includeInferred: Boolean): Map<String, Int> = store.placeCounts(includeInferred)

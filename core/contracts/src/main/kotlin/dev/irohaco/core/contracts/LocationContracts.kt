@@ -1,5 +1,6 @@
 package dev.irohaco.core.contracts
 
+import dev.irohaco.core.domain.GeoBounds
 import dev.irohaco.core.domain.GeoPoint
 import kotlinx.coroutines.flow.Flow
 
@@ -93,6 +94,9 @@ interface PlaceEvidenceStore {
      * filter a user chose, so unlike [filesAt] it has no limit.
      */
     suspend fun assetsAt(place: String, includeInferred: Boolean): Set<String> = emptySet()
+
+    /** Every file whose place is inside [area], the part of the map the user chose; no limit either. */
+    suspend fun assetsIn(area: GeoBounds, includeInferred: Boolean): Set<String> = emptySet()
 
     /** Available files at one of [names], confirmed first, then guesses by confidence. */
     suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int): List<PlaceMatch>

@@ -308,7 +308,16 @@
     <string name="memo_by_user">You</string>
     <string name="memo_revision">Version %1$d · %2$s · %3$s</string>
     <string name="search_narrow_to_place">Only photos taken in %1$s</string>
-    <string name="timeline_place_any">Any</string>
+    <string name="timeline_place_area">Map area</string>
+    <string name="timeline_place_on_map">Choose an area on the map</string>
+    <string name="timeline_place_search">Search places</string>
+    <string name="timeline_place_search_clear">Clear</string>
+    <string name="timeline_place_no_match">No place matches “%1$s”</string>
+    <string name="timeline_place_chosen">Selected</string>
+    <string name="timeline_place_narrow_to_view">Show the %1$d items in this area</string>
+    <string name="timeline_place_around">Around %1$s</string>
+    <string name="timeline_place_around_on_map">Choose an area around “%1$s” on the map</string>
+    <string name="timeline_place_not_found">Couldn’t find “%1$s”. Move the map to choose an area.</string>
     <string name="timeline_place_count">%1$d items</string>
     <string name="timeline_place_none">No photos have a place yet</string>
     <string name="search_dates">Dates</string>

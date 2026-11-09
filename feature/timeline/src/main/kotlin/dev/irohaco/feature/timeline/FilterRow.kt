@@ -80,7 +80,12 @@ internal fun FilterRow(
             trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), null) },
         )
         ChoiceChip(query.minRating, listOf(null, 1, 2, 3, 4, 5), { ratingLabel(it) }) { onChange(query.copy(minRating = it)) }
-        PlaceChip(query.place, placeCounts, { place, located -> onChange(query.copy(place = place, located = located)) }, query.located, offerLocated = true)
+        PlaceChip(
+            PlaceChoice(query.place, query.area, query.located),
+            placeCounts,
+            { onChange(query.copy(place = it.place, area = it.area, located = it.located)) },
+            offerLocated = true,
+        )
         TagFilterChips(tags, query.tagIds) { onChange(query.copy(tagIds = it)) }
         if (query.filtered) TextButton(onClick = { onChange(query.unfiltered()) }) { Text(stringResource(R.string.timeline_filter_clear)) }
     }

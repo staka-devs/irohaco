@@ -1,5 +1,7 @@
 package dev.irohaco
 
+import dev.irohaco.feature.timeline.LocalAreaPicker
+import dev.irohaco.feature.timeline.library.AreaPicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -121,7 +123,11 @@ class MainActivity : ComponentActivity() {
                 },
             ) {
                 val marks by container.modelMarks.marks.collectAsStateWithLifecycle(emptyMap())
-                CompositionLocalProvider(LocalModelMarks provides marks) {
+                // The place filter's map, wherever the place chip is.
+                val areaPicker: @Composable (GeoBounds?, String?, (GeoBounds?) -> Unit) -> Unit = { initial, lookFor, onDone ->
+                    AreaPicker(viewModel { MapViewModel(container.browseMap) }, initial, lookFor, onDone = { onDone(it) }, onBack = { onDone(null) })
+                }
+                CompositionLocalProvider(LocalModelMarks provides marks, LocalAreaPicker provides areaPicker) {
                     // The first open of the database runs its schema and checks; it must not happen on the main thread
                     // when the first screen builds its ViewModel, so the screens wait for it here.
                     val databaseReady by produceState(false) {

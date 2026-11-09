@@ -304,7 +304,16 @@
     <string name="memo_by_user">あなた</string>
     <string name="memo_revision">第%1$d版 · %2$s · %3$s</string>
     <string name="search_narrow_to_place">%1$sで撮影した写真に絞る</string>
-    <string name="timeline_place_any">指定なし</string>
+    <string name="timeline_place_area">地図の範囲</string>
+    <string name="timeline_place_on_map">地図で範囲を選ぶ</string>
+    <string name="timeline_place_search">地名で探す</string>
+    <string name="timeline_place_search_clear">入力を消す</string>
+    <string name="timeline_place_no_match">「%1$s」の付いた場所はありません</string>
+    <string name="timeline_place_chosen">選択中</string>
+    <string name="timeline_place_narrow_to_view">この範囲の %1$d 枚に絞る</string>
+    <string name="timeline_place_around">%1$sの周り</string>
+    <string name="timeline_place_around_on_map">「%1$s」の周りを地図で選ぶ</string>
+    <string name="timeline_place_not_found">「%1$s」は見つかりませんでした。地図を動かして選んでください</string>
     <string name="timeline_place_count">%1$d 枚</string>
     <string name="timeline_place_none">場所の付いた写真がありません</string>
     <string name="search_dates">日付</string>

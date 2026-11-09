@@ -85,10 +85,10 @@ data class TimelineQuery(
 ) {
     /** The user narrowed what is shown, beyond the order and the hidden folders. */
     val filtered: Boolean
-        get() = kind != null || favoritesOnly || tagIds.isNotEmpty() || takenFromMs != null || takenUntilMs != null || minRating != null || located != null || place != null
+        get() = kind != null || favoritesOnly || tagIds.isNotEmpty() || takenFromMs != null || takenUntilMs != null || minRating != null || located != null || place != null || area != null
 
     /** The same order, with every filter the user can set in the sheet taken off. */
-    fun unfiltered() = copy(kind = null, favoritesOnly = false, tagIds = emptySet(), takenFromMs = null, takenUntilMs = null, minRating = null, located = null, place = null)
+    fun unfiltered() = copy(kind = null, favoritesOnly = false, tagIds = emptySet(), takenFromMs = null, takenUntilMs = null, minRating = null, located = null, place = null, area = null)
 }
 
 /**

@@ -1,5 +1,6 @@
 package dev.irohaco.feature.timeline.search
 
+import dev.irohaco.feature.timeline.PlaceChoice
 import dev.irohaco.feature.timeline.PlaceChip
 import androidx.compose.material3.AssistChip
 import dev.irohaco.feature.timeline.kindLabel
@@ -211,7 +212,7 @@ class SearchViewModel(
     }
 
     /** Only files at [place], a place name or one of its parts; null for every place. */
-    fun showPlace(place: String?) = change { it.copy(filters = it.filters.copy(place = place)) }
+    fun showPlace(choice: PlaceChoice) = change { it.copy(filters = it.filters.copy(place = choice.place, area = choice.area)) }
 
     suspend fun placeCounts(): Map<String, Int> = search.placeCounts(_ui.value.inferredPlaces)
 
@@ -326,7 +327,7 @@ internal fun SearchContent(
     onDates: (Long?, Long?) -> Unit = { _, _ -> },
     onTags: (Set<String>) -> Unit = {},
     onToggleInferredPlaces: () -> Unit = {},
-    onPlace: (String?) -> Unit = {},
+    onPlace: (PlaceChoice) -> Unit = {},
     placeCounts: suspend () -> Map<String, Int> = { emptyMap() },
     onBack: (() -> Unit)? = null,
     onAsk: (() -> Unit)? = null,
@@ -430,7 +431,7 @@ private fun Conditions(
     onDates: (Long?, Long?) -> Unit,
     onTags: (Set<String>) -> Unit,
     onToggleInferredPlaces: () -> Unit,
-    onPlace: (String?) -> Unit,
+    onPlace: (PlaceChoice) -> Unit,
     placeCounts: suspend () -> Map<String, Int>,
     /** The similar photos page: no query, so only conditions on the files apply. */
     similar: Boolean,
@@ -462,12 +463,12 @@ private fun Conditions(
                 label = { Text(dates ?: stringResource(R.string.search_dates)) },
                 trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), null) },
             )
-            PlaceChip(ui.filters.place, placeCounts, { place, _ -> onPlace(place) })
+            PlaceChip(PlaceChoice(ui.filters.place, ui.filters.area), placeCounts, onPlace)
             TagFilterChips(tags, ui.filters.tagIds, onTags)
         }
-        ui.results?.place?.takeIf { ui.filters.place == null && !similar }?.let { place ->
+        ui.results?.place?.takeIf { ui.filters.place == null && ui.filters.area == null && !similar }?.let { place ->
             AssistChip(
-                onClick = { onPlace(place) },
+                onClick = { onPlace(PlaceChoice(place = place)) },
                 label = { Text(stringResource(R.string.search_narrow_to_place, place)) },
                 leadingIcon = { Icon(painterResource(IrohacoIcons.LocationOn), null) },
             )
