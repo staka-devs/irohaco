@@ -23,11 +23,11 @@ import android.content.Intent
 import android.os.Bundle
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.ComposeView
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -85,6 +85,7 @@ import dev.irohaco.feature.timeline.ask.AskViewModel
 import dev.irohaco.core.application.ChatWithLibrary
 import dev.irohaco.core.application.ReadQuery
 import dev.irohaco.core.domain.MediaKind
+import dev.irohaco.ui.AccessibilityEventLimiter
 import dev.irohaco.ui.IrohacoApp
 import dev.irohaco.ui.ScreenViewModelStores
 import dev.irohaco.ui.TopLevelDestination
@@ -110,7 +111,7 @@ class MainActivity : ComponentActivity() {
                 container.indexLocations() // GPS of new files, a few at a time; pausing the app pauses it (GAL-017)
             }
         }
-        setContent {
+        setLimitedContent {
             val themeColor by container.themeColorSettings.observe().collectAsStateWithLifecycle(ThemeColor.Device)
             val contrast by container.themeColorSettings.observeContrast().collectAsStateWithLifecycle(ThemeContrast.DEVICE)
             IrohacoTheme(
@@ -456,4 +457,10 @@ object Route {
             else -> MediaList.Favorites
         }
     }
+}
+
+/** Like setContent, but inside [AccessibilityEventLimiter], so a burst of accessibility events cannot kill the app. */
+private fun ComponentActivity.setLimitedContent(content: @Composable () -> Unit) {
+    val compose = ComposeView(this).apply { setContent(content) }
+    setContentView(AccessibilityEventLimiter(this).apply { addView(compose) })
 }
