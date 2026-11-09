@@ -8,9 +8,11 @@ import androidx.paging.map
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.contracts.DateGrouping
 import dev.irohaco.core.contracts.TimelineItem
+import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineSortKey
 import kotlin.math.max
+import kotlin.math.min
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -127,3 +129,84 @@ internal fun PagingData<TimelineItem>.withSortHeaders(zone: ZoneId, key: Timelin
 
 private fun PagingData<TimelineItem>.mediaCells(zone: ZoneId, key: TimelineSortKey = TimelineSortKey.TAKEN): PagingData<TimelineCell.Media> =
     map { TimelineCell.Media(it, Instant.ofEpochMilli(it.sortTimeMs).atZone(zone).toLocalDate(), it.sortGroup(key)) }
+
+/**
+ * Where the headers fall among all cells, worked out from the whole order's labels before any page
+ * loads. The grid then knows its size and every header's row from the start, so pages landing after
+ * a fling no longer insert headers and shift what is on screen.
+ */
+internal class CellLayout(private val headerAt: IntArray, private val headers: List<TimelineCell>, val mediaCount: Int) {
+    val cellCount: Int get() = mediaCount + headerAt.size
+
+    fun isHeader(cell: Int): Boolean = headerAt.binarySearch(cell) >= 0
+
+    fun header(cell: Int): TimelineCell? = headerAt.binarySearch(cell).takeIf { it >= 0 }?.let(headers::get)
+
+    /** How many photos and videos come before [cell]: the media index of a media cell. */
+    fun mediaBefore(cell: Int): Int = headerAt.binarySearch(cell).let { cell - if (it >= 0) it else -it - 1 }
+}
+
+/** A header before each run of equal groups: a [LocalDate] for a date header, a [SortGroup] for any other. */
+internal fun cellLayout(groups: List<Any>): CellLayout {
+    val at = ArrayList<Int>()
+    val headers = ArrayList<TimelineCell>()
+    groups.forEachIndexed { i, group ->
+        if (i == 0 || group != groups[i - 1]) {
+            at += i + at.size
+            headers += if (group is SortGroup) TimelineCell.Group(group) else TimelineCell.Header(group as LocalDate)
+        }
+    }
+    return CellLayout(at.toIntArray(), headers, groups.size)
+}
+
+/** The group a label falls in, the same one [withDateHeaders] and [withSortHeaders] give its item. */
+internal fun TimelineLabel.group(zone: ZoneId, grouping: DateGrouping): Any = when (this) {
+    is TimelineLabel.Taken -> Instant.ofEpochMilli(epochMs).atZone(zone).toLocalDate().groupStart(grouping)
+    is TimelineLabel.Name -> SortGroup.Initial(firstChar.takeIf { it.isLetter() } ?: '#')
+    is TimelineLabel.Size -> SortGroup.Size(SIZE_BANDS.indexOfFirst { bytes >= it })
+    is TimelineLabel.Rating -> SortGroup.Stars(rating)
+    is TimelineLabel.Distance -> SortGroup.Distance(distanceBand(km))
+}
+
+/**
+ * Pages of cells, headers included, over a layout fixed for this source: placeholders stand for
+ * headers too, so the grid's size and rows hold while pages load and jump.
+ */
+internal class TimelineCellPagingSource(
+    private val getPage: GetTimelinePage,
+    private val zone: ZoneId,
+    private val grouping: DateGrouping,
+    private val onLayout: (CellLayout) -> Unit = {},
+    private val query: TimelineQuery = getPage.query.value,
+) : PagingSource<Int, TimelineCell>() {
+    override val jumpingSupported = true
+
+    private var layout: CellLayout? = null
+
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, TimelineCell> {
+        val layout = layout ?: cellLayout(getPage.labels(query).map { it.group(zone, grouping) }).also { layout = it; onLayout(it) }
+        val total = layout.cellCount
+        val key = (params.key ?: 0).coerceIn(0, total)
+        val start = if (params is LoadParams.Prepend) max(0, key - params.loadSize) else key
+        val end = if (params is LoadParams.Prepend) key else min(total, key + params.loadSize)
+        val from = layout.mediaBefore(start)
+        val items = getPage(from, layout.mediaBefore(end) - from, query)
+        val cells = ArrayList<TimelineCell>(end - start)
+        for (cell in start until end) {
+            val header = layout.header(cell)
+            // The library changed after the labels were read; a new source reads them again.
+            val item = if (header == null) items.getOrNull(layout.mediaBefore(cell) - from) ?: return LoadResult.Invalid() else null
+            cells += header ?: TimelineCell.Media(item!!, Instant.ofEpochMilli(item.sortTimeMs).atZone(zone).toLocalDate(), item.sortGroup(query.sortKey))
+        }
+        return LoadResult.Page(
+            data = cells,
+            prevKey = start.takeIf { it > 0 },
+            nextKey = end.takeIf { it < total },
+            itemsBefore = start,
+            itemsAfter = total - end,
+        )
+    }
+
+    override fun getRefreshKey(state: PagingState<Int, TimelineCell>): Int? =
+        state.anchorPosition?.let { max(0, it - state.config.initialLoadSize / 2) }
+}

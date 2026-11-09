@@ -146,6 +146,7 @@ fun TimelineScreen(
 ) {
     val access by viewModel.access.collectAsStateWithLifecycle()
     val cells = viewModel.cells.collectAsLazyPagingItems()
+    val layout by viewModel.layout.collectAsStateWithLifecycle()
     val selection by viewModel.selection.collectAsStateWithLifecycle()
     val folders by viewModel.folders.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
@@ -304,6 +305,7 @@ fun TimelineScreen(
         selectedGroups = selectedGroups,
         onToggleGroup = viewModel::toggleGroup,
         labelAt = viewModel::labelAt,
+        isHeaderAt = { layout?.isHeader(it) == true },
         chosenColumns = chosenColumns,
         onColumns = viewModel::setColumns,
     )
@@ -392,6 +394,8 @@ internal fun TimelineContent(
     selectedGroups: Set<LocalDate> = emptySet(),
     onToggleGroup: (LocalDate) -> Unit = {},
     labelAt: suspend (Int) -> TimelineLabel? = { null },
+    /** Whether a cell not loaded yet is a header, so it takes a whole row before its page arrives. */
+    isHeaderAt: (Int) -> Boolean = { false },
     /** The columns the user chose, kept in the settings; null shows the default. */
     chosenColumns: Int? = null,
     onColumns: (Int) -> Unit = {},
@@ -498,6 +502,7 @@ internal fun TimelineContent(
                         selectedGroups = selectedGroups,
                         onToggleGroup = onToggleGroup,
                         labelAt = labelAt,
+                        isHeaderAt = isHeaderAt,
                     )
                 }
             }
@@ -532,6 +537,7 @@ private fun TimelineGrid(
     selectedGroups: Set<LocalDate>,
     onToggleGroup: (LocalDate) -> Unit,
     labelAt: suspend (Int) -> TimelineLabel? = { null },
+    isHeaderAt: (Int) -> Boolean = { false },
 ) {
     // Cells ahead are composed, so their thumbnails are loading before they show (M1-34). A new state
     // per column count, at the same first cell: the cache window keeps prefetching lines of the old
@@ -607,7 +613,7 @@ private fun TimelineGrid(
                     }
                 },
                 contentType = cells.itemContentType { it::class },
-                span = { index -> GridItemSpan(if (cells.peek(index)?.isHeader == true) maxLineSpan else 1) },
+                span = { index -> GridItemSpan(if (cells.peek(index)?.isHeader ?: isHeaderAt(index)) maxLineSpan else 1) },
             ) { index ->
                 when (val cell = cells[index]) {
                     is TimelineCell.Header -> DateHeader(cell.date, headerFormatter, cell.date in selectedGroups) { onToggleGroup(cell.date) }

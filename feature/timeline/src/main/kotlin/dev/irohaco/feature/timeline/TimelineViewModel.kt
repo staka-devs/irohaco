@@ -28,7 +28,6 @@ import dev.irohaco.core.contracts.ShareLocationPolicy
 import dev.irohaco.core.contracts.SharingSettings
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
-import dev.irohaco.core.contracts.TimelineSortKey
 import dev.irohaco.core.domain.MediaLibraryAccess
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -59,7 +58,12 @@ class TimelineViewModel(
     /** The places photos were taken at, with their numbers of files, for the place filter. */
     val placeCounts: suspend () -> Map<String, Int> = { emptyMap() },
 ) : ViewModel() {
-    private var source: TimelinePagingSource? = null
+    private var source: TimelineCellPagingSource? = null
+
+    private val _layout = MutableStateFlow<CellLayout?>(null)
+
+    /** Where the headers of the shown order fall, so the grid knows a placeholder's row before its page loads. */
+    internal val layout: StateFlow<CellLayout?> = _layout.asStateFlow()
 
     private val _grouping = MutableStateFlow(DateGrouping.DAY)
 
@@ -92,11 +96,8 @@ class TimelineViewModel(
 
     val cells: Flow<PagingData<TimelineCell>> =
         Pager(PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = true, jumpThreshold = PAGE_SIZE * 4)) {
-            TimelinePagingSource(getPage).also { source = it }
+            TimelineCellPagingSource(getPage, zone, _grouping.value, { _layout.value = it }).also { source = it }
         }.flow
-            .map {
-                if (getPage.query.value.sortKey == TimelineSortKey.TAKEN) it.withDateHeaders(zone, _grouping.value) else it.withSortHeaders(zone, getPage.query.value.sortKey)
-            }
             .cachedIn(viewModelScope)
 
     /** The order and filter, shared with the viewer (GAL-006). */
@@ -173,7 +174,7 @@ class TimelineViewModel(
     }
 
     /** What the fast scrollbar's bubble names at this position (PRD GAL-014). */
-    suspend fun labelAt(index: Int) = getPage.labelAt(index)
+    suspend fun labelAt(index: Int) = getPage.labelAt(_layout.value?.mediaBefore(index) ?: index)
 
     /** Shares with the user's GPS policy (PRD MET-003). */
     val sharing = ShareSupport(share, sharingSettings)
@@ -247,6 +248,8 @@ class TimelineViewModel(
     }
 
     private companion object {
-        const val PAGE_SIZE = 120
+        // Pages of a few hundred, so a fling over a 28-column grid stays within loaded pages instead of jumping:
+        // each jump reloads the grid around the new position, which shifts it and composes every cell again.
+        const val PAGE_SIZE = 500
     }
 }

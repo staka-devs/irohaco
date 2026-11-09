@@ -120,4 +120,41 @@ class TimelinePagingTest {
         assertEquals(LocalDate.of(2027, 1, 1), groupEnd(start.withDayOfYear(1), DateGrouping.YEAR))
         assertEquals(LocalDate.of(2026, 12, 2), groupEnd(start, DateGrouping.DAY))
     }
+
+    private fun TimelineCell.name() = when (this) {
+        is TimelineCell.Header -> "H$date"
+        is TimelineCell.Group -> "G$group"
+        is TimelineCell.Media -> item.assetId
+    }
+
+    @Test
+    fun `the layout places every header before any page loads`() = runTest {
+        var layout: CellLayout? = null
+        val pager = TestPager(config, TimelineCellPagingSource(GetTimelinePage(reader), ZoneOffset.UTC, DateGrouping.DAY, { layout = it }))
+        val first = pager.refresh() as LoadResult.Page
+        assertEquals(listOf("H1970-01-10", "a0", "a1", "a2"), first.data.map { it.name() })
+        assertEquals(10, first.itemsAfter) // 10 items and 4 day headers
+        assertEquals(listOf(0, 4, 8, 12), (0 until 14).filter { layout!!.isHeader(it) })
+        assertEquals(9, layout!!.mediaBefore(13))
+        val next = pager.append() as LoadResult.Page
+        assertEquals(listOf("H1970-01-09", "a3", "a4", "a5"), next.data.map { it.name() })
+    }
+
+    @Test
+    fun `a jump loads the cells of that position, headers included`() = runTest {
+        val pager = TestPager(config, TimelineCellPagingSource(GetTimelinePage(reader), ZoneOffset.UTC, DateGrouping.DAY))
+        val end = pager.refresh(initialKey = 10) as LoadResult.Page
+        assertEquals(listOf("a7", "a8", "H1970-01-07", "a9"), end.data.map { it.name() })
+        assertEquals(10, end.itemsBefore)
+        assertEquals(0, end.itemsAfter)
+        val before = pager.prepend() as LoadResult.Page
+        assertEquals(listOf("a4", "a5", "H1970-01-08", "a6"), before.data.map { it.name() })
+    }
+
+    @Test
+    fun `the layout matches the headers inserted between loaded items`() = runTest {
+        val inserted = flowOf(PagingData.from(items).withDateHeaders(ZoneOffset.UTC, DateGrouping.MONTH)).asSnapshot().map { it.name() }
+        val pager = TestPager(PagingConfig(pageSize = 20, initialLoadSize = 20), TimelineCellPagingSource(GetTimelinePage(reader), ZoneOffset.UTC, DateGrouping.MONTH))
+        assertEquals(inserted, (pager.refresh() as LoadResult.Page).data.map { it.name() })
+    }
 }
