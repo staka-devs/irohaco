@@ -64,13 +64,6 @@ class GridThumbnailFetcher(
         // A few decodes at a time, so scrolling keeps the CPU it needs to draw (M1-34).
         val LOADS = Dispatchers.IO.limitedParallelism(4)
 
-        // 384 is sharp at three columns on a wide phone; a few fixed steps keep the OS's thumbnail cache reusable.
-        val THUMBNAIL_PX = listOf(96, 192, 384)
-
-        /** The smallest step that covers the cell, so 28 columns load a sixteenth of the pixels of four. */
-        fun thumbnailPx(options: Options): Int {
-            val cell = options.size.width.pxOrElse { THUMBNAIL_PX.last() }
-            return THUMBNAIL_PX.firstOrNull { it >= cell } ?: THUMBNAIL_PX.last()
-        }
+        fun thumbnailPx(options: Options): Int = GridThumbnail.stepPx(options.size.width.pxOrElse { GridThumbnail.LARGEST })
     }
 }

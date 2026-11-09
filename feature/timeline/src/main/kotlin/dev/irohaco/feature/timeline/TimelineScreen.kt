@@ -18,10 +18,10 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -83,8 +83,11 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -105,8 +108,8 @@ import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.designsystem.component.FastScrollbar
-import dev.irohaco.core.designsystem.component.GridThumbnail
-import dev.irohaco.core.designsystem.component.MediaThumbnail
+import dev.irohaco.core.designsystem.component.GridMediaCell
+import dev.irohaco.core.designsystem.component.rememberGridCellStyle
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.motion.sharedMedia
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
@@ -574,6 +577,13 @@ private fun TimelineGrid(
         return
     }
     val dense = columns >= DENSE_COLUMNS
+    val cellStyle = rememberGridCellStyle()
+    val resources = LocalResources.current
+    val locale = LocalConfiguration.current.locales[0]
+    val selectLabel = stringResource(R.string.timeline_select)
+    val open by rememberUpdatedState(onOpenMedia)
+    val toggle by rememberUpdatedState(onToggle)
+    val openCell = { item: TimelineItem -> if (currentSelection.isEmpty()) open(item.assetId) else toggle(item) }
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
@@ -584,7 +594,8 @@ private fun TimelineGrid(
             modifier = Modifier
                 .fillMaxSize()
                 .pinchToChangeColumns({ fewer() }, { more() })
-                .dragToSelect(gridState, cells, { currentSelection }) { selectRange(it) },
+                .dragToSelect(gridState, cells, { currentSelection }) { selectRange(it) }
+                .tapCell(gridState, cells) { openCell(it) },
         ) {
             items(
                 count = cells.itemCount,
@@ -602,28 +613,31 @@ private fun TimelineGrid(
                     is TimelineCell.Header -> DateHeader(cell.date, headerFormatter, cell.date in selectedGroups) { onToggleGroup(cell.date) }
                     is TimelineCell.Group -> GroupHeader(cell.group)
                     is TimelineCell.Media -> {
-                        val date = formatter.format(cell.date)
-                        val located = locationPin && cell.item.hasLocation
-                        val description = cell.item.description(date).let { if (located) stringResource(R.string.timeline_located_description, it) else it }
-                        val selecting = selection.isNotEmpty()
-                        val selectLabel = stringResource(R.string.timeline_select)
-                        MediaThumbnail(
-                            model = GridThumbnail(cell.item.contentUri),
-                            contentDescription = description,
-                            selected = cell.item.assetId in selection,
-                            label = cell.item.badge,
-                            labelIcon = cell.item.badgeIcon,
+                        val item = cell.item
+                        val located = locationPin && item.hasLocation
+                        GridMediaCell(
+                            contentUri = item.contentUri,
+                            selected = item.assetId in selection,
+                            style = cellStyle,
+                            label = item.badge,
+                            labelIcon = if (item.badgeIcon != null) cellStyle.play else null,
                             located = located,
                             dense = dense,
                             modifier = Modifier
                                 // A shared element per cell costs on every frame; a cell this small has nothing to grow from.
-                                .then(if (dense) Modifier else Modifier.sharedMedia(cell.item.assetId))
-                                .clickable { if (selecting) onToggle(cell.item) else onOpenMedia(cell.item.assetId) }
-                                // The long press itself is the grid's gesture; screen readers get it as an action.
-                                .semantics { onLongClick(selectLabel) { onToggle(cell.item); true } },
+                                .then(if (dense) Modifier else Modifier.sharedMedia(item.assetId))
+                                // Taps and long presses are the grid's gestures; screen readers get them as actions.
+                                // The text is built here, only when a screen reader reads the cell.
+                                .clearAndSetSemantics {
+                                    val text = item.description(formatter.format(cell.date), resources, locale)
+                                    contentDescription = if (located) resources.getString(R.string.timeline_located_description, text) else text
+                                    this.selected = item.assetId in currentSelection
+                                    onClick { openCell(item); true }
+                                    onLongClick(selectLabel) { onToggle(item); true }
+                                },
                         )
                     }
-                    null -> MediaThumbnail(model = null, contentDescription = "", selected = false)
+                    null -> GridMediaCell(contentUri = null, selected = false, style = cellStyle, dense = dense)
                 }
             }
         }
@@ -759,10 +773,7 @@ private fun Modifier.dragToSelect(
     selection: () -> Map<String, TimelineItem>,
     onSelect: (Map<String, TimelineItem>) -> Unit,
 ): Modifier = pointerInput(cells, gridState) {
-    fun indexAt(position: Offset): Int? = gridState.layoutInfo.visibleItemsInfo.firstOrNull { item ->
-        position.x >= item.offset.x && position.x < item.offset.x + item.size.width &&
-            position.y >= item.offset.y && position.y < item.offset.y + item.size.height
-    }?.index
+    fun indexAt(position: Offset): Int? = gridState.indexAt(position)
     val cellAt = { index: Int -> if (index < cells.itemCount) cells.peek(index) else null }
     // The Initial pass sees the touch before the cells' click handlers, so their consumption cannot cancel the press.
     awaitEachGesture {
@@ -784,6 +795,26 @@ private fun Modifier.dragToSelect(
             if (!change.pressed) break
             indexAt(change.position)?.let { onSelect(rangeSelection(before, cellAt, anchor, it)) }
         }
+    }
+}
+
+private fun LazyGridState.indexAt(position: Offset): Int? = layoutInfo.visibleItemsInfo.firstOrNull { item ->
+    position.x >= item.offset.x && position.x < item.offset.x + item.size.width &&
+        position.y >= item.offset.y && position.y < item.offset.y + item.size.height
+}?.index
+
+/**
+ * A tap on a photo or video cell. One detector for the whole grid instead of one per cell, which a new row
+ * would otherwise build for each cell. Scrolling and a long press consume the touch, so they never count as taps.
+ */
+private fun Modifier.tapCell(
+    gridState: LazyGridState,
+    cells: LazyPagingItems<TimelineCell>,
+    onTap: (TimelineItem) -> Unit,
+): Modifier = pointerInput(cells, gridState) {
+    detectTapGestures { position ->
+        val index = gridState.indexAt(position) ?: return@detectTapGestures
+        (cells.peek(index) as? TimelineCell.Media)?.let { onTap(it.item) }
     }
 }
 

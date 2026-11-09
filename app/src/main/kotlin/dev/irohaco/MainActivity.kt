@@ -152,6 +152,7 @@ class MainActivity : ComponentActivity() {
                     }
                     val shellState = rememberSaveableStateHolder()
                     val stores = viewModel { ScreenViewModelStores() }
+                    val sharedMedia = remember { mutableStateOf<String?>(null) }
                     SharedTransitionLayout {
                         val reducedMotion = rememberReducedMotion()
                         AnimatedContent(
@@ -167,11 +168,14 @@ class MainActivity : ComponentActivity() {
                             },
                             label = "route",
                         ) { target ->
-                            CompositionLocalProvider(LocalSharedMediaScope provides SharedMediaScope(this@SharedTransitionLayout, this)) {
+                            CompositionLocalProvider(LocalSharedMediaScope provides SharedMediaScope(this@SharedTransitionLayout, this, sharedMedia)) {
                                 if (target == Route.SHELL) {
                                     shellState.SaveableStateProvider(Route.SHELL) {
                                         Shell(
-                                            onOpenMedia = { assetId, list -> open(Route.viewer(assetId, list)) },
+                                            onOpenMedia = { assetId, list ->
+                                                sharedMedia.value = assetId
+                                                open(Route.viewer(assetId, list))
+                                            },
                                             onOpenList = { open(Route.list(it)) },
                                             onOpenCandidates = { open(Route.IDENTITY) },
                                             onOpenSettings = { open(Route.SETTINGS) },

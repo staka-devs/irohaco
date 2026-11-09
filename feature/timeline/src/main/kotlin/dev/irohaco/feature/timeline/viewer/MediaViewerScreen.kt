@@ -106,6 +106,7 @@ import android.provider.Settings
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.designsystem.component.VideoPlayer
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
+import dev.irohaco.core.designsystem.motion.LocalSharedMediaScope
 import dev.irohaco.core.designsystem.motion.rememberReducedMotion
 import dev.irohaco.core.designsystem.motion.sharedMedia
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
@@ -372,8 +373,11 @@ internal fun MediaViewerContent(
             val pager = rememberPagerState(initialPage = startIndex.coerceAtMost(items.itemCount - 1)) { items.itemCount }
             val zoom = remember { ZoomState() }
             LaunchedEffect(pager.currentPage, items.itemCount) { current = items.peek(pager.currentPage) }
+            val shared = LocalSharedMediaScope.current
             LaunchedEffect(pager.settledPage) {
                 zoom.reset()
+                // Going back moves the photo shown now into its cell, not the one first opened.
+                items.peek(pager.settledPage)?.let { shared?.active?.value = it.assetId }
                 onPageChanged(items.peek(pager.settledPage)?.assetId) // playback stays on the page it started on
             }
             // Swipes and pinches have actions TalkBack and switch access can reach (DESIGN §7, #251).
