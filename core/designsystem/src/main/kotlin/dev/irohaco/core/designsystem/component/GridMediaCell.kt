@@ -264,7 +264,9 @@ private class GridCellNode(
             show(it.image.toBitmap().asImageBitmap())
             return
         }
-        // The old step's image stays until the new one arrives, so a column change does not flash.
+        // The old step's image stays until the new one arrives, so a column change does not flash. A cell that has
+        // none yet, as each one of a new grid after a pinch, shows another step kept in memory meanwhile.
+        if (image == null) style.cachedThumbnail(uri, px)?.let { show(it) }
         val request = ImageRequest.Builder(style.context).data(GridThumbnail(uri)).size(px).memoryCacheKey(key).build()
         load = coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
             val result = style.loader.execute(request) as? SuccessResult ?: return@launch

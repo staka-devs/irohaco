@@ -25,7 +25,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -771,11 +770,13 @@ private fun TimelineGrid(
                 // Keyed on the grid, so the handlers see the grid of the current column count.
                 .pinchToChangeColumns(
                     key = gridState,
-                    onStart = { center ->
+                    onStart = {
                         settle?.cancel()
                         level = 0f
                         zoom = 1f
                         main = Layer.NONE
+                        // About the middle of the grid on screen, wherever the fingers are.
+                        val center = gridState.layoutInfo.viewportSize.let { Offset(it.width / 2f, it.height / 2f) }
                         pivot = center
                         anchor = cellAt(center) ?: gridState.firstVisibleItemIndex.takeIf { it < currentRows.count }?.let(currentRows::first) ?: 0
                         anchorAt = topLeft(gridState, currentRows, currentColumns, anchor) ?: center
@@ -1150,11 +1151,11 @@ private fun PermissionPrompt(padding: PaddingValues, onRequest: () -> Unit, onOp
 
 /**
  * Two-finger pinch: spreading shows fewer, larger thumbnails; pinching in shows more. One finger still scrolls.
- * [onStart] gets the point between the fingers, [onScale] the zoom so far, and [onEnd] comes when they lift.
+ * [onStart] comes when the second finger lands, [onScale] gets the zoom so far, and [onEnd] comes when they lift.
  */
 private fun Modifier.pinchToChangeColumns(
     key: Any,
-    onStart: (Offset) -> Unit,
+    onStart: () -> Unit,
     onScale: (Float) -> Unit,
     onEnd: () -> Unit,
 ): Modifier = this.then(
@@ -1166,7 +1167,7 @@ private fun Modifier.pinchToChangeColumns(
             do {
                 val event = awaitPointerEvent()
                 if (event.changes.count { it.pressed } >= 2) {
-                    if (!pinched) onStart(event.calculateCentroid())
+                    if (!pinched) onStart()
                     pinched = true
                     zoom *= event.calculateZoom()
                     onScale(zoom)
