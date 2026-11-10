@@ -26,6 +26,8 @@ class RemoteAnswerSession(
     private val streaming: Boolean,
     private val authorize: suspend () -> EgressDecision,
     private val timeoutMs: Int = TIMEOUT_MS,
+    /** The user's [dev.irohaco.core.contracts.GenerationParameter] values, by path. */
+    private val parameters: Map<String, String> = emptyMap(),
 ) : AnswerSession {
     private val format: GenerationFormat = when (protocol) {
         RemoteProtocol.OPENAI_CHAT -> ChatCompletions
@@ -38,7 +40,7 @@ class RemoteAnswerSession(
     override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, think: Boolean, onText: (String) -> Unit): String {
         val decision = authorize()
         if (decision is EgressDecision.Denied) throw EgressDeniedException(decision)
-        val body = format.body(model, instruction, images.map(::Image), question, streaming)
+        val body = withParameters(format.body(model, instruction, images.map(::Image), question, streaming), protocol, parameters)
         return withContext(Dispatchers.IO) {
             post(baseUrl.trimEnd('/') + format.path, format.headers(apiKey), body, apiKey, timeoutMs) { reader ->
                 if (!streaming) return@post format.text(JSONObject(reader.readText()))
@@ -67,5 +69,8 @@ class RemoteAnswerSession(
 /** Streams the answer when the model's test found it can. */
 object RemoteAnswerSessions : RemoteSessions {
     override fun open(connection: RemoteConnection, apiKey: String, model: RemoteModel, authorize: suspend () -> EgressDecision) =
-        RemoteAnswerSession(connection.protocol, connection.baseUrl, apiKey, model.modelId, ModelCapability.STREAMING in model.capabilities, authorize)
+        RemoteAnswerSession(
+            connection.protocol, connection.baseUrl, apiKey, model.modelId, ModelCapability.STREAMING in model.capabilities, authorize,
+            parameters = model.parameters,
+        )
 }

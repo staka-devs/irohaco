@@ -103,6 +103,8 @@ fun SettingsScreen(
     val modelStates by viewModel.modelStates.collectAsStateWithLifecycle()
     val importResult by viewModel.importResult.collectAsStateWithLifecycle()
     val indexing by viewModel.indexing.collectAsStateWithLifecycle()
+    val optionsLookup by viewModel.optionsLookup.collectAsStateWithLifecycle()
+    val modelList by viewModel.modelList.collectAsStateWithLifecycle()
     val indexFolders by viewModel.indexFolders.collectAsStateWithLifecycle()
     val indexTarget by viewModel.indexTarget.collectAsStateWithLifecycle()
     val lowCoverageVideos by viewModel.lowCoverageVideos.collectAsStateWithLifecycle()
@@ -194,6 +196,13 @@ fun SettingsScreen(
                 onRemoveRemote = viewModel::removeModel,
                 onMarkColor = viewModel::setMarkColor,
                 onMarkImage = viewModel::setMarkImage,
+                onSetParameters = viewModel::setModelParameters,
+                optionsLookup = optionsLookup,
+                onLookUpOptions = viewModel::lookUpOptions,
+                onDismissOptions = viewModel::dismissOptions,
+                modelList = modelList,
+                onListModels = viewModel::listModels,
+                onDismissModelList = viewModel::dismissModelList,
             )
         },
         display = { DisplaySettings(themeColor, contrast, viewModel::select, viewModel::selectContrast, locationPin, viewModel::setLocationPin) },

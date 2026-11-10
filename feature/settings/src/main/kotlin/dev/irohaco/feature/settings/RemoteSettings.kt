@@ -12,6 +12,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -43,6 +45,7 @@ import dev.irohaco.core.application.RemoteEmbedding
 import dev.irohaco.core.application.ManageEgress.UrlKind
 import dev.irohaco.core.contracts.EgressGrant
 import dev.irohaco.core.contracts.EgressPayload
+import dev.irohaco.core.contracts.GenerationParameter
 import dev.irohaco.core.contracts.ModelCapability
 import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.RemoteModel
@@ -280,6 +283,89 @@ private fun AddModelDialog(test: SettingsViewModel.ModelTest?, onDismiss: () -> 
                 TextButton(enabled = !running, onClick = onDismiss) { Text(stringResource(R.string.settings_ai_cancel)) }
             }
         },
+    )
+}
+
+/**
+ * The request fields of [parameters], named as the API names them; an empty field is not sent, so the model's own
+ * default applies. models.dev, read only when the user asks, fills in what this model takes.
+ */
+@Composable
+internal fun ParametersDialog(
+    model: RemoteModel,
+    parameters: List<GenerationParameter>,
+    lookup: SettingsViewModel.OptionsLookup?,
+    onLookUp: () -> Unit,
+    onDismiss: () -> Unit,
+    onSave: (Map<String, String>) -> Unit,
+) {
+    var values by remember { mutableStateOf(model.parameters) }
+    val options = (lookup as? SettingsViewModel.OptionsLookup.Found)?.options
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_remote_parameters_title, model.displayName)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+                Text(stringResource(R.string.settings_remote_parameters_hint), style = MaterialTheme.typography.bodySmall)
+                parameters.forEach { parameter ->
+                    val effort = parameter.path.endsWith("effort")
+                    val choices = if (effort) options?.efforts ?: parameter.values else parameter.values
+                    val hint = when {
+                        effort && options?.efforts != null -> stringResource(R.string.settings_remote_parameters_listed, options.efforts!!.joinToString(", "))
+                        parameter.path == "thinking.budget_tokens" && options?.minBudget != null ->
+                            stringResource(R.string.settings_remote_parameters_min, options.minBudget!!)
+                        parameter.path.startsWith("max_") && options?.maxOutput != null ->
+                            stringResource(R.string.settings_remote_parameters_max, options.maxOutput!!)
+                        parameter.path == "max_tokens" -> stringResource(R.string.settings_remote_parameters_default, 1024)
+                        else -> null
+                    }
+                    ParameterField(parameter, values[parameter.path].orEmpty(), choices, hint) { value ->
+                        values = if (value.isBlank()) values - parameter.path else values + (parameter.path to value)
+                    }
+                }
+                when (lookup) {
+                    null -> TextButton(onClick = onLookUp) { Text(stringResource(R.string.settings_remote_parameters_look_up)) }
+                    SettingsViewModel.OptionsLookup.Running -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                    is SettingsViewModel.OptionsLookup.Found -> if (lookup.options == null) {
+                        Text(stringResource(R.string.settings_remote_parameters_unlisted, model.modelId), style = MaterialTheme.typography.bodySmall)
+                    }
+                    is SettingsViewModel.OptionsLookup.Failed -> Text(
+                        remoteFailureText(lookup.cause) ?: stringResource(R.string.settings_remote_parameters_failed),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Text(stringResource(R.string.settings_remote_parameters_look_up_hint), style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(values) }) { Text(stringResource(R.string.settings_remote_parameters_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_ai_cancel)) } },
+    )
+}
+
+/** A field for one request field: numbers only for a number, otherwise any text, with the documented values to pick from. */
+@Composable
+private fun ParameterField(parameter: GenerationParameter, value: String, choices: List<String>, hint: String?, onChange: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = value,
+        onValueChange = { onChange(if (parameter.number) it.filter(Char::isDigit) else it) },
+        label = { Text(parameter.path) },
+        placeholder = { Text(stringResource(R.string.settings_remote_parameters_unset)) },
+        supportingText = hint?.let { { Text(it) } },
+        singleLine = true,
+        keyboardOptions = if (parameter.number) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
+        trailingIcon = if (choices.isEmpty()) null else {
+            {
+                IconButton(onClick = { open = true }) {
+                    Icon(painterResource(IrohacoIcons.ExpandMore), stringResource(R.string.settings_remote_parameters_choose))
+                }
+                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.settings_remote_parameters_unset)) }, onClick = { open = false; onChange("") })
+                    choices.forEach { choice -> DropdownMenuItem(text = { Text(choice) }, onClick = { open = false; onChange(choice) }) }
+                }
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 

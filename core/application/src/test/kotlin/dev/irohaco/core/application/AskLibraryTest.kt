@@ -17,6 +17,7 @@ import dev.irohaco.core.contracts.EgressDeniedException
 import dev.irohaco.core.contracts.EgressPayload
 import dev.irohaco.core.contracts.EgressPolicy
 import dev.irohaco.core.contracts.ModelCapability
+import dev.irohaco.core.contracts.ModelParameters
 import dev.irohaco.core.contracts.RemoteCallException
 import dev.irohaco.core.contracts.RemoteConnection
 import dev.irohaco.core.contracts.RemoteFailure
@@ -91,6 +92,7 @@ class AskLibraryTest {
     private var remoteFails = false
     private val policyAsked = mutableListOf<Set<EgressPayload>>()
     private val remoteAsked = mutableListOf<String>()
+    private val openedWith = mutableListOf<Map<String, String>>()
     private val remote = RemoteAnswering(
         object : RemoteModelStore {
             override val models = flowOf(listOf(claude))
@@ -105,7 +107,8 @@ class AskLibraryTest {
             override fun read(ref: String) = "key"
             override fun delete(ref: String) = Unit
         },
-        RemoteSessions { _, _, _, authorize ->
+        RemoteSessions { _, _, model, authorize ->
+            openedWith += model.parameters
             object : AnswerSession {
                 override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, think: Boolean, onText: (String) -> Unit): String {
                     check(authorize() == EgressDecision.Allowed)
@@ -122,6 +125,10 @@ class AskLibraryTest {
                 policyAsked += payloads
                 return if (granted && (placeGranted || EgressPayload.PLACE_NAME !in payloads)) EgressDecision.Allowed else EgressDecision.Denied(payloads, emptySet())
             }
+        },
+        parameters = object : ModelParameters {
+            override val parameters = flowOf(mapOf("claude" to mapOf("thinking.type" to "adaptive")))
+            override suspend fun set(profileId: String, values: Map<String, String>) = Unit
         },
     )
 
@@ -282,6 +289,7 @@ class AskLibraryTest {
         consent.agree()
         assertEquals(claude.displayName, assertIs<AskResult.Answered>(library.ask("Whose birthday?", listOf(photo, memo, scene))).remoteModel)
         assertEquals(1, remoteAsked.size)
+        assertEquals(listOf(mapOf("thinking.type" to "adaptive")), openedWith) // with the user's request settings
         assertEquals(0, loads) // the local model was never loaded
         // The policy saw the same payloads before the photos were read, and again before the request.
         assertEquals(List(2) { consent.payloads }, policyAsked)
