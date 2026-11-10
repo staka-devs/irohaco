@@ -618,7 +618,12 @@ private fun TimelineGrid(
     var shownColumns by remember { mutableStateOf<Int?>(null) }
     var settle by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
-    val settleSpec = if (rememberReducedMotion()) snap() else MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val reducedMotion = rememberReducedMotion()
+    val settleSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val handOverSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    // The gliding photos, fading out over the grid once they have stopped.
+    var handingOver by remember { mutableStateOf(false) }
+    var glideAlpha by remember { mutableFloatStateOf(1f) }
     if (cells.itemCount == 0 && cells.loadState.refresh is LoadState.NotLoading) {
         Text(
             stringResource(R.string.timeline_empty),
@@ -772,6 +777,8 @@ private fun TimelineGrid(
                     key = gridState,
                     onStart = {
                         settle?.cancel()
+                        handingOver = false
+                        glideAlpha = 1f
                         level = 0f
                         zoom = 1f
                         main = Layer.NONE
@@ -797,6 +804,8 @@ private fun TimelineGrid(
                             if (level == 0f) {
                                 animate(zoom, 1f, animationSpec = settleSpec) { value, _ -> main = edgeLayer(value) }
                             } else {
+                                // Kept on screen through the end of the move, even when it goes back to where it started.
+                                handingOver = true
                                 val to = settleLevel(level)
                                 animate(level, to.toFloat(), animationSpec = settleSpec) { value, _ -> level = value }
                                 val columns = p.columnsAt(to)
@@ -805,10 +814,14 @@ private fun TimelineGrid(
                                     changeColumns(columns)
                                 }
                             }
-                            // With the new columns in the same frame, so the grid shows where the photos stopped.
-                            pinch = null
-                            level = 0f
+                            // The grid comes in under the photos where they stopped, with the new columns in the same frame;
+                            // the photos then fade out over it, so its marks, corners and sharper images come in softly.
                             main = Layer.NONE
+                            if (handingOver) animate(1f, 0f, animationSpec = handOverSpec) { value, _ -> glideAlpha = value }
+                            pinch = null
+                            handingOver = false
+                            glideAlpha = 1f
+                            level = 0f
                         }
                     },
                 )
@@ -817,7 +830,7 @@ private fun TimelineGrid(
                 // Inside the gestures, so they keep reading unscaled positions.
                 .graphicsLayer { apply(main) },
         )
-        pinch?.takeIf { level != 0f }?.let { p ->
+        pinch?.takeIf { level != 0f || handingOver }?.let { p ->
             // The photos read from memory once per pinch; one not in memory shows its placeholder.
             val images = remember(p) { HashMap<Int, ImageBitmap?>() }
             Spacer(
@@ -845,7 +858,7 @@ private fun TimelineGrid(
                                 from != null && to != null -> 1f
                                 from != null -> 1 - t
                                 else -> t
-                            }.coerceIn(0f, 1f)
+                            }.coerceIn(0f, 1f) * glideAlpha
                             when (val c = if (cell < cells.itemCount) cells.peek(cell) else null) {
                                 is TimelineCell.Media -> {
                                     val image = images.getOrPut(cell) { cellStyle.cachedThumbnail(c.item.contentUri, rect.width.toInt()) }
@@ -857,9 +870,9 @@ private fun TimelineGrid(
                         }
                         // After the photos, on the grid's background, so photos gliding past go under the dates.
                         for ((rect, label) in headers) {
-                            drawRect(headerBackground, rect.topLeft, rect.size)
+                            drawRect(headerBackground, rect.topLeft, rect.size, alpha = glideAlpha)
                             val text = headerText.measure(label, headerStyle, maxLines = 1)
-                            drawText(text, topLeft = Offset(rect.left + headerInset, rect.center.y - text.size.height / 2f))
+                            drawText(text, topLeft = Offset(rect.left + headerInset, rect.center.y - text.size.height / 2f), alpha = glideAlpha)
                         }
                     },
             )
