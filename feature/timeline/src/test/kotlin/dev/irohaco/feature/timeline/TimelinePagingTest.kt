@@ -172,16 +172,15 @@ class TimelinePagingTest {
 
     @Test
     fun pinchLevelCrossesSeveralCounts() {
-        val levels = listOf(3, 4, 5, 7, 10, 14, 20, 28)
-        val at = { steps: Int -> stepColumns(levels, 7, steps) }
+        val at = { steps: Int -> (7 + steps).coerceIn(3..28) }
         assertEquals(0f, pinchLevel(1f, 7, at))
-        // Cells as wide as at 5 columns: one step fewer.
-        assertEquals(-1f, pinchLevel(7f / 5, 7, at), 1e-4f)
-        // Half way, by width, from 5 to 4 columns.
-        assertEquals(-1.5f, pinchLevel(7f / 5 * kotlin.math.sqrt(5f / 4), 7, at), 1e-3f)
+        // Cells as wide as at 6 columns: one step fewer.
+        assertEquals(-1f, pinchLevel(7f / 6, 7, at), 1e-4f)
+        // Half way, by width, from 6 to 5 columns.
+        assertEquals(-1.5f, pinchLevel(7f / 6 * kotlin.math.sqrt(6f / 5), 7, at), 1e-3f)
         // As narrow as at 14, then past the last count.
-        assertEquals(2f, pinchLevel(7f / 14, 7, at), 1e-4f)
-        assertEquals(4f, pinchLevel(0.01f, 7, at))
+        assertEquals(7f, pinchLevel(7f / 14, 7, at), 1e-3f)
+        assertEquals(21f, pinchLevel(0.01f, 7, at))
     }
 
     @Test

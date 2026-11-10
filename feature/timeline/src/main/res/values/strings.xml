@@ -12,8 +12,7 @@
     <string name="timeline_located_description">%1$s, has a place</string>
     <string name="timeline_video_description">Video, %1$s</string>
     <string name="timeline_video_length_description">Video, %1$s, %2$s</string>
-    <string name="timeline_columns_fewer">Fewer columns</string>
-    <string name="timeline_columns_more">More columns</string>
+    <string name="timeline_columns">Columns</string>
     <plurals name="timeline_columns_count">
         <item quantity="one">%d column</item>
         <item quantity="other">%d columns</item>

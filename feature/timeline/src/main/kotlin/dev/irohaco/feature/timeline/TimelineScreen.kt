@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -55,6 +56,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -104,6 +106,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -150,6 +153,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.ln
+import kotlin.math.roundToInt
 import kotlin.math.sign
 
 private val MEDIA_PERMISSIONS: Array<String> =
@@ -430,13 +434,14 @@ internal fun TimelineContent(
     var sorting by rememberSaveable { mutableStateOf(false) }
     if (sorting) SortSheet(query, onQueryChange, onDismiss = { sorting = false }, grouping = grouping, onGrouping = onGrouping, tags = tags)
     BoxWithConstraints {
-        // Column steps per width class (DESIGN §4.1); the steps widen as the cells shrink, so a few pinches reach an overview.
-        val levels = when {
-            maxWidth < 600.dp -> listOf(3, 4, 5, 7, 10, 14, 20, 28)
-            maxWidth < 840.dp -> listOf(5, 6, 8, 11, 15, 21, 30, 40)
-            else -> listOf(6, 8, 10, 13, 18, 25, 34, 45)
+        // The column counts per width class (DESIGN §4.1), and the one to start with. Any count in between can be
+        // chosen: a pinch glides through them and the slider stops on each.
+        val (range, initial) = when {
+            maxWidth < 600.dp -> 3..28 to 4
+            maxWidth < 840.dp -> 5..40 to 6
+            else -> 6..45 to 8
         }
-        val columns = stepColumns(levels, chosenColumns ?: levels[1], 0)
+        val columns = (chosenColumns ?: initial).coerceIn(range)
         val noAccess = access.images == LibraryAccess.NONE && access.videos == LibraryAccess.NONE
         // The bar slides away while scrolling down and comes back on any scroll up (DESIGN §3, M1-27).
         // The selection bar does not take part, so the count and the clear button stay in view.
@@ -476,18 +481,7 @@ internal fun TimelineContent(
                                     leadingIcon = { Icon(painterResource(IrohacoIcons.Map), null) },
                                     onClick = { menu = false; onOpenMap() },
                                 )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.timeline_columns_fewer)) },
-                                    leadingIcon = { Icon(painterResource(IrohacoIcons.ZoomIn), null) },
-                                    enabled = columns > levels.first(),
-                                    onClick = { menu = false; onColumns(stepColumns(levels, columns, -1)) },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.timeline_columns_more)) },
-                                    leadingIcon = { Icon(painterResource(IrohacoIcons.ZoomOut), null) },
-                                    enabled = columns < levels.last(),
-                                    onClick = { menu = false; onColumns(stepColumns(levels, columns, 1)) },
-                                )
+                                ColumnsSlider(columns, range, onColumns)
                             }
                         }
                     },
@@ -506,7 +500,7 @@ internal fun TimelineContent(
                         cells = cells,
                         columns = columns,
                         bottomPadding = padding.calculateBottomPadding(),
-                        columnsBy = { stepColumns(levels, columns, it) },
+                        columnsBy = { (columns + it).coerceIn(range) },
                         onColumns = onColumns,
                         onOpenMedia = onOpenMedia,
                         selection = selection,
@@ -1250,14 +1244,35 @@ private const val EDGE_GIVE = 1.08f
 /** A header line: the date's 48 dp button, or a group name's minimum height. */
 private val HEADER_HEIGHT = 48.dp
 
+/**
+ * The number of columns on a slider, for choosing one without a pinch, as with TalkBack (M1-30). The grid follows
+ * the thumb at once; the count the thumb shows is kept while it moves, so it never waits on the saved setting.
+ */
+@Composable
+private fun ColumnsSlider(columns: Int, range: IntRange, onColumns: (Int) -> Unit) {
+    var sliding by remember { mutableStateOf<Float?>(null) }
+    val shown = sliding?.roundToInt() ?: columns
+    val label = stringResource(R.string.timeline_columns)
+    Column(Modifier.width(COLUMNS_SLIDER_WIDTH).padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s)) {
+        Text(pluralStringResource(R.plurals.timeline_columns_count, shown, shown), style = MaterialTheme.typography.labelLarge)
+        Slider(
+            value = sliding ?: columns.toFloat(),
+            onValueChange = { value ->
+                sliding = value
+                if (value.roundToInt() != columns) onColumns(value.roundToInt())
+            },
+            onValueChangeFinished = { sliding = null },
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            steps = range.last - range.first - 1,
+            modifier = Modifier.semantics { contentDescription = label },
+        )
+    }
+}
+
+private val COLUMNS_SLIDER_WIDTH = 280.dp
+
 /** From this many columns a cell is an overview dot: it drops the marks, the morph and the shared element. */
 private const val DENSE_COLUMNS = 10
-
-/** The step [by] steps away from the one that holds [columns], kept within [levels]. */
-internal fun stepColumns(levels: List<Int>, columns: Int, by: Int): Int {
-    val at = levels.indexOfFirst { it >= columns }.takeIf { it >= 0 } ?: levels.lastIndex
-    return levels[(at + by).coerceIn(levels.indices)]
-}
 
 /**
  * Two screens ahead and one behind at four columns, less as the columns grow: the cells in a screen
