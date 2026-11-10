@@ -18,7 +18,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -64,6 +70,8 @@ internal fun AnswerCard(
     onOpenSettings: () -> Unit,
     /** The answer so far while the model writes it. */
     partial: String = "",
+    /** What the model thought so far, shown faint and small until the answer starts. */
+    thought: String = "",
     /** What the card says while the model has not written yet, and the caution under an answer. */
     askingLabel: Int = R.string.search_asking,
     caution: Int = R.string.search_ask_caution,
@@ -77,7 +85,9 @@ internal fun AnswerCard(
             when (answer) {
                 null -> {
                     if (partial.isEmpty()) {
-                        Text(stringResource(askingLabel), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(if (thought.isEmpty()) askingLabel else R.string.ask_thinking), style = MaterialTheme.typography.bodyMedium)
+                        // The latest lines only, so the card does not grow with every thought.
+                        if (thought.isNotEmpty()) Thought(thought.takeLast(THOUGHT_SHOWN), maxLines = 6)
                     } else {
                         Text(partial, style = MaterialTheme.typography.bodyLarge)
                     }
@@ -109,6 +119,13 @@ internal fun AnswerCard(
                     ) { Text(stringResource(R.string.search_ask_consent_send)) }
                 }
                 is AskResult.Answered -> {
+                    if (answer.thought.isNotEmpty()) {
+                        var open by rememberSaveable { mutableStateOf(false) }
+                        TextButton(onClick = { open = !open }, contentPadding = PaddingValues(0.dp)) {
+                            Text(stringResource(if (open) R.string.ask_thought_hide else R.string.ask_thought_show))
+                        }
+                        if (open) Thought(answer.thought)
+                    }
                     Text(answer.text, style = MaterialTheme.typography.bodyLarge)
                     if (answer.citations.isNotEmpty()) {
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
@@ -177,6 +194,20 @@ private fun hitModel(hit: SearchHit): Any {
     return ImageRequest.Builder(LocalContext.current).data(hit.item.contentUri).videoFrameMillis(at).build()
 }
 
+/** The model's thoughts: faint and small, apart from the answer. */
+@Composable
+private fun Thought(text: String, maxLines: Int = Int.MAX_VALUE) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+private const val THOUGHT_SHOWN = 600
+
 @Composable
 private fun CitationCell(citation: Citation, onOpen: (SearchHit) -> Unit) {
     val hit = citation.hit
@@ -225,6 +256,7 @@ private fun AnswerCardPreview() {
                     asking = false,
                     answer = AskResult.Answered(
                         "It was Grandma's 80th birthday [2], at the harbour [1]. The cake was cut in the evening [3].",
+                        thought = "The memo says Grandma's birthday; the photo shows a harbour.",
                         known = true,
                         citations = listOf(Citation(photo, Basis.OBSERVED, 1), Citation(memo, Basis.USER_STATED, 2), Citation(scene, Basis.INFERRED, 3)),
                     ),

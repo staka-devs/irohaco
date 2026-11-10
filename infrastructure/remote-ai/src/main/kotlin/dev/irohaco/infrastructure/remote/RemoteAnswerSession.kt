@@ -34,7 +34,8 @@ class RemoteAnswerSession(
         else -> throw IllegalArgumentException("$protocol does not generate text")
     }
 
-    override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, onText: (String) -> Unit): String {
+    // A service decides for itself whether a model thinks.
+    override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, think: Boolean, onText: (String) -> Unit): String {
         val decision = authorize()
         if (decision is EgressDecision.Denied) throw EgressDeniedException(decision)
         val body = format.body(model, instruction, images.map(::Image), question, streaming)

@@ -27,6 +27,14 @@ class ChatWithLibraryTest {
     }
 
     @Test
+    fun `the model's reading is the search, the rules' words only when it gave none`() {
+        val rules = ReadQuery("はどこに行った？", 1L, 2L, hasWords = true)
+        val plan = SearchPlan("旅行 観光", 5L, 6L, MediaKind.IMAGE, show = false)
+        assertEquals(ReadQuery("旅行 観光", 5L, 6L, MediaKind.IMAGE), ChatWithLibrary.merge(rules, plan))
+        assertEquals(ReadQuery("お盆", 5L, 6L, hasWords = false), ChatWithLibrary.merge(ReadQuery("お盆", hasWords = false), plan.copy(words = "", kind = null)))
+    }
+
+    @Test
     fun `a first question is answered from the search alone`() {
         assertEquals(listOf("x", "y"), ChatWithLibrary.sources(listOf(hit("x"), hit("y")), emptyList()).map { it.item.assetId })
     }

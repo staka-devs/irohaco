@@ -75,6 +75,10 @@ data class AskTurn(
     val partial: String = "",
     val found: ChatWithLibrary.Found? = null,
     val answering: Boolean = true,
+    /** What the model thought so far, before [partial]. */
+    val thought: String = "",
+    /** The search the question was read as, for showing its photos; null before it is read. */
+    val read: ReadQuery? = null,
 )
 
 /** Questions about the photo or scene on screen and the answers, one under another (#201). */
@@ -134,7 +138,7 @@ internal fun AskContent(
     }
     val scroll = rememberScrollState()
     // The newest message stays in view as it is asked and written, as in a chat.
-    LaunchedEffect(turns.size, turns.lastOrNull()?.partial?.length, turns.lastOrNull()?.answer, turns.lastOrNull()?.found) {
+    LaunchedEffect(turns.size, turns.lastOrNull()?.partial?.length, turns.lastOrNull()?.thought?.length, turns.lastOrNull()?.answer, turns.lastOrNull()?.found) {
         scroll.animateScrollTo(scroll.maxValue)
     }
     // Messages sit on the field when there are few, as in a chat; the sheet wraps them instead.
@@ -159,11 +163,12 @@ internal fun AskContent(
                         onOpen = onOpen,
                         onOpenSettings = onOpenSettings,
                         partial = turn.partial,
+                        thought = turn.thought,
                         askingLabel = if (turn.answering) askingLabel else R.string.ask_finding,
                         caution = caution,
                     )
                     if (onShowPhotos != null && turn.answer != null) {
-                        TextButton(onClick = { onShowPhotos(QueryReader.read(turn.question, ZonedDateTime.now())) }) {
+                        TextButton(onClick = { onShowPhotos(turn.read ?: QueryReader.read(turn.question, ZonedDateTime.now())) }) {
                             Icon(painterResource(IrohacoIcons.Photo), contentDescription = null)
                             Text(stringResource(R.string.ask_show_photos), modifier = Modifier.padding(start = IrohacoSpacing.s))
                         }
@@ -278,7 +283,7 @@ private fun AskContentPreview() {
             AskContent(
                 turns = listOf(
                     AskTurn("What is this?", AskResult.Answered("A pier at dusk [1].", known = true, citations = listOf(Citation(photo, Basis.OBSERVED, 1)))),
-                    AskTurn("Where is it?", partial = "Probably a harbour"),
+                    AskTurn("Where is it?", thought = "A pier and boats, so a harbour. The sign is too small to read."),
                     AskTurn("Fireworks last summer", found = ChatWithLibrary.Found(ReadQuery("fireworks", 1_750_000_000_000, 1_756_000_000_000, MediaKind.IMAGE), (1..4).map { photo.copy(item = photo.item.copy(assetId = "p$it")) })),
                 ),
                 hint = "Ask about this photo",

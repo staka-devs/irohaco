@@ -265,8 +265,8 @@ class ViewerViewModel(
         asking = viewModelScope.launch {
             val answer = library.askAbout(
                 question, item, frameMs, memos.value.map { it.current.text }, edits.value.takenAtMs ?: item.sortTimeMs, placeName.value, earlier,
-            ) { text -> _turns.update { it.dropLast(1) + it.last().copy(partial = text) } }
-            _turns.update { it.dropLast(1) + it.last().copy(answer = answer, partial = "") }
+            ) { so -> _turns.update { it.dropLast(1) + it.last().copy(partial = so.text, thought = so.thought) } }
+            _turns.update { it.dropLast(1) + it.last().copy(answer = answer, partial = "", thought = "") }
         }
     }
 
