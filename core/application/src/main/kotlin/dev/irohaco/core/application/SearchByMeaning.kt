@@ -25,13 +25,15 @@ class SearchByMeaning(
     private val modelDigest: String = ModelCatalog.EMBEDDING.sha256,
     /** The remote models; their spaces are queried through it (ADR-0032). */
     private val remote: RemoteEmbedding? = null,
+    /** The folders the user indexes, so coverage counts only them; null for every folder. */
+    private val folders: suspend () -> Set<String>? = { null },
 ) {
     fun spaces(): Flow<List<EmbeddingSpace>> = store.spaces()
 
     /** Switches new searches to [spaceId]; only a READY space can be the default. */
     suspend fun setDefault(spaceId: String): Boolean = store.setDefault(spaceId)
 
-    suspend fun coverage(spaceId: String): Float = store.coverage(spaceId)
+    suspend fun coverage(spaceId: String): Float = store.coverage(spaceId, folders())
 
     /**
      * Marks spaces of another model file, or of a remote model that was removed, STALE and cancels their
@@ -59,7 +61,7 @@ class SearchByMeaning(
         if (!searchable(space)) return null
         val vector = store.vectorOf(space.spaceId, assetId) ?: return null
         val hits = store.nearest(space.spaceId, vector, LIMIT + 1).filter { it.assetId != assetId }
-        return MeaningResult(space, hits, store.coverage(space.spaceId))
+        return MeaningResult(space, hits, store.coverage(space.spaceId, folders()))
     }
 
     /**
@@ -95,7 +97,7 @@ class SearchByMeaning(
         val vector = queries.getOrPut(space.modelProfileId to space.queryPrefix) {
             remote?.embedder(space.modelProfileId)?.query(query.trim()) ?: embedText((space.queryPrefix ?: "") + query.trim())
         }
-        return MeaningResult(space, store.nearest(space.spaceId, vector, LIMIT), store.coverage(space.spaceId))
+        return MeaningResult(space, store.nearest(space.spaceId, vector, LIMIT), store.coverage(space.spaceId, folders()))
     }
 
     private companion object {

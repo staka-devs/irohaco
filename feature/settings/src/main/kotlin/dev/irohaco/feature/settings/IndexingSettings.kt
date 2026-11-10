@@ -66,6 +66,7 @@ data class IndexingUi(val jobId: String, val progress: IndexJobProgress, val fai
 /**
  * Settings > AI > index (DESIGN §4.5, §4.7, IDX-001, IDX-002): starts an index of every photo and video
  * or of chosen folders, videos sampled at the chosen quality (IDX-004), shows its progress, and pauses, resumes, cancels and retries it.
+ * The folders chosen stay the index's target: the start button, the index of changes and search's coverage use them.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -95,6 +96,8 @@ internal fun IndexingSettings(
     pendingSend: PlanMediaIndex.Outgoing? = null,
     onConfirmSend: () -> Unit = {},
     onDismissSend: () -> Unit = {},
+    /** The folders the index covers, as relative paths; null for every folder. */
+    target: Set<String>? = null,
 ) {
     pendingSend?.let { outgoing ->
         AlertDialog(
@@ -131,13 +134,19 @@ internal fun IndexingSettings(
             dismissButton = { TextButton(onClick = { confirming = null }) { Text(stringResource(R.string.settings_ai_cancel)) } },
         )
     }
-    if (choosing) FolderChooser(folders, onDismiss = { choosing = false }, onChoose = { choosing = false; start(it) })
+    if (choosing) FolderChooser(folders, target.orEmpty(), onDismiss = { choosing = false }, onChoose = { choosing = false; start(it) })
 
     Column(
         verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.s),
         modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.m),
     ) {
         Text(stringResource(R.string.settings_index), style = MaterialTheme.typography.titleMedium)
+        Text(
+            target?.let { stringResource(R.string.settings_index_target_some, it.sorted().joinToString(", ") { path -> path.ifEmpty { "/" } }) }
+                ?: stringResource(R.string.settings_index_target_all),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         val active = indexing?.progress?.state in ACTIVE
         if (indexing != null) JobProgress(indexing, onPause, onResume, onCancel, onRetry)
         if (lowCoverageVideos > 0) {
@@ -182,7 +191,7 @@ internal fun IndexingSettings(
             Box {
                 SplitButtonLayout(
                     leadingButton = {
-                        SplitButtonDefaults.LeadingButton(onClick = { start(null) }, enabled = modelReady) {
+                        SplitButtonDefaults.LeadingButton(onClick = { start(target) }, enabled = modelReady) {
                             Text(stringResource(R.string.settings_index_start))
                         }
                     },
@@ -311,8 +320,8 @@ private fun stateLabel(state: IndexJobState, reason: PauseReason?): String = str
 
 /** Picks the folders to index; a folder is its relative path, as the index plans it. */
 @Composable
-private fun FolderChooser(folders: List<LibraryFolder>, onDismiss: () -> Unit, onChoose: (Set<String>) -> Unit) {
-    var chosen by remember { mutableStateOf(emptySet<String>()) }
+private fun FolderChooser(folders: List<LibraryFolder>, initial: Set<String>, onDismiss: () -> Unit, onChoose: (Set<String>) -> Unit) {
+    var chosen by remember { mutableStateOf(initial) }
     val paths = folders.map { it.folder.relativePath }.distinct()
     AlertDialog(
         onDismissRequest = onDismiss,

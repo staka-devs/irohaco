@@ -150,7 +150,13 @@ class SettingsViewModel(
      * Plans an index of [folders] (relative paths; null for every folder), videos at [quality], and runs
      * it. With a remote model it first counts what would be sent and waits for [confirmSend].
      */
+    /** The folders the index covers, as relative paths; null for every folder. */
+    val indexTarget: StateFlow<Set<String>?> = (indexSettings?.indexFolders ?: flowOf(null))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** The folders chosen become the index's target, also for the index of changes and search's coverage. */
     fun startIndex(folders: Set<String>?, quality: VideoQuality) = plan {
+        indexSettings?.setIndexFolders(folders)
         val outgoing = planMediaIndex?.outgoing(folders, quality)
         if (outgoing != null) {
             _pendingSend.value = PendingSend(folders, quality, outgoing)
