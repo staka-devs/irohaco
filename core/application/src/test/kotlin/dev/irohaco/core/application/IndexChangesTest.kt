@@ -35,7 +35,7 @@ class IndexChangesTest {
         override suspend fun ensureSpace(newSpaceId: String, spec: EmbeddingSpaceSpec, signature: String) = "s"
         override suspend fun findSpace(signature: String) = "s"
         override suspend fun hasVectors(spaceId: String) = hasVectors
-        override suspend fun plan(spaceId: String, folders: Set<String>?, quality: VideoQuality, now: Long) = changed
+        override suspend fun plan(spaceId: String, folders: Set<String>?, quality: VideoQuality, now: Long) = changed.also { planned += folders }
         override suspend fun source(targetId: String) = null
 
         override suspend fun assetOf(targetId: String) = null
@@ -84,10 +84,15 @@ class IndexChangesTest {
     private var ids = 0
     private val indexJobs = IndexJobs(jobStore, { _, _ -> floatArrayOf() }, { null }, { "job${ids++}" }, { 0 })
     private val plan = PlanMediaIndex(media, indexJobs, { "id" }, { 0 })
+    private val planned = mutableListOf<Set<String>?>()
     private val settings = object : IndexSettings {
         override val autoIndex = auto
         override suspend fun setAutoIndex(enabled: Boolean) {
             auto.value = enabled
+        }
+        override val indexFolders = MutableStateFlow<Set<String>?>(null)
+        override suspend fun setIndexFolders(folders: Set<String>?) {
+            indexFolders.value = folders
         }
     }
     private val indexChanges = IndexChanges(plan, indexJobs, SearchByMeaning(vectors, { floatArrayOf() }), settings) { started += it; allowed }
@@ -98,6 +103,13 @@ class IndexChangesTest {
         assertEquals(listOf("job0"), started)
         val job = jobs.getValue("job0")
         assertEquals(IndexJobKind.INCREMENTAL to false, job.kind to job.byUser)
+    }
+
+    @Test
+    fun `changes are looked for only in the folders the user indexes`() = runTest {
+        settings.setIndexFolders(setOf("DCIM/Camera/"))
+        indexChanges()
+        assertEquals(setOf("DCIM/Camera/"), planned.last())
     }
 
     @Test
