@@ -100,7 +100,8 @@ class TimelineGestureTest {
         var width = photos[0].fetchSemanticsNode().boundsInRoot.width
         repeat(3) {
             rule.onRoot().performTouchInput {
-                pinch(center - Offset(140f, 0f), center - Offset(10f, 0f), center + Offset(140f, 0f), center + Offset(10f, 0f))
+                // A small pinch each time, now that one pinch can cross several counts.
+                pinch(center - Offset(140f, 0f), center - Offset(100f, 0f), center + Offset(140f, 0f), center + Offset(100f, 0f))
             }
             rule.waitForIdle()
             val now = photos[0].fetchSemanticsNode().boundsInRoot.width

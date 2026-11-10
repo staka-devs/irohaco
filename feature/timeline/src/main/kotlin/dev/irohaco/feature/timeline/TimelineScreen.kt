@@ -147,7 +147,10 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.ln
+import kotlin.math.sign
 
 private val MEDIA_PERMISSIONS: Array<String> =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -604,15 +607,16 @@ private fun TimelineGrid(
             DateGrouping.DAY -> SCRUB_DATE
         },
     )
-    // While pinching, every photo glides from its place at this column count to its place at the next one,
-    // growing or shrinking on the way, as far as the fingers have pinched; the photo under the fingers stays
-    // under them. Lifting past the commit point finishes the move and shows the new grid, else it goes back.
+    // While pinching, every photo glides through the column counts the fingers pass, growing or shrinking on
+    // the way, so one pinch can cross several; the photo under the fingers stays under them. Lifting settles
+    // on the nearest count the pinch has gone most of the way to, and shows the grid of that count.
     val currentColumns by rememberUpdatedState(columns)
     val currentLayout by rememberUpdatedState(cellLayout)
     val columnsAt by rememberUpdatedState(columnsBy)
     val changeColumns by rememberUpdatedState(onColumns)
     var pinch by remember { mutableStateOf<Pinch?>(null) }
-    var progress by remember { mutableFloatStateOf(0f) }
+    // Column steps from where the pinch started, in between while the photos glide: 1.5 is half way from one more to two more.
+    var level by remember { mutableFloatStateOf(0f) }
     var zoom by remember { mutableFloatStateOf(1f) }
     var pivot by remember { mutableStateOf(Offset.Zero) }
     var anchor by remember { mutableIntStateOf(0) }
@@ -654,32 +658,37 @@ private fun TimelineGrid(
         return Offset(item.offset.x + (cell - rows.first(row)) * (item.size.width + spacingPx) / columns, item.offset.y.toFloat())
     }
 
-    /** The move towards [to] columns: where each cell is now, and where it is at [to] columns. */
-    fun pinchTo(to: Int): Pinch {
-        val ratio = currentColumns.toFloat() / to
+    /** Where every cell sits at each column count the pinch can reach, worked out as the pinch reaches it. */
+    fun startPinch(): Pinch {
+        val start = currentColumns
         val viewport = gridState.layoutInfo.viewportSize
         val width = viewport.width.toFloat()
         val height = viewport.height.toFloat()
         // A header shown now gives the real height of one; the default only when none is.
         val header = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.index < currentRows.count && currentLayout.isHeader(currentRows.first(it.index)) }
             ?.size?.height?.toFloat() ?: headerPx
-        val toRows = currentLayout.rows(to)
-        // The photo under the fingers ends where a zoom of the whole step carries it.
-        val toY = pivot.y + (anchorAt.y - pivot.y) * ratio
-        fun placed(rows: CellRows, columns: Int, anchorY: Float) =
-            currentLayout.place(rows, columns, width, spacingPx, header, anchor, anchorY, -height, 2 * height)
-        val now = placed(currentRows, currentColumns, anchorAt.y)
-        val next = placed(toRows, to, toY)
-        return Pinch(to, ratio, now, next) {
-            // The new grid starts at the line whose top is at or above the screen's, so the anchor's line sits at toY.
-            var row = toRows.rowOf(anchor)
-            var top = toY
-            while (row > 0 && top > 0) {
-                row--
-                top -= (if (currentLayout.isHeader(toRows.first(row))) header else (width - (to - 1) * spacingPx) / to) + spacingPx
-            }
-            LazyGridState(ColumnsCacheWindow(to), row, (-top).toInt().coerceAtLeast(0))
-        }
+        val layout = currentLayout
+        val steps = columnsAt
+        val rowsAt = HashMap<Int, CellRows>()
+        fun rows(columns: Int) = rowsAt.getOrPut(columns) { if (columns == start) currentRows else layout.rows(columns) }
+        // The photo under the fingers moves as a zoom about them would carry it.
+        fun anchorY(columns: Int) = pivot.y + (anchorAt.y - pivot.y) * start / columns
+        return Pinch(
+            columnsAt = steps,
+            placeAt = { columns -> layout.place(rows(columns), columns, width, spacingPx, header, anchor, anchorY(columns), -height, 2 * height) },
+            stateAt = { columns ->
+                // The grid starts at the line whose top is at or above the screen's, so the anchor's line sits where the photos stopped.
+                val toRows = rows(columns)
+                var row = toRows.rowOf(anchor)
+                var top = anchorY(columns)
+                while (row > 0 && top > 0) {
+                    row--
+                    top -= (if (layout.isHeader(toRows.first(row))) header else (width - (columns - 1) * spacingPx) / columns) + spacingPx
+                }
+                LazyGridState(ColumnsCacheWindow(columns), row, (-top).toInt().coerceAtLeast(0))
+            },
+            start = start,
+        )
     }
 
     // At the first or last column count, the grid only gives a little.
@@ -770,45 +779,40 @@ private fun TimelineGrid(
                     key = gridState,
                     onStart = { center ->
                         settle?.cancel()
-                        pinch = null
-                        progress = 0f
+                        level = 0f
                         zoom = 1f
                         main = Layer.NONE
                         pivot = center
                         anchor = cellAt(center) ?: gridState.firstVisibleItemIndex.takeIf { it < currentRows.count }?.let(currentRows::first) ?: 0
                         anchorAt = topLeft(gridState, currentRows, currentColumns, anchor) ?: center
+                        pinch = startPinch()
                     },
                     onScale = { total ->
                         zoom = total
-                        val to = columnsAt(if (total >= 1f) -1 else 1)
-                        pinch = when {
-                            to == currentColumns -> null
-                            pinch?.to == to -> pinch
-                            else -> pinchTo(to)
-                        }
-                        val p = pinch
-                        progress = p?.let { pinchProgress(total, it.ratio) } ?: 0f
-                        // The moving photos stand in for the grid while there are any.
-                        main = if (p != null) Layer.NONE.copy(alpha = 0f) else edgeLayer(total)
-                        shownColumns = p?.takeIf { progress >= COMMIT }?.to ?: currentColumns
+                        val p = pinch ?: return@pinchToChangeColumns
+                        level = pinchLevel(total, p.start, p.columnsAt)
+                        // The gliding photos stand in for the grid; past the first or last count, the grid only gives a little.
+                        main = if (level != 0f) Layer.NONE.copy(alpha = 0f) else edgeLayer(total)
+                        shownColumns = p.columnsAt(settleLevel(level))
                     },
                     onEnd = {
                         shownColumns = null
-                        val p = pinch
+                        val p = pinch ?: return@pinchToChangeColumns
                         settle = scope.launch {
-                            if (p == null) {
+                            if (level == 0f) {
                                 animate(zoom, 1f, animationSpec = settleSpec) { value, _ -> main = edgeLayer(value) }
-                                main = Layer.NONE
-                                return@launch
-                            }
-                            val keep = progress >= COMMIT
-                            animate(progress, if (keep) 1f else 0f, animationSpec = settleSpec) { value, _ -> progress = value }
-                            if (keep) {
-                                handoff[0] = p.state()
-                                changeColumns(p.to)
+                            } else {
+                                val to = settleLevel(level)
+                                animate(level, to.toFloat(), animationSpec = settleSpec) { value, _ -> level = value }
+                                val columns = p.columnsAt(to)
+                                if (columns != p.start) {
+                                    handoff[0] = p.stateAt(columns)
+                                    changeColumns(columns)
+                                }
                             }
                             // With the new columns in the same frame, so the grid shows where the photos stopped.
                             pinch = null
+                            level = 0f
                             main = Layer.NONE
                         }
                     },
@@ -818,7 +822,7 @@ private fun TimelineGrid(
                 // Inside the gestures, so they keep reading unscaled positions.
                 .graphicsLayer { apply(main) },
         )
-        pinch?.let { p ->
+        pinch?.takeIf { level != 0f }?.let { p ->
             // The photos read from memory once per pinch; one not in memory shows its placeholder.
             val images = remember(p) { HashMap<Int, ImageBitmap?>() }
             Spacer(
@@ -826,12 +830,16 @@ private fun TimelineGrid(
                     .fillMaxSize()
                     .clipToBounds()
                     .drawBehind {
-                        val t = progress
+                        // Between the column counts on either side of the level.
+                        val below = floor(level).toInt()
+                        val t = level - below
+                        val now = p.placed(below)
+                        val next = p.placed(below + 1)
                         val shown = Rect(0f, 0f, size.width, size.height)
                         val headers = ArrayList<Pair<Rect, String>>()
-                        for (cell in p.now.keys + p.next.keys) {
-                            val from = p.now[cell]
-                            val to = p.next[cell]
+                        for (cell in now.keys + next.keys) {
+                            val from = now[cell]
+                            val to = next[cell]
                             val rect = when {
                                 from != null && to != null -> lerp(from, to, t)
                                 else -> from ?: to!!
@@ -1177,13 +1185,45 @@ private fun Modifier.pinchToChangeColumns(
 )
 
 /**
- * A pinch towards [to] columns, whose cells are [ratio] times as wide as now: each cell's place [now] and [next],
- * and the grid's [state] for when the pinch ends at [to].
+ * A pinch that started at [start] columns: [columnsAt] gives the count that many steps away, [placeAt] where each
+ * cell sits at a count, and [stateAt] the grid to show when the pinch ends there.
  */
-private class Pinch(val to: Int, val ratio: Float, val now: Map<Int, Rect>, val next: Map<Int, Rect>, val state: () -> LazyGridState)
+private class Pinch(
+    val start: Int,
+    val columnsAt: (Int) -> Int,
+    private val placeAt: (Int) -> Map<Int, Rect>,
+    val stateAt: (Int) -> LazyGridState,
+) {
+    private val placedAt = HashMap<Int, Map<Int, Rect>>()
 
-/** How far a pinch of [zoom] is towards a column count whose cells are [ratio] times as wide, from 0 to 1. */
-internal fun pinchProgress(zoom: Float, ratio: Float): Float = (ln(zoom) / ln(ratio)).coerceIn(0f, 1f)
+    /** Where each cell sits [steps] column steps from the start. */
+    fun placed(steps: Int): Map<Int, Rect> = columnsAt(steps).let { columns -> placedAt.getOrPut(columns) { placeAt(columns) } }
+}
+
+/**
+ * Column steps from [start] for a pinch of [zoom], fractional between two counts: the cells grow by the zoom, and
+ * a count is reached when they are its width. Positive steps have more columns. Stops at the first or last count.
+ */
+internal fun pinchLevel(zoom: Float, start: Int, columnsAt: (Int) -> Int): Float {
+    val wanted = ln(zoom)
+    val way = if (wanted >= 0) -1 else 1
+    var steps = 0
+    var grown = 0f
+    while (true) {
+        val next = columnsAt(steps + way)
+        if (next == columnsAt(steps)) return steps.toFloat()
+        val nextGrown = ln(start.toFloat() / next)
+        if (abs(wanted) <= abs(nextGrown)) return steps + way * (wanted - grown) / (nextGrown - grown)
+        steps += way
+        grown = nextGrown
+    }
+}
+
+/** The count a pinch at [level] settles on: the next one out once the pinch is [COMMIT] of the way there. */
+internal fun settleLevel(level: Float): Int {
+    val whole = level.toInt()
+    return whole + if (abs(level - whole) >= COMMIT) sign(level).toInt() else 0
+}
 
 /** A grid's scale about [pivot], then its move by [shift], and how opaque it is. */
 private data class Layer(val scale: Float, val shift: Offset, val pivot: Offset, val alpha: Float) {

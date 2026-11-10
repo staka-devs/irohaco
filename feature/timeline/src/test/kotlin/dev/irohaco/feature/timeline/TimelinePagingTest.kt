@@ -171,12 +171,26 @@ class TimelinePagingTest {
     }
 
     @Test
-    fun pinchProgressRunsFromNoneToTheNextCount() {
-        assertEquals(0f, pinchProgress(1f, 1.4f))
-        assertEquals(1f, pinchProgress(1.4f, 1.4f), 1e-4f)
-        assertEquals(1f, pinchProgress(2f, 1.4f))
-        assertEquals(0f, pinchProgress(0.9f, 1.4f))
-        assertEquals(0.5f, pinchProgress(0.8366f, 0.7f), 1e-3f)
+    fun pinchLevelCrossesSeveralCounts() {
+        val levels = listOf(3, 4, 5, 7, 10, 14, 20, 28)
+        val at = { steps: Int -> stepColumns(levels, 7, steps) }
+        assertEquals(0f, pinchLevel(1f, 7, at))
+        // Cells as wide as at 5 columns: one step fewer.
+        assertEquals(-1f, pinchLevel(7f / 5, 7, at), 1e-4f)
+        // Half way, by width, from 5 to 4 columns.
+        assertEquals(-1.5f, pinchLevel(7f / 5 * kotlin.math.sqrt(5f / 4), 7, at), 1e-3f)
+        // As narrow as at 14, then past the last count.
+        assertEquals(2f, pinchLevel(7f / 14, 7, at), 1e-4f)
+        assertEquals(4f, pinchLevel(0.01f, 7, at))
+    }
+
+    @Test
+    fun settleLevelKeepsACountReachedMostOfTheWay() {
+        assertEquals(0, settleLevel(0.3f))
+        assertEquals(1, settleLevel(0.5f))
+        assertEquals(2, settleLevel(1.45f))
+        assertEquals(-1, settleLevel(-0.6f))
+        assertEquals(-2, settleLevel(-2.2f))
     }
 
     @Test
