@@ -24,7 +24,12 @@ import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.After
+import android.os.Looper
 import org.junit.Rule
+import org.junit.rules.RuleChain
+import org.junit.runner.Description
+import org.junit.runners.model.Statement
+import java.time.Duration
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -35,7 +40,19 @@ import java.time.ZoneOffset
 /** Long press and drag on the grid (DESIGN §4.1). */
 @RunWith(RobolectricTestRunner::class)
 class TimelineGestureTest {
-    @get:Rule val rule = createComposeRule()
+    private val rule = createComposeRule()
+
+    // A pinch's settling leaves frames queued on the shared AndroidUiDispatcher when the v2 rule ends. Robolectric
+    // drops them between tests, so the dispatcher would wait for good and the next test's paged items would never
+    // arrive, as for the search bar's test.
+    @get:Rule val chain: RuleChain = RuleChain.outerRule { base: Statement, _: Description ->
+        object : Statement() {
+            override fun evaluate() {
+                base.evaluate()
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            }
+        }
+    }.around(rule)
 
     private var items = (0 until 6).map { TimelineItem("a$it", MediaKind.IMAGE, "content://test/$it", 0) }
     private var selection by mutableStateOf(emptyMap<String, TimelineItem>())
