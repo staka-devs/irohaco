@@ -5,6 +5,7 @@ import androidx.paging.PagingData
 import androidx.paging.PagingSource.LoadResult
 import androidx.paging.testing.TestPager
 import androidx.paging.testing.asSnapshot
+import androidx.compose.ui.geometry.Rect
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.contracts.DateGrouping
 import dev.irohaco.core.contracts.TimelineItem
@@ -170,11 +171,24 @@ class TimelinePagingTest {
     }
 
     @Test
-    fun aPinchMovesOneStepAtMost() {
-        assertEquals(0, pinchSteps(1.2f))
-        assertEquals(-1, pinchSteps(1.4f))
-        assertEquals(-1, pinchSteps(3f))
-        assertEquals(1, pinchSteps(0.7f))
-        assertEquals(1, pinchSteps(0.2f))
+    fun pinchProgressRunsFromNoneToTheNextCount() {
+        assertEquals(0f, pinchProgress(1f, 1.4f))
+        assertEquals(1f, pinchProgress(1.4f, 1.4f), 1e-4f)
+        assertEquals(1f, pinchProgress(2f, 1.4f))
+        assertEquals(0f, pinchProgress(0.9f, 1.4f))
+        assertEquals(0.5f, pinchProgress(0.8366f, 0.7f), 1e-3f)
+    }
+
+    @Test
+    fun placeLaysCellsOutAroundTheAnchor() {
+        // H a a a | H a a a a a at 2 columns, 10 wide: photos are 5 square, headers 2 high.
+        val layout = cellLayout(listOf(1, 1, 1, 2, 2, 2, 2, 2).map { LocalDate.ofEpochDay(it.toLong()) })
+        val placed = layout.place(layout.rows(2), 2, width = 10f, spacing = 0f, header = 2f, anchor = 5, anchorY = 10f, top = 0f, bottom = 25f)
+        assertEquals(Rect(0f, 10f, 5f, 15f), placed[5])
+        assertEquals(Rect(5f, 10f, 10f, 15f), placed[6])
+        assertEquals(Rect(0f, 8f, 10f, 10f), placed[4])
+        assertEquals(Rect(0f, 20f, 5f, 25f), placed[9])
+        assertEquals(Rect(0f, -2f, 5f, 3f), placed[1])
+        assertNull(placed[0])
     }
 }

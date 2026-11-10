@@ -14,6 +14,10 @@
     <string name="timeline_video_length_description">Video, %1$s, %2$s</string>
     <string name="timeline_columns_fewer">Fewer columns</string>
     <string name="timeline_columns_more">More columns</string>
+    <plurals name="timeline_columns_count">
+        <item quantity="one">%d column</item>
+        <item quantity="other">%d columns</item>
+    </plurals>
     <string name="viewer_back">Back</string>
     <string name="viewer_photo_description">Photo</string>
     <string name="viewer_video_description">Video</string>

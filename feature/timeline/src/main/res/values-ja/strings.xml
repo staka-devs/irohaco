@@ -14,6 +14,9 @@
     <string name="timeline_video_length_description">動画、%1$s、%2$s</string>
     <string name="timeline_columns_fewer">列を減らす</string>
     <string name="timeline_columns_more">列を増やす</string>
+    <plurals name="timeline_columns_count">
+        <item quantity="other">%d 列</item>
+    </plurals>
     <string name="viewer_back">戻る</string>
     <string name="viewer_photo_description">写真</string>
     <string name="viewer_video_description">動画</string>

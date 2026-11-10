@@ -1,5 +1,7 @@
 package dev.irohaco.feature.timeline
 
+import android.content.Context
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,10 +23,13 @@ import dev.irohaco.core.domain.MediaLibraryAccess
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
+import androidx.test.core.app.ApplicationProvider
 import java.time.ZoneOffset
 
 /** Long press and drag on the grid (DESIGN §4.1). */
@@ -37,7 +42,15 @@ class TimelineGestureTest {
     private var opened = 0
     private var columns by mutableStateOf<Int?>(null)
 
+    private val accessibility get() = shadowOf(ApplicationProvider.getApplicationContext<Context>().getSystemService(AccessibilityManager::class.java))
+
+    // The setting outlives the test, so later tests would run as if a screen reader were on.
+    @After
+    fun screenReaderOff() = accessibility.setTouchExplorationEnabled(false)
+
     private fun showGrid() {
+        // The cells are found by what a screen reader reads, which they only have while one is on.
+        accessibility.setTouchExplorationEnabled(true)
         rule.setContent {
             IrohacoTheme(dynamicColor = false) {
                 val cells = remember { flowOf(PagingData.from(items).withDateHeaders(ZoneOffset.UTC)) }.collectAsLazyPagingItems()

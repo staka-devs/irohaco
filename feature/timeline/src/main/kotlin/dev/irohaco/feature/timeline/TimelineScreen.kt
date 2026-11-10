@@ -16,8 +16,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -77,6 +80,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -95,11 +104,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
@@ -114,6 +126,8 @@ import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.designsystem.component.FastScrollbar
 import dev.irohaco.core.designsystem.component.GridMediaCell
+import dev.irohaco.core.designsystem.component.cachedThumbnail
+import dev.irohaco.core.designsystem.component.drawGridThumbnail
 import dev.irohaco.core.designsystem.component.rememberGridCellStyle
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.motion.rememberReducedMotion
@@ -133,6 +147,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import kotlin.math.ln
 
 private val MEDIA_PERMISSIONS: Array<String> =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -488,7 +503,8 @@ internal fun TimelineContent(
                         cells = cells,
                         columns = columns,
                         bottomPadding = padding.calculateBottomPadding(),
-                        onStepColumns = { stepColumns(levels, columns, it).also(onColumns) },
+                        columnsBy = { stepColumns(levels, columns, it) },
+                        onColumns = onColumns,
                         onOpenMedia = onOpenMedia,
                         selection = selection,
                         onToggle = onToggle,
@@ -522,8 +538,9 @@ private fun TimelineGrid(
     cells: LazyPagingItems<TimelineCell>,
     columns: Int,
     bottomPadding: Dp,
-    /** Moves the columns by that many steps and returns the new count. */
-    onStepColumns: (Int) -> Int,
+    /** The column count that many steps away, without changing to it. */
+    columnsBy: (Int) -> Int,
+    onColumns: (Int) -> Unit,
     onOpenMedia: (String) -> Unit,
     selection: Map<String, TimelineItem>,
     onToggle: (TimelineItem) -> Unit,
@@ -553,14 +570,18 @@ private fun TimelineGrid(
     // per column count, at the same first cell: the cache window keeps prefetching lines of the old
     // count and reads past them when the columns change (an ArrayIndexOutOfBounds in Compose, #181).
     val last = remember { arrayOfNulls<Pair<LazyGridState, CellRows>>(1) }
+    // The grid a pinch faded in, kept as it is when the pinch ends on its column count.
+    val handoff = remember { arrayOfNulls<LazyGridState>(1) }
     val saver = listSaver<LazyGridState, Int>(
         save = { listOf(it.firstVisibleItemIndex, it.firstVisibleItemScrollOffset) },
         restore = { LazyGridState(ColumnsCacheWindow(columns), it[0], it[1]) },
     )
     val gridState = rememberSaveable(columns, saver = saver) {
-        // The line that holds the old first cell, so changing the columns keeps the place.
-        val first = last[0]?.takeIf { it.second.count > 0 }?.let { (state, old) -> old.first(state.firstVisibleItemIndex.coerceAtMost(old.count - 1)) }
-        LazyGridState(ColumnsCacheWindow(columns), first?.let(rows::rowOf) ?: 0)
+        handoff[0]?.also { handoff[0] = null } ?: run {
+            // The line that holds the old first cell, so changing the columns keeps the place.
+            val first = last[0]?.takeIf { it.second.count > 0 }?.let { (state, old) -> old.first(state.firstVisibleItemIndex.coerceAtMost(old.count - 1)) }
+            LazyGridState(ColumnsCacheWindow(columns), first?.let(rows::rowOf) ?: 0)
+        }
     }
     last[0] = gridState to rows
     val currentRows by rememberUpdatedState(rows)
@@ -583,14 +604,21 @@ private fun TimelineGrid(
             DateGrouping.DAY -> SCRUB_DATE
         },
     )
-    // The pinch detector is installed once, so it must read the latest columns and callback.
-    val stepBy by rememberUpdatedState(onStepColumns)
+    // While pinching, every photo glides from its place at this column count to its place at the next one,
+    // growing or shrinking on the way, as far as the fingers have pinched; the photo under the fingers stays
+    // under them. Lifting past the commit point finishes the move and shows the new grid, else it goes back.
     val currentColumns by rememberUpdatedState(columns)
-    // While pinching, the grid is only scaled; the columns change once, when the fingers lift, and the
-    // new grid starts at the size the fingers left it and springs to its own, so the step never jumps.
-    var pinchScale by remember { mutableFloatStateOf(1f) }
-    var pinchCenter by remember { mutableStateOf(Offset.Zero) }
-    var pinchStart by remember { mutableFloatStateOf(1f) }
+    val currentLayout by rememberUpdatedState(cellLayout)
+    val columnsAt by rememberUpdatedState(columnsBy)
+    val changeColumns by rememberUpdatedState(onColumns)
+    var pinch by remember { mutableStateOf<Pinch?>(null) }
+    var progress by remember { mutableFloatStateOf(0f) }
+    var zoom by remember { mutableFloatStateOf(1f) }
+    var pivot by remember { mutableStateOf(Offset.Zero) }
+    var anchor by remember { mutableIntStateOf(0) }
+    var anchorAt by remember { mutableStateOf(Offset.Zero) }
+    var main by remember { mutableStateOf(Layer.NONE) }
+    var shownColumns by remember { mutableStateOf<Int?>(null) }
     var settle by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
     val settleSpec = if (rememberReducedMotion()) snap() else MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
@@ -603,15 +631,60 @@ private fun TimelineGrid(
         )
         return
     }
-    val dense = columns >= DENSE_COLUMNS
     val cellStyle = rememberGridCellStyle()
     val resources = LocalResources.current
     val locale = LocalConfiguration.current.locales[0]
     val selectLabel = stringResource(R.string.timeline_select)
+    // Built once the grid stops: a screen reader reads what stays on screen, and lines scrolled past never get read.
+    val readable = rememberScreenReader() && !gridState.isScrollInProgress
     val open by rememberUpdatedState(onOpenMedia)
     val toggle by rememberUpdatedState(onToggle)
     val openCell = { item: TimelineItem -> if (currentSelection.isEmpty()) open(item.assetId) else toggle(item) }
     val spacingPx = with(LocalDensity.current) { IrohacoSpacing.xxs.toPx() }
+    val headerPx = with(LocalDensity.current) { HEADER_HEIGHT.toPx() }
+    val headerText = rememberTextMeasurer()
+    val headerStyle = MaterialTheme.typography.titleMedium.copy(color = MaterialTheme.colorScheme.onSurface)
+    val headerInset = with(LocalDensity.current) { IrohacoSpacing.l.toPx() }
+    val headerBackground = MaterialTheme.colorScheme.surface
+
+    /** Where [cell] starts in a grid of [columns] laid out by [state], or null while its line is not shown. */
+    fun topLeft(state: LazyGridState, rows: CellRows, columns: Int, cell: Int): Offset? {
+        val row = rows.rowOf(cell)
+        val item = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == row } ?: return null
+        return Offset(item.offset.x + (cell - rows.first(row)) * (item.size.width + spacingPx) / columns, item.offset.y.toFloat())
+    }
+
+    /** The move towards [to] columns: where each cell is now, and where it is at [to] columns. */
+    fun pinchTo(to: Int): Pinch {
+        val ratio = currentColumns.toFloat() / to
+        val viewport = gridState.layoutInfo.viewportSize
+        val width = viewport.width.toFloat()
+        val height = viewport.height.toFloat()
+        // A header shown now gives the real height of one; the default only when none is.
+        val header = gridState.layoutInfo.visibleItemsInfo.firstOrNull { it.index < currentRows.count && currentLayout.isHeader(currentRows.first(it.index)) }
+            ?.size?.height?.toFloat() ?: headerPx
+        val toRows = currentLayout.rows(to)
+        // The photo under the fingers ends where a zoom of the whole step carries it.
+        val toY = pivot.y + (anchorAt.y - pivot.y) * ratio
+        fun placed(rows: CellRows, columns: Int, anchorY: Float) =
+            currentLayout.place(rows, columns, width, spacingPx, header, anchor, anchorY, -height, 2 * height)
+        val now = placed(currentRows, currentColumns, anchorAt.y)
+        val next = placed(toRows, to, toY)
+        return Pinch(to, ratio, now, next) {
+            // The new grid starts at the line whose top is at or above the screen's, so the anchor's line sits at toY.
+            var row = toRows.rowOf(anchor)
+            var top = toY
+            while (row > 0 && top > 0) {
+                row--
+                top -= (if (currentLayout.isHeader(toRows.first(row))) header else (width - (to - 1) * spacingPx) / to) + spacingPx
+            }
+            LazyGridState(ColumnsCacheWindow(to), row, (-top).toInt().coerceAtLeast(0))
+        }
+    }
+
+    // At the first or last column count, the grid only gives a little.
+    fun edgeLayer(zoom: Float) = Layer(zoom.coerceIn(1 / EDGE_GIVE, EDGE_GIVE), Offset.Zero, pivot, 1f)
+
     // The cell under a point: the line under it, then the column within the line.
     val cellAt: (Offset) -> Int? = remember(gridState, columns, spacingPx) { { position ->
         gridState.layoutInfo.visibleItemsInfo.firstOrNull { item ->
@@ -623,7 +696,7 @@ private fun TimelineGrid(
         }
     } }
     @Composable
-    fun Cell(index: Int, modifier: Modifier) {
+    fun Cell(index: Int, dense: Boolean, modifier: Modifier) {
         when (val cell = if (index < cells.itemCount) cells[index] else null) {
             is TimelineCell.Header -> DateHeader(cell.date, headerFormatter, cell.date in selectedGroups) { onToggleGroup(cell.date) }
             is TimelineCell.Group -> GroupHeader(cell.group)
@@ -643,51 +716,29 @@ private fun TimelineGrid(
                         .then(if (dense) Modifier else Modifier.sharedMedia(item.assetId))
                         // Taps and long presses are the grid's gestures; screen readers get them as actions.
                         // The text is built here, only when a screen reader reads the cell.
-                        .clearAndSetSemantics {
-                            val text = item.description(formatter.format(cell.date), resources, locale)
-                            contentDescription = if (located) resources.getString(R.string.timeline_located_description, text) else text
-                            this.selected = item.assetId in currentSelection
-                            onClick { openCell(item); true }
-                            onLongClick(selectLabel) { onToggle(item); true }
-                        },
+                        .then(
+                            if (!readable) Modifier else Modifier.clearAndSetSemantics {
+                                val text = item.description(formatter.format(cell.date), resources, locale)
+                                contentDescription = if (located) resources.getString(R.string.timeline_located_description, text) else text
+                                this.selected = item.assetId in currentSelection
+                                onClick { openCell(item); true }
+                                onLongClick(selectLabel) { onToggle(item); true }
+                            },
+                        ),
                 )
             }
             null -> GridMediaCell(contentUri = null, selected = false, style = cellStyle, dense = dense, modifier = modifier)
         }
     }
-    Box(Modifier.fillMaxSize()) {
+    @Composable
+    fun Lines(rows: CellRows, columns: Int, state: LazyGridState, modifier: Modifier) {
+        val dense = columns >= DENSE_COLUMNS
         LazyVerticalGrid(
             columns = GridCells.Fixed(1),
-            state = gridState,
+            state = state,
             contentPadding = PaddingValues(bottom = bottomPadding),
             verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs),
-            modifier = Modifier
-                .fillMaxSize()
-                .pinchToChangeColumns(
-                    onStart = {
-                        settle?.cancel()
-                        pinchStart = pinchScale
-                    },
-                    onScale = { zoom, center ->
-                        pinchScale = (pinchStart * zoom).coerceIn(MIN_PINCH_SCALE, MAX_PINCH_SCALE)
-                        pinchCenter = center
-                    },
-                    onEnd = { zoom ->
-                        val from = currentColumns
-                        val to = pinchSteps(zoom).takeIf { it != 0 }?.let(stepBy) ?: from
-                        // Written with the new columns, so their first frame already has the matching size.
-                        pinchScale = pinchScale * to / from
-                        settle = scope.launch { animate(pinchScale, 1f, animationSpec = settleSpec) { value, _ -> pinchScale = value } }
-                    },
-                )
-                .dragToSelect(cells, cellAt, { currentSelection }) { selectRange(it) }
-                .tapCell(cells, cellAt) { openCell(it) }
-                // Inside the gestures, so they keep reading unscaled positions.
-                .graphicsLayer {
-                    scaleX = pinchScale
-                    scaleY = pinchScale
-                    if (size.width > 0 && size.height > 0) transformOrigin = TransformOrigin(pinchCenter.x / size.width, pinchCenter.y / size.height)
-                },
+            modifier = modifier.fillMaxSize(),
         ) {
             // Index keys: a line holds different cells at each column count, so no cell's key fits it.
             items(
@@ -696,16 +747,119 @@ private fun TimelineGrid(
             ) { row ->
                 val first = rows.first(row)
                 if (cellLayout.isHeader(first)) {
-                    Cell(first, Modifier)
+                    Cell(first, dense, Modifier)
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
                         val end = rows.end(row)
-                        for (index in first until end) Cell(index, Modifier.weight(1f))
+                        for (index in first until end) Cell(index, dense, Modifier.weight(1f))
                         // The last line of a group keeps the cells' width.
                         repeat(columns - (end - first)) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
+        }
+    }
+    Box(Modifier.fillMaxSize()) {
+        Lines(
+            rows,
+            columns,
+            gridState,
+            Modifier
+                // Keyed on the grid, so the handlers see the grid of the current column count.
+                .pinchToChangeColumns(
+                    key = gridState,
+                    onStart = { center ->
+                        settle?.cancel()
+                        pinch = null
+                        progress = 0f
+                        zoom = 1f
+                        main = Layer.NONE
+                        pivot = center
+                        anchor = cellAt(center) ?: gridState.firstVisibleItemIndex.takeIf { it < currentRows.count }?.let(currentRows::first) ?: 0
+                        anchorAt = topLeft(gridState, currentRows, currentColumns, anchor) ?: center
+                    },
+                    onScale = { total ->
+                        zoom = total
+                        val to = columnsAt(if (total >= 1f) -1 else 1)
+                        pinch = when {
+                            to == currentColumns -> null
+                            pinch?.to == to -> pinch
+                            else -> pinchTo(to)
+                        }
+                        val p = pinch
+                        progress = p?.let { pinchProgress(total, it.ratio) } ?: 0f
+                        // The moving photos stand in for the grid while there are any.
+                        main = if (p != null) Layer.NONE.copy(alpha = 0f) else edgeLayer(total)
+                        shownColumns = p?.takeIf { progress >= COMMIT }?.to ?: currentColumns
+                    },
+                    onEnd = {
+                        shownColumns = null
+                        val p = pinch
+                        settle = scope.launch {
+                            if (p == null) {
+                                animate(zoom, 1f, animationSpec = settleSpec) { value, _ -> main = edgeLayer(value) }
+                                main = Layer.NONE
+                                return@launch
+                            }
+                            val keep = progress >= COMMIT
+                            animate(progress, if (keep) 1f else 0f, animationSpec = settleSpec) { value, _ -> progress = value }
+                            if (keep) {
+                                handoff[0] = p.state()
+                                changeColumns(p.to)
+                            }
+                            // With the new columns in the same frame, so the grid shows where the photos stopped.
+                            pinch = null
+                            main = Layer.NONE
+                        }
+                    },
+                )
+                .dragToSelect(cells, cellAt, { currentSelection }) { selectRange(it) }
+                .tapCell(cells, cellAt) { openCell(it) }
+                // Inside the gestures, so they keep reading unscaled positions.
+                .graphicsLayer { apply(main) },
+        )
+        pinch?.let { p ->
+            // The photos read from memory once per pinch; one not in memory shows its placeholder.
+            val images = remember(p) { HashMap<Int, ImageBitmap?>() }
+            Spacer(
+                Modifier
+                    .fillMaxSize()
+                    .clipToBounds()
+                    .drawBehind {
+                        val t = progress
+                        val shown = Rect(0f, 0f, size.width, size.height)
+                        val headers = ArrayList<Pair<Rect, String>>()
+                        for (cell in p.now.keys + p.next.keys) {
+                            val from = p.now[cell]
+                            val to = p.next[cell]
+                            val rect = when {
+                                from != null && to != null -> lerp(from, to, t)
+                                else -> from ?: to!!
+                            }
+                            if (!rect.overlaps(shown)) continue
+                            // A cell on only one side fades with it.
+                            val alpha = when {
+                                from != null && to != null -> 1f
+                                from != null -> 1 - t
+                                else -> t
+                            }.coerceIn(0f, 1f)
+                            when (val c = if (cell < cells.itemCount) cells.peek(cell) else null) {
+                                is TimelineCell.Media -> {
+                                    val image = images.getOrPut(cell) { cellStyle.cachedThumbnail(c.item.contentUri, rect.width.toInt()) }
+                                    drawGridThumbnail(cellStyle, image, rect, alpha)
+                                }
+                                is TimelineCell.Header -> headers += rect to headerFormatter.format(c.date)
+                                is TimelineCell.Group, null -> if (c == null && !currentLayout.isHeader(cell)) drawGridThumbnail(cellStyle, null, rect, alpha)
+                            }
+                        }
+                        // After the photos, on the grid's background, so photos gliding past go under the dates.
+                        for ((rect, label) in headers) {
+                            drawRect(headerBackground, rect.topLeft, rect.size)
+                            val text = headerText.measure(label, headerStyle, maxLines = 1)
+                            drawText(text, topLeft = Offset(rect.left + headerInset, rect.center.y - text.size.height / 2f))
+                        }
+                    },
+            )
         }
         // The date of the first visible row stays at the top while scrolling (DESIGN §4.1).
         val pinned by remember(cells, gridState, rows) {
@@ -723,7 +877,8 @@ private fun TimelineGrid(
         }
         // The next group's header pushes the pinned one up as it nears the top, so the two never stack (M1-31).
         var pinnedHeight by remember { mutableIntStateOf(0) }
-        pinned?.let {
+        // Not while the photos glide: the moving dates show where each group goes.
+        pinned?.takeIf { pinch == null }?.let {
             Box(
                 Modifier
                     .onSizeChanged { size -> pinnedHeight = size.height }
@@ -739,6 +894,23 @@ private fun TimelineGrid(
                     is LocalDate -> DateHeader(it, headerFormatter, it in selectedGroups) { onToggleGroup(it) }
                     is SortGroup -> GroupHeader(it)
                 }
+            }
+        }
+        // The column count while pinching; it keeps its last number while fading out.
+        val lastShown = remember { intArrayOf(columns) }
+        shownColumns?.let { lastShown[0] = it }
+        AnimatedVisibility(
+            visible = shownColumns != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = IrohacoSpacing.l),
+        ) {
+            Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.inverseSurface) {
+                Text(
+                    pluralStringResource(R.plurals.timeline_columns_count, lastShown[0], lastShown[0]),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
+                )
             }
         }
         val context = LocalContext.current
@@ -976,11 +1148,15 @@ private fun PermissionPrompt(padding: PaddingValues, onRequest: () -> Unit, onOp
 
 /**
  * Two-finger pinch: spreading shows fewer, larger thumbnails; pinching in shows more. One finger still scrolls.
- * While the fingers move, [onScale] gets the zoom so far, for scaling the grid without any layout; [onEnd]
- * gets the whole zoom when they lift, for changing the columns once.
+ * [onStart] gets the point between the fingers, [onScale] the zoom so far, and [onEnd] comes when they lift.
  */
-private fun Modifier.pinchToChangeColumns(onStart: () -> Unit, onScale: (Float, Offset) -> Unit, onEnd: (Float) -> Unit): Modifier = this.then(
-    Modifier.pointerInput(Unit) {
+private fun Modifier.pinchToChangeColumns(
+    key: Any,
+    onStart: (Offset) -> Unit,
+    onScale: (Float) -> Unit,
+    onEnd: () -> Unit,
+): Modifier = this.then(
+    Modifier.pointerInput(key) {
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false)
             var zoom = 1f
@@ -988,30 +1164,51 @@ private fun Modifier.pinchToChangeColumns(onStart: () -> Unit, onScale: (Float, 
             do {
                 val event = awaitPointerEvent()
                 if (event.changes.count { it.pressed } >= 2) {
-                    if (!pinched) onStart()
+                    if (!pinched) onStart(event.calculateCentroid())
                     pinched = true
                     zoom *= event.calculateZoom()
-                    onScale(zoom, event.calculateCentroid())
+                    onScale(zoom)
                     event.changes.forEach { it.consume() }
                 }
             } while (event.changes.any { it.pressed })
-            if (pinched) onEnd(zoom)
+            if (pinched) onEnd()
         }
     },
 )
 
 /**
- * The column step for a pinch that scaled by [zoom]: -1, fewer columns, for spreading. One step per pinch,
- * as the grid shown while pinching is scaled no further than about one step either way.
+ * A pinch towards [to] columns, whose cells are [ratio] times as wide as now: each cell's place [now] and [next],
+ * and the grid's [state] for when the pinch ends at [to].
  */
-internal fun pinchSteps(zoom: Float): Int = when {
-    zoom > PINCH_STEP -> -1
-    zoom < 1 / PINCH_STEP -> 1
-    else -> 0
+private class Pinch(val to: Int, val ratio: Float, val now: Map<Int, Rect>, val next: Map<Int, Rect>, val state: () -> LazyGridState)
+
+/** How far a pinch of [zoom] is towards a column count whose cells are [ratio] times as wide, from 0 to 1. */
+internal fun pinchProgress(zoom: Float, ratio: Float): Float = (ln(zoom) / ln(ratio)).coerceIn(0f, 1f)
+
+/** A grid's scale about [pivot], then its move by [shift], and how opaque it is. */
+private data class Layer(val scale: Float, val shift: Offset, val pivot: Offset, val alpha: Float) {
+    companion object {
+        val NONE = Layer(1f, Offset.Zero, Offset.Zero, 1f)
+    }
 }
 
-private const val MIN_PINCH_SCALE = 0.6f
-private const val MAX_PINCH_SCALE = 1.7f
+private fun GraphicsLayerScope.apply(layer: Layer) {
+    scaleX = layer.scale
+    scaleY = layer.scale
+    translationX = layer.shift.x
+    translationY = layer.shift.y
+    alpha = layer.alpha
+    if (size.width > 0 && size.height > 0) transformOrigin = TransformOrigin(layer.pivot.x / size.width, layer.pivot.y / size.height)
+}
+
+/** Past this much of the way, lifting the fingers keeps the new column count. */
+private const val COMMIT = 0.4f
+
+/** How much the grid scales at the first or last column count. */
+private const val EDGE_GIVE = 1.08f
+
+/** A header line: the date's 48 dp button, or a group name's minimum height. */
+private val HEADER_HEIGHT = 48.dp
 
 /** From this many columns a cell is an overview dot: it drops the marks, the morph and the shared element. */
 private const val DENSE_COLUMNS = 10
@@ -1033,8 +1230,6 @@ private class ColumnsCacheWindow(private val columns: Int) : LazyLayoutCacheWind
 
     override fun Density.calculateBehindWindow(viewport: Int): Int = viewport * 4 / columns.coerceAtLeast(4)
 }
-
-private const val PINCH_STEP = 1.3f
 
 /** How far the pinned header moves up: as much as the next header overlaps it, never down. */
 internal fun pinnedHeaderOffset(nextHeaderTop: Int?, pinnedHeight: Int): Int =

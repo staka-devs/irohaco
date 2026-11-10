@@ -8,9 +8,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -50,6 +53,7 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * What every cell of a grid shares: the loader, the marks' icons and text, colors and sizes. Made once per
@@ -74,9 +78,32 @@ class GridCellStyle internal constructor(
     internal val checkSize: Float,
     internal val pinPadding: Float,
     internal val selectSpec: AnimationSpec<Float>?,
-    /** How a thumbnail that had to be loaded fades in over the placeholder; null shows it at once. */
-    internal val fadeSpec: AnimationSpec<Float>?,
+    /** How long a thumbnail that had to be loaded fades in over the placeholder; 0 shows it at once. */
+    internal val fadeNanos: Long,
+    internal val fades: Fades,
 )
+
+/**
+ * Redraws the cells that are fading in, once a frame, from one frame callback for the whole grid: a dense grid
+ * fades hundreds of cells at once, and an animation each cost a frame callback, too much on the main thread.
+ */
+internal class Fades(private val scope: CoroutineScope) {
+    private val waiting = mutableSetOf<DrawModifierNode>()
+    private var ticking: Job? = null
+
+    fun redrawNextFrame(node: DrawModifierNode) {
+        waiting += node
+        if (ticking?.isActive == true) return
+        ticking = scope.launch {
+            while (waiting.isNotEmpty()) {
+                withFrameNanos {}
+                val now = waiting.toList()
+                waiting.clear()
+                now.forEach { if (it.node.isAttached) it.invalidateDraw() }
+            }
+        }
+    }
+}
 
 @Composable
 fun rememberGridCellStyle(): GridCellStyle {
@@ -92,7 +119,8 @@ fun rememberGridCellStyle(): GridCellStyle {
     val play = painterResource(IrohacoIcons.PlayArrowFilled)
     val reduced = rememberReducedMotion()
     val spec = if (reduced) null else MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-    val fade = if (reduced) null else MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val fade = if (reduced) 0L else FADE_NANOS
+    val scope = rememberCoroutineScope()
     return remember(context, density, colors, shapes, text, labelStyle, check, pin, play, spec, fade) {
         val size = Size(100f, 100f)
         with(density) {
@@ -114,7 +142,8 @@ fun rememberGridCellStyle(): GridCellStyle {
                 checkSize = 24.dp.toPx(),
                 pinPadding = 2.dp.toPx(),
                 selectSpec = spec,
-                fadeSpec = fade,
+                fadeNanos = fade,
+                fades = Fades(scope),
             )
         }
     }
@@ -171,8 +200,8 @@ private class GridCellNode(
     private var load: Job? = null
     private var progress = if (selected) 1f else 0f
     private var morph: Job? = null
-    private var alpha = 1f
-    private var fade: Job? = null
+    // When the image started to fade in; 0 once it is fully shown.
+    private var fadeStart = 0L
     private val clip = Path()
 
     override val shouldAutoInvalidate = false
@@ -190,7 +219,7 @@ private class GridCellNode(
             image = null
             key = null
             load?.cancel()
-            fade?.cancel()
+            fadeStart = 0L
             morph?.cancel()
             progress = if (selected) 1f else 0f
             this.selected = selected
@@ -246,20 +275,20 @@ private class GridCellNode(
     /** A cached image, or one replacing the old step's, shows at once; one that only now arrived fades in. */
     private fun show(bitmap: ImageBitmap, fadeIn: Boolean = false) {
         image = bitmap
-        val spec = style.fadeSpec
-        if (fadeIn && spec != null) {
-            fade?.cancel()
-            alpha = 0f
-            fade = coroutineScope.launch {
-                animate(0f, 1f, animationSpec = spec) { value, _ ->
-                    alpha = value
-                    invalidateDraw()
-                }
-            }
-        } else {
-            alpha = 1f
-            invalidateDraw()
+        fadeStart = if (fadeIn && style.fadeNanos > 0) System.nanoTime() else 0L
+        invalidateDraw()
+    }
+
+    // Worked out while drawing, from the time; the grid's one frame callback draws the cell again until done.
+    private fun alpha(): Float {
+        if (fadeStart == 0L) return 1f
+        val t = (System.nanoTime() - fadeStart).toFloat() / style.fadeNanos
+        if (t >= 1f) {
+            fadeStart = 0L
+            return 1f
         }
+        style.fades.redrawNextFrame(this)
+        return t
     }
 
     override fun ContentDrawScope.draw() {
@@ -290,7 +319,7 @@ private class GridCellNode(
             srcOffset = androidx.compose.ui.unit.IntOffset((image.width - side) / 2, (image.height - side) / 2),
             srcSize = IntSize(side, side),
             dstSize = IntSize(size.width.toInt(), size.height.toInt()),
-            alpha = alpha,
+            alpha = alpha(),
         )
     }
 
@@ -347,4 +376,31 @@ private class GridCellNode(
         val OVERLAY = Color.Black.copy(alpha = 0.6f)
         val WHITE = ColorFilter.tint(Color.White)
     }
+}
+
+/** Material's short duration, for a thumbnail fading in over its placeholder. */
+private const val FADE_NANOS = 150_000_000L
+
+/** The thumbnail of [contentUri] already in memory, at the step for [px] or else the nearest one kept; null if none. */
+fun GridCellStyle.cachedThumbnail(contentUri: String, px: Int): ImageBitmap? {
+    val want = GridThumbnail.stepPx(px)
+    val cache = loader.memoryCache ?: return null
+    return GridThumbnail.STEPS.sortedBy { kotlin.math.abs(it - want) }.firstNotNullOfOrNull { step ->
+        cache[MemoryCache.Key(GridThumbnail(contentUri).memoryKey + "@" + step)]
+    }?.image?.toBitmap()?.asImageBitmap()
+}
+
+/** Draws [image] into [rect] as a grid cell does: center-cropped, over the placeholder while there is none. */
+fun DrawScope.drawGridThumbnail(style: GridCellStyle, image: ImageBitmap?, rect: Rect, alpha: Float = 1f) {
+    drawRect(style.placeholder, rect.topLeft, rect.size, alpha = alpha)
+    if (image == null) return
+    val side = minOf(image.width, image.height)
+    drawImage(
+        image,
+        srcOffset = androidx.compose.ui.unit.IntOffset((image.width - side) / 2, (image.height - side) / 2),
+        srcSize = IntSize(side, side),
+        dstOffset = androidx.compose.ui.unit.IntOffset(rect.left.toInt(), rect.top.toInt()),
+        dstSize = IntSize(rect.width.toInt(), rect.height.toInt()),
+        alpha = alpha,
+    )
 }

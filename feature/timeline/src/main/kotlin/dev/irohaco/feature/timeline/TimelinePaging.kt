@@ -13,6 +13,7 @@ import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineSortKey
 import kotlin.math.max
 import kotlin.math.min
+import androidx.compose.ui.geometry.Rect
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -162,6 +163,54 @@ internal class CellLayout(private val headerAt: IntArray, private val headers: L
         }
         return CellRows(start.copyOf(rows), cellCount)
     }
+}
+
+/**
+ * Where each cell sits in a grid of [columns] across [width], with the line of [anchor] at [anchorY]: only the
+ * lines between [top] and [bottom]. A header takes the whole width at [header] high; a photo is square.
+ */
+internal fun CellLayout.place(
+    rows: CellRows,
+    columns: Int,
+    width: Float,
+    spacing: Float,
+    header: Float,
+    anchor: Int,
+    anchorY: Float,
+    top: Float,
+    bottom: Float,
+): Map<Int, Rect> {
+    val side = (width - (columns - 1) * spacing) / columns
+    val placed = HashMap<Int, Rect>()
+    fun height(row: Int) = if (isHeader(rows.first(row))) header else side
+    fun put(row: Int, y: Float) {
+        val first = rows.first(row)
+        if (isHeader(first)) {
+            placed[first] = Rect(0f, y, width, y + header)
+        } else {
+            for (cell in first until rows.end(row)) {
+                val x = (cell - first) * (side + spacing)
+                placed[cell] = Rect(x, y, x + side, y + side)
+            }
+        }
+    }
+    if (rows.count == 0) return placed
+    val anchorRow = rows.rowOf(anchor)
+    var row = anchorRow
+    var y = anchorY
+    while (row < rows.count && y < bottom) {
+        put(row, y)
+        y += height(row) + spacing
+        row++
+    }
+    row = anchorRow
+    y = anchorY
+    while (row > 0 && y > top) {
+        row--
+        y -= height(row) + spacing
+        put(row, y)
+    }
+    return placed
 }
 
 /** Where each line of the grid starts, in cells. */
