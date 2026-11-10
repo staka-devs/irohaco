@@ -1,5 +1,20 @@
 package dev.irohaco.feature.timeline.search
 
+import dev.irohaco.feature.timeline.PlaceChoice
+import dev.irohaco.feature.timeline.PlaceChip
+import androidx.compose.material3.AssistChip
+import dev.irohaco.feature.timeline.kindLabel
+import dev.irohaco.feature.timeline.ChoiceChip
+import dev.irohaco.core.designsystem.component.IrohacoBottomSheet
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.Switch
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.text.KeyboardOptions
@@ -105,8 +120,6 @@ data class SearchUi(
     val query: String = "",
     /** The query without the dates and the kind read out of it (#203); what is searched. */
     val rest: String = "",
-    /** Only files at the place the query names (#203). */
-    val atPlace: Boolean = true,
     val byMeaning: Boolean = true,
     val byText: Boolean = true,
     val byMemo: Boolean = true,
@@ -174,8 +187,7 @@ class SearchViewModel(
                     query = read.rest,
                     rest = read.rest,
                     kind = read.kind,
-                    filters = it.filters.copy(fromMs = read.fromMs, untilMs = read.untilMs),
-                    atPlace = true,
+                    filters = it.filters.copy(fromMs = read.fromMs, untilMs = read.untilMs, place = read.place),
                 )
             }
         }
@@ -195,12 +207,14 @@ class SearchViewModel(
                 rest = read.rest,
                 kind = read.kind ?: it.kind,
                 filters = if (read.fromMs != null) it.filters.copy(fromMs = read.fromMs, untilMs = read.untilMs) else it.filters,
-                atPlace = true,
             )
         }
     }
 
-    fun toggleAtPlace() = change { it.copy(atPlace = !it.atPlace) }
+    /** Only files at [place], a place name or one of its parts; null for every place. */
+    fun showPlace(choice: PlaceChoice) = change { it.copy(filters = it.filters.copy(place = choice.place, area = choice.area)) }
+
+    suspend fun placeCounts(): Map<String, Int> = search.placeCounts(_ui.value.inferredPlaces)
 
     fun toggleMeaning() = change { it.copy(byMeaning = !it.byMeaning) }
 
@@ -240,7 +254,7 @@ class SearchViewModel(
             val results = if (similarTo != null) {
                 search.similar(similarTo, ui.spaceId, ui.kind, ui.filters)
             } else {
-                search(ui.rest.ifEmpty { ui.query }, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare, ui.byMemo, ui.filters, ui.inferredPlaces, ui.atPlace)
+                search(ui.rest.ifEmpty { ui.query }, ui.spaceId, ui.byMeaning, ui.byText, ui.kind, ui.compare, ui.byMemo, ui.filters, ui.inferredPlaces)
             }
             _ui.update { it.copy(searching = false, results = results) }
             // Loading a model takes half a minute; start while the user looks at the results.
@@ -273,7 +287,8 @@ fun SearchScreen(
         onDates = viewModel::showDates,
         onTags = viewModel::showTags,
         onToggleInferredPlaces = viewModel::toggleInferredPlaces,
-        onToggleAtPlace = viewModel::toggleAtPlace,
+        onPlace = viewModel::showPlace,
+        placeCounts = viewModel::placeCounts,
         onBack = onBack,
         onBackToChat = onBackToChat,
         onSearch = viewModel::search,
@@ -312,13 +327,15 @@ internal fun SearchContent(
     onDates: (Long?, Long?) -> Unit = { _, _ -> },
     onTags: (Set<String>) -> Unit = {},
     onToggleInferredPlaces: () -> Unit = {},
-    onToggleAtPlace: () -> Unit = {},
+    onPlace: (PlaceChoice) -> Unit = {},
+    placeCounts: suspend () -> Map<String, Int> = { emptyMap() },
     onBack: (() -> Unit)? = null,
     onAsk: (() -> Unit)? = null,
     onOpenAsk: (() -> Unit)? = null,
     onBackToChat: (() -> Unit)? = null,
 ) {
     val text = rememberTextFieldState(ui.query)
+    var tuning by rememberSaveable { mutableStateOf(false) }
     // The query arrives after the first frame when the page opens with one, so the field takes it up then.
     LaunchedEffect(ui.query) { if (text.text.isEmpty() && ui.query.isNotEmpty()) text.setTextAndPlaceCursorAtEnd(ui.query) }
     val labels = spaceLabels(spaces)
@@ -350,6 +367,7 @@ internal fun SearchContent(
                     },
                     trailingIcon = {
                         Row {
+                            IconButton(onClick = { tuning = true }) { Icon(painterResource(IrohacoIcons.Tune), stringResource(R.string.search_options)) }
                             IconButton(onClick = onOpenSettings) { Icon(painterResource(IrohacoIcons.Settings), stringResource(R.string.timeline_settings)) }
                         }
                     },
@@ -369,7 +387,10 @@ internal fun SearchContent(
             // Asking AI is a way of its own beside the search, not hidden in the bar.
             if (onOpenAsk != null && ui.results == null) item(span = { GridItemSpan(maxLineSpan) }) { AskEntry(onOpenAsk) }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Conditions(ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTags, onToggleInferredPlaces, onToggleAtPlace, similar = onBack != null)
+                Conditions(
+                    ui, spaces, labels, onToggleMeaning, onToggleText, onToggleMemo, onKind, onToggleCompare, onSpace, tags, onDates, onTags,
+                    onToggleInferredPlaces, onPlace, placeCounts, similar = onBack != null, tuning = tuning, onTuned = { tuning = false },
+                )
             }
             ui.results?.let { results ->
                 item(span = { GridItemSpan(maxLineSpan) }) { Notices(ui, results, labels, onOpenSettings) }
@@ -410,31 +431,47 @@ private fun Conditions(
     onDates: (Long?, Long?) -> Unit,
     onTags: (Set<String>) -> Unit,
     onToggleInferredPlaces: () -> Unit,
-    onToggleAtPlace: () -> Unit,
+    onPlace: (PlaceChoice) -> Unit,
+    placeCounts: suspend () -> Map<String, Int>,
     /** The similar photos page: no query, so only conditions on the files apply. */
     similar: Boolean,
+    /** The search options sheet is open: what to search in, which rarely changes, kept off the screen. */
+    tuning: Boolean = false,
+    onTuned: () -> Unit = {},
 ) {
     val searchable = spaces.count { it.space.state in PICKABLE }
     var pickingDates by rememberSaveable { mutableStateOf(false) }
-    if (pickingDates) DateRangeDialog(ui.filters.fromMs, ui.filters.untilMs, onDismiss = { pickingDates = false }) { from, until -> pickingDates = false; onDates(from, until) }
+    if (pickingDates) {
+        DateRangeDialog(ui.filters.fromMs, ui.filters.untilMs, onDismiss = { pickingDates = false }, onClear = { pickingDates = false; onDates(null, null) }) { from, until ->
+            pickingDates = false
+            onDates(from, until)
+        }
+    }
+    if (tuning && !similar) {
+        IrohacoBottomSheet(onDismiss = onTuned) {
+            SearchOptions(ui, searchable > 1, onToggleMeaning, onToggleText, onToggleMemo, onToggleInferredPlaces, onToggleCompare)
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
-            if (!similar) {
-                FilterChip(ui.byMeaning, onToggleMeaning, label = { Text(stringResource(R.string.search_by_meaning)) })
-                FilterChip(ui.byText, onToggleText, label = { Text(stringResource(R.string.search_by_text)) })
-                FilterChip(ui.byMemo, onToggleMemo, label = { Text(stringResource(R.string.search_by_memo)) })
-            }
-            FilterChip(ui.kind == MediaKind.IMAGE, { onKind(if (ui.kind == MediaKind.IMAGE) null else MediaKind.IMAGE) }, label = { Text(stringResource(R.string.search_photos)) })
-            FilterChip(ui.kind == MediaKind.VIDEO, { onKind(if (ui.kind == MediaKind.VIDEO) null else MediaKind.VIDEO) }, label = { Text(stringResource(R.string.search_videos)) })
+        // The conditions on the files, in one row that scrolls sideways.
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
+            ChoiceChip(ui.kind, listOf(null, MediaKind.IMAGE, MediaKind.VIDEO), { kindLabel(it) }, onKind)
             val dates = ui.filters.fromMs?.let { from -> ui.filters.untilMs?.let { until -> dateRangeLabel(from, until) } }
-            FilterChip(dates != null, { if (dates != null) onDates(null, null) else pickingDates = true }, label = { Text(dates ?: stringResource(R.string.search_dates)) })
-            ui.results?.place?.let { place -> FilterChip(ui.atPlace, onToggleAtPlace, label = { Text(place) }) }
+            FilterChip(
+                dates != null,
+                { pickingDates = true },
+                label = { Text(dates ?: stringResource(R.string.search_dates)) },
+                trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), null) },
+            )
+            PlaceChip(PlaceChoice(ui.filters.place, ui.filters.area), placeCounts, onPlace)
             TagFilterChips(tags, ui.filters.tagIds, onTags)
-            if (!similar) FilterChip(ui.inferredPlaces, onToggleInferredPlaces, label = { Text(stringResource(R.string.search_inferred_places)) })
-            // Comparing searches every model at once, so it needs two of them (SRCH-005).
-            if (searchable > 1 && !similar) {
-                FilterChip(ui.compare, onToggleCompare, enabled = ui.byMeaning, label = { Text(stringResource(R.string.search_compare)) })
-            }
+        }
+        ui.results?.place?.takeIf { ui.filters.place == null && ui.filters.area == null && !similar }?.let { place ->
+            AssistChip(
+                onClick = { onPlace(PlaceChoice(place = place)) },
+                label = { Text(stringResource(R.string.search_narrow_to_place, place)) },
+                leadingIcon = { Icon(painterResource(IrohacoIcons.LocationOn), null) },
+            )
         }
         // The model switch appears once there is a choice (DESIGN §3: a few models side by side).
         if (spaces.size > 1) {
@@ -455,6 +492,55 @@ private fun Conditions(
     }
 }
 
+/** What the search looks in, where it takes places from, and the models side by side, each under its heading. */
+@Composable
+private fun SearchOptions(
+    ui: SearchUi,
+    /** Comparing searches every model at once, so it needs two of them (SRCH-005). */
+    comparable: Boolean,
+    onToggleMeaning: () -> Unit,
+    onToggleText: () -> Unit,
+    onToggleMemo: () -> Unit,
+    onToggleInferredPlaces: () -> Unit,
+    onToggleCompare: () -> Unit,
+) {
+    @Composable
+    fun Heading(text: Int) = Text(
+        stringResource(text),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = IrohacoSpacing.l, end = IrohacoSpacing.l, top = IrohacoSpacing.m),
+    )
+
+    @Composable
+    fun Option(label: Int, hint: Int, on: Boolean, enabled: Boolean = true, onToggle: () -> Unit) = ListItem(
+        supportingContent = { Text(stringResource(hint)) },
+        trailingContent = { Switch(checked = on, onCheckedChange = null, enabled = enabled) },
+        modifier = Modifier.toggleable(on, enabled = enabled, role = Role.Switch) { onToggle() },
+    ) { Text(stringResource(label)) }
+    Column(Modifier.padding(bottom = IrohacoSpacing.l)) {
+        Text(stringResource(R.string.search_options), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = IrohacoSpacing.l))
+        Heading(R.string.search_options_sources)
+        Option(R.string.search_by_meaning, R.string.search_by_meaning_hint, ui.byMeaning, onToggle = onToggleMeaning)
+        Option(R.string.search_by_text, R.string.search_by_text_hint, ui.byText, onToggle = onToggleText)
+        Option(R.string.search_by_memo, R.string.search_by_memo_hint, ui.byMemo, onToggle = onToggleMemo)
+        Heading(R.string.search_options_places)
+        Option(R.string.search_inferred_places, R.string.search_inferred_places_hint, ui.inferredPlaces, onToggle = onToggleInferredPlaces)
+        if (comparable) {
+            Heading(R.string.search_options_models)
+            Option(R.string.search_compare, R.string.search_compare_hint, ui.compare, enabled = ui.byMeaning, onToggle = onToggleCompare)
+        }
+    }
+}
+
+@IrohacoPreviews
+@Composable
+private fun SearchOptionsPreview() {
+    IrohacoTheme(dynamicColor = false) {
+        Surface { SearchOptions(SearchUi(), comparable = true, {}, {}, {}, {}, {}) }
+    }
+}
+
 /** The similar photos page's header: a way back and what the page shows. */
 @Composable
 private fun SimilarHeader(onBack: () -> Unit) {
@@ -467,7 +553,14 @@ private fun SimilarHeader(onBack: () -> Unit) {
 /** Picks a range of days, given and returned as the start of the first and the end of the last whole local day. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DateRangeDialog(fromMs: Long?, untilMs: Long?, onDismiss: () -> Unit, onPick: (Long, Long) -> Unit) {
+internal fun DateRangeDialog(
+    fromMs: Long?,
+    untilMs: Long?,
+    onDismiss: () -> Unit,
+    /** Takes the dates off; offered only while some are set. */
+    onClear: (() -> Unit)? = null,
+    onPick: (Long, Long) -> Unit,
+) {
     val zone = ZoneId.systemDefault()
     // The picker works in UTC days; the filter in this device's days.
     fun toPicker(ms: Long?) = ms?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }
@@ -485,7 +578,12 @@ internal fun DateRangeDialog(fromMs: Long?, untilMs: Long?, onDismiss: () -> Uni
                 enabled = state.selectedStartDateMillis != null,
             ) { Text(stringResource(R.string.search_dates_apply)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.memo_cancel)) } },
+        dismissButton = {
+            Row {
+                if (onClear != null && fromMs != null) TextButton(onClick = onClear) { Text(stringResource(R.string.timeline_filter_clear)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.memo_cancel)) }
+            }
+        },
     ) {
         DateRangePicker(state, modifier = Modifier.heightIn(max = 520.dp))
     }

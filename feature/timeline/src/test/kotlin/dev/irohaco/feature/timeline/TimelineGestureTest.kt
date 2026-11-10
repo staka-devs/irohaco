@@ -1,5 +1,7 @@
 package dev.irohaco.feature.timeline
 
+import android.content.Context
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,23 +23,51 @@ import dev.irohaco.core.domain.MediaLibraryAccess
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.After
+import android.os.Looper
 import org.junit.Rule
+import org.junit.rules.RuleChain
+import org.junit.runner.Description
+import org.junit.runners.model.Statement
+import java.time.Duration
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
+import androidx.test.core.app.ApplicationProvider
 import java.time.ZoneOffset
 
 /** Long press and drag on the grid (DESIGN §4.1). */
 @RunWith(RobolectricTestRunner::class)
 class TimelineGestureTest {
-    @get:Rule val rule = createComposeRule()
+    private val rule = createComposeRule()
+
+    // A pinch's settling leaves frames queued on the shared AndroidUiDispatcher when the v2 rule ends. Robolectric
+    // drops them between tests, so the dispatcher would wait for good and the next test's paged items would never
+    // arrive, as for the search bar's test.
+    @get:Rule val chain: RuleChain = RuleChain.outerRule { base: Statement, _: Description ->
+        object : Statement() {
+            override fun evaluate() {
+                base.evaluate()
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            }
+        }
+    }.around(rule)
 
     private var items = (0 until 6).map { TimelineItem("a$it", MediaKind.IMAGE, "content://test/$it", 0) }
     private var selection by mutableStateOf(emptyMap<String, TimelineItem>())
     private var opened = 0
     private var columns by mutableStateOf<Int?>(null)
 
+    private val accessibility get() = shadowOf(ApplicationProvider.getApplicationContext<Context>().getSystemService(AccessibilityManager::class.java))
+
+    // The setting outlives the test, so later tests would run as if a screen reader were on.
+    @After
+    fun screenReaderOff() = accessibility.setTouchExplorationEnabled(false)
+
     private fun showGrid() {
+        // The cells are found by what a screen reader reads, which they only have while one is on.
+        accessibility.setTouchExplorationEnabled(true)
         rule.setContent {
             IrohacoTheme(dynamicColor = false) {
                 val cells = remember { flowOf(PagingData.from(items).withDateHeaders(ZoneOffset.UTC)) }.collectAsLazyPagingItems()
@@ -87,7 +117,8 @@ class TimelineGestureTest {
         var width = photos[0].fetchSemanticsNode().boundsInRoot.width
         repeat(3) {
             rule.onRoot().performTouchInput {
-                pinch(center - Offset(140f, 0f), center - Offset(10f, 0f), center + Offset(140f, 0f), center + Offset(10f, 0f))
+                // A small pinch each time, now that one pinch can cross several counts.
+                pinch(center - Offset(140f, 0f), center - Offset(100f, 0f), center + Offset(140f, 0f), center + Offset(100f, 0f))
             }
             rule.waitForIdle()
             val now = photos[0].fetchSemanticsNode().boundsInRoot.width

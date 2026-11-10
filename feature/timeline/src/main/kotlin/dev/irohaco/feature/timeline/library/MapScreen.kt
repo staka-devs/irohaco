@@ -1,5 +1,10 @@
 package dev.irohaco.feature.timeline.library
 
+import dev.irohaco.core.domain.GeoPoint
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Button
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -89,6 +94,9 @@ class MapViewModel(private val browse: BrowseMap) : ViewModel() {
     fun allow(granted: Boolean) {
         viewModelScope.launch { browse.allow(granted) }
     }
+
+    /** Where a place or landmark the user typed is, by the place name service; null without consent or a match. */
+    suspend fun find(name: String): GeoPoint? = browse.findPlaces(name).firstOrNull()?.point
 }
 
 /**
@@ -120,6 +128,57 @@ fun MapScreen(viewModel: MapViewModel, onOpenArea: (GeoBounds) -> Unit, onBack: 
     }
 }
 
+/**
+ * The map as a filter: the user moves it to the part they want, starting around [lookFor] (a place or landmark the
+ * user typed) or at [initial] when one was chosen, and narrows to what is in view. The photos on it show where there
+ * is something to find.
+ */
+@Composable
+fun AreaPicker(viewModel: MapViewModel, initial: GeoBounds?, lookFor: String?, onDone: (GeoBounds) -> Unit, onBack: () -> Unit) {
+    val points by viewModel.located.collectAsStateWithLifecycle()
+    val allowed by viewModel.allowed.collectAsStateWithLifecycle()
+    var declined by remember { mutableStateOf(false) }
+    // Looked up only once the map is allowed: the name service may be a server (ADR-0011).
+    var found by remember { mutableStateOf<GeoPoint?>(null) }
+    var lookedUp by remember { mutableStateOf(false) }
+    LaunchedEffect(lookFor, allowed) {
+        if (lookFor != null && allowed == true) {
+            found = viewModel.find(lookFor)
+            lookedUp = true
+        }
+    }
+    var view by remember { mutableStateOf(initial) }
+    val inView = remember(points, view) { view?.let { area -> points.orEmpty().count { it.point in area } } }
+    MapContent(
+        allowed = allowed,
+        declined = declined,
+        onAllow = { viewModel.allow(true) },
+        onDecline = { declined = true },
+        onBack = onBack,
+        providerName = stringResource(R.string.map_provider_openfreemap),
+        title = lookFor?.let { stringResource(R.string.timeline_place_around, it) } ?: stringResource(R.string.timeline_place_on_map),
+        bottomBar = {
+            val area = view
+            if (allowed == true && area != null && inView != null) {
+                Button(
+                    onClick = { onDone(area) },
+                    enabled = inView > 0,
+                    modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(IrohacoSpacing.l),
+                ) { Text(stringResource(R.string.timeline_place_narrow_to_view, inView)) }
+            }
+        },
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            MapLibreClusterMap(points.orEmpty(), onOpenArea = null, initial = initial, center = found, onView = { view = it })
+            if (lookFor != null && lookedUp && found == null) {
+                Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 3.dp, modifier = Modifier.align(Alignment.TopCenter).padding(IrohacoSpacing.l)) {
+                    Text(stringResource(R.string.timeline_place_not_found, lookFor), modifier = Modifier.padding(IrohacoSpacing.m))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 internal fun MapContent(
     allowed: Boolean?,
@@ -128,6 +187,8 @@ internal fun MapContent(
     onDecline: () -> Unit,
     onBack: () -> Unit,
     providerName: String,
+    title: String = stringResource(R.string.map_title),
+    bottomBar: @Composable () -> Unit = {},
     map: @Composable () -> Unit,
 ) {
     if (allowed == false && !declined) {
@@ -142,12 +203,13 @@ internal fun MapContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.map_title)) },
+                title = { Text(title) },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(painterResource(IrohacoIcons.ArrowBack), stringResource(R.string.viewer_back)) }
                 },
             )
         },
+        bottomBar = bottomBar,
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
@@ -169,14 +231,23 @@ private val MARKER_SIZE = 56.dp
 
 /**
  * The map library draws only the map; each group is a photo marker laid over it in Compose (M1-29)
- * and placed through the map's projection, so it follows every pan and zoom.
+ * and placed through the map's projection, so it follows every pan and zoom. Without [onOpenArea] a marker zooms to
+ * its group; [onView] hears the area in view each time the map stops.
  */
 @Composable
-private fun MapLibreClusterMap(located: List<LocatedAsset>, onOpenArea: (GeoBounds) -> Unit) {
+private fun MapLibreClusterMap(
+    located: List<LocatedAsset>,
+    onOpenArea: ((GeoBounds) -> Unit)?,
+    initial: GeoBounds? = null,
+    /** Moves the map to here, close up, once it is known. */
+    center: GeoPoint? = null,
+    onView: (GeoBounds) -> Unit = {},
+) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val mapView = remember { MapLibre.getInstance(context); MapView(context).apply { onCreate(null) } }
     val openArea by rememberUpdatedState(onOpenArea)
+    val viewed by rememberUpdatedState(onView)
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var view by remember { mutableStateOf<LatLngBounds?>(null) } // the area in view when the camera last stopped
     var zoom by remember { mutableDoubleStateOf(2.0) }
@@ -203,22 +274,28 @@ private fun MapLibreClusterMap(located: List<LocatedAsset>, onOpenArea: (GeoBoun
                 m.addOnCameraMoveListener { moved++ }
                 m.addOnCameraIdleListener {
                     zoom = m.cameraPosition.zoom
-                    view = m.projection.visibleRegion.latLngBounds
+                    view = m.projection.visibleRegion.latLngBounds.also { viewed(GeoBounds(it.latitudeSouth, it.longitudeWest, it.latitudeNorth, it.longitudeEast)) }
                     moved++
                 }
                 map = m
             }
         }
     }
-    // Starts with every point in view; later the user moves the map.
+    // Starts at the area chosen before, else with every point in view; later the user moves the map.
     LaunchedEffect(map, located.isNotEmpty()) {
         val m = map ?: return@LaunchedEffect
-        if (located.size >= 2) {
+        if (initial != null) {
+            m.moveCamera(CameraUpdateFactory.newLatLngBounds(LatLngBounds.from(initial.north, initial.east, initial.south, initial.west), 0))
+        } else if (located.size >= 2) {
             val bounds = LatLngBounds.Builder().includes(located.map { LatLng(it.point.latitude, it.point.longitude) }).build()
             m.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds, 96))
         } else if (located.size == 1) {
             m.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(located[0].point.latitude, located[0].point.longitude), 12.0))
         }
+    }
+    LaunchedEffect(map, center) {
+        val m = map ?: return@LaunchedEffect
+        if (center != null) m.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(center.latitude, center.longitude), 15.0))
     }
     val clusters = remember(located, zoom) { clusterPoints(located.map { it.point }, zoom) }
     Box(Modifier.fillMaxSize()) {
@@ -231,7 +308,14 @@ private fun MapLibreClusterMap(located: List<LocatedAsset>, onOpenArea: (GeoBoun
                 PhotoMarker(
                     contentUri = located[cluster.first].contentUri,
                     count = cluster.count,
-                    onClick = { openArea(cluster.bounds) },
+                    onClick = {
+                        openArea?.invoke(cluster.bounds) ?: m.animateCamera(
+                            CameraUpdateFactory.newLatLngBounds(
+                                LatLngBounds.from(cluster.bounds.north, cluster.bounds.east, cluster.bounds.south, cluster.bounds.west),
+                                96,
+                            ),
+                        )
+                    },
                     modifier = Modifier.offset {
                         moved // read here so a camera move only re-places the markers
                         val p = m.projection.toScreenLocation(LatLng(cluster.center.latitude, cluster.center.longitude))

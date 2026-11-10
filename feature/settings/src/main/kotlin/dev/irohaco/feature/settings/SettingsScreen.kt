@@ -1,5 +1,10 @@
 package dev.irohaco.feature.settings
 
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarHost
 import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -115,7 +120,6 @@ fun SettingsScreen(
     val startFailed by viewModel.startFailed.collectAsStateWithLifecycle()
     val remoteConnections by viewModel.remoteConnections.collectAsStateWithLifecycle()
     val egressGrants by viewModel.egressGrants.collectAsStateWithLifecycle()
-    val remoteModels by viewModel.remoteModels.collectAsStateWithLifecycle()
     val modelTest by viewModel.modelTest.collectAsStateWithLifecycle()
     val remoteAnswerModels by viewModel.remoteAnswerModels.collectAsStateWithLifecycle()
     val connectionFailed by viewModel.connectionFailed.collectAsStateWithLifecycle()
@@ -231,18 +235,16 @@ fun SettingsScreen(
                 viewModel::setEgress,
                 viewModel::addConnection,
                 viewModel::removeConnection,
-                remoteModels,
-                viewModel::addModel,
-                viewModel::removeModel,
-                modelTest,
-                viewModel::dismissModelTest,
-                connectionFailed,
-                viewModel::dismissConnectionFailed,
-                viewModel::renameConnection,
+                connectionFailed = connectionFailed,
+                onDismissConnectionFailed = viewModel::dismissConnectionFailed,
+                onRename = viewModel::renameConnection,
             )
         },
     )
 }
+
+/** Where a settings page says something that needs no answer, such as a backup that finished. */
+internal val LocalSettingsSnackbar = staticCompositionLocalOf<(String) -> Unit> { {} }
 
 /** The categories; each opens its own page, with the same name as its title, and says what can be set there. */
 enum class SettingsCategory(@StringRes val title: Int, @StringRes val summary: Int, @DrawableRes val icon: Int) {
@@ -271,6 +273,7 @@ internal fun SettingsContent(
     val navigator = rememberListDetailPaneScaffoldNavigator(initialDestinationHistory = initialHistory(initial))
     val scope = rememberCoroutineScope()
     val listHidden = navigator.scaffoldValue[ListDetailPaneScaffoldRole.List] == PaneAdaptedValue.Hidden
+    val snackbar = remember { SnackbarHostState() }
     BackHandler(enabled = !navigator.canNavigateBack(), onBack = onBack)
     NavigableListDetailPaneScaffold(
         navigator = navigator,
@@ -302,6 +305,7 @@ internal fun SettingsContent(
             AnimatedPane {
                 val category = navigator.currentDestination?.contentKey
                 Scaffold(
+                    snackbarHost = { SnackbarHost(snackbar) },
                     topBar = {
                         TopAppBar(
                             title = { Text(category?.let { stringResource(it.title) }.orEmpty()) },
@@ -315,6 +319,8 @@ internal fun SettingsContent(
                         )
                     },
                 ) { padding ->
+                    // Shown from the page's scope, so the message outlives what asked for it.
+                    CompositionLocalProvider(LocalSettingsSnackbar provides { text: String -> scope.launch { snackbar.showSnackbar(text) } }) {
                     Column(Modifier.padding(padding).verticalScroll(rememberScrollState())) {
                         when (category) {
                             SettingsCategory.DISPLAY -> display()
@@ -330,6 +336,7 @@ internal fun SettingsContent(
                         }
                     }
                 }
+                    }
             }
         },
     )
@@ -432,6 +439,7 @@ internal fun DisplaySettings(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
         )
+        ThemePreview(Color(0xFF000000.toInt() or seed.rgb), Modifier.padding(horizontal = IrohacoSpacing.l))
     }
 
     SectionTitle(R.string.settings_contrast)
@@ -501,7 +509,14 @@ private fun PaletteColors(seed: ThemeColor.Seed?, seedHue: Int?, enabled: Boolea
 /** Any colour as #RRGGBB; only a valid code is applied. */
 @Composable
 private fun ColorCode(seed: ThemeColor.Seed?, enabled: Boolean, onSelect: (ThemeColor) -> Unit) {
-    var text by rememberSaveable { mutableStateOf(seed?.toHex() ?: "#") }
+    var text by rememberSaveable(seed) { mutableStateOf(seed?.toHex() ?: "#") }
+    if (enabled) {
+        ColorPicker(
+            color = Color(0xFF000000.toInt() or (seed?.rgb ?: 0x2196F3)),
+            onPick = { onSelect(it.toSeed()) },
+            modifier = Modifier.padding(horizontal = IrohacoSpacing.l).padding(top = IrohacoSpacing.l),
+        )
+    }
     val invalid = text.length > 1 && ThemeColor.Seed.parseHex(text) == null
     OutlinedTextField(
         value = text,

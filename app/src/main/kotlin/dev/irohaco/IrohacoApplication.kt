@@ -4,6 +4,7 @@ import android.app.Application
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import coil3.memory.MemoryCache
 import coil3.video.VideoFrameDecoder
 import dev.irohaco.ui.GridThumbnailFetcher
 
@@ -27,5 +28,8 @@ class IrohacoApplication : Application(), SingletonImageLoader.Factory {
             add(GridThumbnailFetcher.Factory(this@IrohacoApplication))
             add(GridThumbnailFetcher.Key())
             add(VideoFrameDecoder.Factory())
-        }.build()
+        }
+            // A little more than the default, so the thumbnails of a dense grid scrolled back to are still kept.
+            .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.3).build() }
+            .build()
 }

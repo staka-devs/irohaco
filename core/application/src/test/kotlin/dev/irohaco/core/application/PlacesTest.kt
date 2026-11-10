@@ -58,6 +58,13 @@ class PlacesTest {
     @Test
     fun `a query names a place by one of its parts`() = runTest {
         assertEquals(true, SearchPlaces.mentions("徳島で撮った夕日", "徳島市, 徳島県"))
+        // The search names the place as asked, whichever town the first file is in.
+        assertEquals("徳島", SearchPlaces.mentionedPart("徳島", "三好市, 徳島県"))
+        assertEquals("三好", SearchPlaces.mentionedPart("三好市の川", "三好市, 徳島県"))
+        assertEquals(null, SearchPlaces.mentionedPart("京都", "三好市, 徳島県"))
+        assertEquals("花火", SearchPlaces.without("大阪　花火", "大阪"))
+        assertEquals("撮った夕日", SearchPlaces.without("徳島市で撮った夕日", "徳島"))
+        assertEquals("看板", SearchPlaces.without("京都の看板", "京都"))
         assertEquals(true, SearchPlaces.mentions("京都の紅葉", "京都市, 京都府"))
         assertEquals(true, SearchPlaces.mentions("ｔｏｋｕｓｈｉｍａ ramen", "Tokushima, Tokushima"))
         assertEquals(false, SearchPlaces.mentions("大阪の夜景", "京都市, 京都府"))

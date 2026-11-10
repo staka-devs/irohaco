@@ -3,6 +3,7 @@ package dev.irohaco.infrastructure.media
 import android.content.Context
 import android.location.Address
 import android.location.Geocoder
+import dev.irohaco.core.contracts.NamedPlace
 import dev.irohaco.core.contracts.PlaceNames
 import dev.irohaco.core.domain.GeoPoint
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -35,6 +36,35 @@ class AndroidPlaceNames(private val context: Context) : PlaceNames {
         }
     }
 
+    override suspend fun find(query: String): List<NamedPlace> {
+        if (!Geocoder.isPresent()) return emptyList()
+        val geocoder = Geocoder(context, Locale.getDefault())
+        return suspendCancellableCoroutine { continuation ->
+            geocoder.getFromLocationName(
+                query,
+                MAX_FOUND,
+                object : Geocoder.GeocodeListener {
+                    override fun onGeocode(addresses: MutableList<Address>) {
+                        continuation.resume(
+                            addresses.map { address ->
+                                val name = address.getAddressLine(0) ?: placeOf(address) ?: query
+                                NamedPlace(name, GeoPoint(address.latitude, address.longitude))
+                            },
+                        )
+                    }
+
+                    override fun onError(errorMessage: String?) {
+                        continuation.resume(emptyList())
+                    }
+                },
+            )
+        }
+    }
+
     private fun placeOf(address: Address): String? =
         listOfNotNull(address.locality ?: address.subAdminArea, address.adminArea).distinct().joinToString(", ").ifEmpty { null }
+
+    private companion object {
+        const val MAX_FOUND = 5
+    }
 }

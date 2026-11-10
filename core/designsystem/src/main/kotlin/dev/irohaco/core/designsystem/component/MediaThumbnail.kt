@@ -55,6 +55,18 @@ private const val SelectedScale = 0.9f
 data class GridThumbnail(val contentUri: String) {
     /** The start of the image loader's memory-cache key; the loader adds the size step. */
     val memoryKey: String get() = "grid:$contentUri"
+
+    companion object {
+        // 384 is sharp at three columns on a wide phone; a few fixed steps keep the OS's thumbnail cache reusable.
+        // 48 for the densest grids, whose cells are under 48 px: a quarter of the pixels to load, keep and draw.
+        internal val STEPS = intArrayOf(48, 96, 192, 384)
+
+        /** The smallest step that covers a cell [px] wide, so 28 columns load a sixteenth of the pixels of four. */
+        fun stepPx(px: Int): Int = STEPS.firstOrNull { it >= px } ?: STEPS.last()
+
+        /** The step to load when the cell's width is unknown. */
+        val LARGEST: Int get() = STEPS.last()
+    }
 }
 
 /**

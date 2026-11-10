@@ -5,6 +5,7 @@ import androidx.paging.PagingData
 import androidx.paging.PagingSource.LoadResult
 import androidx.paging.testing.TestPager
 import androidx.paging.testing.asSnapshot
+import androidx.compose.ui.geometry.Rect
 import dev.irohaco.core.application.GetTimelinePage
 import dev.irohaco.core.contracts.DateGrouping
 import dev.irohaco.core.contracts.TimelineItem
@@ -119,5 +120,88 @@ class TimelinePagingTest {
         assertEquals(LocalDate.of(2027, 1, 1), groupEnd(start, DateGrouping.MONTH))
         assertEquals(LocalDate.of(2027, 1, 1), groupEnd(start.withDayOfYear(1), DateGrouping.YEAR))
         assertEquals(LocalDate.of(2026, 12, 2), groupEnd(start, DateGrouping.DAY))
+    }
+
+    private fun TimelineCell.name() = when (this) {
+        is TimelineCell.Header -> "H$date"
+        is TimelineCell.Group -> "G$group"
+        is TimelineCell.Media -> item.assetId
+    }
+
+    @Test
+    fun `the layout places every header before any page loads`() = runTest {
+        var layout: CellLayout? = null
+        val pager = TestPager(config, TimelineCellPagingSource(GetTimelinePage(reader), ZoneOffset.UTC, DateGrouping.DAY, { layout = it }))
+        val first = pager.refresh() as LoadResult.Page
+        assertEquals(listOf("H1970-01-10", "a0", "a1", "a2"), first.data.map { it.name() })
+        assertEquals(10, first.itemsAfter) // 10 items and 4 day headers
+        assertEquals(listOf(0, 4, 8, 12), (0 until 14).filter { layout!!.isHeader(it) })
+        assertEquals(9, layout!!.mediaBefore(13))
+        val next = pager.append() as LoadResult.Page
+        assertEquals(listOf("H1970-01-09", "a3", "a4", "a5"), next.data.map { it.name() })
+    }
+
+    @Test
+    fun `a jump loads the cells of that position, headers included`() = runTest {
+        val pager = TestPager(config, TimelineCellPagingSource(GetTimelinePage(reader), ZoneOffset.UTC, DateGrouping.DAY))
+        val end = pager.refresh(initialKey = 10) as LoadResult.Page
+        assertEquals(listOf("a7", "a8", "H1970-01-07", "a9"), end.data.map { it.name() })
+        assertEquals(10, end.itemsBefore)
+        assertEquals(0, end.itemsAfter)
+        val before = pager.prepend() as LoadResult.Page
+        assertEquals(listOf("a4", "a5", "H1970-01-08", "a6"), before.data.map { it.name() })
+    }
+
+    @Test
+    fun `the layout matches the headers inserted between loaded items`() = runTest {
+        val inserted = flowOf(PagingData.from(items).withDateHeaders(ZoneOffset.UTC, DateGrouping.MONTH)).asSnapshot().map { it.name() }
+        val pager = TestPager(PagingConfig(pageSize = 20, initialLoadSize = 20), TimelineCellPagingSource(GetTimelinePage(reader), ZoneOffset.UTC, DateGrouping.MONTH))
+        assertEquals(inserted, (pager.refresh() as LoadResult.Page).data.map { it.name() })
+    }
+
+    @Test
+    fun rowsBreakAtHeadersAndColumns() {
+        // Groups of 3 and 5: H a a a | H a a a a a, at 2 columns.
+        val rows = cellLayout(listOf(1, 1, 1, 2, 2, 2, 2, 2).map { LocalDate.ofEpochDay(it.toLong()) }).rows(2)
+        assertEquals(listOf(0, 1, 3, 4, 5, 7, 9), (0 until rows.count).map(rows::first))
+        assertEquals(10, rows.end(rows.count - 1))
+        assertEquals(1, rows.rowOf(2))
+        assertEquals(4, rows.rowOf(5))
+        assertEquals(6, rows.rowOf(9))
+    }
+
+    @Test
+    fun pinchLevelCrossesSeveralCounts() {
+        val at = { steps: Int -> (7 + steps).coerceIn(3..28) }
+        assertEquals(0f, pinchLevel(1f, 7, at))
+        // Cells as wide as at 6 columns: one step fewer.
+        assertEquals(-1f, pinchLevel(7f / 6, 7, at), 1e-4f)
+        // Half way, by width, from 6 to 5 columns.
+        assertEquals(-1.5f, pinchLevel(7f / 6 * kotlin.math.sqrt(6f / 5), 7, at), 1e-3f)
+        // As narrow as at 14, then past the last count.
+        assertEquals(7f, pinchLevel(7f / 14, 7, at), 1e-3f)
+        assertEquals(21f, pinchLevel(0.01f, 7, at))
+    }
+
+    @Test
+    fun settleLevelKeepsACountReachedMostOfTheWay() {
+        assertEquals(0, settleLevel(0.3f))
+        assertEquals(1, settleLevel(0.5f))
+        assertEquals(2, settleLevel(1.45f))
+        assertEquals(-1, settleLevel(-0.6f))
+        assertEquals(-2, settleLevel(-2.2f))
+    }
+
+    @Test
+    fun placeLaysCellsOutAroundTheAnchor() {
+        // H a a a | H a a a a a at 2 columns, 10 wide: photos are 5 square, headers 2 high.
+        val layout = cellLayout(listOf(1, 1, 1, 2, 2, 2, 2, 2).map { LocalDate.ofEpochDay(it.toLong()) })
+        val placed = layout.place(layout.rows(2), 2, width = 10f, spacing = 0f, header = 2f, anchor = 5, anchorY = 10f, top = 0f, bottom = 25f)
+        assertEquals(Rect(0f, 10f, 5f, 15f), placed[5])
+        assertEquals(Rect(5f, 10f, 10f, 15f), placed[6])
+        assertEquals(Rect(0f, 8f, 10f, 10f), placed[4])
+        assertEquals(Rect(0f, 20f, 5f, 25f), placed[9])
+        assertEquals(Rect(0f, -2f, 5f, 3f), placed[1])
+        assertNull(placed[0])
     }
 }

@@ -1,5 +1,6 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.contracts.NamedPlace
 import dev.irohaco.core.contracts.LocatedAsset
 import dev.irohaco.core.contracts.LocationStore
 import dev.irohaco.core.contracts.MapSettings
@@ -56,6 +57,9 @@ class BrowseMap(
     val allowed: Flow<Boolean> = settings.allowed
 
     suspend fun allow(granted: Boolean) = settings.setAllowed(granted)
+
+    /** Places named like [query]; the name service may be a server, so none without the user's consent. */
+    suspend fun findPlaces(query: String): List<NamedPlace> = if (settings.allowed.first()) places.find(query) else emptyList()
 
     /** The place name of an item, looked up once and kept; null without the user's consent. */
     suspend fun placeName(assetId: String, point: GeoPoint): String? {

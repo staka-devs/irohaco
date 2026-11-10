@@ -25,9 +25,12 @@ data class TimelineItem(
     val rating: Int = 0,
     /** Whether the app shows a place for it, from the file's GPS or the user; the grid marks it with a pin. */
     val hasLocation: Boolean = false,
+    /** Sorted by distance: how far its place is from [TimelineQuery.near], in km; null without a place. */
+    val distanceKm: Double? = null,
 )
 
-enum class TimelineSortKey { TAKEN, NAME, SIZE, RATING }
+/** DISTANCE orders by the straight-line distance from [TimelineQuery.near]; files without a place come last. */
+enum class TimelineSortKey { TAKEN, NAME, SIZE, RATING, DISTANCE }
 
 /** What to name a position in the timeline, for the fast scrollbar's bubble while dragging (PRD GAL-014). */
 sealed interface TimelineLabel {
@@ -35,6 +38,9 @@ sealed interface TimelineLabel {
     data class Name(val firstChar: Char) : TimelineLabel
     data class Size(val bytes: Long) : TimelineLabel
     data class Rating(val rating: Int) : TimelineLabel
+
+    /** Null for a file without a place. */
+    data class Distance(val km: Double?) : TimelineLabel
 }
 
 /** A folder on one volume, such as "DCIM/Camera/"; the volume root is "" (PRD GAL-002). */
@@ -66,12 +72,23 @@ data class TimelineQuery(
     val takenFromMs: Long? = null,
     /** Only items taken before this instant; null has no upper bound. */
     val takenUntilMs: Long? = null,
+    /** Only items rated at least this many stars; null has no bound. */
+    val minRating: Int? = null,
+    /** Only items with a place the app shows (true) or without one (false); null shows both. */
+    val located: Boolean? = null,
+    /** Only items at this place name or one of its parts ("徳島県", "三好市, 徳島県"). */
+    val place: String? = null,
+    /** Where the distance order measures from: where the device was when the user chose it. */
+    val near: GeoPoint? = null,
+    /** The distance order also uses places guessed for files without GPS. */
+    val nearIncludesInferred: Boolean = false,
 ) {
     /** The user narrowed what is shown, beyond the order and the hidden folders. */
-    val filtered: Boolean get() = kind != null || favoritesOnly || tagIds.isNotEmpty() || takenFromMs != null || takenUntilMs != null
+    val filtered: Boolean
+        get() = kind != null || favoritesOnly || tagIds.isNotEmpty() || takenFromMs != null || takenUntilMs != null || minRating != null || located != null || place != null || area != null
 
     /** The same order, with every filter the user can set in the sheet taken off. */
-    fun unfiltered() = copy(kind = null, favoritesOnly = false, tagIds = emptySet(), takenFromMs = null, takenUntilMs = null)
+    fun unfiltered() = copy(kind = null, favoritesOnly = false, tagIds = emptySet(), takenFromMs = null, takenUntilMs = null, minRating = null, located = null, place = null, area = null)
 }
 
 /**

@@ -1,5 +1,7 @@
 package dev.irohaco
 
+import dev.irohaco.feature.timeline.LocalAreaPicker
+import dev.irohaco.feature.timeline.library.AreaPicker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,11 +23,11 @@ import android.content.Intent
 import android.os.Bundle
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.ComposeView
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -83,6 +85,7 @@ import dev.irohaco.feature.timeline.ask.AskViewModel
 import dev.irohaco.core.application.ChatWithLibrary
 import dev.irohaco.core.application.ReadQuery
 import dev.irohaco.core.domain.MediaKind
+import dev.irohaco.ui.AccessibilityEventLimiter
 import dev.irohaco.ui.IrohacoApp
 import dev.irohaco.ui.ScreenViewModelStores
 import dev.irohaco.ui.TopLevelDestination
@@ -108,7 +111,7 @@ class MainActivity : ComponentActivity() {
                 container.indexLocations() // GPS of new files, a few at a time; pausing the app pauses it (GAL-017)
             }
         }
-        setContent {
+        setLimitedContent {
             val themeColor by container.themeColorSettings.observe().collectAsStateWithLifecycle(ThemeColor.Device)
             val contrast by container.themeColorSettings.observeContrast().collectAsStateWithLifecycle(ThemeContrast.DEVICE)
             IrohacoTheme(
@@ -121,7 +124,11 @@ class MainActivity : ComponentActivity() {
                 },
             ) {
                 val marks by container.modelMarks.marks.collectAsStateWithLifecycle(emptyMap())
-                CompositionLocalProvider(LocalModelMarks provides marks) {
+                // The place filter's map, wherever the place chip is.
+                val areaPicker: @Composable (GeoBounds?, String?, (GeoBounds?) -> Unit) -> Unit = { initial, lookFor, onDone ->
+                    AreaPicker(viewModel { MapViewModel(container.browseMap) }, initial, lookFor, onDone = { onDone(it) }, onBack = { onDone(null) })
+                }
+                CompositionLocalProvider(LocalModelMarks provides marks, LocalAreaPicker provides areaPicker) {
                     // The first open of the database runs its schema and checks; it must not happen on the main thread
                     // when the first screen builds its ViewModel, so the screens wait for it here.
                     val databaseReady by produceState(false) {
@@ -145,6 +152,7 @@ class MainActivity : ComponentActivity() {
                     }
                     val shellState = rememberSaveableStateHolder()
                     val stores = viewModel { ScreenViewModelStores() }
+                    val sharedMedia = remember { mutableStateOf<String?>(null) }
                     SharedTransitionLayout {
                         val reducedMotion = rememberReducedMotion()
                         AnimatedContent(
@@ -160,11 +168,14 @@ class MainActivity : ComponentActivity() {
                             },
                             label = "route",
                         ) { target ->
-                            CompositionLocalProvider(LocalSharedMediaScope provides SharedMediaScope(this@SharedTransitionLayout, this)) {
+                            CompositionLocalProvider(LocalSharedMediaScope provides SharedMediaScope(this@SharedTransitionLayout, this, sharedMedia)) {
                                 if (target == Route.SHELL) {
                                     shellState.SaveableStateProvider(Route.SHELL) {
                                         Shell(
-                                            onOpenMedia = { assetId, list -> open(Route.viewer(assetId, list)) },
+                                            onOpenMedia = { assetId, list ->
+                                                sharedMedia.value = assetId
+                                                open(Route.viewer(assetId, list))
+                                            },
                                             onOpenList = { open(Route.list(it)) },
                                             onOpenCandidates = { open(Route.IDENTITY) },
                                             onOpenSettings = { open(Route.SETTINGS) },
@@ -215,6 +226,7 @@ class MainActivity : ComponentActivity() {
                             container.timelineSettings,
                             container.prepareShare,
                             container.sharingSettings,
+                            placeCounts = { container.searchMedia.placeCounts(includeInferred = false) },
                         )
                     },
                     onOpenMedia = { onOpenMedia(it, null) },
@@ -391,13 +403,13 @@ object Route {
 
     /** The photos a chat found, as a search page opened with the conditions the chat read. */
     fun photosFor(read: ReadQuery) =
-        PHOTOS_FOR + listOf(read.fromMs?.toString().orEmpty(), read.untilMs?.toString().orEmpty(), read.kind?.name.orEmpty(), read.rest).joinToString("$SEP")
+        PHOTOS_FOR + listOf(read.fromMs?.toString().orEmpty(), read.untilMs?.toString().orEmpty(), read.kind?.name.orEmpty(), read.place.orEmpty(), read.rest).joinToString("$SEP")
 
     fun isPhotosFor(route: String) = route.startsWith(PHOTOS_FOR)
 
     fun parsePhotosFor(route: String): ReadQuery {
-        val (from, until, kind, rest) = route.removePrefix(PHOTOS_FOR).split(SEP, limit = 4)
-        return ReadQuery(rest, from.toLongOrNull(), until.toLongOrNull(), kind.takeIf { it.isNotEmpty() }?.let(MediaKind::valueOf))
+        val (from, until, kind, place, rest) = route.removePrefix(PHOTOS_FOR).split(SEP, limit = 5)
+        return ReadQuery(rest, from.toLongOrNull(), until.toLongOrNull(), kind.takeIf { it.isNotEmpty() }?.let(MediaKind::valueOf), place = place.ifEmpty { null })
     }
 
     fun isSimilar(route: String) = route.startsWith(SIMILAR)
@@ -449,4 +461,10 @@ object Route {
             else -> MediaList.Favorites
         }
     }
+}
+
+/** Like setContent, but inside [AccessibilityEventLimiter], so a burst of accessibility events cannot kill the app. */
+private fun ComponentActivity.setLimitedContent(content: @Composable () -> Unit) {
+    val compose = ComposeView(this).apply { setContent(content) }
+    setContentView(AccessibilityEventLimiter(this).apply { addView(compose) })
 }
