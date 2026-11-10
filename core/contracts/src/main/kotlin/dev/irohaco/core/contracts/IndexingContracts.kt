@@ -197,4 +197,9 @@ interface IndexSettings {
     val autoIndex: Flow<Boolean>
 
     suspend fun setAutoIndex(enabled: Boolean)
+
+    /** The folders the index covers, as relative paths; null for every folder. */
+    val indexFolders: Flow<Set<String>?>
+
+    suspend fun setIndexFolders(folders: Set<String>?)
 }

@@ -106,6 +106,7 @@ fun SettingsScreen(
     val optionsLookup by viewModel.optionsLookup.collectAsStateWithLifecycle()
     val modelList by viewModel.modelList.collectAsStateWithLifecycle()
     val indexFolders by viewModel.indexFolders.collectAsStateWithLifecycle()
+    val indexTarget by viewModel.indexTarget.collectAsStateWithLifecycle()
     val lowCoverageVideos by viewModel.lowCoverageVideos.collectAsStateWithLifecycle()
     val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
     val autoIndex by viewModel.autoIndex.collectAsStateWithLifecycle()
@@ -142,6 +143,7 @@ fun SettingsScreen(
                 // A remote model needs no file on the device.
                 modelReady = embeddingModel != null || viewModel.modelCatalog.any { modelStates[it.id] is ModelInstallState.Installed },
                 folders = indexFolders,
+                target = indexTarget,
                 lowCoverageVideos = lowCoverageVideos,
                 pendingCount = pendingCount,
                 autoIndex = autoIndex,

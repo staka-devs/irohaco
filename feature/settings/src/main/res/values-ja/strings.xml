@@ -95,6 +95,8 @@
     <string name="settings_index">検索用の索引</string>
     <string name="settings_index_start">索引を作成</string>
     <string name="settings_index_choose_target">索引の対象を選ぶ</string>
+    <string name="settings_index_target_all">対象: すべてのフォルダ</string>
+    <string name="settings_index_target_some">対象: %1$s</string>
     <string name="settings_index_all">すべての写真と動画</string>
     <string name="settings_index_folders">フォルダを選ぶ</string>
     <string name="settings_index_needs_model">索引を作るには、モデルをダウンロードするか取り込んでください。</string>

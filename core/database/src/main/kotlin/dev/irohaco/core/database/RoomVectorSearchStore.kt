@@ -33,6 +33,9 @@ private const val VECTOR_FILES =
          AND CASE WHEN t.annotation_id IS NULL THEN v.source_revision_digest = $REVISION
                   ELSE n.searchable = 1 AND v.source_revision_digest = $MEMO_REVISION END"""
 
+/** The file [a] is in one of :folders, as the index plans folders (RoomMediaIndexStore). */
+private const val IN_FOLDERS = "EXISTS (SELECT 1 FROM media_sources fs WHERE fs.asset_id = a.asset_id AND COALESCE(fs.relative_path, '') IN (:folders))"
+
 /** Rows per page of a search: 400 vectors of 768 floats fill about 1.2 MB of the 2 MB cursor window. */
 private const val PAGE = 400
 
@@ -94,6 +97,12 @@ interface VectorSearchDao {
              / MAX(1, (SELECT COUNT(*) FROM media_assets a WHERE a.tombstoned_at IS NULL AND $REVISION IS NOT NULL))""",
     )
     suspend fun coverage(spaceId: String): Float
+
+    @Query(
+        """SELECT CAST((SELECT COUNT(DISTINCT a.asset_id) $VECTOR_FILES AND t.annotation_id IS NULL AND $IN_FOLDERS) AS REAL)
+             / MAX(1, (SELECT COUNT(*) FROM media_assets a WHERE a.tombstoned_at IS NULL AND $REVISION IS NOT NULL AND $IN_FOLDERS))""",
+    )
+    suspend fun coverageIn(spaceId: String, folders: List<String>): Float
 }
 
 data class SpaceRow(
@@ -159,6 +168,9 @@ class RoomVectorSearchStore(private val db: IrohacoDatabase) : VectorSearchStore
     }
 
     override suspend fun coverage(spaceId: String) = dao.coverage(spaceId)
+
+    override suspend fun coverage(spaceId: String, folders: Set<String>?) =
+        if (folders == null) dao.coverage(spaceId) else dao.coverageIn(spaceId, folders.toList())
 
     override suspend fun vectorOf(spaceId: String, assetId: String): FloatArray? = withContext(Dispatchers.IO) {
         db.openHelper.readableDatabase.query(

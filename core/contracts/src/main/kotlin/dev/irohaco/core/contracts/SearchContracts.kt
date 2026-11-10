@@ -54,6 +54,9 @@ interface VectorSearchStore {
     /** The share of available photos and videos with a vector of their current revision in [spaceId]. */
     suspend fun coverage(spaceId: String): Float
 
+    /** The same share among the files in [folders] (relative paths), the ones the user indexes; null for every folder. */
+    suspend fun coverage(spaceId: String, folders: Set<String>?): Float = coverage(spaceId)
+
     /** The vector [assetId] has in [spaceId] at its current revision: the photo's, or a video's first frame; null without one. */
     suspend fun vectorOf(spaceId: String, assetId: String): FloatArray?
 }

@@ -76,11 +76,12 @@ class PlanMediaIndex(
      * nothing changed; null then. With a remote model it plans nothing: files leave the device only
      * after the user has seen how many (ARCHITECTURE §9.2).
      */
-    suspend fun changes(): String? {
+    /** Indexes what changed in [folders] (relative paths; null for every folder) since the last index. */
+    suspend fun changes(folders: Set<String>? = null): String? {
         val spec = spec()
         if (spec.modelProfileId != ImageSpaces.LOCAL.modelProfileId) return null
         val spaceId = store.findSpace(ImageSpaces.signature(spec))?.takeIf { store.hasVectors(it) } ?: return null
-        val items = store.plan(spaceId, null, VideoQuality.BALANCED, now()).ifEmpty { return null }
+        val items = store.plan(spaceId, folders, VideoQuality.BALANCED, now()).ifEmpty { return null }
         return jobs.start(spaceId, IndexJobKind.INCREMENTAL, items, requestedByUser = false)
     }
 
@@ -122,7 +123,7 @@ class IndexChanges(
         jobs.recover()
         val latest = jobs.latest().first()?.let { jobs.progress(it).first() }
         if (latest != null && latest.state in OPEN) return
-        val jobId = plan.changes() ?: return
+        val jobId = plan.changes(settings.indexFolders.first()) ?: return
         // Not allowed to start from where the app is now: the job waits paused for the user to resume it.
         if (!run(jobId)) jobs.pause(jobId)
     }
