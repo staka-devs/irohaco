@@ -74,6 +74,8 @@ class GridCellStyle internal constructor(
     internal val checkSize: Float,
     internal val pinPadding: Float,
     internal val selectSpec: AnimationSpec<Float>?,
+    /** How a thumbnail that had to be loaded fades in over the placeholder; null shows it at once. */
+    internal val fadeSpec: AnimationSpec<Float>?,
 )
 
 @Composable
@@ -88,8 +90,10 @@ fun rememberGridCellStyle(): GridCellStyle {
     val check = painterResource(IrohacoIcons.CheckCircleFilled)
     val pin = painterResource(IrohacoIcons.LocationOn)
     val play = painterResource(IrohacoIcons.PlayArrowFilled)
-    val spec = if (rememberReducedMotion()) null else MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-    return remember(context, density, colors, shapes, text, labelStyle, check, pin, play, spec) {
+    val reduced = rememberReducedMotion()
+    val spec = if (reduced) null else MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val fade = if (reduced) null else MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    return remember(context, density, colors, shapes, text, labelStyle, check, pin, play, spec, fade) {
         val size = Size(100f, 100f)
         with(density) {
             GridCellStyle(
@@ -110,6 +114,7 @@ fun rememberGridCellStyle(): GridCellStyle {
                 checkSize = 24.dp.toPx(),
                 pinPadding = 2.dp.toPx(),
                 selectSpec = spec,
+                fadeSpec = fade,
             )
         }
     }
@@ -166,6 +171,8 @@ private class GridCellNode(
     private var load: Job? = null
     private var progress = if (selected) 1f else 0f
     private var morph: Job? = null
+    private var alpha = 1f
+    private var fade: Job? = null
     private val clip = Path()
 
     override val shouldAutoInvalidate = false
@@ -183,6 +190,7 @@ private class GridCellNode(
             image = null
             key = null
             load?.cancel()
+            fade?.cancel()
             morph?.cancel()
             progress = if (selected) 1f else 0f
             this.selected = selected
@@ -231,13 +239,27 @@ private class GridCellNode(
         val request = ImageRequest.Builder(style.context).data(GridThumbnail(uri)).size(px).memoryCacheKey(key).build()
         load = coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
             val result = style.loader.execute(request) as? SuccessResult ?: return@launch
-            show(result.image.toBitmap().asImageBitmap())
+            show(result.image.toBitmap().asImageBitmap(), fadeIn = image == null)
         }
     }
 
-    private fun show(bitmap: ImageBitmap) {
+    /** A cached image, or one replacing the old step's, shows at once; one that only now arrived fades in. */
+    private fun show(bitmap: ImageBitmap, fadeIn: Boolean = false) {
         image = bitmap
-        invalidateDraw()
+        val spec = style.fadeSpec
+        if (fadeIn && spec != null) {
+            fade?.cancel()
+            alpha = 0f
+            fade = coroutineScope.launch {
+                animate(0f, 1f, animationSpec = spec) { value, _ ->
+                    alpha = value
+                    invalidateDraw()
+                }
+            }
+        } else {
+            alpha = 1f
+            invalidateDraw()
+        }
     }
 
     override fun ContentDrawScope.draw() {
@@ -268,6 +290,7 @@ private class GridCellNode(
             srcOffset = androidx.compose.ui.unit.IntOffset((image.width - side) / 2, (image.height - side) / 2),
             srcSize = IntSize(side, side),
             dstSize = IntSize(size.width.toInt(), size.height.toInt()),
+            alpha = alpha,
         )
     }
 

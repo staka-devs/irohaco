@@ -16,10 +16,13 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +31,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -35,7 +39,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
@@ -62,6 +65,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,12 +77,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -99,8 +106,6 @@ import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.compose.itemContentType
-import androidx.paging.compose.itemKey
 import dev.irohaco.core.contracts.DateGrouping
 import dev.irohaco.core.contracts.FileOperationResult
 import dev.irohaco.core.contracts.Tag
@@ -111,6 +116,7 @@ import dev.irohaco.core.designsystem.component.FastScrollbar
 import dev.irohaco.core.designsystem.component.GridMediaCell
 import dev.irohaco.core.designsystem.component.rememberGridCellStyle
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
+import dev.irohaco.core.designsystem.motion.rememberReducedMotion
 import dev.irohaco.core.designsystem.motion.sharedMedia
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
@@ -118,6 +124,7 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import dev.irohaco.core.domain.LibraryAccess
 import dev.irohaco.core.domain.MediaKind
 import dev.irohaco.core.domain.MediaLibraryAccess
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
@@ -305,7 +312,7 @@ fun TimelineScreen(
         selectedGroups = selectedGroups,
         onToggleGroup = viewModel::toggleGroup,
         labelAt = viewModel::labelAt,
-        isHeaderAt = { layout?.isHeader(it) == true },
+        layout = layout,
         chosenColumns = chosenColumns,
         onColumns = viewModel::setColumns,
     )
@@ -395,7 +402,7 @@ internal fun TimelineContent(
     onToggleGroup: (LocalDate) -> Unit = {},
     labelAt: suspend (Int) -> TimelineLabel? = { null },
     /** Whether a cell not loaded yet is a header, so it takes a whole row before its page arrives. */
-    isHeaderAt: (Int) -> Boolean = { false },
+    layout: CellLayout? = null,
     /** The columns the user chose, kept in the settings; null shows the default. */
     chosenColumns: Int? = null,
     onColumns: (Int) -> Unit = {},
@@ -481,8 +488,7 @@ internal fun TimelineContent(
                         cells = cells,
                         columns = columns,
                         bottomPadding = padding.calculateBottomPadding(),
-                        onFewerColumns = { onColumns(stepColumns(levels, columns, -1)) },
-                        onMoreColumns = { onColumns(stepColumns(levels, columns, 1)) },
+                        onStepColumns = { stepColumns(levels, columns, it).also(onColumns) },
                         onOpenMedia = onOpenMedia,
                         selection = selection,
                         onToggle = onToggle,
@@ -502,7 +508,7 @@ internal fun TimelineContent(
                         selectedGroups = selectedGroups,
                         onToggleGroup = onToggleGroup,
                         labelAt = labelAt,
-                        isHeaderAt = isHeaderAt,
+                        layout = layout,
                     )
                 }
             }
@@ -516,8 +522,8 @@ private fun TimelineGrid(
     cells: LazyPagingItems<TimelineCell>,
     columns: Int,
     bottomPadding: Dp,
-    onFewerColumns: () -> Unit,
-    onMoreColumns: () -> Unit,
+    /** Moves the columns by that many steps and returns the new count. */
+    onStepColumns: (Int) -> Int,
     onOpenMedia: (String) -> Unit,
     selection: Map<String, TimelineItem>,
     onToggle: (TimelineItem) -> Unit,
@@ -537,20 +543,27 @@ private fun TimelineGrid(
     selectedGroups: Set<LocalDate>,
     onToggleGroup: (LocalDate) -> Unit,
     labelAt: suspend (Int) -> TimelineLabel? = { null },
-    isHeaderAt: (Int) -> Boolean = { false },
+    layout: CellLayout? = null,
 ) {
+    // Each item is a whole line, not a cell: a line of 28 cells is one item to compose, place and prefetch
+    // instead of 28. The lines come from where the headers fall, known before any page loads.
+    val cellLayout = layout ?: remember(cells.itemCount) { cells.peekedLayout() }
+    val rows = remember(cellLayout, columns) { cellLayout.rows(columns) }
     // Cells ahead are composed, so their thumbnails are loading before they show (M1-34). A new state
     // per column count, at the same first cell: the cache window keeps prefetching lines of the old
     // count and reads past them when the columns change (an ArrayIndexOutOfBounds in Compose, #181).
-    val last = remember { arrayOfNulls<LazyGridState>(1) }
+    val last = remember { arrayOfNulls<Pair<LazyGridState, CellRows>>(1) }
     val saver = listSaver<LazyGridState, Int>(
         save = { listOf(it.firstVisibleItemIndex, it.firstVisibleItemScrollOffset) },
         restore = { LazyGridState(ColumnsCacheWindow(columns), it[0], it[1]) },
     )
     val gridState = rememberSaveable(columns, saver = saver) {
-        LazyGridState(ColumnsCacheWindow(columns), last[0]?.firstVisibleItemIndex ?: 0, last[0]?.firstVisibleItemScrollOffset ?: 0)
+        // The line that holds the old first cell, so changing the columns keeps the place.
+        val first = last[0]?.takeIf { it.second.count > 0 }?.let { (state, old) -> old.first(state.firstVisibleItemIndex.coerceAtMost(old.count - 1)) }
+        LazyGridState(ColumnsCacheWindow(columns), first?.let(rows::rowOf) ?: 0)
     }
-    last[0] = gridState
+    last[0] = gridState to rows
+    val currentRows by rememberUpdatedState(rows)
     LaunchedEffect(scrollToTop, gridState) { scrollToTop.collect { gridState.scrollToItem(0) } }
     val currentSelection by rememberUpdatedState(selection)
     val selectRange by rememberUpdatedState(onSelectRange)
@@ -570,9 +583,17 @@ private fun TimelineGrid(
             DateGrouping.DAY -> SCRUB_DATE
         },
     )
-    // The pinch detector is installed once, so it must call the latest callbacks.
-    val fewer by rememberUpdatedState(onFewerColumns)
-    val more by rememberUpdatedState(onMoreColumns)
+    // The pinch detector is installed once, so it must read the latest columns and callback.
+    val stepBy by rememberUpdatedState(onStepColumns)
+    val currentColumns by rememberUpdatedState(columns)
+    // While pinching, the grid is only scaled; the columns change once, when the fingers lift, and the
+    // new grid starts at the size the fingers left it and springs to its own, so the step never jumps.
+    var pinchScale by remember { mutableFloatStateOf(1f) }
+    var pinchCenter by remember { mutableStateOf(Offset.Zero) }
+    var pinchStart by remember { mutableFloatStateOf(1f) }
+    var settle by remember { mutableStateOf<Job?>(null) }
+    val scope = rememberCoroutineScope()
+    val settleSpec = if (rememberReducedMotion()) snap() else MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     if (cells.itemCount == 0 && cells.loadState.refresh is LoadState.NotLoading) {
         Text(
             stringResource(R.string.timeline_empty),
@@ -590,68 +611,107 @@ private fun TimelineGrid(
     val open by rememberUpdatedState(onOpenMedia)
     val toggle by rememberUpdatedState(onToggle)
     val openCell = { item: TimelineItem -> if (currentSelection.isEmpty()) open(item.assetId) else toggle(item) }
+    val spacingPx = with(LocalDensity.current) { IrohacoSpacing.xxs.toPx() }
+    // The cell under a point: the line under it, then the column within the line.
+    val cellAt: (Offset) -> Int? = remember(gridState, columns, spacingPx) { { position ->
+        gridState.layoutInfo.visibleItemsInfo.firstOrNull { item ->
+            position.x >= item.offset.x && position.x < item.offset.x + item.size.width &&
+                position.y >= item.offset.y && position.y < item.offset.y + item.size.height
+        }?.takeIf { it.index < currentRows.count }?.let { item ->
+            val column = ((position.x - item.offset.x) / ((item.size.width + spacingPx) / columns)).toInt()
+            (currentRows.first(item.index) + column).takeIf { it < currentRows.end(item.index) }
+        }
+    } }
+    @Composable
+    fun Cell(index: Int, modifier: Modifier) {
+        when (val cell = if (index < cells.itemCount) cells[index] else null) {
+            is TimelineCell.Header -> DateHeader(cell.date, headerFormatter, cell.date in selectedGroups) { onToggleGroup(cell.date) }
+            is TimelineCell.Group -> GroupHeader(cell.group)
+            is TimelineCell.Media -> {
+                val item = cell.item
+                val located = locationPin && item.hasLocation
+                GridMediaCell(
+                    contentUri = item.contentUri,
+                    selected = item.assetId in selection,
+                    style = cellStyle,
+                    label = item.badge,
+                    labelIcon = if (item.badgeIcon != null) cellStyle.play else null,
+                    located = located,
+                    dense = dense,
+                    modifier = modifier
+                        // A shared element per cell costs on every frame; a cell this small has nothing to grow from.
+                        .then(if (dense) Modifier else Modifier.sharedMedia(item.assetId))
+                        // Taps and long presses are the grid's gestures; screen readers get them as actions.
+                        // The text is built here, only when a screen reader reads the cell.
+                        .clearAndSetSemantics {
+                            val text = item.description(formatter.format(cell.date), resources, locale)
+                            contentDescription = if (located) resources.getString(R.string.timeline_located_description, text) else text
+                            this.selected = item.assetId in currentSelection
+                            onClick { openCell(item); true }
+                            onLongClick(selectLabel) { onToggle(item); true }
+                        },
+                )
+            }
+            null -> GridMediaCell(contentUri = null, selected = false, style = cellStyle, dense = dense, modifier = modifier)
+        }
+    }
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(columns),
+            columns = GridCells.Fixed(1),
             state = gridState,
             contentPadding = PaddingValues(bottom = bottomPadding),
-            horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs),
             verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs),
             modifier = Modifier
                 .fillMaxSize()
-                .pinchToChangeColumns({ fewer() }, { more() })
-                .dragToSelect(gridState, cells, { currentSelection }) { selectRange(it) }
-                .tapCell(gridState, cells) { openCell(it) },
-        ) {
-            items(
-                count = cells.itemCount,
-                key = cells.itemKey {
-                    when (it) {
-                        is TimelineCell.Header -> "date-${it.date}"
-                        is TimelineCell.Group -> "group-${it.group}"
-                        is TimelineCell.Media -> it.item.assetId
-                    }
+                .pinchToChangeColumns(
+                    onStart = {
+                        settle?.cancel()
+                        pinchStart = pinchScale
+                    },
+                    onScale = { zoom, center ->
+                        pinchScale = (pinchStart * zoom).coerceIn(MIN_PINCH_SCALE, MAX_PINCH_SCALE)
+                        pinchCenter = center
+                    },
+                    onEnd = { zoom ->
+                        val from = currentColumns
+                        val to = pinchSteps(zoom).takeIf { it != 0 }?.let(stepBy) ?: from
+                        // Written with the new columns, so their first frame already has the matching size.
+                        pinchScale = pinchScale * to / from
+                        settle = scope.launch { animate(pinchScale, 1f, animationSpec = settleSpec) { value, _ -> pinchScale = value } }
+                    },
+                )
+                .dragToSelect(cells, cellAt, { currentSelection }) { selectRange(it) }
+                .tapCell(cells, cellAt) { openCell(it) }
+                // Inside the gestures, so they keep reading unscaled positions.
+                .graphicsLayer {
+                    scaleX = pinchScale
+                    scaleY = pinchScale
+                    if (size.width > 0 && size.height > 0) transformOrigin = TransformOrigin(pinchCenter.x / size.width, pinchCenter.y / size.height)
                 },
-                contentType = cells.itemContentType { it::class },
-                span = { index -> GridItemSpan(if (cells.peek(index)?.isHeader ?: isHeaderAt(index)) maxLineSpan else 1) },
-            ) { index ->
-                when (val cell = cells[index]) {
-                    is TimelineCell.Header -> DateHeader(cell.date, headerFormatter, cell.date in selectedGroups) { onToggleGroup(cell.date) }
-                    is TimelineCell.Group -> GroupHeader(cell.group)
-                    is TimelineCell.Media -> {
-                        val item = cell.item
-                        val located = locationPin && item.hasLocation
-                        GridMediaCell(
-                            contentUri = item.contentUri,
-                            selected = item.assetId in selection,
-                            style = cellStyle,
-                            label = item.badge,
-                            labelIcon = if (item.badgeIcon != null) cellStyle.play else null,
-                            located = located,
-                            dense = dense,
-                            modifier = Modifier
-                                // A shared element per cell costs on every frame; a cell this small has nothing to grow from.
-                                .then(if (dense) Modifier else Modifier.sharedMedia(item.assetId))
-                                // Taps and long presses are the grid's gestures; screen readers get them as actions.
-                                // The text is built here, only when a screen reader reads the cell.
-                                .clearAndSetSemantics {
-                                    val text = item.description(formatter.format(cell.date), resources, locale)
-                                    contentDescription = if (located) resources.getString(R.string.timeline_located_description, text) else text
-                                    this.selected = item.assetId in currentSelection
-                                    onClick { openCell(item); true }
-                                    onLongClick(selectLabel) { onToggle(item); true }
-                                },
-                        )
+        ) {
+            // Index keys: a line holds different cells at each column count, so no cell's key fits it.
+            items(
+                count = rows.count,
+                contentType = { row -> if (cellLayout.isHeader(rows.first(row))) 0 else 1 },
+            ) { row ->
+                val first = rows.first(row)
+                if (cellLayout.isHeader(first)) {
+                    Cell(first, Modifier)
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xxs)) {
+                        val end = rows.end(row)
+                        for (index in first until end) Cell(index, Modifier.weight(1f))
+                        // The last line of a group keeps the cells' width.
+                        repeat(columns - (end - first)) { Spacer(Modifier.weight(1f)) }
                     }
-                    null -> GridMediaCell(contentUri = null, selected = false, style = cellStyle, dense = dense)
                 }
             }
         }
         // The date of the first visible row stays at the top while scrolling (DESIGN §4.1).
-        val pinned by remember(cells, gridState) {
+        val pinned by remember(cells, gridState, rows) {
             derivedStateOf {
                 // The list is empty until the first page arrives.
-                val index = gridState.firstVisibleItemIndex
+                val index = gridState.firstVisibleItemIndex.takeIf { it < rows.count }?.let(rows::first) ?: Int.MAX_VALUE
                 // A date, or the group of a name, size or rating sort (M1-36).
                 when (val cell = if (index < cells.itemCount) cells.peek(index) else null) {
                     is TimelineCell.Header -> cell.date
@@ -670,7 +730,7 @@ private fun TimelineGrid(
                     .offset {
                         val first = gridState.firstVisibleItemIndex
                         val next = gridState.layoutInfo.visibleItemsInfo.firstOrNull { item ->
-                            item.index > first && item.index < cells.itemCount && cells.peek(item.index)?.isHeader == true
+                            item.index > first && item.index < currentRows.count && cellLayout.isHeader(currentRows.first(item.index))
                         }
                         IntOffset(0, pinnedHeaderOffset(next?.offset?.y, pinnedHeight))
                     },
@@ -684,10 +744,12 @@ private fun TimelineGrid(
         val context = LocalContext.current
         val zone = ZoneId.systemDefault()
         var dragIndex by remember { mutableStateOf<Int?>(null) }
-        val scrubLabel by rememberScrubLabel(dragIndex) { labelAt(it)?.format(scrubFormatter, zone, context) }
+        val scrubLabel by rememberScrubLabel(dragIndex) { row ->
+            labelAt(currentRows.first(row.coerceIn(0, currentRows.count - 1)))?.format(scrubFormatter, zone, context)
+        }
         FastScrollbar(
             gridState = gridState,
-            itemCount = cells.itemCount,
+            itemCount = rows.count,
             label = scrubLabel,
             onDragIndex = { dragIndex = it },
             modifier = Modifier.align(Alignment.CenterEnd).padding(bottom = bottomPadding),
@@ -774,12 +836,11 @@ private fun TimelineGrid(
  * shortcut: no auto-scroll at the grid edges yet; add it if selecting long ranges feels cramped on devices.
  */
 private fun Modifier.dragToSelect(
-    gridState: LazyGridState,
     cells: LazyPagingItems<TimelineCell>,
+    indexAt: (Offset) -> Int?,
     selection: () -> Map<String, TimelineItem>,
     onSelect: (Map<String, TimelineItem>) -> Unit,
-): Modifier = pointerInput(cells, gridState) {
-    fun indexAt(position: Offset): Int? = gridState.indexAt(position)
+): Modifier = pointerInput(cells, indexAt) {
     val cellAt = { index: Int -> if (index < cells.itemCount) cells.peek(index) else null }
     // The Initial pass sees the touch before the cells' click handlers, so their consumption cannot cancel the press.
     awaitEachGesture {
@@ -804,22 +865,17 @@ private fun Modifier.dragToSelect(
     }
 }
 
-private fun LazyGridState.indexAt(position: Offset): Int? = layoutInfo.visibleItemsInfo.firstOrNull { item ->
-    position.x >= item.offset.x && position.x < item.offset.x + item.size.width &&
-        position.y >= item.offset.y && position.y < item.offset.y + item.size.height
-}?.index
-
 /**
  * A tap on a photo or video cell. One detector for the whole grid instead of one per cell, which a new row
  * would otherwise build for each cell. Scrolling and a long press consume the touch, so they never count as taps.
  */
 private fun Modifier.tapCell(
-    gridState: LazyGridState,
     cells: LazyPagingItems<TimelineCell>,
+    indexAt: (Offset) -> Int?,
     onTap: (TimelineItem) -> Unit,
-): Modifier = pointerInput(cells, gridState) {
+): Modifier = pointerInput(cells, indexAt) {
     detectTapGestures { position ->
-        val index = gridState.indexAt(position) ?: return@detectTapGestures
+        val index = indexAt(position) ?: return@detectTapGestures
         (cells.peek(index) as? TimelineCell.Media)?.let { onTap(it.item) }
     }
 }
@@ -918,29 +974,44 @@ private fun PermissionPrompt(padding: PaddingValues, onRequest: () -> Unit, onOp
     }
 }
 
-/** Two-finger pinch: spreading shows fewer, larger thumbnails; pinching in shows more. One finger still scrolls. */
-private fun Modifier.pinchToChangeColumns(onFewer: () -> Unit, onMore: () -> Unit): Modifier = this.then(
+/**
+ * Two-finger pinch: spreading shows fewer, larger thumbnails; pinching in shows more. One finger still scrolls.
+ * While the fingers move, [onScale] gets the zoom so far, for scaling the grid without any layout; [onEnd]
+ * gets the whole zoom when they lift, for changing the columns once.
+ */
+private fun Modifier.pinchToChangeColumns(onStart: () -> Unit, onScale: (Float, Offset) -> Unit, onEnd: (Float) -> Unit): Modifier = this.then(
     Modifier.pointerInput(Unit) {
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false)
             var zoom = 1f
+            var pinched = false
             do {
                 val event = awaitPointerEvent()
                 if (event.changes.count { it.pressed } >= 2) {
+                    if (!pinched) onStart()
+                    pinched = true
                     zoom *= event.calculateZoom()
-                    if (zoom > PINCH_STEP) {
-                        onFewer()
-                        zoom = 1f
-                    } else if (zoom < 1 / PINCH_STEP) {
-                        onMore()
-                        zoom = 1f
-                    }
+                    onScale(zoom, event.calculateCentroid())
                     event.changes.forEach { it.consume() }
                 }
             } while (event.changes.any { it.pressed })
+            if (pinched) onEnd(zoom)
         }
     },
 )
+
+/**
+ * The column step for a pinch that scaled by [zoom]: -1, fewer columns, for spreading. One step per pinch,
+ * as the grid shown while pinching is scaled no further than about one step either way.
+ */
+internal fun pinchSteps(zoom: Float): Int = when {
+    zoom > PINCH_STEP -> -1
+    zoom < 1 / PINCH_STEP -> 1
+    else -> 0
+}
+
+private const val MIN_PINCH_SCALE = 0.6f
+private const val MAX_PINCH_SCALE = 1.7f
 
 /** From this many columns a cell is an overview dot: it drops the marks, the morph and the shared element. */
 private const val DENSE_COLUMNS = 10
@@ -1040,4 +1111,10 @@ private fun TimelineYearsPreview() {
         val cells = flowOf(PagingData.from(groupedPreviewItems).withDateHeaders(ZoneOffset.UTC, DateGrouping.YEAR)).collectAsLazyPagingItems()
         TimelineContent(MediaLibraryAccess(LibraryAccess.FULL, LibraryAccess.FULL), cells, {}, {}, grouping = DateGrouping.YEAR)
     }
+}
+
+/** Where the headers fall among the cells loaded so far, for a grid without the view model's layout, as in previews. */
+private fun LazyPagingItems<TimelineCell>.peekedLayout(): CellLayout {
+    val at = (0 until itemCount).filter { peek(it)?.isHeader == true }
+    return CellLayout(at.toIntArray(), at.map { peek(it)!! }, itemCount - at.size)
 }

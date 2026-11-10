@@ -144,6 +144,36 @@ internal class CellLayout(private val headerAt: IntArray, private val headers: L
 
     /** How many photos and videos come before [cell]: the media index of a media cell. */
     fun mediaBefore(cell: Int): Int = headerAt.binarySearch(cell).let { cell - if (it >= 0) it else -it - 1 }
+
+    /** The grid's lines at [columns]: a header alone, or up to [columns] cells of one group. */
+    fun rows(columns: Int): CellRows {
+        val start = IntArray(cellCount)
+        var rows = 0
+        var cell = 0
+        var h = 0
+        while (cell < cellCount) {
+            start[rows++] = cell
+            cell = if (h < headerAt.size && headerAt[h] == cell) {
+                h++
+                cell + 1
+            } else {
+                min(cell + columns, if (h < headerAt.size) headerAt[h] else cellCount)
+            }
+        }
+        return CellRows(start.copyOf(rows), cellCount)
+    }
+}
+
+/** Where each line of the grid starts, in cells. */
+internal class CellRows(private val start: IntArray, private val cellCount: Int) {
+    val count: Int get() = start.size
+
+    fun first(row: Int): Int = start[row]
+
+    /** The cell after the last one of [row]. */
+    fun end(row: Int): Int = if (row + 1 < start.size) start[row + 1] else cellCount
+
+    fun rowOf(cell: Int): Int = start.binarySearch(cell).let { if (it >= 0) it else -it - 2 }.coerceAtLeast(0)
 }
 
 /** A header before each run of equal groups: a [LocalDate] for a date header, a [SortGroup] for any other. */

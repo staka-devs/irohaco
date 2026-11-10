@@ -157,4 +157,24 @@ class TimelinePagingTest {
         val pager = TestPager(PagingConfig(pageSize = 20, initialLoadSize = 20), TimelineCellPagingSource(GetTimelinePage(reader), ZoneOffset.UTC, DateGrouping.MONTH))
         assertEquals(inserted, (pager.refresh() as LoadResult.Page).data.map { it.name() })
     }
+
+    @Test
+    fun rowsBreakAtHeadersAndColumns() {
+        // Groups of 3 and 5: H a a a | H a a a a a, at 2 columns.
+        val rows = cellLayout(listOf(1, 1, 1, 2, 2, 2, 2, 2).map { LocalDate.ofEpochDay(it.toLong()) }).rows(2)
+        assertEquals(listOf(0, 1, 3, 4, 5, 7, 9), (0 until rows.count).map(rows::first))
+        assertEquals(10, rows.end(rows.count - 1))
+        assertEquals(1, rows.rowOf(2))
+        assertEquals(4, rows.rowOf(5))
+        assertEquals(6, rows.rowOf(9))
+    }
+
+    @Test
+    fun aPinchMovesOneStepAtMost() {
+        assertEquals(0, pinchSteps(1.2f))
+        assertEquals(-1, pinchSteps(1.4f))
+        assertEquals(-1, pinchSteps(3f))
+        assertEquals(1, pinchSteps(0.7f))
+        assertEquals(1, pinchSteps(0.2f))
+    }
 }
