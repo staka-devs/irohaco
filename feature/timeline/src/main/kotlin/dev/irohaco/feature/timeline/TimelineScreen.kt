@@ -88,6 +88,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
@@ -155,8 +156,10 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.ln
+import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sign
+import kotlin.math.sin
 
 private val MEDIA_PERMISSIONS: Array<String> =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -864,6 +867,13 @@ private fun TimelineGrid(
                 Modifier
                     .fillMaxSize()
                     .clipToBounds()
+                    // A light blur over the whole picture while the next count fades in, peaking half way: one pass
+                    // for the layer, not one per photo. Ignored where the system has no blur.
+                    .graphicsLayer {
+                        val fade = fadeIn.value
+                        val radius = if (fadingFrom != null && fade < 1f) CROSSFADE_BLUR.toPx() * sin(PI * fade).toFloat() else 0f
+                        renderEffect = if (radius > 0f) BlurEffect(radius, radius) else null
+                    }
                     .drawBehind {
                         // The size the photos have grown to, between the column counts on either side of the level.
                         val below = floor(level).toInt()
@@ -1284,6 +1294,9 @@ private const val HAND_OVER_MS = 120
 
 // How long the next column count takes to fade in over the zooming grid: short, so the two never linger together.
 private const val CROSSFADE_MS = 150
+
+// How much the zooming picture blurs at the height of the fade.
+private val CROSSFADE_BLUR = 4.dp
 
 /** Past this much of the way, lifting the fingers keeps the new column count. */
 private const val COMMIT = 0.4f
