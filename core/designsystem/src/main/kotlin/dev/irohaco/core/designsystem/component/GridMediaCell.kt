@@ -392,6 +392,17 @@ fun GridCellStyle.cachedThumbnail(contentUri: String, px: Int): ImageBitmap? {
     }?.image?.toBitmap()?.asImageBitmap()
 }
 
+/**
+ * Reads the thumbnail of [contentUri] at the step a grid cell [px] wide loads, under the same memory key, so the
+ * cell finds it in memory later; null if it cannot be read.
+ */
+suspend fun GridCellStyle.loadThumbnail(contentUri: String, px: Int): ImageBitmap? {
+    val step = GridThumbnail.stepPx(px)
+    val request = ImageRequest.Builder(context).data(GridThumbnail(contentUri)).size(step)
+        .memoryCacheKey(GridThumbnail(contentUri).memoryKey + "@" + step).build()
+    return (loader.execute(request) as? SuccessResult)?.image?.toBitmap()?.asImageBitmap()
+}
+
 /** Draws [image] into [rect] as a grid cell does: center-cropped, over the placeholder while there is none. */
 fun DrawScope.drawGridThumbnail(style: GridCellStyle, image: ImageBitmap?, rect: Rect, alpha: Float = 1f) {
     drawRect(style.placeholder, rect.topLeft, rect.size, alpha = alpha)

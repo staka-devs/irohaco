@@ -133,6 +133,7 @@ import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.designsystem.component.FastScrollbar
 import dev.irohaco.core.designsystem.component.GridMediaCell
 import dev.irohaco.core.designsystem.component.cachedThumbnail
+import dev.irohaco.core.designsystem.component.loadThumbnail
 import dev.irohaco.core.designsystem.component.drawGridThumbnail
 import dev.irohaco.core.designsystem.component.rememberGridCellStyle
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
@@ -861,8 +862,11 @@ private fun TimelineGrid(
                 .graphicsLayer { apply(main) },
         )
         pinch?.takeIf { level != 0f || handingOver }?.let { p ->
-            // The photos read from memory once per pinch; one not in memory shows its placeholder.
+            // A photo in memory draws at once. One that is not is read as it comes on screen, at the size the grid
+            // of that count loads, so the grid finds it in memory after the pinch; reads still going stop with the pinch.
             val images = remember(p) { HashMap<Int, ImageBitmap?>() }
+            var loaded by remember(p) { mutableIntStateOf(0) }
+            val loads = rememberCoroutineScope()
             Spacer(
                 Modifier
                     .fillMaxSize()
@@ -880,10 +884,12 @@ private fun TimelineGrid(
                         fun side(columns: Int) = (size.width - (columns - 1) * spacingPx) / columns
                         val grown = lerp(side(p.columnsAt(below)), side(p.columnsAt(below + 1)), level - below)
                         val shown = Rect(0f, 0f, size.width, size.height)
+                        loaded // Draws again as reads come in.
                         // One grid as a picture zoomed about the middle, its photos at the size they have grown to.
                         // A date keeps its text size and its place at the left, on a band as tall as the zoom makes it.
                         fun drawGrid(steps: Int, alpha: Float) {
-                            val by = grown / side(p.columnsAt(steps))
+                            val cellSide = side(p.columnsAt(steps))
+                            val by = grown / cellSide
                             val a = alpha * glideAlpha
                             // Near the top of the list the first line stays at the top, so no blank opens above it as the grid shrinks.
                             val lift = p.placed(steps)[0]?.let { (pivot.y + (it.top - pivot.y) * by).coerceAtLeast(0f) } ?: 0f
@@ -897,7 +903,12 @@ private fun TimelineGrid(
                                 if (!rect.overlaps(shown)) continue
                                 when (val c = if (cell < cells.itemCount) cells.peek(cell) else null) {
                                     is TimelineCell.Media -> {
-                                        val image = images.getOrPut(cell) { cellStyle.cachedThumbnail(c.item.contentUri, rect.width.toInt()) }
+                                        val uri = c.item.contentUri
+                                        val image = images.getOrPut(cell) {
+                                            cellStyle.cachedThumbnail(uri, cellSide.toInt()) ?: null.also {
+                                                loads.launch { cellStyle.loadThumbnail(uri, cellSide.toInt())?.let { images[cell] = it; loaded++ } }
+                                            }
+                                        }
                                         drawGridThumbnail(cellStyle, image, rect, a)
                                     }
                                     is TimelineCell.Header -> headers += rect to headerFormatter.format(c.date)
