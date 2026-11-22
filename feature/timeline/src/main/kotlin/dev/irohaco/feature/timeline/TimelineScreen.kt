@@ -18,7 +18,10 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -55,6 +58,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -431,6 +437,8 @@ internal fun TimelineContent(
     tags: List<Tag> = emptyList(),
 ) {
     var sorting by rememberSaveable { mutableStateOf(false) }
+    // shortcut: a temporary switch for comparing pinch motions on a device; drop it once one is chosen.
+    var pinchMotion by rememberSaveable { mutableStateOf(PinchMotion.A) }
     if (sorting) SortSheet(query, onQueryChange, onDismiss = { sorting = false }, grouping = grouping, onGrouping = onGrouping, tags = tags)
     BoxWithConstraints {
         // The column counts per width class (DESIGN §4.1), and the one to start with. Any count in between can be
@@ -481,6 +489,7 @@ internal fun TimelineContent(
                                     onClick = { menu = false; onOpenMap() },
                                 )
                                 ColumnsSlider(columns, range, onColumns)
+                                PinchMotionChoice(pinchMotion) { pinchMotion = it }
                             }
                         }
                     },
@@ -500,6 +509,7 @@ internal fun TimelineContent(
                         columns = columns,
                         bottomPadding = padding.calculateBottomPadding(),
                         columnsBy = { (columns + it).coerceIn(range) },
+                        pinchMotion = pinchMotion,
                         onColumns = onColumns,
                         onOpenMedia = onOpenMedia,
                         selection = selection,
@@ -536,6 +546,7 @@ private fun TimelineGrid(
     bottomPadding: Dp,
     /** The column count that many steps away, without changing to it. */
     columnsBy: (Int) -> Int,
+    pinchMotion: PinchMotion = PinchMotion.A,
     onColumns: (Int) -> Unit,
     onOpenMedia: (String) -> Unit,
     selection: Map<String, TimelineItem>,
@@ -619,8 +630,9 @@ private fun TimelineGrid(
     var settle by remember { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
     val reducedMotion = rememberReducedMotion()
-    val settleSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-    val handOverSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    // Without bounce: overshooting carried the photos past the column count and back.
+    val settleSpec = if (reducedMotion) snap() else spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+    val handOverSpec = if (reducedMotion) snap() else tween<Float>(HAND_OVER_MS)
     // The gliding photos, fading out over the grid once they have stopped.
     var handingOver by remember { mutableStateOf(false) }
     var glideAlpha by remember { mutableFloatStateOf(1f) }
@@ -637,8 +649,13 @@ private fun TimelineGrid(
     val resources = LocalResources.current
     val locale = LocalConfiguration.current.locales[0]
     val selectLabel = stringResource(R.string.timeline_select)
-    // Built once the grid stops: a screen reader reads what stays on screen, and lines scrolled past never get read.
-    val readable = rememberScreenReader() && !gridState.isScrollInProgress
+    // With a screen reader, built once the grid stops: it reads what stays on screen, and lines scrolled past never
+    // get read. With no service at all they are kept, which costs nothing and spares the toggling at each scroll.
+    val readable = when (rememberCellReaders()) {
+        CellReaders.NONE -> true
+        CellReaders.SCREEN_READER -> !gridState.isScrollInProgress
+        CellReaders.OTHER_SERVICES -> false
+    }
     val open by rememberUpdatedState(onOpenMedia)
     val toggle by rememberUpdatedState(onToggle)
     val openCell = { item: TimelineItem -> if (currentSelection.isEmpty()) open(item.assetId) else toggle(item) }
@@ -845,27 +862,45 @@ private fun TimelineGrid(
                         val next = p.placed(below + 1)
                         val shown = Rect(0f, 0f, size.width, size.height)
                         val headers = ArrayList<Pair<Rect, String>>()
-                        for (cell in now.keys + next.keys) {
-                            val from = now[cell]
-                            val to = next[cell]
-                            val rect = when {
-                                from != null && to != null -> lerp(from, to, t)
-                                else -> from ?: to!!
-                            }
-                            if (!rect.overlaps(shown)) continue
-                            // A cell on only one side fades with it.
-                            val alpha = when {
-                                from != null && to != null -> 1f
-                                from != null -> 1 - t
-                                else -> t
-                            }.coerceIn(0f, 1f) * glideAlpha
+                        // How much the photos have grown from each side's size, for the ones that only zoom.
+                        fun side(columns: Int) = (size.width - (columns - 1) * spacingPx) / columns
+                        val fromSide = side(p.columnsAt(below))
+                        val toSide = side(p.columnsAt(below + 1))
+                        val grown = lerp(fromSide, toSide, t)
+                        fun Rect.zoomed(by: Float, header: Boolean): Rect {
+                            val top = pivot.y + (top - pivot.y) * by
+                            return if (header) Rect(left, top, right, top + height)
+                            else Rect(pivot.x + (left - pivot.x) * by, top, pivot.x + (right - pivot.x) * by, pivot.y + (bottom - pivot.y) * by)
+                        }
+                        fun drawCell(cell: Int, rect: Rect, alpha: Float) {
+                            if (!rect.overlaps(shown) || alpha <= 0f) return
+                            val a = alpha.coerceIn(0f, 1f) * glideAlpha
                             when (val c = if (cell < cells.itemCount) cells.peek(cell) else null) {
                                 is TimelineCell.Media -> {
                                     val image = images.getOrPut(cell) { cellStyle.cachedThumbnail(c.item.contentUri, rect.width.toInt()) }
-                                    drawGridThumbnail(cellStyle, image, rect, alpha)
+                                    drawGridThumbnail(cellStyle, image, rect, a)
                                 }
                                 is TimelineCell.Header -> headers += rect to headerFormatter.format(c.date)
-                                is TimelineCell.Group, null -> if (c == null && !currentLayout.isHeader(cell)) drawGridThumbnail(cellStyle, null, rect, alpha)
+                                is TimelineCell.Group, null -> if (c == null && !currentLayout.isHeader(cell)) drawGridThumbnail(cellStyle, null, rect, a)
+                            }
+                        }
+                        for (cell in now.keys + next.keys) {
+                            val from = now[cell]
+                            val to = next[cell]
+                            val header = currentLayout.isHeader(cell)
+                            // A photo that stays in its part of the row glides; one that moves to the far side of
+                            // another row would cut across the grid, so it only zooms with the rest at each place
+                            // and the two fade into each other. So does a cell on only one side.
+                            val glides = when (pinchMotion) {
+                                PinchMotion.A -> from != null && to != null && abs(from.center.x - to.center.x) <= size.width / 3
+                                PinchMotion.B -> false
+                                PinchMotion.C -> true
+                            }
+                            if (from != null && to != null && (header || glides)) {
+                                drawCell(cell, lerp(from, to, t), 1f)
+                            } else {
+                                from?.let { drawCell(cell, it.zoomed(grown / fromSide, header), 1 - t) }
+                                to?.let { drawCell(cell, it.zoomed(grown / toSide, header), t) }
                             }
                         }
                         // After the photos, on the grid's background, so photos gliding past go under the dates.
@@ -1249,6 +1284,9 @@ private fun GraphicsLayerScope.apply(layer: Layer) {
     if (size.width > 0 && size.height > 0) transformOrigin = TransformOrigin(layer.pivot.x / size.width, layer.pivot.y / size.height)
 }
 
+/** How long the gliding photos take to fade out over the grid once they have stopped. */
+private const val HAND_OVER_MS = 120
+
 /** Past this much of the way, lifting the fingers keeps the new column count. */
 private const val COMMIT = 0.4f
 
@@ -1284,6 +1322,34 @@ private fun ColumnsSlider(columns: Int, range: IntRange, onColumns: (Int) -> Uni
 }
 
 private val COLUMNS_SLIDER_WIDTH = 280.dp
+
+/** The pinch motions being compared: which photos glide to their new place, and which only zoom and fade. */
+internal enum class PinchMotion {
+    /** Photos staying in their part of the row glide; ones moving to the far side of another row fade. */
+    A,
+
+    /** None glide: the whole grid zooms with the fingers and fades into the next count. */
+    B,
+
+    /** All glide to their new place. */
+    C,
+}
+
+@Composable
+private fun PinchMotionChoice(motion: PinchMotion, onMotion: (PinchMotion) -> Unit) {
+    Column(Modifier.width(COLUMNS_SLIDER_WIDTH).padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s)) {
+        Text(stringResource(R.string.timeline_pinch_motion), style = MaterialTheme.typography.labelLarge)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            PinchMotion.entries.forEachIndexed { index, option ->
+                SegmentedButton(
+                    selected = option == motion,
+                    onClick = { onMotion(option) },
+                    shape = SegmentedButtonDefaults.itemShape(index, PinchMotion.entries.size),
+                ) { Text(option.name) }
+            }
+        }
+    }
+}
 
 /** From this many columns a cell is an overview dot: it drops the marks, the morph and the shared element. */
 private const val DENSE_COLUMNS = 10
