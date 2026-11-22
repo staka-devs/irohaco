@@ -875,10 +875,12 @@ private fun TimelineGrid(
                         fun drawGrid(steps: Int, alpha: Float) {
                             val by = grown / side(p.columnsAt(steps))
                             val a = alpha * glideAlpha
+                            // Near the top of the list the first line stays at the top, so no blank opens above it as the grid shrinks.
+                            val lift = p.placed(steps)[0]?.let { (pivot.y + (it.top - pivot.y) * by).coerceAtLeast(0f) } ?: 0f
                             val headers = ArrayList<Pair<Rect, String>>()
                             for ((cell, placed) in p.placed(steps)) {
-                                val top = pivot.y + (placed.top - pivot.y) * by
-                                val bottom = pivot.y + (placed.bottom - pivot.y) * by
+                                val top = pivot.y + (placed.top - pivot.y) * by - lift
+                                val bottom = pivot.y + (placed.bottom - pivot.y) * by - lift
                                 val header = currentLayout.isHeader(cell)
                                 val rect = if (header) Rect(placed.left, top, placed.right, bottom)
                                 else Rect(pivot.x + (placed.left - pivot.x) * by, top, pivot.x + (placed.right - pivot.x) * by, bottom)
