@@ -45,7 +45,7 @@ internal fun FilterRow(
     onChange: (TimelineQuery) -> Unit,
     modifier: Modifier = Modifier,
     /** The places photos were taken at, with their numbers of files, read when the place chip opens. */
-    placeCounts: suspend () -> Map<String, Int> = { emptyMap() },
+    placeCounts: suspend (includeInferred: Boolean) -> Map<String, Int> = { emptyMap() },
 ) {
     var pickingDates by rememberSaveable { mutableStateOf(false) }
     if (pickingDates) {
@@ -82,9 +82,11 @@ internal fun FilterRow(
         ChoiceChip(query.minRating, listOf(null, 1, 2, 3, 4, 5), { ratingLabel(it) }) { onChange(query.copy(minRating = it)) }
         PlaceChip(
             PlaceChoice(query.place, query.area, query.located),
-            placeCounts,
+            { placeCounts(query.placesIncludeInferred) },
             { onChange(query.copy(place = it.place, area = it.area, located = it.located)) },
             offerLocated = true,
+            inferred = query.placesIncludeInferred,
+            onInferred = { onChange(query.copy(placesIncludeInferred = it)) },
         )
         TagFilterChips(tags, query.tagIds) { onChange(query.copy(tagIds = it)) }
         if (query.filtered) TextButton(onClick = { onChange(query.unfiltered()) }) { Text(stringResource(R.string.timeline_filter_clear)) }

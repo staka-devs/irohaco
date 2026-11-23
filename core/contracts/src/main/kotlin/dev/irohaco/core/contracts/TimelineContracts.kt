@@ -82,6 +82,8 @@ data class TimelineQuery(
     val near: GeoPoint? = null,
     /** The distance order also uses places guessed for files without GPS. */
     val nearIncludesInferred: Boolean = false,
+    /** The place filters (with or without a place, a place name, a part of the map) also use places guessed for files without GPS. */
+    val placesIncludeInferred: Boolean = false,
 ) {
     /** The user narrowed what is shown, beyond the order and the hidden folders. */
     val filtered: Boolean

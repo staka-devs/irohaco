@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -14,6 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.Switch
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -32,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -87,6 +90,9 @@ internal fun PlaceChip(
     onPick: (PlaceChoice) -> Unit,
     /** Offers "with a place" and "without one", where files without a place can be listed. */
     offerLocated: Boolean = false,
+    /** Whether places guessed for files without GPS count, and how to change it; without [onInferred] it is not offered. */
+    inferred: Boolean = false,
+    onInferred: ((Boolean) -> Unit)? = null,
 ) {
     var open by rememberSaveable { mutableStateOf(false) }
     var onMap by rememberSaveable { mutableStateOf(false) }
@@ -110,10 +116,10 @@ internal fun PlaceChip(
         trailingIcon = { Icon(painterResource(IrohacoIcons.ExpandMore), null) },
     )
     if (open) {
-        val places by produceState<Map<String, Int>?>(null) { value = counts() }
+        val places by produceState<Map<String, Int>?>(null, inferred) { value = counts() }
         IrohacoBottomSheet(onDismiss = { open = false }) {
             PlacePanel(
-                places, choice, offerLocated,
+                places, choice, offerLocated, inferred, onInferred,
                 onMap = if (areaPicker == null) null else ({ typed -> open = false; lookFor = typed; onMap = true }),
             ) {
                 open = false
@@ -132,7 +138,15 @@ internal fun PlaceChip(
 }
 
 @Composable
-private fun PlacePanel(places: Map<String, Int>?, choice: PlaceChoice, offerLocated: Boolean, onMap: ((lookFor: String?) -> Unit)?, onPick: (PlaceChoice) -> Unit) {
+private fun PlacePanel(
+    places: Map<String, Int>?,
+    choice: PlaceChoice,
+    offerLocated: Boolean,
+    inferred: Boolean,
+    onInferred: ((Boolean) -> Unit)?,
+    onMap: ((lookFor: String?) -> Unit)?,
+    onPick: (PlaceChoice) -> Unit,
+) {
     var typed by rememberSaveable { mutableStateOf("") }
     Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = IrohacoSpacing.l)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = IrohacoSpacing.l), verticalAlignment = Alignment.CenterVertically) {
@@ -151,6 +165,15 @@ private fun PlacePanel(places: Map<String, Int>?, choice: PlaceChoice, offerLoca
                     )
                 }
             }
+        }
+        // As in search: a file without GPS can have a place guessed from photos taken near it in time.
+        if (onInferred != null) {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.search_inferred_places)) },
+                supportingContent = { Text(stringResource(R.string.search_inferred_places_hint)) },
+                trailingContent = { Switch(checked = inferred, onCheckedChange = null) },
+                modifier = Modifier.toggleable(inferred, role = Role.Switch) { onInferred(it) },
+            )
         }
         OutlinedTextField(
             typed,
@@ -239,6 +262,8 @@ private fun PlacePanelPreview() {
                 mapOf("徳島市, 徳島県" to 120, "三好市, 徳島県" to 30, "大阪市, 大阪府" to 80, "Paris, France" to 12),
                 PlaceChoice(place = "三好市, 徳島県"),
                 offerLocated = true,
+                inferred = false,
+                onInferred = {},
                 onMap = {},
             ) {}
         }

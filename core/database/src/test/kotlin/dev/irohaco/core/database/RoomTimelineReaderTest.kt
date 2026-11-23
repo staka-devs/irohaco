@@ -11,6 +11,7 @@ import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineSortKey
 import dev.irohaco.core.domain.AssetAvailability
+import dev.irohaco.core.domain.GeoBounds
 import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.test.runTest
@@ -130,6 +131,13 @@ class RoomTimelineReaderTest {
         assertEquals(listOf("far"), order(TimelineQuery(place = "札幌市")))
         assertEquals(listOf("far"), order(TimelineQuery(place = "札幌市, 北海道")))
         assertEquals(emptyList(), order(TimelineQuery(place = "京都")))
+
+        // Asked to, the place filters count a guessed place too.
+        assertEquals(listOf("guessed", "near"), order(TimelineQuery(place = "東京都", placesIncludeInferred = true)))
+        assertEquals(listOf("guessed", "near", "far"), order(TimelineQuery(located = true, placesIncludeInferred = true)))
+        assertEquals(listOf("none"), order(TimelineQuery(located = false, placesIncludeInferred = true)))
+        assertEquals(listOf("guessed"), order(TimelineQuery(area = GeoBounds(35.675, 139.75, 35.685, 139.77), placesIncludeInferred = true)))
+        assertEquals(emptyList(), order(TimelineQuery(area = GeoBounds(35.675, 139.75, 35.685, 139.77))))
     }
 
     @Test

@@ -108,11 +108,15 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             "LEFT JOIN media_ratings r ON r.asset_id = a.asset_id"
         const val MAX_ARGS = 500
 
-        /** The pin in the grid: the same place the map and the area filter use. */
         /** One per tag the items must all carry. */
         const val HAS_TAG = " AND EXISTS (SELECT 1 FROM media_tags mt WHERE mt.asset_id = a.asset_id AND mt.tag_id = ?)"
 
+        /** The pin in the grid: only the place the app shows, never a guess. */
         const val HAS_LOCATION = "EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = a.asset_id AND $SHOWN)"
+
+        /** Has one of [places], a condition on `le`. */
+        fun hasLocation(places: String) = "EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = a.asset_id AND $places)"
+
         const val TIME = "COALESCE($EDITED_TAKEN, s.observed_taken_at, s.observed_modified_at, a.first_seen_at)"
 
         // The volume root has a null relative path in MediaStore; FolderRef calls it "".
@@ -125,6 +129,8 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
         fun fromArgs(query: TimelineQuery): Array<Any> = listOfNotNull(query.albumId).toTypedArray()
 
         fun where(query: TimelineQuery): String = buildString {
+            // The places the filters use: the one shown, and with the guesses also a guessed one.
+            val places = if (query.placesIncludeInferred) "(($SHOWN) OR $GUESS)" else "($SHOWN)"
             append("WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL")
             if (query.kind != null) append(" AND a.media_kind = ?")
             if (query.favoritesOnly) append(" AND r.is_favorite = 1")
@@ -133,7 +139,7 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             repeat(query.excludedFolders.size) { append(" AND NOT (s.volume_id = ? AND $PATH = ?)") }
             if (query.area != null) {
                 append(
-                    " AND EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = a.asset_id AND $SHOWN" +
+                    " AND EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = a.asset_id AND $places" +
                         " AND le.latitude BETWEEN ? AND ? AND le.longitude BETWEEN ? AND ?)",
                 )
             }
@@ -141,14 +147,14 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
             if (query.takenUntilMs != null) append(" AND $TIME < ?")
             if (query.minRating != null) append(" AND COALESCE(r.rating, 0) >= ?")
             when (query.located) {
-                true -> append(" AND $HAS_LOCATION")
-                false -> append(" AND NOT $HAS_LOCATION")
+                true -> append(" AND ${hasLocation(places)}")
+                false -> append(" AND NOT ${hasLocation(places)}")
                 null -> Unit
             }
             // A part is the whole name, its first part or its last one, as the names are "town, prefecture".
             if (query.place != null) {
                 append(
-                    " AND EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = a.asset_id AND $SHOWN" +
+                    " AND EXISTS (SELECT 1 FROM location_evidence le WHERE le.asset_id = a.asset_id AND $places" +
                         " AND (le.place_text = ? OR le.place_text LIKE ? || ', %' OR le.place_text LIKE '%, ' || ?))",
                 )
             }

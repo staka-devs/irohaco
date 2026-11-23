@@ -420,7 +420,7 @@ internal fun TimelineContent(
     snackbar: SnackbarHostState = remember { SnackbarHostState() },
     query: TimelineQuery = TimelineQuery(),
     onQueryChange: (TimelineQuery) -> Unit = {},
-    placeCounts: suspend () -> Map<String, Int> = { emptyMap() },
+    placeCounts: suspend (includeInferred: Boolean) -> Map<String, Int> = { emptyMap() },
     scrollToTop: Flow<Unit> = emptyFlow(),
     grouping: DateGrouping = DateGrouping.DAY,
     onGrouping: (DateGrouping) -> Unit = {},

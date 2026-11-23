@@ -226,7 +226,7 @@ class MainActivity : ComponentActivity() {
                             container.timelineSettings,
                             container.prepareShare,
                             container.sharingSettings,
-                            placeCounts = { container.searchMedia.placeCounts(includeInferred = false) },
+                            placeCounts = { container.searchMedia.placeCounts(includeInferred = it) },
                         )
                     },
                     onOpenMedia = { onOpenMedia(it, null) },
