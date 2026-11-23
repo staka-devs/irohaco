@@ -35,6 +35,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,6 +49,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
@@ -245,7 +249,7 @@ private class LocalModels(
         val installed = state is ModelInstallState.Installed
         val context = LocalContext.current
         ListItem(
-            leadingContent = { RadioButton(selected = selected, onClick = null, enabled = installed) },
+            leadingContent = { InUse(selected) },
             supportingContent = {
                 Column(verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
                     Text(stringResource(R.string.settings_ai_on_device) + " · " + modelStateLabel(state) + " · " + Formatter.formatShortFileSize(context, model.sizeBytes))
@@ -297,7 +301,7 @@ private fun RemoteRow(
     onOpen: () -> Unit,
 ) {
     ListItem(
-        leadingContent = { RadioButton(selected = selected, onClick = null) },
+        leadingContent = { InUse(selected) },
         supportingContent = {
             // What the user set goes with every question, so the row says it.
             Text((listOf(stringResource(R.string.settings_ai_remote_at, host.orEmpty())) + model.parameters.map { (path, value) -> "$path: $value" }).joinToString("\n"))
@@ -360,18 +364,28 @@ private fun Details(importResult: ModelInstallState?, onImport: () -> Unit, back
     SectionTitle(R.string.settings_ai_backend)
     val gpuFails = gpuCheck?.works == false
     val running = if (gpuFails) AiBackend.CPU else backend ?: AiBackend.GPU
-    Column(Modifier.selectableGroup()) {
-        BackendRow(
-            R.string.settings_ai_backend_gpu,
-            running == AiBackend.GPU,
-            enabled = !gpuFails,
-            note = when {
-                gpuFails -> R.string.settings_ai_backend_gpu_fails
-                gpuCheck == null -> R.string.settings_ai_backend_gpu_unchecked
-                else -> null
-            },
-        ) { onSelectBackend(AiBackend.GPU) }
-        BackendRow(R.string.settings_ai_backend_cpu, running == AiBackend.CPU, enabled = true, note = null) { onSelectBackend(AiBackend.CPU) }
+    // Two short choices side by side; the GPU's note goes under them.
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = IrohacoSpacing.l)) {
+        listOf(AiBackend.GPU to R.string.settings_ai_backend_gpu, AiBackend.CPU to R.string.settings_ai_backend_cpu).forEachIndexed { index, (value, label) ->
+            SegmentedButton(
+                selected = running == value,
+                onClick = { onSelectBackend(value) },
+                enabled = value != AiBackend.GPU || !gpuFails,
+                shape = SegmentedButtonDefaults.itemShape(index, 2),
+            ) { Text(stringResource(label)) }
+        }
+    }
+    when {
+        gpuFails -> R.string.settings_ai_backend_gpu_fails
+        gpuCheck == null -> R.string.settings_ai_backend_gpu_unchecked
+        else -> null
+    }?.let { note ->
+        Text(
+            stringResource(note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = IrohacoSpacing.l, vertical = IrohacoSpacing.s),
+        )
     }
     ListItem(
         supportingContent = {
@@ -396,14 +410,14 @@ internal fun ChoiceRow(selected: Boolean, enabled: Boolean, label: String, onCli
     ) { Text(label) }
 }
 
+/** In a list of models, the one in use: a check mark, and the same empty space on the others so the names line up. */
 @Composable
-private fun BackendRow(label: Int, selected: Boolean, enabled: Boolean, note: Int?, onClick: () -> Unit) {
-    ListItem(
-        supportingContent = note?.let { { Text(stringResource(it)) } },
-        leadingContent = { RadioButton(selected = selected, onClick = null, enabled = enabled) },
-        modifier = Modifier.selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick),
-    ) { Text(stringResource(label)) }
-}
+private fun InUse(selected: Boolean) = Icon(
+    painterResource(IrohacoIcons.Check),
+    contentDescription = null,
+    tint = MaterialTheme.colorScheme.primary,
+    modifier = Modifier.alpha(if (selected) 1f else 0f),
+)
 
 /** One line for the category list: the default model's state. */
 @Composable

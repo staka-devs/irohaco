@@ -25,7 +25,6 @@ import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Switch
@@ -40,11 +39,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.irohaco.core.application.ImageSpaces
 import dev.irohaco.core.application.PlanMediaIndex
@@ -208,8 +210,10 @@ internal fun IndexingSettings(
                     VideoQuality.entries.forEach { q ->
                         DropdownMenuItem(
                             text = { Text(stringResource(qualityLabel(q))) },
-                            leadingIcon = { RadioButton(selected = q == quality, onClick = null) },
+                            // A menu marks its choice with a check; the other keeps the space, so the labels line up.
+                            leadingIcon = { Icon(painterResource(IrohacoIcons.Check), null, Modifier.alpha(if (q == quality) 1f else 0f)) },
                             onClick = { quality = q },
+                            modifier = Modifier.semantics { selected = q == quality },
                         )
                     }
                 }
