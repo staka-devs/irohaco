@@ -14,6 +14,7 @@ import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.withContext
 
 class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, MediaItems, FolderMedia {
@@ -46,7 +47,36 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
     override suspend fun count(query: TimelineQuery): Int =
         db.timelineDao().count(SimpleSQLiteQuery("SELECT count(*) ${from(query)} ${where(query)}", arrayOf(*fromArgs(query), *args(query))))
 
-    override suspend fun page(query: TimelineQuery, offset: Int, limit: Int): List<TimelineItem> =
+    // The order of the last query whose labels were read. Sorting the whole library takes most of a page's time, and
+    // the grid reads the labels first, so its pages read that order's ids instead of sorting again at every jump.
+    @Volatile private var order: Pair<TimelineQuery, List<String>>? = null
+
+    override suspend fun page(query: TimelineQuery, offset: Int, limit: Int): List<TimelineItem> {
+        val ids = order?.takeIf { it.first == query }?.second
+        if (ids != null && offset in 0..ids.size) {
+            val slice = ids.subList(offset, minOf(ids.size, offset + limit))
+            // A file gone since the order was read leaves a gap; the slow path then reads the order as it is now.
+            byIds(query, slice).takeIf { it.size == slice.size }?.let { return it }
+        }
+        return sorted(query, offset, limit)
+    }
+
+    private suspend fun byIds(query: TimelineQuery, ids: List<String>): List<TimelineItem> {
+        val rows = ids.chunked(MAX_ARGS).flatMap { chunk ->
+            db.timelineDao().page(
+                SimpleSQLiteQuery(
+                    """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
+                              s.observed_duration_ms AS durationMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes,
+                              COALESCE(r.rating, 0) AS rating, $HAS_LOCATION AS hasLocation, ${distanceColumn(query)} AS distance
+                       $FROM WHERE s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL AND a.asset_id IN (${chunk.joinToString { "?" }})""",
+                    chunk.toTypedArray(),
+                ),
+            )
+        }.associateBy { it.assetId }
+        return ids.mapNotNull { rows[it] }.map { TimelineItem(it.assetId, MediaKind.valueOf(it.mediaKind), it.contentUri, it.sortTimeMs, it.mimeType, it.durationMs, it.displayName, it.sizeBytes, it.rating ?: 0, it.hasLocation == true, it.distance?.let(::km)) }
+    }
+
+    private suspend fun sorted(query: TimelineQuery, offset: Int, limit: Int): List<TimelineItem> =
         db.timelineDao().page(
             SimpleSQLiteQuery(
                 """SELECT a.asset_id AS assetId, a.media_kind AS mediaKind, s.content_uri AS contentUri, $TIME AS sortTimeMs, s.mime_type AS mimeType,
@@ -80,11 +110,11 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
     override suspend fun labels(query: TimelineQuery): List<TimelineLabel> =
         db.timelineDao().labelRows(
             SimpleSQLiteQuery(
-                """SELECT $TIME AS takenMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, COALESCE(r.rating, 0) AS rating, ${distanceColumn(query)} AS distance
+                """SELECT a.asset_id AS assetId, $TIME AS takenMs, s.display_name AS displayName, s.file_size_bytes AS sizeBytes, COALESCE(r.rating, 0) AS rating, ${distanceColumn(query)} AS distance
                    ${from(query)} ${where(query)} ORDER BY ${orderBy(query)}""",
                 arrayOf(*fromArgs(query), *args(query)),
             ),
-        ).map { row -> label(query, row) }
+        ).also { rows -> order = query to rows.map { it.assetId } }.map { row -> label(query, row) }
 
     private fun label(query: TimelineQuery, row: LabelRow): TimelineLabel =
         when (query.sortKey) {
@@ -100,7 +130,7 @@ class RoomTimelineReader(private val db: IrohacoDatabase) : TimelineReader, Medi
      * this flow is collected would otherwise leave the timeline showing stale rows.
      */
     override fun changes(): Flow<Unit> =
-        db.invalidationTracker.createFlow("media_sources", "media_assets", "media_ratings", "media_tags", "album_items", "metadata_override_values", "location_evidence", emitInitialState = true).map { }
+        db.invalidationTracker.createFlow("media_sources", "media_assets", "media_ratings", "media_tags", "album_items", "metadata_override_values", "location_evidence", emitInitialState = true).withIndex().map { (i, _) -> if (i > 0) order = null }
 
     private companion object {
         // shortcut: no index on the sort expressions yet; add them if M0-13 measures slow pages at 10k items.

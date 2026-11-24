@@ -257,10 +257,10 @@ internal class TimelineCellPagingSource(
     private val grouping: DateGrouping,
     private val onLayout: (CellLayout) -> Unit = {},
     private val query: TimelineQuery = getPage.query.value,
+    /** The layout of this order read by an earlier source, as a jump makes a new one; null reads it. */
+    private var layout: CellLayout? = null,
 ) : PagingSource<Int, TimelineCell>() {
     override val jumpingSupported = true
-
-    private var layout: CellLayout? = null
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, TimelineCell> {
         val layout = layout ?: cellLayout(getPage.labels(query).map { it.group(zone, grouping) }).also { layout = it; onLayout(it) }

@@ -27,4 +27,4 @@ data class TimelineRow(val assetId: String, val mediaKind: String, val contentUr
 )
 
 /** Every column the fast scrollbar's bubble might need, whichever sort is active ([RoomTimelineReader] picks one). */
-data class LabelRow(val takenMs: Long, val displayName: String, val sizeBytes: Long, val rating: Int, val distance: Double? = null)
+data class LabelRow(val assetId: String, val takenMs: Long, val displayName: String, val sizeBytes: Long, val rating: Int, val distance: Double? = null)

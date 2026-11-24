@@ -57,6 +57,9 @@ class RoomTimelineReaderTest {
         val rest = reader.page(newest, offset = 2, limit = 10)
         assertEquals(listOf("b" to 200L, "d" to 100L), rest.map { it.assetId to it.sortTimeMs })
         assertEquals(listOf(0, 1, 2, 3), listOf("c", "a", "b", "d").map { reader.indexOf(newest, it) })
+        // Once the labels are read, pages come from that order by id, the same as sorted.
+        reader.labels(newest)
+        assertEquals(first + rest, reader.page(newest, offset = 0, limit = 2) + reader.page(newest, offset = 2, limit = 10))
         assertEquals(null, reader.indexOf(newest, "hidden"))
         // A date group: from inclusive, until exclusive, hidden files left out, in the timeline's order.
         assertEquals(listOf("c", "a", "b"), reader.between(newest, 200, 301).map { it.assetId })

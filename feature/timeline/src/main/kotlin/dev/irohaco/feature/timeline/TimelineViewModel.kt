@@ -94,9 +94,18 @@ class TimelineViewModel(
         viewModelScope.launch { settings?.setPinchHintShown() }
     }
 
+    // The layout of the current order, kept across the new sources a jump makes, so a jump does not sort the library again.
+    private var kept: CellLayout? = null
+
+    /** Reads the order again: it, the filter or the library changed. */
+    private fun reload() {
+        kept = null
+        source?.invalidate()
+    }
+
     val cells: Flow<PagingData<TimelineCell>> =
         Pager(PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = true, jumpThreshold = PAGE_SIZE * 4)) {
-            TimelineCellPagingSource(getPage, zone, _grouping.value, { _layout.value = it }).also { source = it }
+            TimelineCellPagingSource(getPage, zone, _grouping.value, { kept = it; _layout.value = it }, layout = kept).also { source = it }
         }.flow
             .cachedIn(viewModelScope)
 
@@ -111,7 +120,7 @@ class TimelineViewModel(
     fun setQuery(query: TimelineQuery) {
         if (query == getPage.query.value) return
         getPage.query.value = query
-        source?.invalidate()
+        reload()
         _scrollToTop.trySend(Unit)
         clearSelection() // selected items may no longer be shown
     }
@@ -120,17 +129,17 @@ class TimelineViewModel(
     val access: StateFlow<MediaLibraryAccess> = _access.asStateFlow()
 
     init {
-        viewModelScope.launch { getPage.changes().collect { source?.invalidate() } }
+        viewModelScope.launch { getPage.changes().collect { reload() } }
         viewModelScope.launch {
             settings?.dateGrouping?.collect {
                 _grouping.value = it
-                source?.invalidate()
+                reload()
             }
         }
         viewModelScope.launch {
             excludedFolders.collect { excluded ->
                 getPage.query.update { it.copy(excludedFolders = excluded) }
-                source?.invalidate()
+                reload()
             }
         }
     }
