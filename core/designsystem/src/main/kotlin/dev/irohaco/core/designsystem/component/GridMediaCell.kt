@@ -52,6 +52,7 @@ import dev.irohaco.core.designsystem.motion.rememberReducedMotion
 import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 
@@ -196,6 +197,8 @@ private class GridCellNode(
 ) : Modifier.Node(), DrawModifierNode, LayoutAwareModifierNode {
     private var image: ImageBitmap? = null
     private var key: String? = null
+    // The key of the image shown when it is the one asked for, not another step standing in for it.
+    private var shownKey: String? = null
     private var px = 0
     private var load: Job? = null
     private var progress = if (selected) 1f else 0f
@@ -218,6 +221,7 @@ private class GridCellNode(
             // A reused node now shows another file: nothing of the old one carries over.
             image = null
             key = null
+            shownKey = null
             load?.cancel()
             fadeStart = 0L
             morph?.cancel()
@@ -256,12 +260,14 @@ private class GridCellNode(
         val uri = uri ?: return
         if (px == 0 || !isAttached) return
         val key = GridThumbnail(uri).memoryKey + "@" + px
-        if (key == this.key && (image != null || load?.isActive == true)) return
+        // A stand-in from another step, or a load stopped when the cell left the screen, loads again.
+        if (key == this.key && (shownKey == key || load?.isActive == true)) return
         this.key = key
         load?.cancel()
         // A cached copy draws in this frame, so scrolling back and changing the columns show no placeholders.
         style.loader.memoryCache?.get(MemoryCache.Key(key))?.let {
             show(it.image.toBitmap().asImageBitmap())
+            shownKey = key
             return
         }
         // The old step's image stays until the new one arrives, so a column change does not flash. A cell that has
@@ -269,8 +275,15 @@ private class GridCellNode(
         if (image == null) style.cachedThumbnail(uri, px)?.let { show(it) }
         val request = ImageRequest.Builder(style.context).data(GridThumbnail(uri)).size(px).memoryCacheKey(key).build()
         load = coroutineScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            val result = style.loader.execute(request) as? SuccessResult ?: return@launch
-            show(result.image.toBitmap().asImageBitmap(), fadeIn = image == null)
+            // A read that fails while the device is busy, as when a pinch asks for many at once, is tried again a little later.
+            repeat(LOAD_TRIES) { attempt ->
+                (style.loader.execute(request) as? SuccessResult)?.let { result ->
+                    show(result.image.toBitmap().asImageBitmap(), fadeIn = image == null)
+                    shownKey = key
+                    return@launch
+                }
+                delay(RETRY_MS * (attempt + 1))
+            }
         }
     }
 
@@ -379,6 +392,10 @@ private class GridCellNode(
         val WHITE = ColorFilter.tint(Color.White)
     }
 }
+
+/** How many times a cell reads its thumbnail before it keeps the placeholder, and the wait before the first retry. */
+private const val LOAD_TRIES = 3
+private const val RETRY_MS = 500L
 
 /** Material's short duration, for a thumbnail fading in over its placeholder. */
 private const val FADE_NANOS = 150_000_000L
