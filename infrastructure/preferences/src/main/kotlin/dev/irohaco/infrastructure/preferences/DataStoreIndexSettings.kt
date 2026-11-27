@@ -17,6 +17,12 @@ class DataStoreIndexSettings(private val store: DataStore<Preferences>) : IndexS
         store.edit { it[AUTO_INDEX] = enabled }
     }
 
+    override val chargingOnly: Flow<Boolean> = store.data.map { it[CHARGING_ONLY] ?: false }.distinctUntilChanged()
+
+    override suspend fun setChargingOnly(enabled: Boolean) {
+        store.edit { it[CHARGING_ONLY] = enabled }
+    }
+
     override val indexFolders: Flow<Set<String>?> = store.data.map { it[FOLDERS] }.distinctUntilChanged()
 
     override suspend fun setIndexFolders(folders: Set<String>?) {
@@ -25,6 +31,7 @@ class DataStoreIndexSettings(private val store: DataStore<Preferences>) : IndexS
 
     private companion object {
         val AUTO_INDEX = booleanPreferencesKey("auto_index")
+        val CHARGING_ONLY = booleanPreferencesKey("auto_index_charging_only")
         val FOLDERS = stringSetPreferencesKey("index_folders")
     }
 }

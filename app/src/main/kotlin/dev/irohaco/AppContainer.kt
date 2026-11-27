@@ -2,6 +2,7 @@ package dev.irohaco
 
 import android.content.Context
 import android.net.Uri
+import android.os.BatteryManager
 import android.provider.DocumentsContract
 import android.util.Log
 import androidx.annotation.OptIn
@@ -277,7 +278,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
 
     /** Indexes new and changed files by itself when the user turned it on (M2-12); the app is in front during a sync. */
     private val indexChanges by lazy {
-        IndexChanges(planMediaIndex, indexJobs, searchByMeaning, indexSettings) { jobId ->
+        IndexChanges(planMediaIndex, indexJobs, searchByMeaning, indexSettings, { appContext.getSystemService(BatteryManager::class.java).isCharging }) { jobId ->
             try {
                 IndexingService.start(appContext, jobId)
                 true
@@ -400,7 +401,7 @@ class AppContainer(context: Context, private val databaseName: String = IrohacoD
             withContext(Dispatchers.IO) {
                 val changed = syncMediaCatalog()
                 RoomIdentityStore(database).findCandidates()
-                if (changed) indexChanges()
+                indexChanges(changed)
             }
         } catch (e: CancellationException) {
             throw e

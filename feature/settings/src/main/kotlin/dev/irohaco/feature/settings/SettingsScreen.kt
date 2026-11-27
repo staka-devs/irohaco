@@ -115,6 +115,7 @@ fun SettingsScreen(
     val lowCoverageVideos by viewModel.lowCoverageVideos.collectAsStateWithLifecycle()
     val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
     val autoIndex by viewModel.autoIndex.collectAsStateWithLifecycle()
+    val chargingOnly by viewModel.chargingOnly.collectAsStateWithLifecycle()
     val needsRebuild by viewModel.needsRebuild.collectAsStateWithLifecycle()
     val preparing by viewModel.preparing.collectAsStateWithLifecycle()
     val startFailed by viewModel.startFailed.collectAsStateWithLifecycle()
@@ -152,6 +153,8 @@ fun SettingsScreen(
                 pendingCount = pendingCount,
                 autoIndex = autoIndex,
                 onAutoIndex = viewModel::setAutoIndex,
+                chargingOnly = chargingOnly,
+                onChargingOnly = viewModel::setChargingOnly,
                 needsRebuild = needsRebuild,
                 onStart = { folders, quality ->
                     // The job runs either way; without the permission only its progress notification is hidden.

@@ -86,6 +86,8 @@ internal fun IndexingSettings(
     pendingCount: Int? = null,
     autoIndex: Boolean = false,
     onAutoIndex: (Boolean) -> Unit = {},
+    chargingOnly: Boolean = false,
+    onChargingOnly: (Boolean) -> Unit = {},
     /** The model file changed and the index has to be built again (ADR-0003). */
     needsRebuild: Boolean = false,
     /** The files to index are being listed; the job does not exist yet. */
@@ -230,8 +232,26 @@ internal fun IndexingSettings(
             }
             Switch(checked = autoIndex, onCheckedChange = null)
         }
+        // Applies only to the automatic index, so it follows that switch and is off while it is.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.m),
+            modifier = Modifier
+                .toggleable(chargingOnly, enabled = autoIndex, role = Role.Switch, onValueChange = onChargingOnly)
+                .padding(vertical = IrohacoSpacing.s)
+                .alpha(if (autoIndex) 1f else DISABLED_ALPHA),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.settings_index_charging_only), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.settings_index_charging_only_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(checked = chargingOnly, onCheckedChange = null, enabled = autoIndex)
+        }
     }
 }
+
+/** Material's opacity for disabled text. */
+private const val DISABLED_ALPHA = 0.38f
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable

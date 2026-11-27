@@ -144,6 +144,8 @@
     <string name="settings_index_dismiss">閉じる</string>
     <string name="settings_index_auto">新しい写真を自動でインデックス</string>
     <string name="settings_index_auto_summary">アプリを開いた際に、自動で追加・変更された写真を探してインデックスします。最初のインデックス後に有効化されます。</string>
+    <string name="settings_index_charging_only">充電中のみ</string>
+    <string name="settings_index_charging_only_summary">充電していないときは、充電中にアプリを開くまで待ちます。</string>
     <string name="settings_location_history">位置情報の履歴</string>
     <string name="settings_location_history_open">Google マップのタイムラインから場所を付ける</string>
     <string name="settings_location_history_summary">書き出した Timeline.json を、端末の中だけで読みます</string>

@@ -198,6 +198,11 @@ interface IndexSettings {
 
     suspend fun setAutoIndex(enabled: Boolean)
 
+    /** Whether the automatic index waits until the device is charging; off indexes on battery too. */
+    val chargingOnly: Flow<Boolean>
+
+    suspend fun setChargingOnly(enabled: Boolean)
+
     /** The folders the index covers, as relative paths; null for every folder. */
     val indexFolders: Flow<Set<String>?>
 

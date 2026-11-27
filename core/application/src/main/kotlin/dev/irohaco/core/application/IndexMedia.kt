@@ -107,19 +107,29 @@ class PlanMediaIndex(
 
 /**
  * Indexes changes by itself after the catalog syncs, when the user turned it on (IDX-005). It first
- * retires spaces of an older model file, and leaves a job that is already open alone.
+ * retires spaces of an older model file, and leaves a job that is already open alone. Set to charging
+ * only, it waits for a sync while the device charges.
  */
 class IndexChanges(
     private val plan: PlanMediaIndex,
     private val jobs: IndexJobs,
     private val meaning: SearchByMeaning,
     private val settings: IndexSettings,
+    /** Whether the device is charging now. */
+    private val charging: () -> Boolean,
     /** Runs the job in the foreground service; returns false when the system does not allow it now. */
     private val run: (String) -> Boolean,
 ) {
-    suspend operator fun invoke() {
+    // shortcut: kept in memory only; changes left when the process dies are indexed at the next change.
+    @Volatile private var waitingForCharger = false
+
+    /** [changed]: the sync found changes; without them it runs only for changes left for the charger. */
+    suspend operator fun invoke(changed: Boolean = true) {
+        if (!changed && !waitingForCharger) return
         meaning.retireOldSpaces()
         if (!settings.autoIndex.first()) return
+        waitingForCharger = settings.chargingOnly.first() && !charging()
+        if (waitingForCharger) return
         jobs.recover()
         val latest = jobs.latest().first()?.let { jobs.progress(it).first() }
         if (latest != null && latest.state in OPEN) return

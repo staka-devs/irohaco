@@ -90,12 +90,35 @@ class IndexChangesTest {
         override suspend fun setAutoIndex(enabled: Boolean) {
             auto.value = enabled
         }
+        override val chargingOnly = MutableStateFlow(false)
+        override suspend fun setChargingOnly(enabled: Boolean) {
+            chargingOnly.value = enabled
+        }
         override val indexFolders = MutableStateFlow<Set<String>?>(null)
         override suspend fun setIndexFolders(folders: Set<String>?) {
             indexFolders.value = folders
         }
     }
-    private val indexChanges = IndexChanges(plan, indexJobs, SearchByMeaning(vectors, { floatArrayOf() }), settings) { started += it; allowed }
+    private var charging = false
+    private val indexChanges = IndexChanges(plan, indexJobs, SearchByMeaning(vectors, { floatArrayOf() }), settings, { charging }) { started += it; allowed }
+
+    @Test
+    fun `set to charging only, changes found on battery wait for a sync while charging`() = runTest {
+        settings.setChargingOnly(true)
+        indexChanges()
+        assertEquals(emptyList(), started)
+        indexChanges(changed = false) // still on battery
+        assertEquals(emptyList(), started)
+        charging = true
+        indexChanges(changed = false)
+        assertEquals(listOf("job0"), started)
+    }
+
+    @Test
+    fun `a sync without changes starts nothing when nothing waits`() = runTest {
+        indexChanges(changed = false)
+        assertEquals(emptyList(), started)
+    }
 
     @Test
     fun `changes are indexed by an incremental job the user did not start`() = runTest {

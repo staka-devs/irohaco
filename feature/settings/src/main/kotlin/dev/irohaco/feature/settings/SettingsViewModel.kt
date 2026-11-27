@@ -115,6 +115,14 @@ class SettingsViewModel(
         viewModelScope.launch { indexSettings?.setAutoIndex(enabled) }
     }
 
+    /** The automatic index waits for the charger. */
+    val chargingOnly: StateFlow<Boolean> = (indexSettings?.chargingOnly ?: flowOf(false))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setChargingOnly(enabled: Boolean) {
+        viewModelScope.launch { indexSettings?.setChargingOnly(enabled) }
+    }
+
     /** Files and memos the index lacks or has at an older revision; counted again whenever a job changes state. */
     val pendingCount: StateFlow<Int?> = indexing.map { it?.progress?.state }.distinctUntilChanged()
         .map { planMediaIndex?.pendingCount() }

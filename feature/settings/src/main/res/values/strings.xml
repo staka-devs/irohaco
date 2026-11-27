@@ -146,6 +146,8 @@
     <string name="settings_index_dismiss">Dismiss</string>
     <string name="settings_index_auto">Index new photos automatically</string>
     <string name="settings_index_auto_summary">When you open the app, finds added or changed photos and indexes them. Available after the first index.</string>
+    <string name="settings_index_charging_only">Only while charging</string>
+    <string name="settings_index_charging_only_summary">On battery, waits until you open the app while charging.</string>
     <string name="settings_location_history">Location history</string>
     <string name="settings_location_history_open">Add places from Google Maps Timeline</string>
     <string name="settings_location_history_summary">Reads a Timeline.json you exported, on this device only</string>
