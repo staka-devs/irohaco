@@ -1,5 +1,6 @@
 package dev.irohaco.core.database
 
+import dev.irohaco.core.domain.GeoBounds
 import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Transaction
@@ -145,6 +146,30 @@ interface LocationDao {
     )
     suspend fun placeNames(includeInferred: Boolean): List<String>
 
+    @Query(
+        """SELECT le.place_text AS name, COUNT(DISTINCT le.asset_id) AS count
+           FROM location_evidence le JOIN media_assets a ON a.asset_id = le.asset_id
+           WHERE le.place_text IS NOT NULL AND le.place_text <> '' AND a.tombstoned_at IS NULL
+             AND (($SHOWN) OR (:includeInferred AND $GUESS))
+           GROUP BY le.place_text""",
+    )
+    suspend fun placeCounts(includeInferred: Boolean): List<PlaceCountRow>
+
+    // A part is the whole name, its first part or its last one, as the names are "town, prefecture".
+    @Query(
+        """SELECT DISTINCT le.asset_id FROM location_evidence le
+           WHERE (le.place_text = :place OR le.place_text LIKE :place || ', %' OR le.place_text LIKE '%, ' || :place)
+             AND (($SHOWN) OR (:includeInferred AND $GUESS))""",
+    )
+    suspend fun assetsAt(place: String, includeInferred: Boolean): List<String>
+
+    @Query(
+        """SELECT DISTINCT le.asset_id FROM location_evidence le
+           WHERE le.latitude BETWEEN :south AND :north AND le.longitude BETWEEN :west AND :east
+             AND (($SHOWN) OR (:includeInferred AND $GUESS))""",
+    )
+    suspend fun assetsIn(south: Double, west: Double, north: Double, east: Double, includeInferred: Boolean): List<String>
+
     @Query("DELETE FROM location_evidence WHERE asset_id = :assetId AND evidence_source = 'USER'")
     suspend fun deleteUser(assetId: String)
 
@@ -277,6 +302,8 @@ data class AssetTime(val assetId: String, val timeMs: Long)
 
 data class ItemRow(val assetId: String, val mediaKind: String, val contentUri: String, val sortTimeMs: Long, val mimeType: String?)
 
+data class PlaceCountRow(val name: String, val count: Int)
+
 data class KnownPlaceRow(val name: String, val latitude: Double, val longitude: Double, val count: Int)
 
 /** Capture time, else modified time, else when the catalog first saw the file: the timeline's order. */
@@ -297,7 +324,7 @@ private const val UNDECIDED =
        WHERE $HISTORY_CANDIDATE AND s.access_state = 'AVAILABLE' AND a.tombstoned_at IS NULL"""
 
 /** A place guessed for a file without GPS: from nearby photos, or from the location history (SRCH-003, #174). */
-private const val GUESS = "(le.evidence_status = 'CANDIDATE' AND le.evidence_source IN ('NEARBY_MEDIA', 'LOCATION_HISTORY'))"
+internal const val GUESS = "(le.evidence_status = 'CANDIDATE' AND le.evidence_source IN ('NEARBY_MEDIA', 'LOCATION_HISTORY'))"
 
 /** EXIF and video GPS in `location_evidence`, source EXIF (PRD GAL-017). A file without GPS is kept as UNKNOWN. */
 class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -> String = { UUID.randomUUID().toString() }) : LocationStore, PlaceEvidenceStore, LocationHistoryStore {
@@ -332,6 +359,13 @@ class RoomLocationStore(private val db: IrohacoDatabase, private val newId: () -
     override suspend fun replaceInferred(places: List<InferredPlace>) = dao.replaceInferred(places)
 
     override suspend fun placeNames(includeInferred: Boolean) = dao.placeNames(includeInferred)
+
+    override suspend fun placeCounts(includeInferred: Boolean) = dao.placeCounts(includeInferred).associate { it.name to it.count }
+
+    override suspend fun assetsAt(place: String, includeInferred: Boolean) = dao.assetsAt(place, includeInferred).toSet()
+
+    override suspend fun assetsIn(area: GeoBounds, includeInferred: Boolean) =
+        dao.assetsIn(area.south, area.west, area.north, area.east, includeInferred).toSet()
 
     override suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int) =
         dao.filesAt(names.toList(), includeInferred, limit)

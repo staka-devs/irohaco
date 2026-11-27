@@ -42,11 +42,11 @@
     <string name="egress_place_name">Town name where it was taken</string>
     <string name="remote_rate_limited">The remote model is busy. Try again in a while.</string>
     <string name="remote_rate_limited_after">The remote model is busy. Try again in %1$d s.</string>
-    <string name="remote_unauthorized">The remote API refused the key. Check it in Settings.</string>
+    <string name="remote_unauthorized">The API key was refused. Check that a valid key is set.</string>
     <string name="remote_quota">The remote account has reached its usage limit.</string>
     <string name="remote_timeout">The remote model did not answer in time.</string>
     <string name="remote_failed">The remote model returned an error (%1$d).</string>
-    <string name="remote_denied">Not sent: %1$s is not allowed for this model. Turn it on in Settings &gt; Privacy.</string>
-    <string name="remote_blocked">Not sent: a photo kept from being sent is among them.</string>
+    <string name="remote_denied">Sending %1$s is not allowed.</string>
+    <string name="remote_blocked">A photo set not to be sent is among them.</string>
     <string name="remote_unreachable">Could not reach the remote model.</string>
 </resources>

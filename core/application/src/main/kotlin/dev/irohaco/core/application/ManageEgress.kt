@@ -143,6 +143,17 @@ class ManageEgress(
         }
 
         /** What each task could send; a place leaves only as its town name, never as coordinates. */
+        /**
+         * The jobs a connection's API format can do, each with what it may be sent: an embedding format searches and
+         * indexes, a chat format answers questions (RemoteEmbeddingSession, RemoteAnswerSession).
+         */
+        fun offeredFor(protocol: RemoteProtocol): Map<TaskType, List<EgressPayload>> = offered.filterKeys { task ->
+            when (protocol) {
+                RemoteProtocol.OPENAI_EMBEDDINGS, RemoteProtocol.GEMINI_EMBED_CONTENT -> task != TaskType.RAG
+                else -> task == TaskType.RAG
+            }
+        }
+
         val offered: Map<TaskType, List<EgressPayload>> = mapOf(
             TaskType.SEARCH_QUERY to listOf(EgressPayload.QUERY_TEXT),
             TaskType.IMAGE_INDEX to listOf(EgressPayload.IMAGE_PIXELS, EgressPayload.OCR_TEXT, EgressPayload.USER_ANNOTATIONS),

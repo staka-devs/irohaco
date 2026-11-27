@@ -36,7 +36,7 @@ class RouteTest {
 
     @Test
     fun `a chat's photos route keeps the words and conditions whole`() {
-        val read = ReadQuery("花火: viewer:a-1", 1L, 2L, MediaKind.IMAGE)
+        val read = ReadQuery("花火: viewer:a-1", 1L, 2L, MediaKind.IMAGE, place = "大阪府")
         assertTrue(Route.isPhotosFor(Route.photosFor(read)))
         assertFalse(Route.isSimilar(Route.photosFor(read)))
         assertEquals(read, Route.parsePhotosFor(Route.photosFor(read)))

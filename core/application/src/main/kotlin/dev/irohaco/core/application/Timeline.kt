@@ -71,6 +71,10 @@ class GetTimelinePage(private val reader: TimelineReader, private val clock: () 
         return labels.getOrNull(index)
     }
 
+    /** Every label of the order, read now; the scrollbar's bubble then reads these too. */
+    suspend fun labels(query: TimelineQuery = this.query.value): List<TimelineLabel> =
+        reader.labels(query).also { labels -> labelsLock.withLock { kept = KeptLabels(query, labels, clock()) } }
+
     private class KeptLabels(val query: TimelineQuery, val labels: List<TimelineLabel>, val atMs: Long)
 
     private val labelsLock = Mutex()

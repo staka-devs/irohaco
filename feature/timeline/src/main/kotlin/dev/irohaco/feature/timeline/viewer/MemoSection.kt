@@ -1,5 +1,12 @@
 package dev.irohaco.feature.timeline.viewer
 
+import dev.irohaco.core.designsystem.icon.IrohacoIcons
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -87,16 +94,43 @@ internal fun MemoSection(
         Text(stringResource(R.string.memo_title), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         memos.forEach { memo ->
             Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(IrohacoSpacing.m), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
-                    Text(
-                        listOfNotNull(
-                            memo.scene?.let { stringResource(R.string.memo_scene, formatDuration(it.first), formatDuration(it.last + 1)) },
-                            stringResource(memo.kind.label()),
-                            memo.current.author.takeIf { it == AnnotationAuthor.AI }?.let { stringResource(R.string.memo_by_ai) })
-                            .joinToString(" · "),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                Column(Modifier.padding(start = IrohacoSpacing.m, bottom = IrohacoSpacing.m), verticalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            listOfNotNull(
+                                memo.scene?.let { stringResource(R.string.memo_scene, formatDuration(it.first), formatDuration(it.last + 1)) },
+                                stringResource(memo.kind.label()),
+                                memo.current.author.takeIf { it == AnnotationAuthor.AI }?.let { stringResource(R.string.memo_by_ai) })
+                                .joinToString(" · "),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        // The memo's actions in its own menu, so the card shows the memo rather than a row of buttons.
+                        Box {
+                            var menu by remember { mutableStateOf(false) }
+                            IconButton(onClick = { menu = true }) { Icon(painterResource(IrohacoIcons.MoreVert), stringResource(R.string.memo_actions)) }
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.memo_edit)) },
+                                    leadingIcon = { Icon(painterResource(IrohacoIcons.Edit), null) },
+                                    onClick = { menu = false; editing = memo.annotationId },
+                                )
+                                if (memo.current.revisionNo > 1) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.memo_history)) },
+                                        leadingIcon = { Icon(painterResource(IrohacoIcons.Restore), null) },
+                                        onClick = { menu = false; showingHistory = memo.annotationId },
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.memo_delete)) },
+                                    leadingIcon = { Icon(painterResource(IrohacoIcons.Delete), null) },
+                                    onClick = { menu = false; deleting = memo.annotationId },
+                                )
+                            }
+                        }
+                    }
                     Text(memo.current.text, style = MaterialTheme.typography.bodyLarge)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.s)) {
                         val searchLabel = stringResource(R.string.memo_searchable)
@@ -106,11 +140,6 @@ internal fun MemoSection(
                             modifier = Modifier.semantics { contentDescription = searchLabel },
                         )
                         Text(searchLabel, style = MaterialTheme.typography.bodyMedium)
-                    }
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(IrohacoSpacing.xs)) {
-                        TextButton(onClick = { editing = memo.annotationId }) { Text(stringResource(R.string.memo_edit)) }
-                        if (memo.current.revisionNo > 1) TextButton(onClick = { showingHistory = memo.annotationId }) { Text(stringResource(R.string.memo_history)) }
-                        TextButton(onClick = { deleting = memo.annotationId }) { Text(stringResource(R.string.memo_delete)) }
                     }
                 }
             }

@@ -1,5 +1,6 @@
 package dev.irohaco.feature.timeline.viewer
 
+import dev.irohaco.core.contracts.NamedPlace
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -96,6 +97,11 @@ class ViewerViewModel(
     share: PrepareShare? = null,
     sharingSettings: SharingSettings? = null,
 ) : ViewModel() {
+    /** Whether the online map may show, so the location editor can offer the map and the place search (ADR-0011). */
+    val mapAllowed: StateFlow<Boolean> = (map?.allowed ?: flowOf(false)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    suspend fun findPlaces(query: String): List<NamedPlace> = map?.findPlaces(query).orEmpty()
+
     /** Shares with the user's GPS policy, as the timeline does (PRD MET-003). */
     val sharing = ShareSupport(share, sharingSettings)
 
@@ -238,6 +244,11 @@ class ViewerViewModel(
     /** The models that can answer, switched from the question sheet. */
     val answerModels: StateFlow<AnswerChoices?> =
         (ask?.choices ?: flowOf(null)).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** The thinking depth the next questions ask for; null for the model's own. */
+    fun chooseAnswerEffort(value: String?) {
+        ask?.chooseEffort(value)
+    }
 
     fun chooseAnswerModel(id: String) {
         val library = ask ?: return

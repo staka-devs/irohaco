@@ -28,7 +28,6 @@ import dev.irohaco.core.contracts.ShareLocationPolicy
 import dev.irohaco.core.contracts.SharingSettings
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.contracts.TimelineQuery
-import dev.irohaco.core.contracts.TimelineSortKey
 import dev.irohaco.core.domain.MediaLibraryAccess
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -56,8 +55,15 @@ class TimelineViewModel(
     private val share: PrepareShare? = null,
     private val sharingSettings: SharingSettings? = null,
     private val zone: ZoneId = ZoneId.systemDefault(),
+    /** The places photos were taken at, with their numbers of files, for the place filter. */
+    val placeCounts: suspend (includeInferred: Boolean) -> Map<String, Int> = { emptyMap() },
 ) : ViewModel() {
-    private var source: TimelinePagingSource? = null
+    private var source: TimelineCellPagingSource? = null
+
+    private val _layout = MutableStateFlow<CellLayout?>(null)
+
+    /** Where the headers of the shown order fall, so the grid knows a placeholder's row before its page loads. */
+    internal val layout: StateFlow<CellLayout?> = _layout.asStateFlow()
 
     private val _grouping = MutableStateFlow(DateGrouping.DAY)
 
@@ -88,13 +94,19 @@ class TimelineViewModel(
         viewModelScope.launch { settings?.setPinchHintShown() }
     }
 
+    // The layout of the current order, kept across the new sources a jump makes, so a jump does not sort the library again.
+    private var kept: CellLayout? = null
+
+    /** Reads the order again: it, the filter or the library changed. */
+    private fun reload() {
+        kept = null
+        source?.invalidate()
+    }
+
     val cells: Flow<PagingData<TimelineCell>> =
         Pager(PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = true, jumpThreshold = PAGE_SIZE * 4)) {
-            TimelinePagingSource(getPage).also { source = it }
+            TimelineCellPagingSource(getPage, zone, _grouping.value, { kept = it; _layout.value = it }, layout = kept).also { source = it }
         }.flow
-            .map {
-                if (getPage.query.value.sortKey == TimelineSortKey.TAKEN) it.withDateHeaders(zone, _grouping.value) else it.withSortHeaders(zone, getPage.query.value.sortKey)
-            }
             .cachedIn(viewModelScope)
 
     /** The order and filter, shared with the viewer (GAL-006). */
@@ -108,7 +120,7 @@ class TimelineViewModel(
     fun setQuery(query: TimelineQuery) {
         if (query == getPage.query.value) return
         getPage.query.value = query
-        source?.invalidate()
+        reload()
         _scrollToTop.trySend(Unit)
         clearSelection() // selected items may no longer be shown
     }
@@ -117,17 +129,17 @@ class TimelineViewModel(
     val access: StateFlow<MediaLibraryAccess> = _access.asStateFlow()
 
     init {
-        viewModelScope.launch { getPage.changes().collect { source?.invalidate() } }
+        viewModelScope.launch { getPage.changes().collect { reload() } }
         viewModelScope.launch {
             settings?.dateGrouping?.collect {
                 _grouping.value = it
-                source?.invalidate()
+                reload()
             }
         }
         viewModelScope.launch {
             excludedFolders.collect { excluded ->
                 getPage.query.update { it.copy(excludedFolders = excluded) }
-                source?.invalidate()
+                reload()
             }
         }
     }
@@ -171,7 +183,7 @@ class TimelineViewModel(
     }
 
     /** What the fast scrollbar's bubble names at this position (PRD GAL-014). */
-    suspend fun labelAt(index: Int) = getPage.labelAt(index)
+    suspend fun labelAt(index: Int) = getPage.labelAt(_layout.value?.mediaBefore(index) ?: index)
 
     /** Shares with the user's GPS policy (PRD MET-003). */
     val sharing = ShareSupport(share, sharingSettings)
@@ -245,6 +257,8 @@ class TimelineViewModel(
     }
 
     private companion object {
-        const val PAGE_SIZE = 120
+        // Pages of a few hundred, so a fling over a 28-column grid stays within loaded pages instead of jumping:
+        // each jump reloads the grid around the new position, which shifts it and composes every cell again.
+        const val PAGE_SIZE = 500
     }
 }

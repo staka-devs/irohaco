@@ -11,6 +11,8 @@ import dev.irohaco.core.contracts.TimelineLabel
 import dev.irohaco.core.contracts.TimelineQuery
 import dev.irohaco.core.contracts.TimelineSortKey
 import dev.irohaco.core.domain.AssetAvailability
+import dev.irohaco.core.domain.GeoBounds
+import dev.irohaco.core.domain.GeoPoint
 import dev.irohaco.core.domain.MediaKind
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -55,6 +57,9 @@ class RoomTimelineReaderTest {
         val rest = reader.page(newest, offset = 2, limit = 10)
         assertEquals(listOf("b" to 200L, "d" to 100L), rest.map { it.assetId to it.sortTimeMs })
         assertEquals(listOf(0, 1, 2, 3), listOf("c", "a", "b", "d").map { reader.indexOf(newest, it) })
+        // Once the labels are read, pages come from that order by id, the same as sorted.
+        reader.labels(newest)
+        assertEquals(first + rest, reader.page(newest, offset = 0, limit = 2) + reader.page(newest, offset = 2, limit = 10))
         assertEquals(null, reader.indexOf(newest, "hidden"))
         // A date group: from inclusive, until exclusive, hidden files left out, in the timeline's order.
         assertEquals(listOf("c", "a", "b"), reader.between(newest, 200, 301).map { it.assetId })
@@ -96,6 +101,46 @@ class RoomTimelineReaderTest {
         assertEquals(listOf("b", "c"), order(days.copy(takenUntilMs = null)))
         assertEquals(listOf("b"), order(days.copy(takenUntilMs = null, kind = MediaKind.IMAGE)))
         assertEquals(TimelineQuery(TimelineSortKey.TAKEN, descending = false), days.unfiltered())
+    }
+
+    @Test
+    fun `sorts by the distance from a place, guessed places only when asked, files without one last`() = runTest {
+        RoomCatalogStore(db).apply(
+            CatalogChanges(
+                observedAtMs = 1,
+                newVolumes = listOf(CatalogVolume("v1", "external_primary", null, null)),
+                newAssets = listOf(asset("far", 1, 1, 1), asset("near", 2, 2, 1), asset("guessed", 3, 3, 1), asset("none", 4, 4, 1)),
+            ),
+        )
+        fun place(id: String, asset: String, lat: Double, lon: Double, source: String, status: String) = db.openHelper.writableDatabase.execSQL(
+            "INSERT INTO location_evidence(evidence_id, asset_id, evidence_source, evidence_status, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)",
+            arrayOf<Any>(id, asset, source, status, lat, lon),
+        )
+        place("l1", "far", 43.06, 141.35, "EXIF", "CONFIRMED") // Sapporo
+        place("l2", "near", 35.69, 139.70, "EXIF", "CONFIRMED") // Tokyo
+        place("l3", "guessed", 35.68, 139.76, "NEARBY_MEDIA", "CANDIDATE")
+        val fromTokyo = TimelineQuery(TimelineSortKey.DISTANCE, descending = false, near = GeoPoint(35.68, 139.76))
+        suspend fun order(query: TimelineQuery) = reader.page(query, 0, 10).map { it.assetId }
+
+        assertEquals(listOf("near", "far", "guessed", "none"), order(fromTokyo))
+        assertEquals(listOf("guessed", "near", "far", "none"), order(fromTokyo.copy(nearIncludesInferred = true)))
+        assertEquals(listOf("far", "near", "none", "guessed"), order(fromTokyo.copy(descending = true))) // no place: last, id breaks the tie
+
+        // A place name or one of its parts narrows to the files there; a guessed place does not count.
+        db.openHelper.writableDatabase.execSQL("UPDATE location_evidence SET place_text = '札幌市, 北海道' WHERE evidence_id = 'l1'")
+        db.openHelper.writableDatabase.execSQL("UPDATE location_evidence SET place_text = '新宿区, 東京都' WHERE evidence_id = 'l2'")
+        db.openHelper.writableDatabase.execSQL("UPDATE location_evidence SET place_text = '千代田区, 東京都' WHERE evidence_id = 'l3'")
+        assertEquals(listOf("near"), order(TimelineQuery(place = "東京都")))
+        assertEquals(listOf("far"), order(TimelineQuery(place = "札幌市")))
+        assertEquals(listOf("far"), order(TimelineQuery(place = "札幌市, 北海道")))
+        assertEquals(emptyList(), order(TimelineQuery(place = "京都")))
+
+        // Asked to, the place filters count a guessed place too.
+        assertEquals(listOf("guessed", "near"), order(TimelineQuery(place = "東京都", placesIncludeInferred = true)))
+        assertEquals(listOf("guessed", "near", "far"), order(TimelineQuery(located = true, placesIncludeInferred = true)))
+        assertEquals(listOf("none"), order(TimelineQuery(located = false, placesIncludeInferred = true)))
+        assertEquals(listOf("guessed"), order(TimelineQuery(area = GeoBounds(35.675, 139.75, 35.685, 139.77), placesIncludeInferred = true)))
+        assertEquals(emptyList(), order(TimelineQuery(area = GeoBounds(35.675, 139.75, 35.685, 139.77))))
     }
 
     @Test

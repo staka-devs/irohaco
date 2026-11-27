@@ -106,6 +106,7 @@ import android.provider.Settings
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.designsystem.component.VideoPlayer
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
+import dev.irohaco.core.designsystem.motion.LocalSharedMediaScope
 import dev.irohaco.core.designsystem.motion.rememberReducedMotion
 import dev.irohaco.core.designsystem.motion.sharedMedia
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
@@ -158,6 +159,7 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
             isVideo = item.kind == MediaKind.VIDEO,
             models = answerModels,
             onChoose = viewModel::chooseAnswerModel,
+            onEffort = viewModel::chooseAnswerEffort,
             onAsk = { viewModel.askAbout(item, it) },
             onOpenSettings = onOpenSettings,
             onDismiss = {
@@ -175,11 +177,16 @@ fun MediaViewerScreen(viewModel: ViewerViewModel, onBack: () -> Unit, onFindSimi
                 onDismiss = done,
                 onSave = { done(); viewModel.setTakenAt(item, it) },
             )
-            MetadataField.LOCATION -> LocationDialog(
-                initial = (location as? Detail.Value<GeoPoint>)?.value,
-                onDismiss = done,
-                onSave = { done(); viewModel.setLocation(item, it) },
-            )
+            MetadataField.LOCATION -> {
+                val mapAllowed by viewModel.mapAllowed.collectAsStateWithLifecycle()
+                LocationEditor(
+                    initial = (location as? Detail.Value<GeoPoint>)?.value,
+                    mapAllowed = mapAllowed,
+                    findPlaces = viewModel::findPlaces,
+                    onDismiss = done,
+                    onSave = { done(); viewModel.setLocation(item, it) },
+                )
+            }
             MetadataField.DESCRIPTION -> DescriptionDialog(
                 initial = when (val e = edits.description) {
                     is FieldEdit.Set -> e.value
@@ -366,8 +373,11 @@ internal fun MediaViewerContent(
             val pager = rememberPagerState(initialPage = startIndex.coerceAtMost(items.itemCount - 1)) { items.itemCount }
             val zoom = remember { ZoomState() }
             LaunchedEffect(pager.currentPage, items.itemCount) { current = items.peek(pager.currentPage) }
+            val shared = LocalSharedMediaScope.current
             LaunchedEffect(pager.settledPage) {
                 zoom.reset()
+                // Going back moves the photo shown now into its cell, not the one first opened.
+                items.peek(pager.settledPage)?.let { shared?.active?.value = it.assetId }
                 onPageChanged(items.peek(pager.settledPage)?.assetId) // playback stays on the page it started on
             }
             // Swipes and pinches have actions TalkBack and switch access can reach (DESIGN §7, #251).

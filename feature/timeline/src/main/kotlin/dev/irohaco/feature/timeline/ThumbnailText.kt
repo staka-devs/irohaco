@@ -1,5 +1,6 @@
 package dev.irohaco.feature.timeline
 
+import android.content.res.Resources
 import android.icu.text.MeasureFormat
 import android.icu.util.Measure
 import android.icu.util.MeasureUnit
@@ -7,7 +8,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalResources
 import dev.irohaco.core.contracts.TimelineItem
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.domain.MediaKind
@@ -44,11 +45,14 @@ internal fun formatDuration(ms: Long): String {
 
 /** What TalkBack reads for a grid cell: the kind, a video's length in words, then the date. */
 @Composable
-internal fun TimelineItem.description(date: String): String {
+internal fun TimelineItem.description(date: String): String =
+    description(date, LocalResources.current, LocalConfiguration.current.locales[0])
+
+/** The same outside composition, for a description built only when a screen reader asks for it. */
+internal fun TimelineItem.description(date: String, resources: Resources, locale: Locale): String {
     val duration = durationMs
-    if (kind != MediaKind.VIDEO || duration == null) return stringResource(descriptionRes(), date)
-    val locale = LocalConfiguration.current.locales[0]
-    return stringResource(R.string.timeline_video_length_description, spokenDuration(duration, locale), date)
+    if (kind != MediaKind.VIDEO || duration == null) return resources.getString(descriptionRes(), date)
+    return resources.getString(R.string.timeline_video_length_description, spokenDuration(duration, locale), date)
 }
 
 /** "1 minute, 1 second" rather than "1:01", which a screen reader may read as a time of day. */

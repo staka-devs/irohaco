@@ -85,6 +85,13 @@ class EgressPolicyTest {
     private val manage = ManageEgress(store, connectionStore, credentials, { "c${ids++}" }, modelStore, probe)
 
     @Test
+    fun `an embedding format is offered the search and index jobs, a chat format the questions`() {
+        assertEquals(setOf(TaskType.SEARCH_QUERY, IMAGE_INDEX, TaskType.VIDEO_INDEX), ManageEgress.offeredFor(RemoteProtocol.GEMINI_EMBED_CONTENT).keys)
+        assertEquals(setOf(RAG), ManageEgress.offeredFor(RemoteProtocol.ANTHROPIC_MESSAGES).keys)
+        assertEquals(ManageEgress.offered.getValue(RAG), ManageEgress.offeredFor(RemoteProtocol.OPENAI_CHAT).getValue(RAG))
+    }
+
+    @Test
     fun `with no grants nothing is sent`() = runTest {
         assertEquals(EgressDecision.Denied(setOf(QUERY_TEXT, IMAGE_PIXELS), emptySet()), policy.authorize(RAG, "gpt", setOf(QUERY_TEXT, IMAGE_PIXELS), emptySet()))
     }

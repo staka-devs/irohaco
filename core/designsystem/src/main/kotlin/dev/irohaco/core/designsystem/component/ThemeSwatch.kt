@@ -16,7 +16,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -30,7 +29,6 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
-import com.materialkolor.dynamicColorScheme
 import dev.irohaco.core.designsystem.icon.IrohacoIcons
 import dev.irohaco.core.designsystem.preview.IrohacoPreviews
 import dev.irohaco.core.designsystem.theme.IrohacoTheme
@@ -39,8 +37,8 @@ import dev.irohaco.core.designsystem.tokens.IrohacoSpacing
 /** A theme colour made from [seed], as a round swatch (APP-002). */
 @Composable
 fun ThemeSwatch(seed: Color, name: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    val scheme = remember(seed) { dynamicColorScheme(seedColor = seed, isDark = false) }
-    ThemeSwatch(scheme, name, selected, onClick, modifier, enabled)
+    // The colour itself: the theme made from it is pale beside it, so the user would not see what they pick.
+    Swatch(name, selected, onClick, modifier, enabled) { Box(Modifier.fillMaxSize().background(seed)) }
 }
 
 /**
@@ -50,6 +48,19 @@ fun ThemeSwatch(seed: Color, name: String, selected: Boolean, onClick: () -> Uni
  */
 @Composable
 fun ThemeSwatch(scheme: ColorScheme, name: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    Swatch(name, selected, onClick, modifier, enabled) {
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxWidth().weight(1f).background(scheme.primary))
+            Row(Modifier.fillMaxWidth().weight(1f)) {
+                Box(Modifier.fillMaxSize().weight(1f).background(scheme.secondaryContainer))
+                Box(Modifier.fillMaxSize().weight(1f).background(scheme.tertiaryContainer))
+            }
+        }
+    }
+}
+
+@Composable
+private fun Swatch(name: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier, enabled: Boolean, fill: @Composable () -> Unit) {
     Box(
         modifier
             .size(64.dp)
@@ -66,13 +77,7 @@ fun ThemeSwatch(scheme: ColorScheme, name: String, selected: Boolean, onClick: (
             .padding(if (selected) 6.dp else 0.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Column(Modifier.fillMaxSize().clip(CircleShape)) {
-            Box(Modifier.fillMaxWidth().weight(1f).background(scheme.primary))
-            Row(Modifier.fillMaxWidth().weight(1f)) {
-                Box(Modifier.fillMaxSize().weight(1f).background(scheme.secondaryContainer))
-                Box(Modifier.fillMaxSize().weight(1f).background(scheme.tertiaryContainer))
-            }
-        }
+        Box(Modifier.fillMaxSize().clip(CircleShape)) { fill() }
         if (selected) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
                 Icon(painterResource(IrohacoIcons.Check), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(2.dp).size(18.dp))

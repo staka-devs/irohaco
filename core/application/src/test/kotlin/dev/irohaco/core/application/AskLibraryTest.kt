@@ -67,12 +67,14 @@ class AskLibraryTest {
     private var closed = 0
     private val asked = mutableListOf<Pair<Int, String>>()
     private var warmed = 0
+    private val thought = mutableListOf<Boolean>()
     private val runtime = AnswerRuntime { _, _ ->
         loads++
         object : AnswerSession {
             override suspend fun answer(instruction: String, images: List<ByteArray>, question: String, think: Boolean, onText: (String) -> Unit): String {
                 check(!failing) { "The model's process died" }
                 asked += images.size to question
+                thought += think
                 // The reply arrives in pieces, as the runtime streams it.
                 reply.chunked(8).runningReduce { so, piece -> so + piece }.forEach(onText)
                 return reply
@@ -162,8 +164,9 @@ class AskLibraryTest {
     @Test
     fun `the choices are the installed models and the services' answering ones, the pick or else the first local`() = runTest {
         val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id))
-        val local = AnswerChoice(ModelCatalog.GEMMA_4_E2B.id, ModelCatalog.GEMMA_4_E2B.displayName)
-        assertEquals(AnswerChoices(listOf(local, AnswerChoice("claude", "Claude", "Anthropic")), local.id), library.choices.first())
+        val local = AnswerChoice(ModelCatalog.GEMMA_4_E2B.id, ModelCatalog.GEMMA_4_E2B.displayName, efforts = listOf(THINK_OFF, THINK_ON))
+        val claude = AnswerChoice("claude", "Claude", "Anthropic", listOf("low", "medium", "high", "xhigh", "max"))
+        assertEquals(AnswerChoices(listOf(local, claude), local.id), library.choices.first())
         library.choose("claude")
         assertEquals("claude", library.choices.first().current)
         library.choose("removed")
@@ -205,6 +208,24 @@ class AskLibraryTest {
         library.choose(ModelCatalog.LFM_3_VL_2B.id)
         assertEquals("/models/${ModelCatalog.LFM_3_VL_2B.id}", library.modelPath())
         assertEquals(AskResult.NothingFound, library.ask("Where?", emptyList()))
+    }
+
+    @Test
+    fun `the depth chosen for the next questions goes with them, until another model is chosen`() = runTest {
+        reply = "ANSWER: A pier [1].\nKNOWN: yes\nSOURCES: 1=OBSERVED"
+        val library = ask(setOf(ModelCatalog.GEMMA_4_E2B.id))
+        assertEquals(listOf(THINK_OFF, THINK_ON), library.choices.first().all.first().efforts)
+        library.chooseEffort(THINK_OFF)
+        library.ask("Where?", listOf(photo))
+        assertEquals(listOf(false), thought)
+        library.choose("claude")
+        assertEquals(null, library.choices.first().effort)
+        // Anthropic's depth is output_config.effort, over the saved settings.
+        assertEquals(listOf("low", "medium", "high", "xhigh", "max"), library.choices.first().all.first { it.id == "claude" }.efforts)
+        library.chooseEffort("high")
+        assertIs<AskResult.NeedsConsent>(library.ask("Where?", listOf(photo))).agree()
+        library.ask("Where?", listOf(photo))
+        assertEquals(mapOf("thinking.type" to "adaptive", "output_config.effort" to "high"), openedWith.last())
     }
 
     @Test
@@ -342,7 +363,8 @@ class AskLibraryTest {
         val plan = AskLibrary.parsePlan("""```json
 {"words": ["旅行", "観光"], "place": "京都", "from": "2025-06-01", "until": "2025-08-31", "kind": "any", "show": false}
 ```""", zone)
-        assertEquals(SearchPlan("京都 旅行 観光", ms(2025, 6, 1), ms(2025, 9, 1), null, show = false), plan)
+        // The place stays apart from the words, as a condition on where.
+        assertEquals(SearchPlan("旅行 観光", ms(2025, 6, 1), ms(2025, 9, 1), null, show = false, place = "京都"), plan)
         assertEquals(
             SearchPlan("fireworks", null, null, MediaKind.IMAGE, show = true),
             AskLibrary.parsePlan("""Sure: {"words": ["fireworks"], "place": null, "from": null, "until": null, "kind": "photo", "show": true}""", zone),
@@ -356,7 +378,8 @@ class AskLibraryTest {
     fun `the previous search goes back to the model in the plan's own form`() {
         val zone = ZoneId.of("Asia/Tokyo")
         val read = ReadQuery("花火", LocalDate.of(2025, 6, 1).atStartOfDay(zone).toInstant().toEpochMilli(), LocalDate.of(2025, 9, 1).atStartOfDay(zone).toInstant().toEpochMilli(), MediaKind.IMAGE)
-        assertEquals("""{"words": ["花火"], "from": "2025-06-01", "until": "2025-08-31", "kind": "photo"}""", AskLibrary.planJson(read, zone))
+        assertEquals("""{"words": ["花火"], "place": null, "from": "2025-06-01", "until": "2025-08-31", "kind": "photo"}""", AskLibrary.planJson(read, zone))
+        assertEquals("""{"words": ["花火"], "place": "大阪府", "from": null, "until": null, "kind": "any"}""", AskLibrary.planJson(ReadQuery("花火", place = "大阪府"), zone))
     }
 
     @Test

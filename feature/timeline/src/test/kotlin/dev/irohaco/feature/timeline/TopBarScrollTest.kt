@@ -1,7 +1,7 @@
 package dev.irohaco.feature.timeline
 
 import androidx.compose.runtime.remember
-import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
@@ -42,7 +42,7 @@ class TopBarScrollTest {
     private fun bottomOf(text: String) = rule.onNodeWithText(text).fetchSemanticsNode().boundsInRoot.bottom
 
     private fun scroll(down: Boolean) {
-        rule.onNode(hasScrollAction()).performTouchInput { if (down) swipeUp() else swipeDown() }
+        rule.onNode(hasScrollToIndexAction()).performTouchInput { if (down) swipeUp() else swipeDown() }
         rule.waitForIdle()
     }
 

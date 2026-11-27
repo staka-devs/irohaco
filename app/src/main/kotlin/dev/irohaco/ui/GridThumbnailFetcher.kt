@@ -1,6 +1,7 @@
 package dev.irohaco.ui
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import android.util.Size
 import coil3.ImageLoader
@@ -11,6 +12,7 @@ import coil3.fetch.Fetcher
 import coil3.fetch.ImageFetchResult
 import coil3.key.Keyer
 import coil3.request.Options
+import coil3.request.bitmapConfig
 import coil3.size.pxOrElse
 import coil3.toUri
 import dev.irohaco.core.designsystem.component.GridThumbnail
@@ -34,7 +36,11 @@ class GridThumbnailFetcher(
         val px = thumbnailPx(options)
         val bitmap = withContext(LOADS) {
             try {
-                context.contentResolver.loadThumbnail(Uri.parse(data.contentUri), Size(px, px), null)
+                val small = context.contentResolver.loadThumbnail(Uri.parse(data.contentUri), Size(px, px), null)
+                // In GPU memory from the start: a 28-column screen shows more bitmaps than the GPU's cache holds,
+                // so plain ones were uploaded again every frame, about 60,000 uploads in a 14 s scroll.
+                if (options.bitmapConfig != Bitmap.Config.HARDWARE) small
+                else small.copy(Bitmap.Config.HARDWARE, false)?.also { small.recycle() } ?: small
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {
@@ -64,13 +70,6 @@ class GridThumbnailFetcher(
         // A few decodes at a time, so scrolling keeps the CPU it needs to draw (M1-34).
         val LOADS = Dispatchers.IO.limitedParallelism(4)
 
-        // 384 is sharp at three columns on a wide phone; a few fixed steps keep the OS's thumbnail cache reusable.
-        val THUMBNAIL_PX = listOf(96, 192, 384)
-
-        /** The smallest step that covers the cell, so 28 columns load a sixteenth of the pixels of four. */
-        fun thumbnailPx(options: Options): Int {
-            val cell = options.size.width.pxOrElse { THUMBNAIL_PX.last() }
-            return THUMBNAIL_PX.firstOrNull { it >= cell } ?: THUMBNAIL_PX.last()
-        }
+        fun thumbnailPx(options: Options): Int = GridThumbnail.stepPx(options.size.width.pxOrElse { GridThumbnail.LARGEST })
     }
 }

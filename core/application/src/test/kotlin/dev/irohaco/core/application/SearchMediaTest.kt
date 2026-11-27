@@ -1,5 +1,6 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.domain.GeoBounds
 import dev.irohaco.core.contracts.InferredPlace
 import dev.irohaco.core.contracts.ModelNotInstalledException
 import dev.irohaco.core.contracts.PlaceEvidenceStore
@@ -68,11 +69,19 @@ class SearchMediaTest {
             override suspend fun placeNames(includeInferred: Boolean) = listOf("京都市, 京都府")
             override suspend fun filesAt(names: Collection<String>, includeInferred: Boolean, limit: Int) = listOf(PlaceMatch("p2", "京都市, 京都府", inferred = false))
             override suspend fun placesOf(assetIds: Collection<String>) = emptyMap<String, PlaceMatch>()
+            override suspend fun assetsAt(place: String, includeInferred: Boolean) = if (place == "京都府") setOf("p2") else emptySet()
+            override suspend fun assetsIn(area: GeoBounds, includeInferred: Boolean) = setOf("p2")
         }
         val atPlaces = SearchMedia(SearchByMeaning(vectors, embedText = { floatArrayOf(1f) }, modelDigest = "d"), SearchText(texts), { ids, _ -> catalog.filter { it.assetId in ids } }, { it }, SearchPlaces(places))
-        val narrowed = atPlaces("京都の看板", onlyAtPlace = true)
+        // Named in the query, the place is offered, not applied.
+        assertEquals("京都府", atPlaces("京都の看板").place)
+        val narrowed = atPlaces("京都の看板", filters = SearchFilters(place = "京都府"))
         assertEquals(listOf("p2"), narrowed.hits.map { it.item.assetId })
-        assertEquals("京都市", narrowed.place)
+        assertEquals(null, narrowed.place) // already chosen
+        // A part of the map narrows the same way, and with a place only files in both are left.
+        val area = GeoBounds(34.0, 135.0, 36.0, 136.0)
+        assertEquals(listOf("p2"), atPlaces("京都の看板", filters = SearchFilters(area = area)).hits.map { it.item.assetId })
+        assertEquals(emptyList<String>(), atPlaces("京都の看板", filters = SearchFilters(place = "大阪府", area = area)).hits.map { it.item.assetId })
         assertEquals(listOf("p2", "p1", "v1", "v1"), atPlaces("京都の看板").hits.map { it.item.assetId })
     }
 

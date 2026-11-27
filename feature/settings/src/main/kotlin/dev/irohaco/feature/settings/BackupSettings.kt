@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -72,19 +73,13 @@ internal fun BackupSettings(
     target?.let { PassphraseDialog(onDismiss) { onExport(it, this) } }
     restoreSource?.let { source -> OpenDialog(onDismissRestore) { onOpenRestore(source, it) } }
     RestoreDialog(restore, onApplyRestore, onDismissRestore)
-    if (state is ExportState.Done || state is ExportState.Failed) {
+    // A success needs no answer, so it is a snackbar; a failure stays a dialog, since it says what to do next.
+    if (state is ExportState.Done) Notice(stringResource(R.string.settings_backup_done_short, state.records), onDismiss)
+    if (state is ExportState.Failed) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text(stringResource(if (state is ExportState.Done) R.string.settings_backup_done else R.string.settings_backup_failed)) },
-            text = {
-                Text(
-                    if (state is ExportState.Done) {
-                        stringResource(R.string.settings_backup_done_body, state.records)
-                    } else {
-                        stringResource(R.string.settings_backup_failed_body)
-                    },
-                )
-            },
+            title = { Text(stringResource(R.string.settings_backup_failed)) },
+            text = { Text(stringResource(R.string.settings_backup_failed_body)) },
             confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_remote_model_done)) } },
         )
     }
@@ -138,10 +133,13 @@ private fun OpenDialog(onDismiss: () -> Unit, onConfirm: (CharArray) -> Unit) {
 /** The counts before anything is written (AC-011), then how it went. */
 @Composable
 private fun RestoreDialog(state: RestoreState, onApply: () -> Unit, onDismiss: () -> Unit) {
+    if (state is RestoreState.Done) {
+        Notice(stringResource(R.string.settings_restore_done_short, state.added, state.skipped), onDismiss)
+        return
+    }
     val (title, body) = when (state) {
         is RestoreState.Preview -> R.string.settings_restore_preview_title to
             stringResource(R.string.settings_restore_preview_body, state.records, state.matched, state.needsReview, state.missing)
-        is RestoreState.Done -> R.string.settings_restore_done to stringResource(R.string.settings_restore_done_body, state.added, state.skipped)
         is RestoreState.Failed -> R.string.settings_restore_failed to
             stringResource(if (state.unreadable) R.string.settings_restore_unreadable else R.string.settings_restore_rolled_back)
         else -> return
@@ -159,6 +157,16 @@ private fun RestoreDialog(state: RestoreState, onApply: () -> Unit, onDismiss: (
         },
         dismissButton = if (state is RestoreState.Preview) ({ TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_ai_cancel)) } }) else null,
     )
+}
+
+/** Says [text] in the settings' snackbar once, then clears what asked for it. */
+@Composable
+private fun Notice(text: String, onShown: () -> Unit) {
+    val show = LocalSettingsSnackbar.current
+    LaunchedEffect(text) {
+        show(text)
+        onShown()
+    }
 }
 
 /** The passphrase, typed twice; it is not kept anywhere, so losing it loses the backup. */

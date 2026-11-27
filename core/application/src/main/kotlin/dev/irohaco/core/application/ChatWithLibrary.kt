@@ -36,7 +36,7 @@ class ChatWithLibrary(
     }
 
     /** A request for photos ("去年の夏の花火の写真") is answered with what the search finds, with no model. */
-    suspend fun find(read: ReadQuery): Found = Found(read, lookUp(read))
+    suspend fun find(read: ReadQuery): Found = lookUpAt(read).let { (resolved, results) -> Found(resolved, results.hits) }
 
     suspend fun answer(question: String, read: ReadQuery, earlier: List<Turn>, onText: (AskPartial) -> Unit = {}): AskResult {
         val found = lookUp(read)
@@ -44,8 +44,21 @@ class ChatWithLibrary(
         return ask.ask(question, sources(found, earlier), AskLibrary.context(null, null, chat), onText)
     }
 
-    private suspend fun lookUp(read: ReadQuery): List<SearchHit> =
-        search(read.rest, kind = read.kind, filters = SearchFilters(read.fromMs, read.untilMs), onlyAtPlace = true).hits
+    private suspend fun lookUp(read: ReadQuery): List<SearchHit> = lookUpAt(read).second.hits
+
+    /**
+     * The search a reading asks for, and the reading with its place as the library names it. The place, the model's or
+     * one the words name, narrows the files to those taken there, and the words without it are looked for by meaning:
+     * "大阪の花火" finds fireworks among the photos of 大阪府. A place no photo was taken at stays among the words.
+     */
+    private suspend fun lookUpAt(read: ReadQuery): Pair<ReadQuery, SearchResults> {
+        val asked = read.place?.let { search.placeNamed(it) }
+        val place = asked ?: if (read.place == null) search.placeNamed(read.rest) else null
+        val text = if (read.place != null && asked == null) "${read.place} ${read.rest}".trim() else read.rest
+        val words = place?.let { SearchPlaces.without(text, it.trimEnd(*SearchPlaces.SUFFIXES)) }?.takeIf { it.isNotBlank() } ?: text
+        val resolved = read.copy(rest = words, place = place)
+        return resolved to search(words, kind = read.kind, filters = SearchFilters(read.fromMs, read.untilMs, place = place))
+    }
 
     internal companion object {
         /** Sources the last answer cited and still kept for a follow-up; the rest are the new search's. */
@@ -57,7 +70,7 @@ class ChatWithLibrary(
         /** The model's reading; only when it gave no words does the search fall back on the rules' words. */
         fun merge(rules: ReadQuery, plan: SearchPlan): ReadQuery {
             val words = plan.words.takeIf { it.isNotBlank() }
-            return ReadQuery(words ?: rules.rest, plan.fromMs, plan.untilMs, plan.kind, hasWords = words != null || rules.hasWords)
+            return ReadQuery(words ?: rules.rest, plan.fromMs, plan.untilMs, plan.kind, hasWords = words != null || rules.hasWords, place = plan.place)
         }
 
         /** The last search with the dates or kind [read] names put in its place; null unless [question] is only that. */

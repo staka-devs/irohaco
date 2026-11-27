@@ -1,5 +1,6 @@
 package dev.irohaco.core.application
 
+import dev.irohaco.core.domain.GeoBounds
 import dev.irohaco.core.contracts.EgressDeniedException
 import dev.irohaco.core.contracts.EmbeddingSpace
 import dev.irohaco.core.contracts.MediaAccessCheck
@@ -82,26 +83,42 @@ class SearchMedia(
         filters: SearchFilters = SearchFilters(),
         /** Places guessed from photos taken near in time count too (`include_inferred`); else only GPS (`confirmed_only`). */
         includeInferredPlaces: Boolean = true,
-        /** Only files at the place the query names, when it names one (#203). */
-        onlyAtPlace: Boolean = false,
     ): SearchResults {
-        val meant = if (byMeaning) meaningOrEmpty { if (compare) meaning.compare(query) else listOfNotNull(meaning(query, spaceId)) } else emptyList()
-        val texts = if (byText || byMemo) text(query).filter { if (it.fromMemo) byMemo else byText } else emptyList()
         val atPlaces = places?.invoke(query, includeInferredPlaces).orEmpty()
-        // shortcut: the place search keeps its first 200 files, so a place with more loses the rest; page it if that shows.
-        val atPlace = atPlaces.map { it.assetId }.toSet().takeIf { onlyAtPlace && it.isNotEmpty() }
+        // A place the query names is only offered: the user narrows to it, the query does not on its own.
+        val named = atPlaces.firstNotNullOfOrNull { SearchPlaces.mentionedName(query, it.placeName) }
+        val chosen = chosen(filters, includeInferredPlaces)
+        // Narrowed to a place, its name says nothing more about what is in the photo: "大阪 花火" looks for 花火.
+        val placeWord = filters.place?.let { place -> atPlaces.firstNotNullOfOrNull { SearchPlaces.mentionedPart(query, it.placeName) }?.takeIf { it in place } }
+        val asked = placeWord?.let { SearchPlaces.without(query, it).ifBlank { query } } ?: query
+        val meant = if (byMeaning) meaningOrEmpty { if (compare) meaning.compare(asked) else listOfNotNull(meaning(asked, spaceId)) } else emptyList()
+        val texts = if (byText || byMemo) text(query).filter { if (it.fromMemo) byMemo else byText } else emptyList()
         val results = fuse(meant.map { it.copy(hits = it.hits.filter { hit -> byMemo || !hit.fromMemo }) }, texts, kind, filters, meaningAsked = byMeaning, atPlaces)
         return results.copy(
-            hits = results.hits.filter { atPlace == null || it.item.assetId in atPlace },
-            place = atPlaces.firstOrNull()?.placeName?.substringBefore(",")?.trim(),
+            hits = results.hits.filter { chosen == null || it.item.assetId in chosen },
+            place = named.takeIf { filters.place == null && filters.area == null },
         )
+    }
+
+    /** The files at the place and inside the area the user chose; null when neither is chosen. */
+    private suspend fun chosen(filters: SearchFilters, includeInferred: Boolean): Set<String>? {
+        val at = filters.place?.let { places?.at(it, includeInferred) }
+        val inside = filters.area?.let { places?.within(it, includeInferred) }
+        return if (at != null && inside != null) at intersect inside else at ?: inside
     }
 
     /** Photos and video scenes like [assetId] (SRCH-001), under the same conditions as a search. */
     suspend fun similar(assetId: String, spaceId: String? = null, kind: MediaKind? = null, filters: SearchFilters = SearchFilters()): SearchResults {
         val meant = meaningOrEmpty { listOfNotNull(meaning.similar(assetId, spaceId)) }
-        return fuse(meant, emptyList(), kind, filters, meaningAsked = true)
+        val chosen = chosen(filters, includeInferred = true)
+        return fuse(meant, emptyList(), kind, filters, meaningAsked = true).let { results -> results.copy(hits = results.hits.filter { chosen == null || it.item.assetId in chosen }) }
     }
+
+    /** Every place with its number of files, for choosing one to narrow by. */
+    suspend fun placeCounts(includeInferred: Boolean): Map<String, Int> = places?.counts(includeInferred).orEmpty()
+
+    /** The place [text] names, as a part of a known place name; null when it names none. */
+    suspend fun placeNamed(text: String): String? = places?.named(text, includeInferred = true)
 
     private suspend fun fuse(
         meant: List<MeaningResult>,
@@ -178,6 +195,14 @@ class SearchMedia(
  * Conditions besides the query (SRCH-004): the capture time in [fromMs, untilMs) and tags, all of which a file must carry. A file
  * matches them by its capture time, or its modified time when it has none, as the timeline sorts it.
  */
-data class SearchFilters(val fromMs: Long? = null, val untilMs: Long? = null, val tagIds: Set<String> = emptySet()) {
+/** [place] is a place name or one of its parts the user chose ("徳島県"); only files there show. */
+data class SearchFilters(
+    val fromMs: Long? = null,
+    val untilMs: Long? = null,
+    val tagIds: Set<String> = emptySet(),
+    val place: String? = null,
+    /** Only files inside this part of the map. */
+    val area: GeoBounds? = null,
+) {
     fun admits(timeMs: Long) = (fromMs == null || timeMs >= fromMs) && (untilMs == null || timeMs < untilMs)
 }

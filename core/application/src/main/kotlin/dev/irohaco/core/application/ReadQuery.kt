@@ -11,7 +11,15 @@ import java.time.temporal.TemporalAdjusters
  * What a search sentence asks for besides its words: capture times in [fromMs, untilMs) and the kind (#203).
  * [hasWords] is false when the sentence names conditions only, and [rest] is then the sentence itself.
  */
-data class ReadQuery(val rest: String, val fromMs: Long? = null, val untilMs: Long? = null, val kind: MediaKind? = null, val hasWords: Boolean = true)
+/** [place] is a place the request names, apart from the words looked for by meaning; null when it names none. */
+data class ReadQuery(
+    val rest: String,
+    val fromMs: Long? = null,
+    val untilMs: Long? = null,
+    val kind: MediaKind? = null,
+    val hasWords: Boolean = true,
+    val place: String? = null,
+)
 
 /**
  * Reads the dates and the kind out of a search sentence by fixed rules, so it works with no model on the
