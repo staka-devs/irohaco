@@ -45,10 +45,13 @@ internal fun rememberCellReaders(): CellReaders {
     return readers
 }
 
-private fun AccessibilityManager.cellReaders(): CellReaders = when {
-    isTouchExplorationEnabled ||
-        getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_SPOKEN or AccessibilityServiceInfo.FEEDBACK_BRAILLE).isNotEmpty() ->
-        CellReaders.SCREEN_READER
-    isEnabled -> CellReaders.OTHER_SERVICES
-    else -> CellReaders.NONE
+// A test's UiAutomation turns accessibility on without being a service in the list: it reads the nodes as no service.
+private fun AccessibilityManager.cellReaders(): CellReaders {
+    val services = getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+    val readers = AccessibilityServiceInfo.FEEDBACK_SPOKEN or AccessibilityServiceInfo.FEEDBACK_BRAILLE
+    return when {
+        isTouchExplorationEnabled || services.any { it.feedbackType and readers != 0 } -> CellReaders.SCREEN_READER
+        services.isNotEmpty() -> CellReaders.OTHER_SERVICES
+        else -> CellReaders.NONE
+    }
 }
