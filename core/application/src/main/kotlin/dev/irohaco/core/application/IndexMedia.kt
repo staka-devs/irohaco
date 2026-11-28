@@ -88,6 +88,9 @@ class PlanMediaIndex(
     /** How many files and memos the current index lacks or has at an older revision; all of them before the first index. */
     suspend fun pendingCount(): Int = store.pendingCount(store.findSpace(ImageSpaces.signature(spec())).orEmpty())
 
+    /** Images left out of every index because no thumbnail can be made of them. */
+    suspend fun unreadableCount(): Int = store.unreadableCount()
+
     /**
      * What an index of [folders] would send when the picked model is remote, for the user to agree to
      * first (ARCHITECTURE §9.2); null for the local model, which sends nothing.

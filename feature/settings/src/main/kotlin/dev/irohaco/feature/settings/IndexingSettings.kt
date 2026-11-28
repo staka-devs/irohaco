@@ -84,6 +84,8 @@ internal fun IndexingSettings(
     onRetry: (String) -> Unit,
     /** Files and memos the index lacks or has at an older revision (IDX-005); null while counting. */
     pendingCount: Int? = null,
+    /** Images no index takes: empty files and vector images. */
+    unreadableCount: Int = 0,
     autoIndex: Boolean = false,
     onAutoIndex: (Boolean) -> Unit = {},
     chargingOnly: Boolean = false,
@@ -189,6 +191,13 @@ internal fun IndexingSettings(
                     if (pendingCount == 0) stringResource(R.string.settings_index_up_to_date)
                     else pluralStringResource(R.plurals.settings_index_pending, pendingCount, pendingCount),
                     style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            if (unreadableCount > 0) {
+                Text(
+                    pluralStringResource(R.plurals.settings_index_unreadable, unreadableCount, unreadableCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             var menu by remember { mutableStateOf(false) }

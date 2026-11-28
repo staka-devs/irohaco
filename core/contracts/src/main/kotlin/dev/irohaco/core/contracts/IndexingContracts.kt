@@ -152,6 +152,9 @@ interface MediaIndexStore {
      */
     suspend fun pendingCount(spaceId: String): Int
 
+    /** Available images no index takes: empty files and vector images, of which no thumbnail can be made. */
+    suspend fun unreadableCount(): Int = 0
+
     /** Stores a vector outside a job; one already stored for the space, target and revision is kept. */
     suspend fun putVector(spaceId: String, item: IndexItem, vectorId: String, vector: FloatArray, createdAt: Long)
 

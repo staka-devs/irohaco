@@ -114,6 +114,7 @@ fun SettingsScreen(
     val indexTarget by viewModel.indexTarget.collectAsStateWithLifecycle()
     val lowCoverageVideos by viewModel.lowCoverageVideos.collectAsStateWithLifecycle()
     val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
+    val unreadableCount by viewModel.unreadableCount.collectAsStateWithLifecycle()
     val autoIndex by viewModel.autoIndex.collectAsStateWithLifecycle()
     val chargingOnly by viewModel.chargingOnly.collectAsStateWithLifecycle()
     val needsRebuild by viewModel.needsRebuild.collectAsStateWithLifecycle()
@@ -151,6 +152,7 @@ fun SettingsScreen(
                 target = indexTarget,
                 lowCoverageVideos = lowCoverageVideos,
                 pendingCount = pendingCount,
+                unreadableCount = unreadableCount,
                 autoIndex = autoIndex,
                 onAutoIndex = viewModel::setAutoIndex,
                 chargingOnly = chargingOnly,

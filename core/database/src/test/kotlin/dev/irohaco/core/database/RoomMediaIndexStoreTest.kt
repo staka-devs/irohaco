@@ -53,6 +53,21 @@ class RoomMediaIndexStoreTest {
     }
 
     @Test
+    fun `empty files and vector images are left out of plans and counts, and counted apart`() = runTest {
+        setUp()
+        media("e", "IMAGE", "DCIM/Camera/", "AVAILABLE")
+        media("f", "IMAGE", "Download/", "AVAILABLE")
+        sql.execSQL("UPDATE media_sources SET file_size_bytes = 0 WHERE asset_id = 'e'")
+        sql.execSQL("UPDATE media_sources SET mime_type = 'image/svg+xml' WHERE asset_id = 'f'")
+        val space = store.ensureSpace("s1", spec, "sig")
+        assertEquals(setOf("asset:a", "asset:b"), store.plan(space, null, VideoQuality.BALANCED, 0).map { it.targetId }.toSet())
+        assertEquals(2, store.pendingCount(space))
+        assertEquals(2, store.unreadableCount())
+        // A job planned before keeps the target; its file is skipped rather than failed again.
+        assertNull(store.source("asset:e"))
+    }
+
+    @Test
     fun `the same signature gives the same space`() = runTest {
         setUp()
         val first = store.ensureSpace("s1", spec, "sig")

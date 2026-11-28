@@ -139,6 +139,9 @@
     <plurals name="settings_index_pending">
         <item quantity="other">未インデックスまたは変更あり: %1$d件</item>
     </plurals>
+    <plurals name="settings_index_unreadable">
+        <item quantity="other">空のファイルや SVG など、読み込めない画像 %1$d件は対象外です</item>
+    </plurals>
     <string name="settings_index_preparing">インデックスの対象を準備中</string>
     <string name="settings_index_start_failed">インデックスを開始できませんでした</string>
     <string name="settings_index_dismiss">閉じる</string>

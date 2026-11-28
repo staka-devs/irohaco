@@ -128,6 +128,11 @@ class SettingsViewModel(
         .map { planMediaIndex?.pendingCount() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** Images no index takes (empty files, vector images), so the user knows why they are not found. */
+    val unreadableCount: StateFlow<Int> = indexing.map { it?.progress?.state }.distinctUntilChanged()
+        .map { planMediaIndex?.unreadableCount() ?: 0 }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
     /** The model file changed: the old index is STALE and none of the new one exists yet (ADR-0003). */
     val needsRebuild: StateFlow<Boolean> = spaces
         .map { list -> list.any { it.state == SpaceState.STALE } && list.none { it.state in LIVE } }

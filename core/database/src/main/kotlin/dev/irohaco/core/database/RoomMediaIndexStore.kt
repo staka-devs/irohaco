@@ -18,6 +18,11 @@ internal const val REVISION =
     """(SELECT MIN(s.file_size_bytes || ':' || COALESCE(s.observed_modified_at, 0)) FROM media_sources s
         WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE')"""
 
+/** An available copy the platform can make a thumbnail of: not empty, and not a vector image. */
+private const val READABLE =
+    """EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE'
+               AND s.file_size_bytes > 0 AND COALESCE(s.mime_type, '') <> 'image/svg+xml')"""
+
 private const val IN_FOLDERS =
     """EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE'
                AND (:everywhere OR COALESCE(s.relative_path, '') IN (:folders)))"""
@@ -66,7 +71,7 @@ interface MediaIndexDao {
         """SELECT targetId, sourceRevisionDigest FROM (
              SELECT t.target_id AS targetId, $REVISION AS sourceRevisionDigest
              FROM embedding_targets t JOIN media_assets a ON a.asset_id = t.asset_id
-             WHERE a.media_kind = 'IMAGE' AND a.tombstoned_at IS NULL AND $IN_FOLDERS)
+             WHERE a.media_kind = 'IMAGE' AND a.tombstoned_at IS NULL AND $IN_FOLDERS AND $READABLE)
            WHERE NOT EXISTS (SELECT 1 FROM embedding_vectors v WHERE v.space_id = :spaceId
                              AND v.target_id = targetId AND v.source_revision_digest = sourceRevisionDigest)""",
     )
@@ -163,7 +168,7 @@ interface MediaIndexDao {
         """SELECT
              (SELECT COUNT(*) FROM media_assets a
               WHERE a.tombstoned_at IS NULL AND $REVISION IS NOT NULL
-                AND (a.media_kind = 'IMAGE' OR EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND s.observed_duration_ms > 0))
+                AND (a.media_kind = 'IMAGE' AND $READABLE OR EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND s.observed_duration_ms > 0))
                 AND NOT EXISTS (SELECT 1 FROM embedding_targets t JOIN embedding_vectors v ON v.target_id = t.target_id
                                 WHERE t.asset_id = a.asset_id AND v.space_id = :spaceId AND v.source_revision_digest = $REVISION)
                 AND NOT EXISTS (SELECT 1 FROM media_revisions r CROSS JOIN video_segments g ON g.revision_id = r.revision_id
@@ -176,6 +181,12 @@ interface MediaIndexDao {
                                 WHERE t.annotation_id = n.annotation_id AND v.space_id = :spaceId AND v.source_revision_digest = $MEMO_REVISION))""",
     )
     suspend fun pendingCount(spaceId: String): Int
+
+    @Query(
+        """SELECT COUNT(*) FROM media_assets a WHERE a.media_kind = 'IMAGE' AND a.tombstoned_at IS NULL
+             AND EXISTS (SELECT 1 FROM media_sources s WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE') AND NOT $READABLE""",
+    )
+    suspend fun unreadableCount(): Int
 
     @Query(
         """INSERT OR IGNORE INTO embedding_vectors(vector_id, space_id, target_id, source_revision_digest, vector_blob, created_at)
@@ -210,7 +221,7 @@ interface MediaIndexDao {
         """SELECT (SELECT MIN(s.content_uri) FROM media_sources s WHERE s.asset_id = a.asset_id AND +s.access_state = 'AVAILABLE') AS contentUri,
              $REVISION AS revisionDigest
            FROM embedding_targets t JOIN media_assets a ON a.asset_id = t.asset_id
-           WHERE t.target_id = :targetId AND a.tombstoned_at IS NULL""",
+           WHERE t.target_id = :targetId AND a.tombstoned_at IS NULL AND $READABLE""",
     )
     suspend fun imageSource(targetId: String): IndexSourceRow?
 
@@ -285,6 +296,8 @@ class RoomMediaIndexStore(private val db: IrohacoDatabase) : MediaIndexStore {
     override suspend fun memoItem(annotationId: String) = dao.memoItem(annotationId)
 
     override suspend fun pendingCount(spaceId: String) = dao.pendingCount(spaceId)
+
+    override suspend fun unreadableCount() = dao.unreadableCount()
 
     override suspend fun findSpace(signature: String) = dao.findSpace(signature)
 
